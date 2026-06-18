@@ -1,24 +1,41 @@
 import { useState, ChangeEvent } from "react";
-import { Title } from "../components/atoms/title";
-import { Card } from "../components/molecules/card";
-import { Input } from "../components/atoms/inputs";
-import Separator from "../components/atoms/separator";
+import { Plus, Search } from "lucide-react";
+import { toast } from "react-toastify";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 import { Pagination } from "../components/molecules/pagination";
+import { DocumentCard } from "../components/molecules/DocumentCard";
 import {
   useGetReceipts,
   useCreateReceipt,
 } from "../components/hooks/useReceipt";
 import { Loader } from "../components/atoms/loader";
-import { Button } from "../components/molecules/button";
-import { IoMdAddCircleOutline } from "react-icons/io";
 import { Drawer } from "../components/molecules/Drawer";
 import { useGetSales } from "../components/hooks/useSales";
 import { Sale } from "../models/salesModel";
-import { toast } from "react-toastify";
-import { Text } from "../components/atoms/text";
-import { ExportButtons } from "../components/molecules/ExportButtons";
 import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
+
+const selectClass =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring";
+
+const formatDate = (date: string | Date) =>
+  new Date(date).toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mapItems = (items: any[]) =>
+  (items || []).map((p) => ({
+    quantity: p.quantity,
+    name: p.product?.name || p.name,
+    price: p.price,
+    total: (p.quantity ?? 1) * (p.price ?? 0),
+  }));
 
 export const Comprobations = () => {
   const { receipts, loading, error } = useGetReceipts();
@@ -26,13 +43,11 @@ export const Comprobations = () => {
   const { createReceipt } = useCreateReceipt();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
-  const [filterDate, setFilterDate] = useState<string>("");
-  const [filterReceiptNumber, setFilterReceiptNumber] = useState<string>("");
-
+  const [filterDate, setFilterDate] = useState("");
+  const [filterReceiptNumber, setFilterReceiptNumber] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // Filtrado de remitos
   const filteredReceipts = receipts.filter((receipt) => {
     const receiptDate = new Date(receipt.createdAt).toLocaleDateString("en-CA");
     const matchesDate = filterDate ? receiptDate === filterDate : true;
@@ -44,26 +59,11 @@ export const Comprobations = () => {
     return matchesDate && matchesReceiptNumber;
   });
 
-  // Paginación
   const totalPages = Math.ceil(filteredReceipts.length / itemsPerPage);
   const paginatedReceipts = filteredReceipts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleDateFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setFilterDate(e.target.value);
-  };
-
-  const handleReceiptNumberFilterChange = (
-    e: ChangeEvent<HTMLInputElement>,
-  ) => {
-    setFilterReceiptNumber(e.target.value.toLowerCase());
-  };
 
   const handleCreateReceipt = async () => {
     if (selectedSaleId) {
@@ -79,198 +79,112 @@ export const Comprobations = () => {
     }
   };
 
-  // Obtener la venta seleccionada para mostrar el resumen
   const selectedSale = sales?.find(
     (sale) => (sale.id || sale._id) === selectedSaleId,
   );
 
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-    });
-  };
-
-  const handleExportPDF = (receipt: any) => {
-    const exportData = {
-      title: "Remito",
-      documentNumber: receipt.receiptNumber || receipt.id || "",
-      date: formatDate(receipt.createdAt),
-      customer: receipt.relatedDocument?.customer?.name || "",
-      items: (receipt.relatedDocument?.items || []).map((item: any) => ({
-        quantity: item.quantity,
-        name: item.name || "",
-        price: item.price,
-        total: item.quantity * item.price,
-      })),
-      total: receipt.relatedDocument?.totalAmount || 0,
-    };
-    exportToPDF(exportData);
-  };
-
-  const handleExportExcel = (receipt: any) => {
-    const exportData = {
-      title: "Remito",
-      documentNumber: receipt.receiptNumber || receipt.id || "",
-      date: formatDate(receipt.createdAt),
-      customer: receipt.relatedDocument?.customer?.name || "",
-      items: (receipt.relatedDocument?.items || []).map((item: any) => ({
-        quantity: item.quantity,
-        name: item.name || "",
-        price: item.price,
-        total: item.quantity * item.price,
-      })),
-      total: receipt.relatedDocument?.totalAmount || 0,
-    };
-    exportToExcel(exportData);
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const buildExport = (receipt: any) => ({
+    title: "Remito",
+    documentNumber: receipt.receiptNumber || receipt.id || "",
+    date: formatDate(receipt.createdAt),
+    customer: receipt.relatedDocument?.customer?.name || "",
+    items: mapItems(receipt.relatedDocument?.items || []),
+    total: receipt.relatedDocument?.totalAmount || 0,
+  });
 
   if (loading) {
     return (
-      <div className="flex-jc-ac h-100-vh">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <Loader />
       </div>
     );
   }
-
   if (error) {
-    return <div>Error al cargar remitos: {error.message}</div>;
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        Error al cargar remitos: {error.message}
+      </div>
+    );
   }
 
   return (
-    <div className="p-20">
-      <div className="flex-jc-sb">
-        <Title level={1} className="header text-xl mx-20">
-          Remitos de Entrega
-        </Title>
-        <Button
-          onClick={() => setIsOpen(true)}
-          iconLeft={
-            <IoMdAddCircleOutline style={{ marginRight: 5 }} size={24} />
-          }
-        >
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Remitos</h1>
+          <p className="text-sm text-muted-foreground">
+            {filteredReceipts.length} remito
+            {filteredReceipts.length === 1 ? "" : "s"} de entrega
+          </p>
+        </div>
+        <Button onClick={() => setIsOpen(true)}>
+          <Plus className="h-4 w-4" />
           Agregar remito
         </Button>
       </div>
-      <Separator orientation="horizontal" color="#ccc" thickness="1px" />
 
-      {/* Filtros */}
-      <div className="flex gap-10 mx-20">
-        <div>
-          <label>Filtrar por Fecha: </label>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="space-y-2">
+          <Label htmlFor="r-date">Filtrar por fecha</Label>
           <Input
+            id="r-date"
             type="date"
+            className="w-auto"
             value={filterDate}
-            onChange={handleDateFilterChange}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setFilterDate(e.target.value)
+            }
           />
         </div>
-        <div>
-          <label>Filtrar por N° Remito: </label>
-          <Input
-            type="text"
-            placeholder="Buscar por número"
-            value={filterReceiptNumber}
-            onChange={handleReceiptNumberFilterChange}
-          />
+        <div className="space-y-2">
+          <Label htmlFor="r-number">Filtrar por N° remito</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="r-number"
+              className="pl-9 sm:w-56"
+              placeholder="Buscar por número"
+              value={filterReceiptNumber}
+              onChange={(e) =>
+                setFilterReceiptNumber(e.target.value.toLowerCase())
+              }
+            />
+          </div>
         </div>
       </div>
 
-      {/* Mostrar remitos filtrados y paginados */}
-      {paginatedReceipts.map((receipt) => {
-        const receiptId = receipt.id || receipt._id || "";
-        const sale = receipt.sale;
-
-        return (
-          <Card key={receiptId}>
-            <div className="flex-jc-sb">
-              <div>
-                <Title level={4} className="text-bold">
-                  Remito N°: {receipt.receiptNumber}
-                </Title>
-                <Text type="p" className="text-bold">
-                  Fecha:{" "}
-                  {new Date(receipt.createdAt).toLocaleDateString("es-ES")}
-                </Text>
-              </div>
-              <div>
-                <ExportButtons
-                  onExportPDF={() => handleExportPDF(receipt)}
-                  onExportExcel={() => handleExportExcel(receipt)}
-                />
-              </div>
-            </div>
-            <Separator orientation="horizontal" color="#ddd" thickness="1px" />
-
-            {sale && (
-              <>
-                <div style={{ margin: "16px 0" }}>
-                  <Text type="p">
-                    Cliente: {sale.customer?.name || "Sin cliente"}
-                  </Text>
-                </div>
-
-                <table className="budget-table">
-                  <thead>
-                    <tr>
-                      <th>Cantidad</th>
-                      <th>Descripción de Producto</th>
-                      <th>Precio Unitario</th>
-                      <th>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(sale.items || sale.products || []).map((product) => {
-                      const productId =
-                        product.product?.id || product.product?._id || "";
-                      const itemTotal = product.quantity * product.price;
-                      return (
-                        <tr key={productId}>
-                          <td style={{ textAlign: "center" }}>
-                            {product.quantity}
-                          </td>
-                          <td>{product.product?.name}</td>
-                          <td style={{ textAlign: "right" }}>
-                            ${product.price.toFixed(2)}
-                          </td>
-                          <td style={{ textAlign: "right" }}>
-                            ${itemTotal.toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="budget-total-row">
-                      <td
-                        colSpan={3}
-                        style={{ textAlign: "right", fontWeight: "bold" }}
-                      >
-                        Total:
-                      </td>
-                      <td
-                        style={{
-                          textAlign: "right",
-                          fontWeight: "bold",
-                          fontSize: "20px",
-                          color: "var(--primary-color)",
-                        }}
-                      >
-                        ${sale.totalAmount.toFixed(2)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </>
-            )}
-          </Card>
-        );
-      })}
+      {paginatedReceipts.length === 0 ? (
+        <Card className="p-12 text-center text-muted-foreground">
+          No hay remitos para mostrar.
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {paginatedReceipts.map((receipt) => {
+            const receiptId = receipt.id || receipt._id || "";
+            const sale = receipt.sale;
+            return (
+              <DocumentCard
+                key={receiptId}
+                label="Remito"
+                title={`N° ${receipt.receiptNumber}`}
+                subtitle={`Fecha: ${formatDate(receipt.createdAt)}${
+                  sale?.customer?.name ? ` · Cliente: ${sale.customer.name}` : ""
+                }`}
+                items={mapItems(sale?.items || sale?.products || [])}
+                total={sale?.totalAmount || 0}
+                onExportPDF={() => exportToPDF(buildExport(receipt))}
+                onExportExcel={() => exportToExcel(buildExport(receipt))}
+              />
+            );
+          })}
+        </div>
+      )}
 
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
-        onPageChange={handlePageChange}
+        onPageChange={setCurrentPage}
       />
 
       <Drawer
@@ -279,113 +193,44 @@ export const Comprobations = () => {
         title="Crear Remito"
         width="700px"
       >
-        <div className="p-20">
-          <label
-            htmlFor="sale-select"
-            style={{ display: "block", marginBottom: "10px" }}
-          >
-            Seleccionar Venta
-          </label>
-          <select
-            id="sale-select"
-            value={selectedSaleId || ""}
-            onChange={(e) => setSelectedSaleId(e.target.value)}
-            className="select-element"
-            style={{ width: "100%", marginBottom: "20px" }}
-          >
-            <option value="" disabled>
-              Seleccionar venta
-            </option>
-            {sales &&
-              sales.map((sale: Sale) => {
+        <div className="space-y-4 p-6">
+          <div className="space-y-2">
+            <Label htmlFor="sale-select">Seleccionar venta</Label>
+            <select
+              id="sale-select"
+              value={selectedSaleId || ""}
+              onChange={(e) => setSelectedSaleId(e.target.value)}
+              className={selectClass}
+            >
+              <option value="" disabled>
+                Seleccionar venta
+              </option>
+              {sales?.map((sale: Sale) => {
                 const saleId = sale.id || sale._id || "";
                 return (
                   <option key={saleId} value={saleId}>
-                    Venta {new Date(sale.saleDate).toLocaleDateString("es-ES")}{" "}
-                    - ${sale.totalAmount}
+                    Venta {formatDate(sale.saleDate)} - ${sale.totalAmount}
                   </option>
                 );
               })}
-          </select>
+            </select>
+          </div>
 
-          {/* Resumen de la venta seleccionada */}
           {selectedSale && (
-            <div style={{ marginBottom: "20px" }}>
-              <Title level={3}>Resumen del Remito</Title>
-              <Separator
-                orientation="horizontal"
-                color="#ddd"
-                thickness="1px"
-              />
-              <div style={{ margin: "16px 0" }}>
-                <Text type="p" className="text-bold">
-                  Fecha de Venta:{" "}
-                  {new Date(selectedSale.saleDate).toLocaleDateString("es-ES")}
-                </Text>
-              </div>
-
-              <table className="budget-table">
-                <thead>
-                  <tr>
-                    <th>Cantidad</th>
-                    <th>Descripción</th>
-                    <th>Precio Unit.</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selectedSale.items || selectedSale.products || []).map(
-                    (item) => {
-                      const productId = item.id || item._id || "";
-                      const itemTotal =
-                        (item.quantity || 1) * (item.price || 0);
-                      return (
-                        <tr key={productId}>
-                          <td style={{ textAlign: "center" }}>
-                            {item.quantity || 1}
-                          </td>
-                          <td>{item.name}</td>
-                          <td style={{ textAlign: "right" }}>
-                            ${(item.price || 0).toFixed(2)}
-                          </td>
-                          <td style={{ textAlign: "right" }}>
-                            ${itemTotal.toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    },
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr className="budget-total-row">
-                    <td
-                      colSpan={3}
-                      style={{ textAlign: "right", fontWeight: "bold" }}
-                    >
-                      Total:
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "right",
-                        fontWeight: "bold",
-                        fontSize: "20px",
-                        color: "var(--primary-color)",
-                      }}
-                    >
-                      ${selectedSale.totalAmount.toFixed(2)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <DocumentCard
+              label="Resumen del remito"
+              title={`Venta del ${formatDate(selectedSale.saleDate)}`}
+              items={mapItems(selectedSale.items || selectedSale.products || [])}
+              total={selectedSale.totalAmount}
+            />
           )}
 
           <Button
+            className="w-full"
             onClick={handleCreateReceipt}
             disabled={!selectedSaleId}
-            style={{ width: "100%" }}
           >
-            Crear Remito
+            Crear remito
           </Button>
         </div>
       </Drawer>

@@ -1,40 +1,65 @@
 import React, { useState, ChangeEvent } from "react";
+import { Plus, Search } from "lucide-react";
+import { toast } from "react-toastify";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { useCreateOrder, useOrders } from "../components/hooks/useOrder";
 import { useGetBudgetByID, useGetBudgets } from "../components/hooks/useBudget";
 import { Order } from "../models/orderModel";
-import { Title } from "../components/atoms/title";
-import Separator from "../components/atoms/separator";
-import { Card } from "../components/molecules/card";
-import { Text } from "../components/atoms/text";
-import { Button } from "../components/molecules/button";
-import { IoMdAddCircleOutline } from "react-icons/io";
 import { Drawer } from "../components/molecules/Drawer";
 import { Budget } from "../models/budgetModel";
-import { toast } from "react-toastify";
 import { Pagination } from "../components/molecules/pagination";
-import { Input } from "../components/atoms/inputs";
+import { DocumentCard } from "../components/molecules/DocumentCard";
 import { Loader } from "../components/atoms/loader";
-import { ExportButtons } from "../components/molecules/ExportButtons";
 import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
+
+const selectClass =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring";
+
+const formatDate = (date: string) =>
+  new Date(date).toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+
+const statusBadge = (status?: string) => {
+  const map: Record<string, string> = {
+    PENDING: "border-amber-300 bg-amber-50 text-amber-700",
+    COMPLETED: "border-emerald-300 bg-emerald-50 text-emerald-700",
+    CANCELLED: "border-destructive/30 bg-destructive/10 text-destructive",
+  };
+  const labels: Record<string, string> = {
+    PENDING: "Pendiente",
+    COMPLETED: "Completado",
+    CANCELLED: "Cancelado",
+  };
+  if (!status) return null;
+  return (
+    <Badge variant="outline" className={cn("font-medium", map[status])}>
+      {labels[status] ?? status}
+    </Badge>
+  );
+};
 
 export const Orders: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
   const { orders, loading, error } = useOrders();
-  const { budgets } = useGetBudgets(); // Obtener todos los presupuestos
+  const { budgets } = useGetBudgets();
   const { submitOrder: createOrder } = useCreateOrder();
 
-  // Filtros
-  const [filterDate, setFilterDate] = useState<string>("");
-  const [filterCustomerName, setFilterCustomerName] = useState<string>("");
-  const [filterReceipt, setFilterReceipt] = useState<string>("");
-
-  // Paginación
+  const [filterDate, setFilterDate] = useState("");
+  const [filterCustomerName, setFilterCustomerName] = useState("");
+  const [filterReceipt, setFilterReceipt] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // Manejo de filtros
   const filteredOrders = orders.filter((order) => {
     const orderDate = new Date(order.createdAt).toLocaleDateString("en-CA");
     const matchesDate = filterDate ? orderDate === filterDate : true;
@@ -42,14 +67,12 @@ export const Orders: React.FC = () => {
       ? order.customer &&
         order.customer.name.toLowerCase().includes(filterCustomerName)
       : true;
-    // const matchtsBudget = order.receipt ? budgets?.some(budget => budget.receipt === order.receipt) : true;
     const matchesReceipt = filterReceipt
       ? order.receipt?.toLowerCase().includes(filterReceipt.toLowerCase())
       : true;
     return matchesDate && matchesCustomer && matchesReceipt;
   });
 
-  // Paginación
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   const paginatedOrders = filteredOrders.slice(
     (currentPage - 1) * itemsPerPage,
@@ -77,93 +100,98 @@ export const Orders: React.FC = () => {
     }
   };
 
-  const handleDateFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setFilterDate(e.target.value);
-  };
-
-  const handleCustomerNameFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setFilterCustomerName(e.target.value.toLowerCase());
-  };
-  const handleBudgetFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setFilterReceipt(e.target.value.toLowerCase());
-  };
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  // Obtener el presupuesto seleccionado para mostrar el resumen
   const selectedBudget = budgets?.find(
     (budget) => (budget.id || budget._id) === selectedBudgetId,
   );
 
   if (loading) {
     return (
-      <div className="flex-jc-ac h-100-vh">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <Loader />
       </div>
     );
   }
-  if (error) return <div>Error: {error.message}</div>;
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        Error: {error.message}
+      </div>
+    );
+  }
 
   return (
-    <div className="p-20">
-      <div className="flex-jc-sb">
-        <Title level={1} className="header text-xl mx-20">
-          Pedidos
-        </Title>
-        <Button
-          onClick={() => setIsOpen(true)}
-          iconLeft={
-            <IoMdAddCircleOutline style={{ marginRight: 5 }} size={24} />
-          }
-        >
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Pedidos</h1>
+          <p className="text-sm text-muted-foreground">
+            {filteredOrders.length} pedido
+            {filteredOrders.length === 1 ? "" : "s"}
+          </p>
+        </div>
+        <Button onClick={() => setIsOpen(true)}>
+          <Plus className="h-4 w-4" />
           Agregar pedido
         </Button>
       </div>
 
-      <Separator orientation="horizontal" color="#ccc" thickness="1px" />
-
-      {/* Filtros */}
-      <div className="flex gap-10 mx-20">
-        <div>
-          <label>Filtrar por Fecha: </label>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="space-y-2">
+          <Label htmlFor="o-date">Filtrar por fecha</Label>
           <Input
+            id="o-date"
             type="date"
+            className="w-auto"
             value={filterDate}
-            onChange={handleDateFilterChange}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setFilterDate(e.target.value)
+            }
           />
         </div>
-        <div>
-          <label>Filtrar por Cliente: </label>
-          <Input
-            type="text"
-            placeholder="Buscar por cliente"
-            value={filterCustomerName}
-            onChange={handleCustomerNameFilterChange}
-          />
+        <div className="space-y-2">
+          <Label htmlFor="o-customer">Filtrar por cliente</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="o-customer"
+              className="pl-9 sm:w-56"
+              placeholder="Buscar por cliente"
+              value={filterCustomerName}
+              onChange={(e) =>
+                setFilterCustomerName(e.target.value.toLowerCase())
+              }
+            />
+          </div>
         </div>
-        <div>
-          <label>Filtrar por Presupuesto: </label>
+        <div className="space-y-2">
+          <Label htmlFor="o-receipt">Filtrar por N° presupuesto</Label>
           <Input
-            type="text"
-            placeholder="Buscar por cliente"
+            id="o-receipt"
+            className="sm:w-48"
+            placeholder="N° presupuesto"
             value={filterReceipt}
-            onChange={handleBudgetFilterChange}
+            onChange={(e) => setFilterReceipt(e.target.value.toLowerCase())}
           />
         </div>
       </div>
 
-      {/* Mostrar pedidos filtrados y paginados */}
-      {paginatedOrders.map((order) => {
-        const orderId = order.id || order._id || "";
-        return <OrderDetail key={orderId} order={order} />;
-      })}
+      {paginatedOrders.length === 0 ? (
+        <Card className="p-12 text-center text-muted-foreground">
+          No hay pedidos para mostrar.
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {paginatedOrders.map((order) => {
+            const orderId = order.id || order._id || "";
+            return <OrderDetail key={orderId} order={order} />;
+          })}
+        </div>
+      )}
 
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
-        onPageChange={handlePageChange}
+        onPageChange={setCurrentPage}
       />
 
       <Drawer
@@ -172,25 +200,19 @@ export const Orders: React.FC = () => {
         title="Crear Pedido"
         width="700px"
       >
-        <div className="p-20">
-          <label
-            htmlFor="budget-select"
-            style={{ display: "block", marginBottom: "10px" }}
-          >
-            Seleccionar Presupuesto
-          </label>
-          <select
-            id="budget-select"
-            value={selectedBudgetId || ""}
-            onChange={(e) => setSelectedBudgetId(e.target.value)}
-            className="select-element"
-            style={{ width: "100%", marginBottom: "20px" }}
-          >
-            <option value="" disabled>
-              Seleccionar presupuesto
-            </option>
-            {budgets &&
-              budgets.map((budget: Budget) => {
+        <div className="space-y-4 p-6">
+          <div className="space-y-2">
+            <Label htmlFor="budget-select">Seleccionar presupuesto</Label>
+            <select
+              id="budget-select"
+              value={selectedBudgetId || ""}
+              onChange={(e) => setSelectedBudgetId(e.target.value)}
+              className={selectClass}
+            >
+              <option value="" disabled>
+                Seleccionar presupuesto
+              </option>
+              {budgets?.map((budget: Budget) => {
                 const budgetId = budget.id || budget._id || "";
                 return (
                   <option key={budgetId} value={budgetId}>
@@ -198,88 +220,32 @@ export const Orders: React.FC = () => {
                   </option>
                 );
               })}
-          </select>
+            </select>
+          </div>
 
-          {/* Resumen del presupuesto seleccionado */}
           {selectedBudget && (
-            <div style={{ marginBottom: "20px" }}>
-              <Title level={3}>Resumen del Pedido</Title>
-              <Separator
-                orientation="horizontal"
-                color="#ddd"
-                thickness="1px"
-              />
-              <div style={{ margin: "16px 0" }}>
-                <Text type="p" className="text-bold">
-                  Cliente: {selectedBudget.customer.name}
-                </Text>
-                <p style={{ fontSize: "14px", color: "var(--text-secondary)" }}>
-                  Presupuesto N°: {selectedBudget.receipt}
-                </p>
-              </div>
-
-              <table className="budget-table">
-                <thead>
-                  <tr>
-                    <th>Cantidad</th>
-                    <th>Descripción</th>
-                    <th>Precio Unit.</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selectedBudget.items || selectedBudget.products)?.map(
-                    (item) => {
-                      const productId =
-                        item.product.id || item.product._id || "";
-                      const itemTotal = item.quantity * item.price;
-                      return (
-                        <tr key={productId}>
-                          <td style={{ textAlign: "center" }}>
-                            {item.quantity}
-                          </td>
-                          <td>{item.product.name}</td>
-                          <td style={{ textAlign: "right" }}>
-                            ${item.price.toFixed(2)}
-                          </td>
-                          <td style={{ textAlign: "right" }}>
-                            ${itemTotal.toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    },
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr className="budget-total-row">
-                    <td
-                      colSpan={3}
-                      style={{ textAlign: "right", fontWeight: "bold" }}
-                    >
-                      Total:
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "right",
-                        fontWeight: "bold",
-                        fontSize: "20px",
-                        color: "var(--primary-color)",
-                      }}
-                    >
-                      ${selectedBudget.totalAmount.toFixed(2)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <DocumentCard
+              label="Resumen del pedido"
+              title={`Cliente: ${selectedBudget.customer.name}`}
+              subtitle={`Presupuesto N° ${selectedBudget.receipt}`}
+              items={(selectedBudget.items || selectedBudget.products || []).map(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (item: any) => ({
+                  quantity: item.quantity,
+                  name: item.product?.name,
+                  price: item.price,
+                }),
+              )}
+              total={selectedBudget.totalAmount}
+            />
           )}
 
           <Button
+            className="w-full"
             onClick={handleCreateOrder}
             disabled={!selectedBudgetId}
-            style={{ width: "100%" }}
           >
-            Crear Pedido
+            Crear pedido
           </Button>
         </div>
       </Drawer>
@@ -292,135 +258,51 @@ interface OrderDetailProps {
 }
 
 const OrderDetail: React.FC<OrderDetailProps> = ({ order }) => {
-  const {
-    data: budget,
-    isLoading,
-    error,
-  } = useGetBudgetByID(order.quotation || "");
+  const { data: budget, isLoading } = useGetBudgetByID(order.quotation || "");
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-    });
-  };
-
-  const handleExportPDF = (order: any) => {
-    const exportData = {
-      title: "Pedido",
-      documentNumber: order.receipt || order.id || "",
-      date: formatDate(order.createdAt),
-      customer: order.customer?.name || "",
-      items: (order.items || order.products || []).map((item: any) => ({
-        quantity: item.quantity,
-        name: item.product?.name || item.name || "",
-        price: item.price,
-        total: item.quantity * item.price,
-      })),
-      total: order.totalAmount || 0,
-    };
-    exportToPDF(exportData);
-  };
-
-  const handleExportExcel = (order: any) => {
-    const exportData = {
-      title: "Pedido",
-      documentNumber: order.receipt || order.id || "",
-      date: formatDate(order.createdAt),
-      customer: order.customer?.name || "",
-      items: (order.items || order.products || []).map((item: any) => ({
-        quantity: item.quantity,
-        name: item.product?.name || item.name || "",
-        price: item.price,
-        total: item.quantity * item.price,
-      })),
-      total: order.totalAmount || 0,
-    };
-    exportToExcel(exportData);
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const buildExport = (o: any) => ({
+    title: "Pedido",
+    documentNumber: o.receipt || o.id || "",
+    date: formatDate(o.createdAt),
+    customer: o.customer?.name || "",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items: (o.items || o.products || []).map((item: any) => ({
+      quantity: item.quantity,
+      name: item.product?.name || item.name || "",
+      price: item.price,
+      total: item.quantity * item.price,
+    })),
+    total: o.totalAmount || 0,
+  });
 
   if (isLoading) {
     return (
-      <div className="flex-jc-ac h-100-vh">
+      <Card className="flex h-24 items-center justify-center">
         <Loader />
-      </div>
+      </Card>
     );
   }
-  if (error) return <div>Error fetching budget: {error.message}</div>;
 
   return (
-    <div>
-      <Card key={order.id || order._id}>
-        <div className="flex-jc-sb">
-          <div>
-            <Title level={4} className="text-bold">
-              N° Pedido: {order.receipt}
-            </Title>
-            <Text type="p" className="text-bold">
-              Cliente: {budget?.customer.name || "Desconocido"}
-            </Text>
-          </div>
-          <div>
-            <p>Creado: {formatDate(order.createdAt)}</p>
-          </div>
-          <div>
-            <ExportButtons
-              onExportPDF={() => handleExportPDF(order)}
-              onExportExcel={() => handleExportExcel(order)}
-            />
-          </div>
-        </div>
-        <Separator orientation="horizontal" color="#ddd" thickness="1px" />
-        <table className="budget-table">
-          <thead>
-            <tr>
-              <th>Cantidad</th>
-              <th>Descripción de Producto</th>
-              <th>Precio Unitario</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(order.items || order.products)?.map((item) => {
-              const productId = item.product?.id || item.product?._id || "";
-              const itemTotal = item.quantity * item.price;
-              return (
-                <tr key={productId}>
-                  <td style={{ textAlign: "center" }}>{item.quantity}</td>
-                  <td>{item.product?.name}</td>
-                  <td style={{ textAlign: "right" }}>
-                    ${item.price.toFixed(2)}
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    ${itemTotal.toFixed(2)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="budget-total-row">
-              <td
-                colSpan={3}
-                style={{ textAlign: "right", fontWeight: "bold" }}
-              >
-                Total:
-              </td>
-              <td
-                style={{
-                  textAlign: "right",
-                  fontWeight: "bold",
-                  fontSize: "20px",
-                  color: "var(--primary-color)",
-                }}
-              >
-                ${order.totalAmount.toFixed(2)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </Card>
-    </div>
+    <DocumentCard
+      label="Pedido"
+      title={`N° ${order.receipt}`}
+      subtitle={`Cliente: ${budget?.customer.name || "Desconocido"} · Creado ${formatDate(
+        order.createdAt,
+      )}`}
+      badge={statusBadge(order.status)}
+      items={(order.items || order.products || []).map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (item: any) => ({
+          quantity: item.quantity,
+          name: item.product?.name || item.name,
+          price: item.price,
+        }),
+      )}
+      total={order.totalAmount}
+      onExportPDF={() => exportToPDF(buildExport(order))}
+      onExportExcel={() => exportToExcel(buildExport(order))}
+    />
   );
 };

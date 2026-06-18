@@ -1,98 +1,56 @@
-import { IoMdAddCircleOutline } from "react-icons/io";
-import Separator from "../components/atoms/separator";
-import { Text } from "../components/atoms/text";
-import { Title } from "../components/atoms/title";
-import { useGetBudgets, useCreateBudget } from "../components/hooks/useBudget";
-import { Button } from "../components/molecules/button";
-import { Card } from "../components/molecules/card";
-import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { useState, ChangeEvent } from "react";
+import { Plus, Search } from "lucide-react";
+import { toast } from "react-toastify";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { useGetBudgets, useCreateBudget } from "../components/hooks/useBudget";
+import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { usePorducts } from "../components/hooks/useProducts";
 import { useCustomers } from "../components/hooks/useCustomer";
 import { Pagination } from "../components/molecules/pagination";
-import { Input } from "../components/atoms/inputs";
+import { DocumentCard } from "../components/molecules/DocumentCard";
 import { Loader } from "../components/atoms/loader";
 import { CartItem } from "../models/salesModel";
-import { toast } from "react-toastify";
-import { ExportButtons } from "../components/molecules/ExportButtons";
 import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
+
+const formatDate = (date: string) =>
+  new Date(date).toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
 
 export const Quotations = () => {
   const { budgets, error, loading } = useGetBudgets();
   const [isOpen, setIsOpen] = useState(false);
   const { submitBudget } = useCreateBudget();
-
   const { customers } = useCustomers();
   const { products, getProducts } = usePorducts();
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
-
-  const [filterDate, setFilterDate] = useState<string>("");
-  const [filterCustomerName, setFilterCustomerName] = useState<string>("");
-
-  if (loading) {
-    return (
-      <div className="flex-jc-ac h-100-vh">
-        <Loader />
-      </div>
-    );
-  }
-  if (error) {
-    return <div>Error: {error.message}</div>;
-  }
-
-  // Filtrado de presupuestos
-  const filteredBudgets = budgets.filter((budget) => {
-    const budgetDate = new Date(budget.createdAt).toLocaleDateString("en-CA"); // formato 'YYYY-MM-DD'
-    const matchesDate = filterDate ? budgetDate === filterDate : true;
-    const matchesCustomer = filterCustomerName
-      ? budget.customer.name
-          .toLowerCase()
-          .includes(filterCustomerName.toLowerCase())
-      : true;
-    return matchesDate && matchesCustomer;
-  });
-
-  // Paginación
-  const totalPages = Math.ceil(filteredBudgets.length / itemsPerPage);
-  const paginatedBudgets = filteredBudgets.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  );
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleDateFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setFilterDate(e.target.value);
-  };
-
-  const handleCustomerNameFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setFilterCustomerName(e.target.value);
-  };
+  const [filterDate, setFilterDate] = useState("");
+  const [filterCustomerName, setFilterCustomerName] = useState("");
 
   const handleConfirmBudget = async (cart: CartItem[], customerId?: string) => {
     if (!customerId) {
       toast.error("Debe seleccionar un cliente");
       return;
     }
-
     const productsData = cart.map((item) => ({
       product: item.product._id || item.product.id || "",
       quantity: item.quantity,
       price: item.totalPrice / item.quantity,
     }));
-
     const budgetData = {
       customer: customerId,
       products: productsData,
       totalAmount: cart.reduce((total, item) => total + item.totalPrice, 0),
       validUntil: "2024-12-31",
     };
-
     try {
       await submitBudget(budgetData);
       toast.success("Presupuesto creado con éxito");
@@ -103,169 +61,137 @@ export const Quotations = () => {
     }
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-    });
-  };
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        Error: {error.message}
+      </div>
+    );
+  }
 
-  const handleExportPDF = (budget: any) => {
-    const exportData = {
-      title: "Presupuesto",
-      documentNumber: budget.receipt,
-      date: formatDate(budget.createdAt),
-      customer: budget.customer.name,
-      items: (budget.items || budget.products).map((item: any) => ({
-        quantity: item.quantity,
-        name: item.product.name,
-        price: item.price,
-        total: item.quantity * item.price,
-      })),
-      total: budget.totalAmount,
-    };
-    exportToPDF(exportData);
-  };
+  const filteredBudgets = budgets.filter((budget) => {
+    const budgetDate = new Date(budget.createdAt).toLocaleDateString("en-CA");
+    const matchesDate = filterDate ? budgetDate === filterDate : true;
+    const matchesCustomer = filterCustomerName
+      ? budget.customer.name
+          .toLowerCase()
+          .includes(filterCustomerName.toLowerCase())
+      : true;
+    return matchesDate && matchesCustomer;
+  });
 
-  const handleExportExcel = (budget: any) => {
-    const exportData = {
-      title: "Presupuesto",
-      documentNumber: budget.receipt,
-      date: formatDate(budget.createdAt),
-      customer: budget.customer.name,
-      items: (budget.items || budget.products).map((item: any) => ({
-        quantity: item.quantity,
-        name: item.product.name,
-        price: item.price,
-        total: item.quantity * item.price,
-      })),
-      total: budget.totalAmount,
-    };
-    exportToExcel(exportData);
-  };
+  const totalPages = Math.ceil(filteredBudgets.length / itemsPerPage);
+  const paginatedBudgets = filteredBudgets.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const buildExport = (budget: any) => ({
+    title: "Presupuesto",
+    documentNumber: budget.receipt,
+    date: formatDate(budget.createdAt),
+    customer: budget.customer.name,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items: (budget.items || budget.products).map((item: any) => ({
+      quantity: item.quantity,
+      name: item.product.name,
+      price: item.price,
+      total: item.quantity * item.price,
+    })),
+    total: budget.totalAmount,
+  });
 
   return (
-    <div className="p-20">
-      <div className="flex-jc-sb">
-        <Title level={1} className="header text-xl mx-20">
-          Presupuestos
-        </Title>
-        <Button
-          onClick={() => setIsOpen(true)}
-          iconLeft={
-            <IoMdAddCircleOutline style={{ marginRight: 5 }} size={24} />
-          }
-        >
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Presupuestos
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {filteredBudgets.length} presupuesto
+            {filteredBudgets.length === 1 ? "" : "s"}
+          </p>
+        </div>
+        <Button onClick={() => setIsOpen(true)}>
+          <Plus className="h-4 w-4" />
           Agregar presupuesto
         </Button>
       </div>
-      <Separator orientation="horizontal" color="#ccc" thickness="1px" />
-      <br />
 
-      {/* Filtros */}
-      <div className="flex gap-10 mx-20">
-        <div>
-          <label>Filtrar por Fecha: </label>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="space-y-2">
+          <Label htmlFor="q-date">Filtrar por fecha</Label>
           <Input
+            id="q-date"
             type="date"
+            className="w-auto"
             value={filterDate}
-            onChange={handleDateFilterChange}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setFilterDate(e.target.value)
+            }
           />
         </div>
-        <div>
-          <label>Filtrar por Cliente: </label>
-          <Input
-            type="text"
-            placeholder="Buscar por cliente"
-            value={filterCustomerName}
-            onChange={handleCustomerNameFilterChange}
-          />
+        <div className="space-y-2">
+          <Label htmlFor="q-customer">Filtrar por cliente</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="q-customer"
+              className="pl-9 sm:w-72"
+              placeholder="Buscar por cliente"
+              value={filterCustomerName}
+              onChange={(e) => setFilterCustomerName(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Mostrar presupuestos filtrados y paginados */}
-      {paginatedBudgets.map((budget) => {
-        const budgetId = budget.id || budget._id || "";
-        return (
-          <Card key={budgetId}>
-            <div className="flex-jc-sb">
-              <div>
-                <Title level={4} className="text-bold">
-                  N° presupuesto: {budget.receipt}
-                </Title>
-                <Text type="p" className="text-bold">
-                  Cliente: {budget.customer.name}
-                </Text>
-              </div>
-              <div>
-                <p>Válido hasta: {formatDate(budget.validUntil)}</p>
-                <p>Creado: {formatDate(budget.createdAt)}</p>
-              </div>
-              <div>
-                <ExportButtons
-                  onExportPDF={() => handleExportPDF(budget)}
-                  onExportExcel={() => handleExportExcel(budget)}
-                />
-              </div>
-            </div>
-            <Separator orientation="horizontal" color="#ddd" thickness="1px" />
-            <table className="budget-table">
-              <thead>
-                <tr>
-                  <th>Cantidad</th>
-                  <th>Descripción de Producto</th>
-                  <th>Precio Unitario</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(budget.items || budget.products)?.map((item) => {
-                  const productId = item.product.id || item.product._id || "";
-                  const itemTotal = item.quantity * item.price;
-                  return (
-                    <tr key={productId}>
-                      <td style={{ textAlign: "center" }}>{item.quantity}</td>
-                      <td>{item.product.name}</td>
-                      <td style={{ textAlign: "right" }}>
-                        ${item.price.toFixed(2)}
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        ${itemTotal.toFixed(2)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="budget-total-row">
-                  <td
-                    colSpan={3}
-                    style={{ textAlign: "right", fontWeight: "bold" }}
-                  >
-                    Total:
-                  </td>
-                  <td
-                    style={{
-                      textAlign: "right",
-                      fontWeight: "bold",
-                      fontSize: "20px",
-                      color: "var(--primary-color)",
-                    }}
-                  >
-                    ${budget.totalAmount.toFixed(2)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </Card>
-        );
-      })}
+      {paginatedBudgets.length === 0 ? (
+        <Card className="p-12 text-center text-muted-foreground">
+          No hay presupuestos para mostrar.
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {paginatedBudgets.map((budget) => {
+            const budgetId = budget.id || budget._id || "";
+            return (
+              <DocumentCard
+                key={budgetId}
+                label="Presupuesto"
+                title={`N° ${budget.receipt}`}
+                subtitle={`Cliente: ${budget.customer.name} · Válido hasta ${formatDate(
+                  budget.validUntil,
+                )}`}
+                items={(budget.items || budget.products || []).map(
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (item: any) => ({
+                    quantity: item.quantity,
+                    name: item.product?.name,
+                    price: item.price,
+                  }),
+                )}
+                total={budget.totalAmount}
+                onExportPDF={() => exportToPDF(buildExport(budget))}
+                onExportExcel={() => exportToExcel(buildExport(budget))}
+              />
+            );
+          })}
+        </div>
+      )}
 
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
-        onPageChange={handlePageChange}
+        onPageChange={setCurrentPage}
       />
 
       <SalesDrawer
