@@ -7,7 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useCreateOrder, useOrders } from "../components/hooks/useOrder";
+import {
+  useCreateOrder,
+  useOrders,
+  useUpdateOrder,
+} from "../components/hooks/useOrder";
+import { ProductsProps } from "../models/productsModel";
 import { useGetBudgetByID, useGetBudgets } from "../components/hooks/useBudget";
 import { Order } from "../models/orderModel";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
@@ -48,11 +53,38 @@ const statusBadge = (status?: string) => {
 
 export const Orders: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [initialCart, setInitialCart] = useState<CartItem[]>([]);
+  const [initialCustomer, setInitialCustomer] = useState("");
   const { orders, loading, error } = useOrders();
   const { budgets } = useGetBudgets();
   const { customers } = useCustomers();
   const { products } = usePorducts();
   const { submitOrder: createOrder } = useCreateOrder();
+  const { updateOrder } = useUpdateOrder();
+
+  const openCreate = () => {
+    setEditingOrderId(null);
+    setInitialCart([]);
+    setInitialCustomer("");
+    setIsOpen(true);
+  };
+
+  const openEdit = (order: Order) => {
+    const items = (order.items || order.products || []).filter(
+      (i) => i.product,
+    );
+    setInitialCart(
+      items.map((i) => ({
+        product: i.product as unknown as ProductsProps,
+        quantity: i.quantity,
+        totalPrice: i.quantity * i.price,
+      })),
+    );
+    setInitialCustomer(order.customer?.id || order.customer?._id || "");
+    setEditingOrderId(order.id || order._id || "");
+    setIsOpen(true);
+  };
 
   const [filterDate, setFilterDate] = useState("");
   const [filterCustomerName, setFilterCustomerName] = useState("");
@@ -85,6 +117,26 @@ export const Orders: React.FC = () => {
     _orderId?: string,
     budgetId?: string,
   ) => {
+    if (editingOrderId) {
+      // EDITAR pedido existente
+      const productsPayload = cart.map((item) => ({
+        productId: item.product._id || item.product.id || "",
+        quantity: item.quantity,
+        price: item.totalPrice / item.quantity,
+      }));
+      const totalAmount = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+      updateOrder({
+        id: editingOrderId,
+        data: {
+          products: productsPayload,
+          totalAmount,
+          customer: customerId || initialCustomer,
+        },
+      });
+      toast.success("Pedido actualizado correctamente");
+      setIsOpen(false);
+      return;
+    }
     if (budgetId) {
       // Pedido desde un presupuesto existente
       const budget = budgets?.find((b) => (b.id || b._id) === budgetId);
@@ -138,7 +190,7 @@ export const Orders: React.FC = () => {
             {filteredOrders.length === 1 ? "" : "s"}
           </p>
         </div>
-        <Button onClick={() => setIsOpen(true)}>
+        <Button onClick={openCreate}>
           <Plus className="h-4 w-4" />
           Agregar pedido
         </Button>
@@ -192,7 +244,9 @@ export const Orders: React.FC = () => {
         <div className="space-y-4">
           {paginatedOrders.map((order) => {
             const orderId = order.id || order._id || "";
-            return <OrderDetail key={orderId} order={order} />;
+            return (
+              <OrderDetail key={orderId} order={order} onEdit={openEdit} />
+            );
           })}
         </div>
       )}
@@ -209,9 +263,12 @@ export const Orders: React.FC = () => {
         products={products || []}
         customers={customers}
         budgets={budgets}
-        title="Crear Pedido"
+        title={editingOrderId ? "Editar Pedido" : "Crear Pedido"}
         requireCustomer
-        allowBudgetSelection
+        allowBudgetSelection={!editingOrderId}
+        editing={!!editingOrderId}
+        initialCart={initialCart}
+        initialCustomerId={initialCustomer}
         onConfirm={handleDrawerConfirm}
       />
     </div>
@@ -220,9 +277,10 @@ export const Orders: React.FC = () => {
 
 interface OrderDetailProps {
   order: Order;
+  onEdit: (order: Order) => void;
 }
 
-const OrderDetail: React.FC<OrderDetailProps> = ({ order }) => {
+const OrderDetail: React.FC<OrderDetailProps> = ({ order, onEdit }) => {
   const { data: budget, isLoading } = useGetBudgetByID(order.quotation || "");
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -253,7 +311,7 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order }) => {
     <DocumentCard
       label="Pedido"
       title={`N° ${order.receipt}`}
-      subtitle={`Cliente: ${budget?.customer.name || "Desconocido"} · Creado ${formatDate(
+      subtitle={`Cliente: ${order.customer?.name || budget?.customer?.name || "—"} · Creado ${formatDate(
         order.createdAt,
       )}`}
       badge={statusBadge(order.status)}
@@ -266,6 +324,7 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order }) => {
         }),
       )}
       total={order.totalAmount}
+      onEdit={() => onEdit(order)}
       onExportPDF={() => exportToPDF(buildExport(order))}
       onExportExcel={() => exportToExcel(buildExport(order))}
     />

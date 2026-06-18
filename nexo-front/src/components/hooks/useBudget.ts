@@ -1,6 +1,6 @@
 // src/controllers/BudgetController.ts
 import { Budget, CreateBudget } from '../../models/budgetModel';
-import { createBudget, getBudgetById, getBudgets } from '../../services/budgetService';
+import { createBudget, getBudgetById, getBudgets, updateBudget } from '../../services/budgetService';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 
@@ -49,5 +49,22 @@ export const useCreateBudget = () => {
     loading: mutation.status === 'pending', // Verifica si está en estado de carga
     error: mutation.isError ? mutation.error : null, // Verifica si hay un error
     success: mutation.isSuccess, // Verifica si fue exitoso
+  };
+};
+
+// Hook para editar un presupuesto
+export const useUpdateBudget = () => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation<void, Error, { id: string; data: CreateBudget }>({
+    mutationFn: ({ id, data }) => updateBudget(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    },
+  });
+
+  return {
+    updateBudget: mutation.mutate,
+    loading: mutation.isPending,
+    error: mutation.isError ? mutation.error : null,
   };
 };

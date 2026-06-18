@@ -85,6 +85,11 @@ export const updateOrderStatusSchema = z.object({
     z.enum(["PENDING", "COMPLETED", "CANCELLED"]),
   ),
 });
+export const updateOrderSchema = z.object({
+  products: z.array(orderProductSchema).min(1),
+  totalAmount: z.coerce.number(),
+  customer: z.string().optional(),
+});
 
 // ---------- Presupuestos ----------
 const quotationProductSchema = z.object({

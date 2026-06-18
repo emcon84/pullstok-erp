@@ -1,5 +1,7 @@
 import { ReactNode } from "react";
+import { Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ExportButtons } from "../ExportButtons";
 
 interface DocItem {
@@ -16,6 +18,7 @@ interface DocumentCardProps {
   total: number;
   onExportPDF?: () => void;
   onExportExcel?: () => void;
+  onEdit?: () => void;
   badge?: ReactNode;
 }
 
@@ -29,6 +32,7 @@ export const DocumentCard = ({
   total,
   onExportPDF,
   onExportExcel,
+  onEdit,
   badge,
 }: DocumentCardProps) => {
   return (
@@ -46,12 +50,20 @@ export const DocumentCard = ({
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           )}
         </div>
-        {(onExportPDF || onExportExcel) && (
-          <ExportButtons
-            onExportPDF={onExportPDF ?? (() => {})}
-            onExportExcel={onExportExcel ?? (() => {})}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {onEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Pencil className="h-4 w-4" />
+              Editar
+            </Button>
+          )}
+          {(onExportPDF || onExportExcel) && (
+            <ExportButtons
+              onExportPDF={onExportPDF ?? (() => {})}
+              onExportExcel={onExportExcel ?? (() => {})}
+            />
+          )}
+        </div>
       </div>
 
       <div className="mt-4 overflow-hidden rounded-lg border">

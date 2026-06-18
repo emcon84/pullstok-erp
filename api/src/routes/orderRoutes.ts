@@ -5,6 +5,7 @@ import { validate } from "../middlewares/validate";
 import {
   createOrderSchema,
   updateOrderStatusSchema,
+  updateOrderSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -22,6 +23,12 @@ router.put(
   authenticateJWT,
   validate(updateOrderStatusSchema),
   orderController.updateOrderStatus,
+);
+router.put(
+  "/:id",
+  authenticateJWT,
+  validate(updateOrderSchema),
+  orderController.updateOrder,
 );
 
 export default router;

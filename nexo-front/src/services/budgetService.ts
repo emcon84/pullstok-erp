@@ -26,6 +26,18 @@ export const createBudget = async (budgetData: CreateBudget): Promise<void> => {
   });
 };
 
+export const updateBudget = async (
+  id: string,
+  budgetData: CreateBudget,
+): Promise<void> => {
+  const token = localStorage.getItem('token');
+  await axios.put(`${API_URL}/quotations/${id}`, budgetData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};
+
 export const getBudgetById = async (id: string): Promise<Budget> => {
   const token = localStorage.getItem('token');
   const response = await axios.get(`${API_URL}/quotations/${id}`, {

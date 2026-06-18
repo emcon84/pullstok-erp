@@ -5,8 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { useGetBudgets, useCreateBudget } from "../components/hooks/useBudget";
+import {
+  useGetBudgets,
+  useCreateBudget,
+  useUpdateBudget,
+} from "../components/hooks/useBudget";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
+import { ProductsProps } from "../models/productsModel";
+import { Budget } from "../models/budgetModel";
 import { usePorducts } from "../components/hooks/useProducts";
 import { useCustomers } from "../components/hooks/useCustomer";
 import { Pagination } from "../components/molecules/pagination";
@@ -26,7 +32,11 @@ const formatDate = (date: string) =>
 export const Quotations = () => {
   const { budgets, error, loading } = useGetBudgets();
   const [isOpen, setIsOpen] = useState(false);
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [initialCart, setInitialCart] = useState<CartItem[]>([]);
+  const [initialCustomer, setInitialCustomer] = useState("");
   const { submitBudget } = useCreateBudget();
+  const { updateBudget } = useUpdateBudget();
   const { customers } = useCustomers();
   const { products, getProducts } = usePorducts();
 
@@ -35,7 +45,32 @@ export const Quotations = () => {
   const [filterDate, setFilterDate] = useState("");
   const [filterCustomerName, setFilterCustomerName] = useState("");
 
-  const handleConfirmBudget = async (cart: CartItem[], customerId?: string) => {
+  const openCreate = () => {
+    setEditingBudgetId(null);
+    setInitialCart([]);
+    setInitialCustomer("");
+    setIsOpen(true);
+  };
+
+  const openEdit = (budget: Budget) => {
+    const items = (budget.items || budget.products || []).filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (i: any) => i.product,
+    );
+    setInitialCart(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      items.map((i: any) => ({
+        product: i.product as unknown as ProductsProps,
+        quantity: i.quantity,
+        totalPrice: i.quantity * i.price,
+      })),
+    );
+    setInitialCustomer(budget.customer.id || budget.customer._id || "");
+    setEditingBudgetId(budget.id || budget._id || "");
+    setIsOpen(true);
+  };
+
+  const handleConfirmBudget = (cart: CartItem[], customerId?: string) => {
     if (!customerId) {
       toast.error("Debe seleccionar un cliente");
       return;
@@ -45,20 +80,35 @@ export const Quotations = () => {
       quantity: item.quantity,
       price: item.totalPrice / item.quantity,
     }));
-    const budgetData = {
+    const totalAmount = cart.reduce((total, item) => total + item.totalPrice, 0);
+
+    if (editingBudgetId) {
+      const original = budgets.find(
+        (b) => (b.id || b._id) === editingBudgetId,
+      );
+      updateBudget({
+        id: editingBudgetId,
+        data: {
+          customer: customerId,
+          products: productsData,
+          totalAmount,
+          validUntil: original?.validUntil || "2024-12-31",
+        },
+      });
+      toast.success("Presupuesto actualizado con éxito");
+      setIsOpen(false);
+      return;
+    }
+
+    submitBudget({
       customer: customerId,
       products: productsData,
-      totalAmount: cart.reduce((total, item) => total + item.totalPrice, 0),
+      totalAmount,
       validUntil: "2024-12-31",
-    };
-    try {
-      await submitBudget(budgetData);
-      toast.success("Presupuesto creado con éxito");
-      getProducts();
-    } catch (error) {
-      toast.error("Error al crear el presupuesto");
-      console.error("Error al crear el presupuesto:", error);
-    }
+    });
+    toast.success("Presupuesto creado con éxito");
+    getProducts();
+    setIsOpen(false);
   };
 
   if (loading) {
@@ -121,7 +171,7 @@ export const Quotations = () => {
             {filteredBudgets.length === 1 ? "" : "s"}
           </p>
         </div>
-        <Button onClick={() => setIsOpen(true)}>
+        <Button onClick={openCreate}>
           <Plus className="h-4 w-4" />
           Agregar presupuesto
         </Button>
@@ -180,6 +230,7 @@ export const Quotations = () => {
                   }),
                 )}
                 total={budget.totalAmount}
+                onEdit={() => openEdit(budget)}
                 onExportPDF={() => exportToPDF(buildExport(budget))}
                 onExportExcel={() => exportToExcel(buildExport(budget))}
               />
@@ -199,8 +250,11 @@ export const Quotations = () => {
         onClose={() => setIsOpen(false)}
         products={products}
         customers={customers}
-        title="Crear Presupuesto"
+        title={editingBudgetId ? "Editar Presupuesto" : "Crear Presupuesto"}
         requireCustomer={true}
+        editing={!!editingBudgetId}
+        initialCart={initialCart}
+        initialCustomerId={initialCustomer}
         onConfirm={handleConfirmBudget}
       />
     </div>

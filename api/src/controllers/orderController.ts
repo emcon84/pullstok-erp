@@ -34,36 +34,9 @@ const createOrder = async (req: Request, res: Response) => {
     const sequenceNumber = await getNextSequenceValue(organizationId, "receipt");
     const receiptNumber = sequenceNumber.toString().padStart(4, "0");
 
-    // Todo en una transacción: stock + orden + comprobante son atómicos.
+    // El pedido es un BORRADOR editable: NO toca stock. Solo la venta descuenta
+    // inventario. Por eso un pedido se puede editar/borrar libremente.
     const newOrder = await prisma.$transaction(async (tx) => {
-      for (const item of orderProducts) {
-        const product = await tx.product.findFirst({
-          where: { id: item.productId, organizationId },
-        });
-        if (!product) {
-          throw new Error(`Producto ${item.productId} no encontrado`);
-        }
-
-        if (isSale) {
-          const updated = await tx.product.updateMany({
-            where: {
-              id: item.productId,
-              organizationId,
-              quantity: { gte: item.quantity },
-            },
-            data: { quantity: { decrement: item.quantity } },
-          });
-          if (updated.count === 0) {
-            throw new Error(`Stock insuficiente para ${product.name}`);
-          }
-        } else {
-          await tx.product.updateMany({
-            where: { id: item.productId, organizationId },
-            data: { quantity: { increment: item.quantity } },
-          });
-        }
-      }
-
       const order = await tx.order.create({
         data: {
           organizationId,
@@ -158,9 +131,52 @@ const updateOrderStatus = async (req: Request, res: Response) => {
   }
 };
 
+// Update an order's items (un pedido es borrador: no toca stock al editar)
+const updateOrder = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const { products, totalAmount, customer } = req.body;
+
+    const existing = await prisma.order.findFirst({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const order = await prisma.$transaction(async (tx) => {
+      await tx.orderItem.deleteMany({ where: { orderId: id } });
+      await tx.order.updateMany({
+        where: { id },
+        data: {
+          totalAmount,
+          ...(customer ? { customerId: customer } : {}),
+        },
+      });
+      await tx.orderItem.createMany({
+        data: products.map(
+          (p: { productId: string; quantity: number; price: number }) => ({
+            orderId: id,
+            productId: p.productId,
+            quantity: p.quantity,
+            price: p.price,
+          }),
+        ),
+      });
+      return tx.order.findFirst({
+        where: { id },
+        include: { items: { include: { product: true } }, customer: true },
+      });
+    });
+
+    res.status(200).json(order);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 export default {
   createOrder,
   getOrders,
   getOrderById,
   updateOrderStatus,
+  updateOrder,
 };

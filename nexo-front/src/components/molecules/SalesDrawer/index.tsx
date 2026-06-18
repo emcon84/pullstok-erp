@@ -44,6 +44,9 @@ interface SalesDrawerProps {
   allowOrderSelection?: boolean;
   allowBudgetSelection?: boolean;
   warning?: string;
+  editing?: boolean;
+  initialCart?: CartItem[];
+  initialCustomerId?: string;
   onConfirm: (
     cart: CartItem[],
     customerId?: string,
@@ -64,6 +67,9 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
   allowOrderSelection = false,
   allowBudgetSelection = false,
   warning,
+  editing = false,
+  initialCart,
+  initialCustomerId,
   onConfirm,
 }) => {
   const [mode, setMode] = useState<Mode>("products");
@@ -114,10 +120,18 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
             totalPrice: (item.price || 0) * item.quantity,
           })),
       );
-    } else if (mode === "products") {
-      setCart([]);
     }
   }, [selectedOrder, selectedBudget, mode, orders, budgets]);
+
+  // Pre-carga para edición: al abrir, llena el carrito con los items del documento.
+  useEffect(() => {
+    if (isOpen && editing) {
+      setMode("products");
+      setCart(initialCart ?? []);
+      setSelectedCustomer(initialCustomerId ?? "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editing]);
 
   const handleProductsSelected = (
     selectedProducts: { product: ProductsProps; quantity: number }[],
@@ -206,7 +220,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
                 <span>{warning}</span>
               </div>
             )}
-            {tabs.length > 1 && (
+            {!editing && tabs.length > 1 && (
               <div
                 className="grid gap-1 rounded-lg bg-muted p-1"
                 style={{
@@ -222,7 +236,12 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
                         ? "bg-background shadow-sm"
                         : "text-muted-foreground hover:text-foreground",
                     )}
-                    onClick={() => setMode(tab.key)}
+                    onClick={() => {
+                      if (tab.key === "products" && mode !== "products") {
+                        setCart([]);
+                      }
+                      setMode(tab.key);
+                    }}
                   >
                     {tab.label}
                   </button>

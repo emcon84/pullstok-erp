@@ -54,3 +54,9 @@ export interface CreateOrder {
   products?: CreateOrderDirectProduct[]; // pedido directo
   totalAmount?: number;
 }
+
+export interface UpdateOrder {
+  products: CreateOrderDirectProduct[];
+  totalAmount: number;
+  customer?: string;
+}

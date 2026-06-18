@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createOrder, getOrders } from '../../services/orderService';
-import { CreateOrder, Order } from '../../models/orderModel';
+import { createOrder, getOrders, updateOrder } from '../../services/orderService';
+import { CreateOrder, Order, UpdateOrder } from '../../models/orderModel';
 
 // Hook para obtener las órdenes
 export const useOrders = () => {
@@ -42,5 +42,23 @@ export const useCreateOrder = () => {
     loading: mutation.status === 'pending', // Verifica si está en estado de carga
     error: mutation.isError ? mutation.error : null, // Verifica si hay un error
     success: mutation.isSuccess, // Verifica si fue exitoso
+  };
+};
+
+// Hook para editar una orden (items)
+export const useUpdateOrder = () => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation<void, Error, { id: string; data: UpdateOrder }>({
+    mutationFn: ({ id, data }) => updateOrder(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    },
+  });
+
+  return {
+    updateOrder: mutation.mutate,
+    loading: mutation.isPending,
+    error: mutation.isError ? mutation.error : null,
   };
 };
