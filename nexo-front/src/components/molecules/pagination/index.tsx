@@ -1,5 +1,10 @@
-import React from 'react';
-import './index.css'; // Asegúrate de crear este archivo con el CSS correspondiente
+import {
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsRight,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface PaginationProps {
   currentPage: number;
@@ -7,53 +12,58 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
 }
 
-export const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange }) => {
-  
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      onPageChange(page);
-    }
+export const Pagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: PaginationProps) => {
+  if (totalPages <= 1) return null;
+
+  const go = (page: number) => {
+    if (page >= 1 && page <= totalPages) onPageChange(page);
   };
 
   return (
-    <div className="pagination-container">
-      <button 
-        className="pagination-button"
-        onClick={() => handlePageChange(1)}
+    <div className="flex items-center justify-center gap-1 pt-2">
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-8 w-8"
         disabled={currentPage === 1}
+        onClick={() => go(1)}
       >
-        Inicio
-      </button>
-      <button 
-        className="pagination-button"
-        onClick={() => handlePageChange(currentPage - 1)}
+        <ChevronsLeft className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-8 w-8"
         disabled={currentPage === 1}
+        onClick={() => go(currentPage - 1)}
       >
-        Anterior
-      </button>
-      {[...Array(totalPages)].map((_, index) => (
-        <button 
-          key={index} 
-          className={`pagination-button ${currentPage === index + 1 ? 'active' : ''}`} 
-          onClick={() => handlePageChange(index + 1)}
-        >
-          {index + 1}
-        </button>
-      ))}
-      <button 
-        className="pagination-button"
-        onClick={() => handlePageChange(currentPage + 1)}
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <span className="px-3 text-sm text-muted-foreground">
+        Página {currentPage} de {totalPages}
+      </span>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-8 w-8"
         disabled={currentPage === totalPages}
+        onClick={() => go(currentPage + 1)}
       >
-        Siguiente
-      </button>
-      <button 
-        className="pagination-button"
-        onClick={() => handlePageChange(totalPages)}
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-8 w-8"
         disabled={currentPage === totalPages}
+        onClick={() => go(totalPages)}
       >
-        Final
-      </button>
+        <ChevronsRight className="h-4 w-4" />
+      </Button>
     </div>
   );
 };

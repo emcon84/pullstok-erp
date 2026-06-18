@@ -1,6 +1,5 @@
-import React from "react";
-import { Button } from "../button";
-import { FaFilePdf, FaFileExcel } from "react-icons/fa";
+import { FileText, FileSpreadsheet } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ExportButtonsProps {
   onExportPDF: () => void;
@@ -8,35 +7,31 @@ interface ExportButtonsProps {
   disabled?: boolean;
 }
 
-export const ExportButtons: React.FC<ExportButtonsProps> = ({
+export const ExportButtons = ({
   onExportPDF,
   onExportExcel,
   disabled = false,
-}) => {
+}: ExportButtonsProps) => {
   return (
-    <div style={{ display: "flex", gap: "8px" }}>
+    <div className="flex gap-2">
       <Button
+        variant="outline"
+        size="sm"
         onClick={onExportPDF}
         disabled={disabled}
-        iconLeft={<FaFilePdf style={{ marginRight: 5 }} />}
-        style={{
-          background: "var(--error-color)",
-          padding: "8px 16px",
-          fontSize: "14px",
-        }}
+        className="text-red-600 hover:text-red-700"
       >
+        <FileText className="h-4 w-4" />
         PDF
       </Button>
       <Button
+        variant="outline"
+        size="sm"
         onClick={onExportExcel}
         disabled={disabled}
-        iconLeft={<FaFileExcel style={{ marginRight: 5 }} />}
-        style={{
-          background: "var(--success-color)",
-          padding: "8px 16px",
-          fontSize: "14px",
-        }}
+        className="text-emerald-600 hover:text-emerald-700"
       >
+        <FileSpreadsheet className="h-4 w-4" />
         Excel
       </Button>
     </div>

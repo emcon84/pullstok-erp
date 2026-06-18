@@ -1,19 +1,18 @@
 import { useState, ChangeEvent } from "react";
-import { Title } from "../components/atoms/title";
 import DateObject from "react-date-object";
-import { Card } from "../components/molecules/card";
-import { Input } from "../components/atoms/inputs";
-import Separator from "../components/atoms/separator";
+import { Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 import { Pagination } from "../components/molecules/pagination";
+import { DocumentCard } from "../components/molecules/DocumentCard";
 import { useGetSales, useCreateSale } from "../components/hooks/useSales";
 import { Loader } from "../components/atoms/loader";
-import { Button } from "../components/molecules/button";
-import { IoMdAddCircleOutline } from "react-icons/io";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { useOrders } from "../components/hooks/useOrder";
 import { usePorducts } from "../components/hooks/useProducts";
 import { toast } from "react-toastify";
-import { ExportButtons } from "../components/molecules/ExportButtons";
 import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
 import { CartItem } from "../models/salesModel";
@@ -24,40 +23,34 @@ export const SalesPage = () => {
   const { products } = usePorducts();
   const { createSale } = useCreateSale();
   const [isOpen, setIsOpen] = useState(false);
-  const [filterDate, setFilterDate] = useState<string>("");
-  const [filterProductName, setFilterProductName] = useState<string>("");
-
+  const [filterDate, setFilterDate] = useState("");
+  const [filterProductName, setFilterProductName] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // Filtrado de ventas
   const filteredSales = sales.filter((sale) => {
     const matchesDate = filterDate
       ? new DateObject(sale.saleDate).format("YYYY-MM-DD") === filterDate
       : true;
-    const products = sale.items || sale.products || [];
+    const prods = sale.items || sale.products || [];
     const matchesProduct = filterProductName
-      ? products.some((product) =>
+      ? prods.some((product) =>
           product.name.toLowerCase().includes(filterProductName),
         )
       : true;
     return matchesDate && matchesProduct;
   });
 
-  // Paginación
   const totalPages = Math.ceil(filteredSales.length / itemsPerPage);
   const paginatedSales = filteredSales.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleDateFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleDateFilterChange = (e: ChangeEvent<HTMLInputElement>) =>
     setFilterDate(e.target.value);
-  };
+  const handleProductNameFilterChange = (e: ChangeEvent<HTMLInputElement>) =>
+    setFilterProductName(e.target.value.toLowerCase());
 
   const handleConfirmSale = async (
     cart: CartItem[],
@@ -74,182 +67,111 @@ export const SalesPage = () => {
     }
   };
 
-  const handleProductNameFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setFilterProductName(e.target.value.toLowerCase());
-  };
-
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-    });
-  };
-
-  const handleExportPDF = (sale: any) => {
-    const exportData = {
-      title: "Venta",
-      documentNumber: sale.receipt || sale.id || "",
-      date: formatDate(sale.createdAt),
-      customer: sale.customer?.name || "",
-      items: (sale.items || []).map((item: any) => ({
-        quantity: item.quantity,
-        name: item.name || "",
-        price: item.price,
-        total: item.quantity * item.price,
-      })),
-      total: sale.totalAmount || 0,
-    };
-    exportToPDF(exportData);
-  };
-
-  const handleExportExcel = (sale: any) => {
-    const exportData = {
-      title: "Venta",
-      documentNumber: sale.receipt || sale.id || "",
-      date: formatDate(sale.createdAt),
-      customer: sale.customer?.name || "",
-      items: (sale.items || []).map((item: any) => ({
-        quantity: item.quantity,
-        name: item.name || "",
-        price: item.price,
-        total: item.quantity * item.price,
-      })),
-      total: sale.totalAmount || 0,
-    };
-    exportToExcel(exportData);
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const buildExport = (sale: any) => ({
+    title: "Venta",
+    documentNumber: sale.receipt || sale.id || "",
+    date: new Date(sale.createdAt || sale.saleDate).toLocaleDateString("es-AR"),
+    customer: sale.customer?.name || "",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items: (sale.items || []).map((item: any) => ({
+      quantity: item.quantity,
+      name: item.name || "",
+      price: item.price,
+      total: item.quantity * item.price,
+    })),
+    total: sale.totalAmount || 0,
+  });
 
   if (loading) {
     return (
-      <div className="flex-jc-ac h-100-vh">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <Loader />
       </div>
     );
   }
 
   if (error) {
-    return <div>Error al cargar ventas: {error.message}</div>;
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        Error al cargar ventas: {error.message}
+      </div>
+    );
   }
 
   return (
-    <div className="p-20">
-      <div className="flex-jc-sb">
-        <Title level={1} className="header text-xl mx-20">
-          Ventas
-        </Title>
-        <Button
-          onClick={() => setIsOpen(true)}
-          iconLeft={
-            <IoMdAddCircleOutline style={{ marginRight: 5 }} size={24} />
-          }
-        >
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Ventas</h1>
+          <p className="text-sm text-muted-foreground">
+            {filteredSales.length} venta
+            {filteredSales.length === 1 ? "" : "s"}
+          </p>
+        </div>
+        <Button onClick={() => setIsOpen(true)}>
+          <Plus className="h-4 w-4" />
           Agregar venta
         </Button>
       </div>
-      <Separator orientation="horizontal" color="#ccc" thickness="1px" />
 
-      {/* Filtro por fecha */}
-      <div className="flex gap-10 mx-20">
-        <div>
-          <label>Filtrar por Fecha: </label>
+      {/* Filtros */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="space-y-2">
+          <Label htmlFor="filter-date">Filtrar por fecha</Label>
           <Input
+            id="filter-date"
             type="date"
+            className="w-auto"
             value={filterDate}
             onChange={handleDateFilterChange}
           />
         </div>
-
-        {/* Filtro por nombre de producto */}
-        <div>
-          <label>Filtrar por Nombre de Producto: </label>
-          <Input
-            type="text"
-            placeholder="Buscar por producto"
-            value={filterProductName}
-            onChange={handleProductNameFilterChange}
-          />
+        <div className="space-y-2">
+          <Label htmlFor="filter-product">Filtrar por producto</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="filter-product"
+              className="pl-9 sm:w-72"
+              placeholder="Buscar por producto"
+              value={filterProductName}
+              onChange={handleProductNameFilterChange}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Mostrar ventas filtradas y paginadas */}
-      {paginatedSales.map((sale) => {
-        const saleId = sale.id || sale._id || "";
-        return (
-          <Card key={saleId}>
-            <div className="flex-jc-sb">
-              <div>
-                <Title level={4} className="text-bold">
-                  Fecha: {new DateObject(sale.saleDate).format("DD-MM-YYYY")}
-                </Title>
-              </div>
-              <div>
-                <ExportButtons
-                  onExportPDF={() => handleExportPDF(sale)}
-                  onExportExcel={() => handleExportExcel(sale)}
-                />
-              </div>
-            </div>
-            <Separator orientation="horizontal" color="#ddd" thickness="1px" />
-            <table className="budget-table">
-              <thead>
-                <tr>
-                  <th>Cantidad</th>
-                  <th>Descripción de Producto</th>
-                  <th>Precio Unitario</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(sale.items || sale.products || []).map((product) => {
-                  const productId = product.id || product._id || "";
-                  const itemTotal =
-                    (product.quantity || 1) * (product.price || 0);
-                  return (
-                    <tr key={productId}>
-                      <td style={{ textAlign: "center" }}>
-                        {product.quantity || 1}
-                      </td>
-                      <td>{product.name}</td>
-                      <td style={{ textAlign: "right" }}>
-                        ${(product.price || 0).toFixed(2)}
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        ${itemTotal.toFixed(2)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="budget-total-row">
-                  <td
-                    colSpan={3}
-                    style={{ textAlign: "right", fontWeight: "bold" }}
-                  >
-                    Total:
-                  </td>
-                  <td
-                    style={{
-                      textAlign: "right",
-                      fontWeight: "bold",
-                      fontSize: "20px",
-                      color: "var(--primary-color)",
-                    }}
-                  >
-                    ${sale.totalAmount.toFixed(2)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </Card>
-        );
-      })}
+      {/* Lista */}
+      {paginatedSales.length === 0 ? (
+        <Card className="p-12 text-center text-muted-foreground">
+          No hay ventas para mostrar.
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {paginatedSales.map((sale) => {
+            const saleId = sale.id || sale._id || "";
+            return (
+              <DocumentCard
+                key={saleId}
+                label="Venta"
+                title={`Fecha: ${new DateObject(sale.saleDate).format(
+                  "DD-MM-YYYY",
+                )}`}
+                items={(sale.items || sale.products || []) as never[]}
+                total={sale.totalAmount}
+                onExportPDF={() => exportToPDF(buildExport(sale))}
+                onExportExcel={() => exportToExcel(buildExport(sale))}
+              />
+            );
+          })}
+        </div>
+      )}
 
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
-        onPageChange={handlePageChange}
+        onPageChange={setCurrentPage}
       />
 
       <SalesDrawer
