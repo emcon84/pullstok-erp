@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -7,6 +7,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ProductSelector } from "../ProductSelector";
@@ -33,6 +43,7 @@ interface SalesDrawerProps {
   requireCustomer?: boolean;
   allowOrderSelection?: boolean;
   allowBudgetSelection?: boolean;
+  warning?: string;
   onConfirm: (
     cart: CartItem[],
     customerId?: string,
@@ -52,9 +63,11 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
   requireCustomer = false,
   allowOrderSelection = false,
   allowBudgetSelection = false,
+  warning,
   onConfirm,
 }) => {
   const [mode, setMode] = useState<Mode>("products");
+  const [showConfirm, setShowConfirm] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [selectedOrder, setSelectedOrder] = useState("");
@@ -129,26 +142,37 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
     setMode("products");
   };
 
-  const handleConfirm = () => {
+  const validate = () => {
     if (cart.length === 0) {
       toast.error("Debes agregar al menos un producto");
-      return;
+      return false;
     }
     if (mode === "products" && requireCustomer && !selectedCustomer) {
       toast.error("Debes seleccionar un cliente");
-      return;
+      return false;
     }
     if (mode === "order" && !selectedOrder) {
       toast.error("Debes seleccionar un pedido");
-      return;
+      return false;
     }
     if (mode === "budget" && !selectedBudget) {
       toast.error("Debes seleccionar un presupuesto");
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const doConfirm = () => {
     onConfirm(cart, selectedCustomer, selectedOrder, selectedBudget);
     resetState();
+    setShowConfirm(false);
     onClose();
+  };
+
+  const handleConfirmClick = () => {
+    if (!validate()) return;
+    if (warning) setShowConfirm(true);
+    else doConfirm();
   };
 
   const handleClose = () => {
@@ -176,6 +200,12 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
           </SheetHeader>
 
           <div className="flex-1 space-y-5 overflow-y-auto p-5">
+            {warning && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{warning}</span>
+              </div>
+            )}
             {tabs.length > 1 && (
               <div
                 className="grid gap-1 rounded-lg bg-muted p-1"
@@ -356,7 +386,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
               </Button>
               <Button
                 className="flex-1"
-                onClick={handleConfirm}
+                onClick={handleConfirmClick}
                 disabled={cart.length === 0}
               >
                 Confirmar
@@ -372,6 +402,21 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
         products={products}
         onConfirm={handleProductsSelected}
       />
+
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent className="z-[70]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar?</AlertDialogTitle>
+            <AlertDialogDescription>{warning}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={doConfirm}>
+              Sí, confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

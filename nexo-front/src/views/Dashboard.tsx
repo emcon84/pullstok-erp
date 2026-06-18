@@ -194,6 +194,7 @@ export const Dashboard = () => {
         title="Nueva Venta"
         requireCustomer={false}
         allowOrderSelection={true}
+        warning="Una vez confirmada, la venta descuenta el stock y no se puede editar ni deshacer."
         onConfirm={handleConfirmSale}
       />
 
