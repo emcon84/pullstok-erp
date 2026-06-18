@@ -1,9 +1,15 @@
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { getTenantContext } from "./tenantContext";
+
+// Prisma 7: la conexión se hace vía driver adapter (pg). Cargamos dotenv arriba
+// para que DATABASE_URL esté disponible al construir el adapter (en import).
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 
 // Cliente base (sin scoping). Se usa para conectar y para operaciones de
 // plataforma del SUPERADMIN (crear organizaciones, usuarios, login).
-const basePrisma = new PrismaClient();
+const basePrisma = new PrismaClient({ adapter });
 
 // Modelos cuyos datos pertenecen a una organización (tenant-scoped).
 // Counter queda FUERA a propósito: lo maneja secuenceService con su clave

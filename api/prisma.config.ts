@@ -7,6 +7,10 @@ import { defineConfig } from "prisma/config";
 // con `import "dotenv/config"`, si no se pierde DATABASE_URL.
 export default defineConfig({
   schema: path.join("prisma", "schema.prisma"),
+  // Conexión para los comandos de Migrate / introspección.
+  datasource: {
+    url: process.env.DATABASE_URL,
+  },
   migrations: {
     seed: "ts-node prisma/seed.ts",
   },

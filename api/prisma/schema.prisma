@@ -6,10 +6,9 @@ generator client {
 }
 
 datasource db {
+  // Prisma 7: la conexión va en prisma.config.ts (migrate) y en el driver
+  // adapter del PrismaClient (runtime). Ya no se declara `url` acá.
   provider = "postgresql"
-  // Prisma 6.x requiere `url` acá. El editor puede avisar que en Prisma 7 esto
-  // se mueve a prisma.config.ts; recién entonces se podrá quitar esta línea.
-  url      = env("DATABASE_URL")
 }
 
 enum Role {
