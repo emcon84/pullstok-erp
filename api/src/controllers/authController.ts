@@ -17,6 +17,15 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
+export const refresh = async (req: Request, res: Response) => {
+  try {
+    const result = await AuthService.refresh(req.body.refreshToken);
+    res.status(200).json(result);
+  } catch (error: any) {
+    res.status(401).json({ message: error.message });
+  }
+};
+
 export const changePassword = async (req: AuthedRequest, res: Response) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) {

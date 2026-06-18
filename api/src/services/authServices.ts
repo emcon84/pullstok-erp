@@ -4,6 +4,7 @@ import { Role } from "@prisma/client";
 import {
   generateAccessToken,
   generateRefreshToken,
+  verifyToken,
 } from "../utils/jwtUtils";
 
 class AuthService {
@@ -36,6 +37,31 @@ class AuthService {
         mustChangePassword: user.mustChangePassword,
       },
     };
+  }
+
+  /** Emite un nuevo access token a partir de un refresh token válido. */
+  static async refresh(refreshToken: string) {
+    let payload: { id: string; type?: string };
+    try {
+      payload = verifyToken<{ id: string; type?: string }>(refreshToken);
+    } catch {
+      throw new Error("Refresh token inválido o expirado");
+    }
+    if (payload.type !== "refresh") {
+      throw new Error("El token provisto no es un refresh token");
+    }
+
+    const user = await basePrisma.user.findUnique({ where: { id: payload.id } });
+    if (!user || !user.isActive) {
+      throw new Error("Usuario no válido");
+    }
+
+    const accessToken = generateAccessToken({
+      id: user.id,
+      role: user.role,
+      organizationId: user.organizationId,
+    });
+    return { accessToken };
   }
 
   static async changePassword(

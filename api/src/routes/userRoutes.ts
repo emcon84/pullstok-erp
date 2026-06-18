@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { authenticate, requireRole } from "../middlewares/authMiddleware";
+import { validate } from "../middlewares/validate";
+import { createUserSchema } from "../validation/schemas";
 import {
   createUser,
   listUsers,
@@ -11,7 +13,7 @@ const router = Router();
 // La gestión de usuarios del negocio es solo para el ADMIN de la organización.
 router.use(authenticate, requireRole("ADMIN"));
 
-router.post("/", createUser);
+router.post("/", validate(createUserSchema), createUser);
 router.get("/", listUsers);
 router.patch("/:id/active", setUserActive);
 
