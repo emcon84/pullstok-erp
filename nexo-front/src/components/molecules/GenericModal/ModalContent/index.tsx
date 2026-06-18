@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { IoMdCheckboxOutline, IoMdCloseCircleOutline } from "react-icons/io";
-import { Input } from "../../../atoms/inputs";
-import { Title } from "../../../atoms/title";
-import { Button } from "../../button";
 import { toast } from "react-toastify";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { API_URL } from "../../../../constants";
 import { ProductsProps } from "../../../../models/productsModel";
 import { useCreateProduct } from "../../../hooks/useProducts";
-import { DataItem, Validation } from "../../../../types";
+import { DataItem } from "../../../../types";
 import { updateProduct } from "../../../../services/productService";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -23,19 +22,17 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
   closeModalEdit,
 }) => {
   const [image, setImage] = useState<File | null>(null);
-  const { createProduct, loading } = useCreateProduct(); // Usa el hook para crear producto
-
+  const { createProduct, loading } = useCreateProduct();
   const queryClient = useQueryClient();
+
+  const isEdit = !!(selectedData?._id || selectedData?.id);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setSelectedData((prevData: any) => {
-      if (prevData) {
-        return { ...prevData, [name]: value };
-      } else {
-        return { [name]: value } as unknown as ProductsProps;
-      }
+      if (prevData) return { ...prevData, [name]: value };
+      return { [name]: value } as unknown as ProductsProps;
     });
   };
 
@@ -46,166 +43,154 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (selectedData) {
-      try {
-        let imageUrl = selectedData.image || ""; // Usa la imagen existente si no se selecciona una nueva
+    if (!selectedData) return;
+    try {
+      let imageUrl = selectedData.image || "";
 
-        if (image) {
-          const formData = new FormData();
-          formData.append("image", image);
-          const response = await fetch(`${API_URL}/image/upload`, {
-            method: "POST",
-            body: formData,
-          });
-          const data = await response.json();
-          imageUrl = data.url; // Actualiza la URL de la imagen solo si se sube una nueva
-        }
-
-        const productData = {
-          ...selectedData,
-          image: imageUrl,
-          price: parseFloat(selectedData.price?.toString() || "0"),
-          quantity: parseInt(selectedData.quantity?.toString() || "0"),
-        };
-
-        const productId = selectedData._id || selectedData.id;
-
-        if (productId) {
-          await updateProduct(productData);
-          queryClient.invalidateQueries({ queryKey: ["products"] });
-        } else {
-          await createProduct(productData);
-          queryClient.invalidateQueries({ queryKey: ["products"] });
-        }
-
-        closeModalEdit();
-        toast.success(
-          productId
-            ? "Producto actualizado correctamente"
-            : "Producto agregado correctamente",
-        );
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "An unknown error occurred";
-        toast.error(errorMessage);
+      if (image) {
+        const formData = new FormData();
+        formData.append("image", image);
+        const response = await fetch(`${API_URL}/image/upload`, {
+          method: "POST",
+          body: formData,
+        });
+        const data = await response.json();
+        imageUrl = data.url;
       }
+
+      const productData = {
+        ...selectedData,
+        image: imageUrl,
+        price: parseFloat(selectedData.price?.toString() || "0"),
+        quantity: parseInt(selectedData.quantity?.toString() || "0"),
+      };
+
+      const productId = selectedData._id || selectedData.id;
+      if (productId) {
+        await updateProduct(productData);
+      } else {
+        await createProduct(productData);
+      }
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+
+      closeModalEdit();
+      toast.success(
+        productId
+          ? "Producto actualizado correctamente"
+          : "Producto agregado correctamente",
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Ocurrió un error";
+      toast.error(errorMessage);
     }
   };
 
-  const nameValidations: Validation[] = [
-    { rule: "required", message: "El nombre es obligatorio" },
-    { rule: "noSQL", message: "Entrada inválida" },
-  ];
-  const descValidations: Validation[] = [
-    { rule: "noSQL", message: "Entrada inválida" },
-  ];
-  const catValidations: Validation[] = [
-    { rule: "noSQL", message: "Entrada inválida" },
-  ];
-  const cantValidations: Validation[] = [
-    { rule: "required", message: "La cantidad es obligatoria" },
-    { rule: "noSQL", message: "Entrada inválida" },
-  ];
-  const priceValidations: Validation[] = [
-    { rule: "required", message: "El precio es obligatorio" },
-    { rule: "noSQL", message: "Entrada inválida" },
-  ];
+  const previewSrc = selectedData?.image
+    ? selectedData.image.startsWith("http")
+      ? selectedData.image
+      : `${API_URL.replace("/api", "")}${selectedData.image}`
+    : null;
 
   return (
-    <div>
-      <Title level={3} className="header">
-        {selectedData?._id ? "Editar Producto" : "Agregar Producto"}
-      </Title>
-      <hr />
-      <br />
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">
+          {isEdit ? "Editar producto" : "Agregar producto"}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Completá los datos y guardá.
+        </p>
+      </div>
 
-      {selectedData?.image && (
-        <div style={{ display: "flex", justifyContent: "center" }}>
+      {previewSrc && (
+        <div className="flex justify-center">
           <img
-            src={
-              selectedData.image.startsWith("http")
-                ? selectedData.image
-                : `${API_URL.replace("/api", "")}${selectedData.image}`
-            }
-            alt="Product Image"
-            style={{ width: "200px", height: "200px", marginBottom: "10px" }}
+            src={previewSrc}
+            alt="Producto"
+            className="h-28 w-28 rounded-lg border object-cover"
           />
         </div>
       )}
 
-      <Input
-        type="text"
-        label="Nombre"
-        name="name"
-        placeholder="agregue un nombre"
-        value={selectedData?.name || ""}
-        onChange={handleChange}
-        validationRules={nameValidations}
-      />
-      <br />
-      <Input
-        type="text"
-        label="Descripción"
-        name="description"
-        placeholder="Agregue una descripción"
-        value={selectedData?.description || ""}
-        onChange={handleChange}
-        validationRules={descValidations}
-      />
-      <br />
-      <Input
-        type="text"
-        label="Categoría"
-        name="category"
-        placeholder="agregue una categoría"
-        value={selectedData?.category || ""}
-        onChange={handleChange}
-        validationRules={catValidations}
-      />
-      <br />
-      <div style={{ display: "flex", gap: 20 }}>
+      <div className="space-y-2">
+        <Label htmlFor="name">Nombre</Label>
         <Input
-          type="text"
-          label="Cantidad"
-          name="quantity"
-          placeholder="agregue una cantidad"
-          value={selectedData?.quantity?.toString() || ""}
+          id="name"
+          name="name"
+          placeholder="Ej: Taladro inalámbrico"
+          value={selectedData?.name || ""}
           onChange={handleChange}
-          validationRules={cantValidations}
-        />
-        <br />
-        <Input
-          type="text"
-          label="Precio"
-          name="price"
-          placeholder="agregue un precio"
-          value={selectedData?.price?.toString() || ""}
-          onChange={handleChange}
-          validationRules={priceValidations}
         />
       </div>
-      <br />
-      <input type="file" name="image" onChange={handleImageChange} />
-      <br />
-      <br />
-      <div style={{ display: "flex", gap: 20, justifyContent: "flex-end" }}>
-        <Button
-          onClick={closeModalEdit}
-          iconLeft={
-            <IoMdCloseCircleOutline style={{ marginRight: 5 }} size={24} />
-          }
-        >
+
+      <div className="space-y-2">
+        <Label htmlFor="description">Descripción</Label>
+        <Input
+          id="description"
+          name="description"
+          placeholder="Detalle del producto"
+          value={selectedData?.description || ""}
+          onChange={handleChange}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="category">Categoría</Label>
+          <Input
+            id="category"
+            name="category"
+            placeholder="Ej: Herramientas"
+            value={selectedData?.category || ""}
+            onChange={handleChange}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="quantity">Cantidad</Label>
+          <Input
+            id="quantity"
+            name="quantity"
+            type="number"
+            inputMode="numeric"
+            placeholder="0"
+            value={selectedData?.quantity?.toString() || ""}
+            onChange={handleChange}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="price">Precio</Label>
+          <Input
+            id="price"
+            name="price"
+            type="number"
+            inputMode="decimal"
+            placeholder="0"
+            value={selectedData?.price?.toString() || ""}
+            onChange={handleChange}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="image">Imagen</Label>
+          <Input
+            id="image"
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            className="cursor-pointer file:mr-2 file:text-muted-foreground"
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={closeModalEdit}>
           Cancelar
         </Button>
-        <Button
-          onClick={handleSubmit}
-          iconLeft={
-            <IoMdCheckboxOutline style={{ marginRight: 5 }} size={24} />
-          }
-          className="bg-green-500"
-          disabled={loading}
-        >
-          Aceptar
+        <Button onClick={handleSubmit} disabled={loading}>
+          {loading ? "Guardando..." : "Guardar"}
         </Button>
       </div>
     </div>
