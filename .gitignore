@@ -1,0 +1,29 @@
+# === Monorepo Nexo — gitignore raíz ===
+
+# Dependencias
+**/node_modules
+
+# Builds
+**/dist
+**/build
+
+# Entorno — solo los .example se commitean
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production.example
+
+# Archivos subidos / generados
+api/uploads/*
+!api/uploads/.gitkeep
+api/invoices/*
+!api/invoices/.gitkeep
+
+# Tests
+**/coverage
+
+# Sistema / editores
+.DS_Store
+.vscode
+.idea
+*.log

@@ -1,0 +1,117 @@
+/* styles.css */
+
+.table-container {
+  max-width: 100%;
+  overflow-x: auto;
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  font-size: 14px;
+  text-align: left;
+}
+
+table th,
+table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+table th {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+table tr {
+  vertical-align: middle;
+  transition: background-color var(--transition-fast);
+}
+
+table tbody tr:hover {
+  background-color: var(--bg-secondary);
+}
+
+table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+table img {
+  max-width: 100px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.table-container h1 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+.table-container {
+  padding: 0;
+  margin: 20px;
+}
+
+/* Pagination*/
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 32px;
+  gap: 8px;
+}
+
+.pagination-container button {
+  padding: 8px 14px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  font-weight: 500;
+  font-size: 14px;
+  min-width: 40px;
+}
+
+.pagination-container button:hover:not([disabled]) {
+  background-color: var(--bg-secondary);
+  border-color: var(--primary-color);
+  transform: translateY(-1px);
+}
+
+.pagination-container button:active:not([disabled]) {
+  transform: translateY(0);
+}
+
+.pagination-container button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+  background-color: var(--bg-tertiary);
+}
+
+.page-number-button.active {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.page-number-button {
+  margin: 0;
+}

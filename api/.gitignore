@@ -1,0 +1,26 @@
+# Dependencias
+/node_modules
+
+# Build
+/dist
+/build
+
+# Entorno — NUNCA commitear valores reales. Solo los .example van al repo.
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Archivos subidos por usuarios / generados
+/uploads/*
+!/uploads/.gitkeep
+/invoices/*
+!/invoices/.gitkeep
+
+# Tests / cobertura
+/coverage
+
+# Sistema / editores
+.DS_Store
+.vscode
+.idea

@@ -1,0 +1,150 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String  @id @default(uuid())
+  email    String  @unique
+  password String
+  isAdmin  Boolean @default(false)
+
+  @@map("users")
+}
+
+model Customer {
+  id         String      @id @default(uuid())
+  name       String
+  email      String      @unique
+  phone      String?
+  orders     Order[]
+  quotations Quotation[]
+
+  @@map("customers")
+}
+
+model Product {
+  id             String          @id @default(uuid())
+  name           String
+  price          Float
+  description    String?
+  category       String
+  image          String?
+  quantity       Int
+  orderItems     OrderItem[]
+  quotationItems QuotationItem[]
+  saleItems      SaleItem[]
+
+  @@map("products")
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  items       OrderItem[]
+  totalAmount Float
+  status      OrderStatus @default(PENDING)
+  type        OrderType
+  quotationId String?
+  quotation   Quotation?  @relation(fields: [quotationId], references: [id])
+  receipt     String?
+  createdAt   DateTime    @default(now())
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id       String  @id @default(uuid())
+  orderId  String
+  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product  Product @relation(fields: [productId], references: [id])
+  quantity Int
+  price    Float
+
+  @@map("order_items")
+}
+
+model Quotation {
+  id          String          @id @default(uuid())
+  customerId  String
+  customer    Customer        @relation(fields: [customerId], references: [id])
+  items       QuotationItem[]
+  totalAmount Float
+  validUntil  DateTime
+  createdAt   DateTime        @default(now())
+  receipt     String?
+  orders      Order[]
+
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id          String    @id @default(uuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  quantity    Int
+  price       Float
+
+  @@map("quotation_items")
+}
+
+model Sale {
+  id          String     @id @default(uuid())
+  items       SaleItem[]
+  totalAmount Float
+  saleDate    DateTime   @default(now())
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  name      String
+  quantity  Int
+  category  String
+  price     Float
+
+  @@map("sale_items")
+}
+
+model Receipt {
+  id              String @id @default(uuid())
+  type            String
+  relatedDocument String
+  receiptNumber   String
+
+  @@map("receipts")
+}
+
+model Counter {
+  id            String @id
+  sequenceValue Int    @default(0)
+
+  @@map("counters")
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderType {
+  SALE
+  PURCHASE
+}

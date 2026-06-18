@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", // Versión de ECMAScript a la que se compilará el código
+    "module": "CommonJS", // Sistema de módulos a utilizar
+    "outDir": "./dist", // Directorio de salida para los archivos compilados
+    "rootDir": "./src", // Directorio raíz para los archivos fuente
+    "strict": true, // Habilita todas las opciones de verificación estricta
+    "esModuleInterop": true, // Habilita la interoperabilidad con módulos ES6
+    "skipLibCheck": true, // Omite la comprobación de tipos en los archivos de declaración de las librerías
+    "forceConsistentCasingInFileNames": true, // Asegura el uso consistente de las mayúsculas y minúsculas en los nombres de los archivos
+    "moduleResolution": "node", // Mecanismo de resolución de módulos
+    "resolveJsonModule": true, // Permite la importación de archivos JSON
+    "noImplicitAny": true, // Previene el uso de la variable `any` implícita
+    "emitDecoratorMetadata": true, // Permite la generación de metadatos para decoradores
+    "experimentalDecorators": true, // Habilita los decoradores experimentales
+    "sourceMap": true, // Genera archivos de mapa de origen para depuración
+    "declaration": true // Genera archivos de declaración .d.ts
+  },
+  "include": [
+    "src/**/*" // Incluye todos los archivos en el directorio src
+  ],
+  "exclude": [
+    "node_modules", // Excluye el directorio node_modules
+    "**/*.test.ts" // Excluye archivos de prueba TypeScript
+  ]
+}

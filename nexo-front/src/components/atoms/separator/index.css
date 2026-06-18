@@ -1,0 +1,10 @@
+/* Separator.css */
+.separator {
+  margin: 20px 0;
+  display: inline-block;
+}
+
+.separator.vertical {
+  display: inline-block;
+  margin: 0 20px;
+}
