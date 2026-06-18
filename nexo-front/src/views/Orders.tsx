@@ -10,16 +10,15 @@ import { cn } from "@/lib/utils";
 import { useCreateOrder, useOrders } from "../components/hooks/useOrder";
 import { useGetBudgetByID, useGetBudgets } from "../components/hooks/useBudget";
 import { Order } from "../models/orderModel";
-import { Drawer } from "../components/molecules/Drawer";
-import { Budget } from "../models/budgetModel";
+import { SalesDrawer } from "../components/molecules/SalesDrawer";
+import { useCustomers } from "../components/hooks/useCustomer";
+import { usePorducts } from "../components/hooks/useProducts";
+import { CartItem } from "../models/salesModel";
 import { Pagination } from "../components/molecules/pagination";
 import { DocumentCard } from "../components/molecules/DocumentCard";
 import { Loader } from "../components/atoms/loader";
 import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
-
-const selectClass =
-  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString("es-AR", {
@@ -49,9 +48,10 @@ const statusBadge = (status?: string) => {
 
 export const Orders: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
   const { orders, loading, error } = useOrders();
   const { budgets } = useGetBudgets();
+  const { customers } = useCustomers();
+  const { products } = usePorducts();
   const { submitOrder: createOrder } = useCreateOrder();
 
   const [filterDate, setFilterDate] = useState("");
@@ -79,30 +79,39 @@ export const Orders: React.FC = () => {
     currentPage * itemsPerPage,
   );
 
-  const handleCreateOrder = () => {
-    if (selectedBudgetId) {
-      const selectedBudget = budgets?.find(
-        (budget) => (budget.id || budget._id) === selectedBudgetId,
-      );
-      if (selectedBudget) {
-        const budgetId = selectedBudget.id || selectedBudget._id || "";
-        const customerId =
-          selectedBudget.customer.id || selectedBudget.customer._id || "";
-        createOrder({
-          customer: customerId,
-          quotationId: budgetId,
-          type: "sale",
-        });
-        setIsOpen(false);
-        toast.success("Se ha creado el pedido correctamente");
-        setSelectedBudgetId(null);
+  const handleDrawerConfirm = (
+    cart: CartItem[],
+    customerId?: string,
+    _orderId?: string,
+    budgetId?: string,
+  ) => {
+    if (budgetId) {
+      // Pedido desde un presupuesto existente
+      const budget = budgets?.find((b) => (b.id || b._id) === budgetId);
+      const customer = budget?.customer.id || budget?.customer._id || "";
+      createOrder({ customer, quotationId: budgetId, type: "sale" });
+    } else {
+      // Pedido directo con productos
+      if (!customerId) {
+        toast.error("Debes seleccionar un cliente");
+        return;
       }
+      const productsPayload = cart.map((item) => ({
+        productId: item.product._id || item.product.id || "",
+        quantity: item.quantity,
+        price: item.totalPrice / item.quantity,
+      }));
+      const totalAmount = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+      createOrder({
+        customer: customerId,
+        products: productsPayload,
+        totalAmount,
+        type: "sale",
+      });
     }
+    toast.success("Pedido creado correctamente");
+    setIsOpen(false);
   };
-
-  const selectedBudget = budgets?.find(
-    (budget) => (budget.id || budget._id) === selectedBudgetId,
-  );
 
   if (loading) {
     return (
@@ -194,61 +203,17 @@ export const Orders: React.FC = () => {
         onPageChange={setCurrentPage}
       />
 
-      <Drawer
+      <SalesDrawer
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
+        products={products || []}
+        customers={customers}
+        budgets={budgets}
         title="Crear Pedido"
-        width="700px"
-      >
-        <div className="space-y-4 p-6">
-          <div className="space-y-2">
-            <Label htmlFor="budget-select">Seleccionar presupuesto</Label>
-            <select
-              id="budget-select"
-              value={selectedBudgetId || ""}
-              onChange={(e) => setSelectedBudgetId(e.target.value)}
-              className={selectClass}
-            >
-              <option value="" disabled>
-                Seleccionar presupuesto
-              </option>
-              {budgets?.map((budget: Budget) => {
-                const budgetId = budget.id || budget._id || "";
-                return (
-                  <option key={budgetId} value={budgetId}>
-                    {budget.receipt} - {budget.customer.name}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {selectedBudget && (
-            <DocumentCard
-              label="Resumen del pedido"
-              title={`Cliente: ${selectedBudget.customer.name}`}
-              subtitle={`Presupuesto N° ${selectedBudget.receipt}`}
-              items={(selectedBudget.items || selectedBudget.products || []).map(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (item: any) => ({
-                  quantity: item.quantity,
-                  name: item.product?.name,
-                  price: item.price,
-                }),
-              )}
-              total={selectedBudget.totalAmount}
-            />
-          )}
-
-          <Button
-            className="w-full"
-            onClick={handleCreateOrder}
-            disabled={!selectedBudgetId}
-          >
-            Crear pedido
-          </Button>
-        </div>
-      </Drawer>
+        requireCustomer
+        allowBudgetSelection
+        onConfirm={handleDrawerConfirm}
+      />
     </div>
   );
 };

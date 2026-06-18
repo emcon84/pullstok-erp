@@ -41,8 +41,16 @@ export interface CreateOrderProduct {
   price: number;
 }
 
+export interface CreateOrderDirectProduct {
+  productId: string;
+  quantity: number;
+  price: number;
+}
+
 export interface CreateOrder {
-  quotationId: string;
   customer: string;
   type: string; // Tipo de orden, e.g., "sale"
+  quotationId?: string; // desde presupuesto
+  products?: CreateOrderDirectProduct[]; // pedido directo
+  totalAmount?: number;
 }

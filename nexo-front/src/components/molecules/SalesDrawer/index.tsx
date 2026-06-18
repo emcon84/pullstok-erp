@@ -14,10 +14,13 @@ import { ProductsProps } from "../../../models/productsModel";
 import { Customer } from "../../../models/customerModel";
 import { CartItem } from "../../../models/salesModel";
 import { Order } from "../../../models/orderModel";
+import { Budget } from "../../../models/budgetModel";
 import { toast } from "react-toastify";
 
 const selectClass =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring";
+
+type Mode = "products" | "order" | "budget";
 
 interface SalesDrawerProps {
   isOpen: boolean;
@@ -25,10 +28,17 @@ interface SalesDrawerProps {
   products: ProductsProps[];
   customers?: Customer[];
   orders?: Order[];
+  budgets?: Budget[];
   title: string;
   requireCustomer?: boolean;
   allowOrderSelection?: boolean;
-  onConfirm: (cart: CartItem[], customerId?: string, orderId?: string) => void;
+  allowBudgetSelection?: boolean;
+  onConfirm: (
+    cart: CartItem[],
+    customerId?: string,
+    orderId?: string,
+    budgetId?: string,
+  ) => void;
 }
 
 export const SalesDrawer: React.FC<SalesDrawerProps> = ({
@@ -37,35 +47,64 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
   products,
   customers,
   orders,
+  budgets,
   title,
   requireCustomer = false,
   allowOrderSelection = false,
+  allowBudgetSelection = false,
   onConfirm,
 }) => {
-  const [mode, setMode] = useState<"products" | "order">("products");
+  const [mode, setMode] = useState<Mode>("products");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [selectedOrder, setSelectedOrder] = useState("");
+  const [selectedBudget, setSelectedBudget] = useState("");
   const [isProductSelectorOpen, setIsProductSelectorOpen] = useState(false);
 
+  const tabs: { key: Mode; label: string }[] = [
+    { key: "products", label: "Productos" },
+    ...(allowOrderSelection
+      ? [{ key: "order" as Mode, label: "Desde pedido" }]
+      : []),
+    ...(allowBudgetSelection
+      ? [{ key: "budget" as Mode, label: "Desde presupuesto" }]
+      : []),
+  ];
+
+  // Cargar items desde el pedido o presupuesto seleccionado
   useEffect(() => {
     if (mode === "order" && selectedOrder && orders) {
       const order = orders.find((o) => (o._id || o.id) === selectedOrder);
-      if (order && order.items) {
-        const cartItems: CartItem[] = order.items
-          .filter((item) => item.product !== null)
-          .map((item) => ({
+      if (order?.items) {
+        setCart(
+          order.items
+            .filter((item) => item.product !== null)
+            .map((item) => ({
+              product: item.product as ProductsProps,
+              quantity: item.quantity,
+              totalPrice:
+                (item.price || item.product?.price || 0) * item.quantity,
+            })),
+        );
+      }
+    } else if (mode === "budget" && selectedBudget && budgets) {
+      const budget = budgets.find((b) => (b._id || b.id) === selectedBudget);
+      const items = budget?.items || budget?.products || [];
+      setCart(
+        items
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .filter((item: any) => item.product !== null)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((item: any) => ({
             product: item.product as ProductsProps,
             quantity: item.quantity,
-            totalPrice:
-              (item.price || item.product?.price || 0) * item.quantity,
-          }));
-        setCart(cartItems);
-      }
+            totalPrice: (item.price || 0) * item.quantity,
+          })),
+      );
     } else if (mode === "products") {
       setCart([]);
     }
-  }, [selectedOrder, mode, orders]);
+  }, [selectedOrder, selectedBudget, mode, orders, budgets]);
 
   const handleProductsSelected = (
     selectedProducts: { product: ProductsProps; quantity: number }[],
@@ -86,15 +125,16 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
     setCart([]);
     setSelectedCustomer("");
     setSelectedOrder("");
+    setSelectedBudget("");
     setMode("products");
   };
 
   const handleConfirm = () => {
     if (cart.length === 0) {
-      toast.error("Debes agregar al menos un producto o seleccionar un pedido");
+      toast.error("Debes agregar al menos un producto");
       return;
     }
-    if (requireCustomer && !selectedCustomer && mode === "products") {
+    if (mode === "products" && requireCustomer && !selectedCustomer) {
       toast.error("Debes seleccionar un cliente");
       return;
     }
@@ -102,7 +142,11 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
       toast.error("Debes seleccionar un pedido");
       return;
     }
-    onConfirm(cart, selectedCustomer, selectedOrder);
+    if (mode === "budget" && !selectedBudget) {
+      toast.error("Debes seleccionar un presupuesto");
+      return;
+    }
+    onConfirm(cart, selectedCustomer, selectedOrder, selectedBudget);
     resetState();
     onClose();
   };
@@ -113,6 +157,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
   };
 
   const totalAmount = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+  const isFromSource = mode === "order" || mode === "budget";
 
   return (
     <>
@@ -131,34 +176,31 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
           </SheetHeader>
 
           <div className="flex-1 space-y-5 overflow-y-auto p-5">
-            {allowOrderSelection && (
-              <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-                <button
-                  className={cn(
-                    "rounded-md py-2 text-sm font-medium transition-colors",
-                    mode === "products"
-                      ? "bg-background shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  onClick={() => setMode("products")}
-                >
-                  Agregar productos
-                </button>
-                <button
-                  className={cn(
-                    "rounded-md py-2 text-sm font-medium transition-colors",
-                    mode === "order"
-                      ? "bg-background shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  onClick={() => setMode("order")}
-                >
-                  Desde pedido
-                </button>
+            {tabs.length > 1 && (
+              <div
+                className="grid gap-1 rounded-lg bg-muted p-1"
+                style={{
+                  gridTemplateColumns: `repeat(${tabs.length}, minmax(0,1fr))`,
+                }}
+              >
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    className={cn(
+                      "rounded-md py-2 text-sm font-medium transition-colors",
+                      mode === tab.key
+                        ? "bg-background shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setMode(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
             )}
 
-            {mode === "order" && allowOrderSelection && orders && (
+            {mode === "order" && orders && (
               <div className="space-y-2">
                 <Label htmlFor="order-select">Seleccionar pedido</Label>
                 <select
@@ -175,6 +217,30 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
                     return (
                       <option key={id} value={id}>
                         {order.receipt} - {order.customer?.name || "Sin cliente"}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
+
+            {mode === "budget" && budgets && (
+              <div className="space-y-2">
+                <Label htmlFor="budget-select">Seleccionar presupuesto</Label>
+                <select
+                  id="budget-select"
+                  className={selectClass}
+                  value={selectedBudget}
+                  onChange={(e) => setSelectedBudget(e.target.value)}
+                >
+                  <option value="" disabled>
+                    Seleccione un presupuesto
+                  </option>
+                  {budgets.map((budget) => {
+                    const id = budget._id || budget.id || "";
+                    return (
+                      <option key={id} value={id}>
+                        {budget.receipt} - {budget.customer?.name}
                       </option>
                     );
                   })}
@@ -226,7 +292,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
                   <p className="text-sm text-muted-foreground">
                     {mode === "products"
                       ? 'Tocá "Agregar productos" para comenzar'
-                      : "Seleccioná un pedido para ver sus productos"}
+                      : "Seleccioná una opción arriba para ver sus productos"}
                   </p>
                 </div>
               ) : (
@@ -239,7 +305,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
                         </th>
                         <th className="py-2 text-left font-medium">Producto</th>
                         <th className="py-2 text-right font-medium">Total</th>
-                        {mode === "products" && <th className="w-10" />}
+                        {!isFromSource && <th className="w-10" />}
                       </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -252,7 +318,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
                           <td className="py-2 text-right tabular-nums">
                             ${item.totalPrice.toLocaleString("es-AR")}
                           </td>
-                          {mode === "products" && (
+                          {!isFromSource && (
                             <td className="px-2 text-center">
                               <Button
                                 variant="ghost"
