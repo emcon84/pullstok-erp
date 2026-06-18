@@ -1,7 +1,29 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from "jsonwebtoken";
+import { UserRole } from "../config/tenantContext";
 
-export const generateToken = (userId: string, isAdmin: boolean) => {
-    return jwt.sign({ id: userId, isAdmin }, process.env.JWT_SECRET as string, {
-        expiresIn: '1h',
-    });
+export interface AccessTokenPayload {
+  id: string;
+  role: UserRole;
+  organizationId: string | null;
+}
+
+const getSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET no está configurado en el entorno");
+  }
+  return secret;
 };
+
+export const generateAccessToken = (payload: AccessTokenPayload): string =>
+  jwt.sign(payload, getSecret(), {
+    expiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
+  } as SignOptions);
+
+export const generateRefreshToken = (userId: string): string =>
+  jwt.sign({ id: userId, type: "refresh" }, getSecret(), {
+    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "30d",
+  } as SignOptions);
+
+export const verifyToken = <T = unknown>(token: string): T =>
+  jwt.verify(token, getSecret()) as T;

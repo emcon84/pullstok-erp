@@ -1,8 +1,6 @@
-// src/services/productService.ts
 import csvParser from "csv-parser";
 import fs from "fs";
-import path from "path";
-import { prisma } from "../config/db";
+import { basePrisma } from "../config/db";
 
 interface ProductInput {
   name: string;
@@ -13,51 +11,39 @@ interface ProductInput {
   quantity: number;
 }
 
-// Ruta de la carpeta de uploads
-const uploadDir = "/opt/render/project/uploads";
-
-// Asegúrate de que la carpeta uploads exista
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-export const bulkAddProducts = async (filePath: string): Promise<void> => {
-  // Verificar si la carpeta 'uploads' existe, si no, crearla
-  // El directorio ya debería existir en la ruta raíz del proyecto
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    console.log(`Directorio creado: ${uploadDir}`);
-  } else {
-    console.log("Directorio ya existe:", uploadDir);
-  }
-
-  // Usar directamente el filePath proporcionado por req.file.path
-  const fullPath = filePath;
-  if (!fs.existsSync(fullPath)) {
-    throw new Error(
-      `El archivo no existe en la ruta especificada: ${fullPath}`,
-    );
+/**
+ * Carga masiva de productos desde un CSV, asignándolos a la organización dada.
+ * Recibe el organizationId explícito porque el insert ocurre dentro de un
+ * callback de stream (donde el contexto de tenant por AsyncLocalStorage puede
+ * no estar disponible); por eso usamos basePrisma + organizationId explícito.
+ */
+export const bulkAddProducts = async (
+  filePath: string,
+  organizationId: string,
+): Promise<void> => {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`El archivo no existe en la ruta especificada: ${filePath}`);
   }
 
   return new Promise((resolve, reject) => {
-    const products: ProductInput[] = [];
+    const products: (ProductInput & { organizationId: string })[] = [];
 
-    fs.createReadStream(fullPath)
+    fs.createReadStream(filePath)
       .pipe(csvParser())
       .on("data", (row: any) => {
-        const product: ProductInput = {
+        products.push({
           name: row.name,
           price: parseFloat(row.price),
           description: row.description,
           category: row.category,
           image: row.image,
           quantity: parseInt(row.quantity, 10),
-        };
-        products.push(product);
+          organizationId,
+        });
       })
       .on("end", async () => {
         try {
-          await prisma.product.createMany({ data: products });
+          await basePrisma.product.createMany({ data: products });
           resolve();
         } catch (error) {
           reject(error);

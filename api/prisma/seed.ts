@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -6,195 +6,79 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding database...");
 
-  // Crear usuario de prueba
-  const hashedPassword = await bcrypt.hash("test123", 10);
-
-  const user = await prisma.user.upsert({
-    where: { email: "test@nexo.com" },
+  // 1) SUPERADMIN (la plataforma — sin organización)
+  const superadminEmail = process.env.SEED_SUPERADMIN_EMAIL ?? "superadmin@nexo.com";
+  const superadminPassword = process.env.SEED_SUPERADMIN_PASSWORD ?? "superadmin123";
+  await prisma.user.upsert({
+    where: { email: superadminEmail },
     update: {},
     create: {
-      email: "test@nexo.com",
-      password: hashedPassword,
-      isAdmin: true,
+      email: superadminEmail,
+      password: await bcrypt.hash(superadminPassword, 10),
+      role: Role.SUPERADMIN,
+      mustChangePassword: false,
+      organizationId: null,
     },
   });
+  console.log(`✅ SUPERADMIN: ${superadminEmail} / ${superadminPassword}`);
 
-  console.log("✅ Usuario de prueba creado:");
-  console.log("   Email: test@nexo.com");
-  console.log("   Password: test123");
-  console.log("   Admin: Sí");
-
-  // Eliminar productos existentes para evitar duplicados
-  await prisma.product.deleteMany({});
-
-  // Crear productos de ejemplo variados
-  const products = await prisma.product.createMany({
-    data: [
-      {
-        name: "Laptop HP Pavilion 15",
-        price: 45999.99,
-        description: "Laptop con procesador Intel i5, 8GB RAM, 512GB SSD",
-        category: "Electrónica",
-        image: "/uploads/placeholder.jpg",
-        quantity: 15,
-      },
-      {
-        name: "Mouse Logitech MX Master 3",
-        price: 5999.0,
-        description: "Mouse inalámbrico ergonómico con 7 botones",
-        category: "Electrónica",
-        image: "/uploads/placeholder.jpg",
-        quantity: 45,
-      },
-      {
-        name: "Teclado Mecánico RGB",
-        price: 8500.5,
-        description: "Teclado mecánico retroiluminado switches blue",
-        category: "Electrónica",
-        image: "/uploads/placeholder.jpg",
-        quantity: 30,
-      },
-      {
-        name: "Monitor Samsung 27 pulgadas",
-        price: 18999.99,
-        description: "Monitor Full HD 27 pulgadas 75Hz",
-        category: "Electrónica",
-        image: "/uploads/placeholder.jpg",
-        quantity: 20,
-      },
-      {
-        name: "Silla Ergonómica Oficina",
-        price: 12500.0,
-        description: "Silla ergonómica con soporte lumbar ajustable",
-        category: "Oficina",
-        image: "/uploads/placeholder.jpg",
-        quantity: 25,
-      },
-      {
-        name: "Escritorio de Madera",
-        price: 28000.0,
-        description: "Escritorio de madera maciza 150x80cm",
-        category: "Oficina",
-        image: "/uploads/placeholder.jpg",
-        quantity: 10,
-      },
-      {
-        name: "Lámpara LED Escritorio",
-        price: 2500.0,
-        description: "Lámpara LED regulable con brazo flexible",
-        category: "Oficina",
-        image: "/uploads/placeholder.jpg",
-        quantity: 50,
-      },
-      {
-        name: "Cafetera Express",
-        price: 15999.0,
-        description: "Cafetera express automática 19 bares",
-        category: "Hogar",
-        image: "/uploads/placeholder.jpg",
-        quantity: 12,
-      },
-      {
-        name: "Aspiradora Robot",
-        price: 22999.99,
-        description: "Aspiradora robot con mapeo inteligente",
-        category: "Hogar",
-        image: "/uploads/placeholder.jpg",
-        quantity: 8,
-      },
-      {
-        name: "Set de Herramientas",
-        price: 4500.0,
-        description: "Set completo de herramientas 100 piezas",
-        category: "Herramientas",
-        image: "/uploads/placeholder.jpg",
-        quantity: 35,
-      },
-      {
-        name: "Taladro Inalámbrico",
-        price: 8999.0,
-        description: "Taladro inalámbrico 20V con 2 baterías",
-        category: "Herramientas",
-        image: "/uploads/placeholder.jpg",
-        quantity: 18,
-      },
-      {
-        name: "Mochila para Laptop",
-        price: 3200.0,
-        description: "Mochila resistente al agua para laptop 15.6 pulgadas",
-        category: "Accesorios",
-        image: "/uploads/placeholder.jpg",
-        quantity: 40,
-      },
-      {
-        name: "Auriculares Bluetooth",
-        price: 4999.0,
-        description: "Auriculares inalámbricos con cancelación de ruido",
-        category: "Electrónica",
-        image: "/uploads/placeholder.jpg",
-        quantity: 55,
-      },
-      {
-        name: "Cargador USB-C 65W",
-        price: 1500.0,
-        description: "Cargador rápido USB-C compatible con laptops",
-        category: "Accesorios",
-        image: "/uploads/placeholder.jpg",
-        quantity: 60,
-      },
-      {
-        name: "Hub USB 3.0 7 Puertos",
-        price: 1800.0,
-        description: "Hub USB 3.0 con 7 puertos y alimentación",
-        category: "Accesorios",
-        image: "/uploads/placeholder.jpg",
-        quantity: 42,
-      },
-    ],
+  // 2) Organización demo + su ADMIN
+  const org = await prisma.organization.upsert({
+    where: { slug: "demo" },
+    update: {},
+    create: { name: "Negocio Demo", slug: "demo" },
   });
 
-  console.log(`✅ ${products.count} productos de prueba creados`);
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@demo.com";
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "admin123";
+  await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: {},
+    create: {
+      email: adminEmail,
+      password: await bcrypt.hash(adminPassword, 10),
+      role: Role.ADMIN,
+      mustChangePassword: false,
+      organizationId: org.id,
+    },
+  });
+  console.log(`✅ ADMIN (org demo): ${adminEmail} / ${adminPassword}`);
 
-  // Eliminar clientes existentes para evitar duplicados
-  await prisma.customer.deleteMany({});
+  // 3) Productos demo (scopeados a la org)
+  await prisma.product.deleteMany({ where: { organizationId: org.id } });
+  const baseProducts = [
+    { name: "Laptop HP Pavilion 15", price: 45999.99, description: "Intel i5, 8GB RAM, 512GB SSD", category: "Electrónica", quantity: 15 },
+    { name: "Mouse Logitech MX Master 3", price: 5999.0, description: "Mouse inalámbrico ergonómico", category: "Electrónica", quantity: 45 },
+    { name: "Teclado Mecánico RGB", price: 8500.5, description: "Switches blue retroiluminado", category: "Electrónica", quantity: 30 },
+    { name: "Monitor Samsung 27\"", price: 18999.99, description: "Full HD 75Hz", category: "Electrónica", quantity: 20 },
+    { name: "Silla Ergonómica", price: 12500.0, description: "Soporte lumbar ajustable", category: "Oficina", quantity: 25 },
+    { name: "Escritorio de Madera", price: 28000.0, description: "Madera maciza 150x80cm", category: "Oficina", quantity: 10 },
+    { name: "Cafetera Express", price: 15999.0, description: "Automática 19 bares", category: "Hogar", quantity: 12 },
+    { name: "Taladro Inalámbrico", price: 8999.0, description: "20V con 2 baterías", category: "Herramientas", quantity: 18 },
+    { name: "Auriculares Bluetooth", price: 4999.0, description: "Cancelación de ruido", category: "Electrónica", quantity: 55 },
+    { name: "Cargador USB-C 65W", price: 1500.0, description: "Carga rápida para laptops", category: "Accesorios", quantity: 60 },
+  ];
+  const products = await prisma.product.createMany({
+    data: baseProducts.map((p) => ({
+      ...p,
+      image: "/uploads/placeholder.jpg",
+      organizationId: org.id,
+    })),
+  });
+  console.log(`✅ ${products.count} productos demo creados`);
 
-  // Crear clientes de ejemplo
+  // 4) Clientes demo (scopeados a la org)
+  await prisma.customer.deleteMany({ where: { organizationId: org.id } });
   const customers = await prisma.customer.createMany({
     data: [
-      {
-        name: "Juan Pérez",
-        email: "juan.perez@example.com",
-        phone: "+52 55 1234 5678",
-      },
-      {
-        name: "María García",
-        email: "maria.garcia@example.com",
-        phone: "+52 55 8765 4321",
-      },
-      {
-        name: "Carlos López",
-        email: "carlos.lopez@example.com",
-        phone: "+52 55 2468 1357",
-      },
-      {
-        name: "Ana Martínez",
-        email: "ana.martinez@example.com",
-        phone: "+52 55 9753 8642",
-      },
-      {
-        name: "Roberto Sánchez",
-        email: "roberto.sanchez@example.com",
-        phone: "+52 55 3698 2541",
-      },
+      { name: "Juan Pérez", email: "juan.perez@example.com", phone: "+54 11 1234 5678", organizationId: org.id },
+      { name: "María García", email: "maria.garcia@example.com", phone: "+54 11 8765 4321", organizationId: org.id },
+      { name: "Carlos López", email: "carlos.lopez@example.com", phone: "+54 11 2468 1357", organizationId: org.id },
     ],
   });
+  console.log(`✅ ${customers.count} clientes demo creados`);
 
-  console.log(`✅ ${customers.count} clientes de prueba creados`);
-
-  console.log("\n🎉 Base de datos inicializada correctamente!");
-  console.log("\n📝 Notas:");
-  console.log("   - Los productos usan la imagen '/uploads/placeholder.jpg'");
-  console.log("   - Puedes reemplazar las imágenes desde el frontend");
+  console.log("\n🎉 Base de datos inicializada!");
 }
 
 main()

@@ -7,26 +7,65 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // Prisma 6.x requiere `url` acá. El editor puede avisar que en Prisma 7 esto
+  // se mueve a prisma.config.ts; recién entonces se podrá quitar esta línea.
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id       String  @id @default(uuid())
-  email    String  @unique
-  password String
-  isAdmin  Boolean @default(false)
+enum Role {
+  SUPERADMIN
+  ADMIN
+  EMPLOYEE
+}
 
+// El tenant: cada negocio que compra el ERP es una Organization.
+model Organization {
+  id         String      @id @default(uuid())
+  name       String
+  slug       String      @unique
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  users      User[]
+  products   Product[]
+  customers  Customer[]
+  orders     Order[]
+  quotations Quotation[]
+  sales      Sale[]
+  receipts   Receipt[]
+  counters   Counter[]
+
+  @@map("organizations")
+}
+
+model User {
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  password           String
+  role               Role     @default(EMPLOYEE)
+  mustChangePassword Boolean  @default(true)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  // null SOLO para el SUPERADMIN (la plataforma). Todo otro usuario pertenece a una org.
+  organizationId     String?
+  organization       Organization? @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@map("users")
 }
 
 model Customer {
-  id         String      @id @default(uuid())
-  name       String
-  email      String      @unique
-  phone      String?
-  orders     Order[]
-  quotations Quotation[]
+  id             String       @id @default(uuid())
+  name           String
+  email          String
+  phone          String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  orders         Order[]
+  quotations     Quotation[]
 
+  // Email único POR organización (dos negocios pueden tener el mismo cliente).
+  @@unique([organizationId, email])
+  @@index([organizationId])
   @@map("customers")
 }
 
@@ -38,52 +77,61 @@ model Product {
   category       String
   image          String?
   quantity       Int
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
   orderItems     OrderItem[]
   quotationItems QuotationItem[]
   saleItems      SaleItem[]
 
+  @@index([organizationId])
   @@map("products")
 }
 
 model Order {
-  id          String      @id @default(uuid())
-  customerId  String
-  customer    Customer    @relation(fields: [customerId], references: [id])
-  items       OrderItem[]
-  totalAmount Float
-  status      OrderStatus @default(PENDING)
-  type        OrderType
-  quotationId String?
-  quotation   Quotation?  @relation(fields: [quotationId], references: [id])
-  receipt     String?
-  createdAt   DateTime    @default(now())
+  id             String       @id @default(uuid())
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  items          OrderItem[]
+  totalAmount    Float
+  status         OrderStatus  @default(PENDING)
+  type           OrderType
+  quotationId    String?
+  quotation      Quotation?   @relation(fields: [quotationId], references: [id])
+  receipt        String?
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
+  @@index([organizationId])
   @@map("orders")
 }
 
 model OrderItem {
-  id       String  @id @default(uuid())
-  orderId  String
-  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String
-  product  Product @relation(fields: [productId], references: [id])
-  quantity Int
-  price    Float
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
 
   @@map("order_items")
 }
 
 model Quotation {
-  id          String          @id @default(uuid())
-  customerId  String
-  customer    Customer        @relation(fields: [customerId], references: [id])
-  items       QuotationItem[]
-  totalAmount Float
-  validUntil  DateTime
-  createdAt   DateTime        @default(now())
-  receipt     String?
-  orders      Order[]
+  id             String          @id @default(uuid())
+  customerId     String
+  customer       Customer        @relation(fields: [customerId], references: [id])
+  items          QuotationItem[]
+  totalAmount    Float
+  validUntil     DateTime
+  createdAt      DateTime        @default(now())
+  receipt        String?
+  orders         Order[]
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
 
+  @@index([organizationId])
   @@map("quotations")
 }
 
@@ -100,11 +148,14 @@ model QuotationItem {
 }
 
 model Sale {
-  id          String     @id @default(uuid())
-  items       SaleItem[]
-  totalAmount Float
-  saleDate    DateTime   @default(now())
+  id             String       @id @default(uuid())
+  items          SaleItem[]
+  totalAmount    Float
+  saleDate       DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
+  @@index([organizationId])
   @@map("sales")
 }
 
@@ -123,18 +174,26 @@ model SaleItem {
 }
 
 model Receipt {
-  id              String @id @default(uuid())
+  id              String       @id @default(uuid())
   type            String
   relatedDocument String
   receiptNumber   String
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
 
+  @@index([organizationId])
   @@map("receipts")
 }
 
+// Numeración de comprobantes, ahora POR organización.
 model Counter {
-  id            String @id
-  sequenceValue Int    @default(0)
+  id             String       @id @default(uuid())
+  name           String
+  sequenceValue  Int          @default(0)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
+  @@unique([organizationId, name])
   @@map("counters")
 }
 

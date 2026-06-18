@@ -1,13 +1,19 @@
 import { prisma } from "../config/db";
 
-// Function to get the next sequence number
-const getNextSequenceValue = async (sequenceName: string): Promise<number> => {
-  const sequenceDocument = await prisma.counter.upsert({
-    where: { id: sequenceName },
+/**
+ * Devuelve el siguiente número de secuencia para un comprobante,
+ * SCOPEADO por organización (cada negocio tiene su propia numeración).
+ */
+const getNextSequenceValue = async (
+  organizationId: string,
+  sequenceName: string,
+): Promise<number> => {
+  const counter = await prisma.counter.upsert({
+    where: { organizationId_name: { organizationId, name: sequenceName } },
     update: { sequenceValue: { increment: 1 } },
-    create: { id: sequenceName, sequenceValue: 1 },
+    create: { organizationId, name: sequenceName, sequenceValue: 1 },
   });
-  return sequenceDocument.sequenceValue;
+  return counter.sequenceValue;
 };
 
 export default getNextSequenceValue;

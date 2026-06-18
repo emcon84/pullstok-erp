@@ -1,4 +1,5 @@
 import { prisma } from "../config/db";
+import { requireOrganizationId } from "../config/tenantContext";
 
 interface IProductSale {
   productId: string;
@@ -13,90 +14,82 @@ interface ISaleRequest {
 }
 
 const createSale = async (saleRequest: ISaleRequest) => {
-  let totalAmount = 0;
-  const saleItems: any[] = [];
+  const organizationId = requireOrganizationId();
 
-  for (const productSaleRequest of saleRequest.products) {
-    if (
-      !productSaleRequest.productId ||
-      !productSaleRequest.name ||
-      !productSaleRequest.quantity ||
-      !productSaleRequest.price
-    ) {
-      throw new Error("Missing required fields in product sale request");
-    }
-
-    const product = await prisma.product.findUnique({
-      where: { id: productSaleRequest.productId },
-    });
-
-    if (!product) {
-      throw new Error(
-        `Product with ID ${productSaleRequest.productId} not found`,
-      );
-    }
-
-    const quantity = parseInt(productSaleRequest.quantity.toString());
-    const price = parseFloat(productSaleRequest.price.toString());
-
-    if (product.quantity < quantity) {
-      throw new Error(`Not enough stock for product ${product.name}`);
-    }
-
-    // Actualizar cantidad del producto
-    await prisma.product.update({
-      where: { id: product.id },
-      data: { quantity: product.quantity - quantity },
-    });
-
-    saleItems.push({
-      productId: product.id,
-      name: product.name,
-      quantity: quantity,
-      category: product.category,
-      price: price,
-    });
-
-    totalAmount += price * quantity;
+  if (!Array.isArray(saleRequest.products) || saleRequest.products.length === 0) {
+    throw new Error("La venta debe incluir al menos un producto");
   }
 
-  const sale = await prisma.sale.create({
-    data: {
-      totalAmount,
-      items: {
-        create: saleItems,
-      },
-    },
-    include: {
-      items: true,
-    },
-  });
+  // Toda la venta se ejecuta en una transacción: o se descuenta TODO el stock
+  // y se crea la venta, o no se toca nada. Evita el "stock fantasma".
+  return prisma.$transaction(async (tx) => {
+    let totalAmount = 0;
+    const saleItems: {
+      productId: string;
+      name: string;
+      quantity: number;
+      category: string;
+      price: number;
+    }[] = [];
 
-  return sale;
+    for (const item of saleRequest.products) {
+      if (!item.productId || !item.quantity || !item.price) {
+        throw new Error("Faltan campos requeridos en un producto de la venta");
+      }
+
+      const quantity = parseInt(String(item.quantity), 10);
+      const price = parseFloat(String(item.price));
+
+      const product = await tx.product.findFirst({
+        where: { id: item.productId, organizationId },
+      });
+      if (!product) {
+        throw new Error(`Producto ${item.productId} no encontrado`);
+      }
+      if (product.quantity < quantity) {
+        throw new Error(`Stock insuficiente para el producto ${product.name}`);
+      }
+
+      // Descuento atómico y condicionado: solo descuenta si todavía hay stock.
+      const updated = await tx.product.updateMany({
+        where: { id: product.id, organizationId, quantity: { gte: quantity } },
+        data: { quantity: { decrement: quantity } },
+      });
+      if (updated.count === 0) {
+        throw new Error(`Stock insuficiente para el producto ${product.name}`);
+      }
+
+      saleItems.push({
+        productId: product.id,
+        name: product.name,
+        quantity,
+        category: product.category,
+        price,
+      });
+      totalAmount += price * quantity;
+    }
+
+    return tx.sale.create({
+      data: {
+        organizationId,
+        totalAmount,
+        items: { create: saleItems },
+      },
+      include: { items: true },
+    });
+  });
 };
 
 const getAllSales = async () => {
-  return await prisma.sale.findMany({
-    include: {
-      items: {
-        include: {
-          product: true,
-        },
-      },
-    },
+  return prisma.sale.findMany({
+    include: { items: { include: { product: true } } },
   });
 };
 
 const getSaleById = async (id: string) => {
-  return await prisma.sale.findUnique({
+  return prisma.sale.findFirst({
     where: { id },
-    include: {
-      items: {
-        include: {
-          product: true,
-        },
-      },
-    },
+    include: { items: { include: { product: true } } },
   });
 };
 

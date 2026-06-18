@@ -1,141 +1,139 @@
-import { Request, Response } from 'express';
-import { prisma } from '../config/db';
-import getNextSequenceValue from '../services/secuenceService';
+import { Request, Response } from "express";
+import { prisma } from "../config/db";
+import getNextSequenceValue from "../services/secuenceService";
+import { requireOrganizationId } from "../config/tenantContext";
 
 // Crear una nueva cotización
 const createQuotation = async (req: Request, res: Response) => {
-    try {
-        const { customer, products, totalAmount, validUntil } = req.body;
+  try {
+    const organizationId = requireOrganizationId();
+    const { customer, products, totalAmount, validUntil } = req.body;
 
-        // Obtener el siguiente número secuencial para el comprobante
-        const sequenceNumber = await getNextSequenceValue('receipt');
-        const receiptNumber = sequenceNumber.toString().padStart(4, '0');
+    const sequenceNumber = await getNextSequenceValue(organizationId, "receipt");
+    const receiptNumber = sequenceNumber.toString().padStart(4, "0");
 
-        // Crear la cotización con sus items
-        const newQuotation = await prisma.quotation.create({
-            data: {
-                customerId: customer,
-                totalAmount,
-                validUntil: new Date(validUntil),
-                receipt: receiptNumber,
-                items: {
-                    create: products.map((p: any) => ({
-                        productId: p.product,
-                        quantity: p.quantity,
-                        price: p.price
-                    }))
-                }
-            },
-            include: {
-                items: {
-                    include: {
-                        product: true
-                    }
-                },
-                customer: true
-            }
-        });
+    const newQuotation = await prisma.$transaction(async (tx) => {
+      const quotation = await tx.quotation.create({
+        data: {
+          organizationId,
+          customerId: customer,
+          totalAmount,
+          validUntil: new Date(validUntil),
+          receipt: receiptNumber,
+          items: {
+            create: products.map((p: any) => ({
+              productId: p.product,
+              quantity: p.quantity,
+              price: p.price,
+            })),
+          },
+        },
+        include: {
+          items: { include: { product: true } },
+          customer: true,
+        },
+      });
 
-        // Crear un comprobante para el presupuesto
-        await prisma.receipt.create({
-            data: {
-                type: 'invoice',
-                relatedDocument: newQuotation.id,
-                receiptNumber
-            }
-        });
+      await tx.receipt.create({
+        data: {
+          organizationId,
+          type: "invoice",
+          relatedDocument: quotation.id,
+          receiptNumber,
+        },
+      });
 
-        res.status(201).json(newQuotation);
-    } catch (error: any) {
-        res.status(400).json({ message: error.message });
-    }
+      return quotation;
+    });
+
+    res.status(201).json(newQuotation);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
 };
 
-// Obtener todas las cotizaciones
-const getQuotations = async (req: Request, res: Response) => {
-    try {
-        const quotations = await prisma.quotation.findMany({
-            include: {
-                customer: true,
-                items: {
-                    include: {
-                        product: true
-                    }
-                }
-            }
-        });
-        res.status(200).json(quotations);
-    } catch (error: any) {
-        res.status(500).json({ message: error.message });
-    }
+// Obtener todas las cotizaciones (scopeado por org)
+const getQuotations = async (_req: Request, res: Response) => {
+  try {
+    const quotations = await prisma.quotation.findMany({
+      include: {
+        customer: true,
+        items: { include: { product: true } },
+      },
+    });
+    res.status(200).json(quotations);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 // Obtener una cotización por ID
 const getQuotationById = async (req: Request, res: Response) => {
-    try {
-        const quotation = await prisma.quotation.findUnique({
-            where: { id: req.params.id },
-            include: {
-                customer: true,
-                items: {
-                    include: {
-                        product: true
-                    }
-                }
-            }
-        });
-        if (quotation) {
-            res.status(200).json(quotation);
-        } else {
-            res.status(404).json({ message: 'Quotation not found' });
-        }
-    } catch (error: any) {
-        res.status(500).json({ message: error.message });
+  try {
+    const quotation = await prisma.quotation.findFirst({
+      where: { id: req.params.id },
+      include: {
+        customer: true,
+        items: { include: { product: true } },
+      },
+    });
+    if (quotation) {
+      res.status(200).json(quotation);
+    } else {
+      res.status(404).json({ message: "Quotation not found" });
     }
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 // Actualizar una cotización
 const updateQuotation = async (req: Request, res: Response) => {
-    try {
-        const { products, totalAmount, validUntil } = req.body;
-        
-        // Eliminar items anteriores
-        await prisma.quotationItem.deleteMany({
-            where: { quotationId: req.params.id }
-        });
+  try {
+    const { products, totalAmount, validUntil } = req.body;
+    const id = req.params.id;
 
-        // Actualizar la cotización con nuevos items
-        const quotation = await prisma.quotation.update({
-            where: { id: req.params.id },
-            data: {
-                totalAmount,
-                validUntil: new Date(validUntil),
-                items: {
-                    create: products.map((p: any) => ({
-                        productId: p.product,
-                        quantity: p.quantity,
-                        price: p.price
-                    }))
-                }
-            },
-            include: {
-                items: {
-                    include: {
-                        product: true
-                    }
-                }
-            }
-        });
-
-        res.status(200).json(quotation);
-    } catch (error: any) {
-        res.status(400).json({ message: error.message });
+    // Verificar que la cotización pertenezca a la organización del usuario.
+    const existing = await prisma.quotation.findFirst({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ message: "Quotation not found" });
     }
+
+    const quotation = await prisma.$transaction(async (tx) => {
+      await tx.quotationItem.deleteMany({ where: { quotationId: id } });
+
+      await tx.quotation.updateMany({
+        where: { id },
+        data: {
+          totalAmount,
+          validUntil: new Date(validUntil),
+        },
+      });
+
+      await tx.quotationItem.createMany({
+        data: products.map((p: any) => ({
+          quotationId: id,
+          productId: p.product,
+          quantity: p.quantity,
+          price: p.price,
+        })),
+      });
+
+      return tx.quotation.findFirst({
+        where: { id },
+        include: { items: { include: { product: true } } },
+      });
+    });
+
+    res.status(200).json(quotation);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
 };
 
 export default {
-    createQuotation,
-    getQuotations,
-    getQuotationById,
-    updateQuotation
+  createQuotation,
+  getQuotations,
+  getQuotationById,
+  updateQuotation,
 };

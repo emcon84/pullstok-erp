@@ -14,7 +14,7 @@
     "emitDecoratorMetadata": true, // Permite la generación de metadatos para decoradores
     "experimentalDecorators": true, // Habilita los decoradores experimentales
     "sourceMap": true, // Genera archivos de mapa de origen para depuración
-    "declaration": true // Genera archivos de declaración .d.ts
+    "declaration": false // Es una app (no una librería): no hace falta emitir .d.ts
   },
   "include": [
     "src/**/*" // Incluye todos los archivos en el directorio src
