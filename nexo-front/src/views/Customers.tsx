@@ -1,34 +1,30 @@
-import { IoMdAddCircleOutline } from "react-icons/io";
-import Separator from "../components/atoms/separator";
-import { Title } from "../components/atoms/title";
-import { Button } from "../components/molecules/button";
+import { useState } from "react";
+import { Plus, Pencil, Trash2, Phone, Users } from "lucide-react";
+import { toast } from "react-toastify";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { GenericModal } from "../components/molecules/GenericModal";
 import { ModalContentCustomer } from "../components/molecules/GenericModal/ModalContentCustomer";
-import { useState } from "react";
 import {
   useCreateCustomer,
   useCustomers,
   useDeleteCustomer,
   useUpdateCustomer,
 } from "../components/hooks/useCustomer";
-import { toast } from "react-toastify";
-import { useQueryClient } from "@tanstack/react-query";
-import { Card } from "../components/molecules/card";
 import { Loader } from "../components/atoms/loader";
-import { MdOutlineModeEdit } from "react-icons/md";
-import { IoTrashOutline } from "react-icons/io5";
 
 export const Customers = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [newCustomerName, setNewCustomerName] = useState<string>("");
-  const [newCustomerEmail, setNewCustomerEmail] = useState<string>("");
-  const [newCustomerPhone, setNewCustomerPhone] = useState<string>("");
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerEmail, setNewCustomerEmail] = useState("");
+  const [newCustomerPhone, setNewCustomerPhone] = useState("");
 
   const [editCustomerId, setEditCustomerId] = useState<string | null>(null);
-  const [updatedCustomerName, setUpdatedCustomerName] = useState<string>("");
-  const [updatedCustomerEmail, setUpdatedCustomerEmail] = useState<string>("");
-  const [updatedCustomerPhone, setUpdatedCustomerPhone] = useState<string>("");
+  const [updatedCustomerName, setUpdatedCustomerName] = useState("");
+  const [updatedCustomerEmail, setUpdatedCustomerEmail] = useState("");
+  const [updatedCustomerPhone, setUpdatedCustomerPhone] = useState("");
 
   const { customers, loadingCustomer: loading, errorCustomer } = useCustomers();
   const { submitCustomer, loadingCustomer } = useCreateCustomer();
@@ -37,10 +33,7 @@ export const Customers = () => {
 
   const queryClient = useQueryClient();
 
-  // Define la función openModal
-  const openModal = () => {
-    setIsOpen(true);
-  };
+  const openModal = () => setIsOpen(true);
 
   const handleAddCustomer = async () => {
     submitCustomer(
@@ -63,6 +56,7 @@ export const Customers = () => {
   };
 
   const handleDeleteCustomer = (customerId: string) => {
+    if (!window.confirm("¿Eliminar este cliente?")) return;
     deleteCustomer(customerId, {
       onSuccess: () => {
         toast.success("Cliente eliminado con éxito");
@@ -89,7 +83,6 @@ export const Customers = () => {
 
   const handleSaveEditedCustomer = async () => {
     if (!editCustomerId) return;
-
     updateCustomer(
       {
         id: editCustomerId,
@@ -127,61 +120,92 @@ export const Customers = () => {
 
   if (loading) {
     return (
-      <div className="flex-jc-ac h-100-vh">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <Loader />
       </div>
     );
   }
 
   if (errorCustomer) {
-    return <div>Error loading customer: {errorCustomer.message}</div>;
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        Error al cargar clientes: {errorCustomer.message}
+      </div>
+    );
   }
 
   return (
-    <div className="p-20">
-      <div className="flex-jc-sb">
-        <Title level={1} className="header text-xl mx-20">
-          Clientes
-        </Title>
-        <Button
-          onClick={openModal}
-          iconLeft={
-            <IoMdAddCircleOutline style={{ marginRight: 5 }} size={24} />
-          }
-        >
-          Agregar Cliente
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Clientes</h1>
+          <p className="text-sm text-muted-foreground">
+            {customers?.length ?? 0} cliente
+            {(customers?.length ?? 0) === 1 ? "" : "s"} registrado
+            {(customers?.length ?? 0) === 1 ? "" : "s"}
+          </p>
+        </div>
+        <Button onClick={openModal}>
+          <Plus className="h-4 w-4" />
+          Agregar cliente
         </Button>
       </div>
-      <Separator orientation="horizontal" color="#ccc" thickness="1px" />
 
-      <div className="mx-20">
-        {customers?.map((customer) => {
-          const customerId = customer.id || customer._id || "";
-          return (
-            <Card key={customerId}>
-              <div className="flex-jc-sb py-5 px-10">
-                <div>
-                  <p className="text-lg font-bold my-5">{customer.name}</p>
-                  <p className="my-5">email: {customer.email}</p>
-                  <p className="my-5">teléfono: {customer.phone}</p>
+      {!customers || customers.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center gap-2 p-12 text-center">
+          <Users className="h-8 w-8 text-muted-foreground" />
+          <p className="font-medium">Todavía no hay clientes</p>
+          <p className="text-sm text-muted-foreground">
+            Agregá tu primer cliente para empezar.
+          </p>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {customers.map((customer) => {
+            const customerId = customer.id || customer._id || "";
+            return (
+              <Card key={customerId} className="gap-0 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent font-semibold uppercase text-accent-foreground">
+                      {customer.name?.[0] ?? "C"}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{customer.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {customer.email}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleEditCustomer(customerId)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => handleDeleteCustomer(customerId)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-10">
-                  <MdOutlineModeEdit
-                    size={20}
-                    onClick={() => handleEditCustomer(customerId)}
-                  />
-                  <IoTrashOutline
-                    size={20}
-                    onClick={() => handleDeleteCustomer(customerId)}
-                  />
+                <div className="mt-4 flex items-center gap-2 border-t pt-3 text-sm text-muted-foreground">
+                  <Phone className="h-3.5 w-3.5" />
+                  {customer.phone || "Sin teléfono"}
                 </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Modal para agregar cliente */}
       <GenericModal isOpen={isOpen} onClose={closeModal}>
         <ModalContentCustomer
           name={newCustomerName}
@@ -197,7 +221,6 @@ export const Customers = () => {
         />
       </GenericModal>
 
-      {/* Modal para editar cliente */}
       <GenericModal isOpen={isEditModalOpen} onClose={closeEditModal}>
         <ModalContentCustomer
           name={updatedCustomerName}

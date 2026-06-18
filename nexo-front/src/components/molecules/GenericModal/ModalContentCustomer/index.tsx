@@ -1,7 +1,6 @@
-import { Input } from "../../../atoms/inputs";
-import Separator from "../../../atoms/separator";
-import { Title } from "../../../atoms/title";
-import { Button } from "../../button";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface NewCustomer {
   name: string;
@@ -13,7 +12,7 @@ interface NewCustomer {
   handleSaveCustomer: () => void;
   handleCloseModal: () => void;
   loadingCustomer: boolean;
-  isEditing: boolean; // Añadir esta nueva propiedad
+  isEditing: boolean;
 }
 
 export const ModalContentCustomer: React.FC<NewCustomer> = ({
@@ -26,46 +25,55 @@ export const ModalContentCustomer: React.FC<NewCustomer> = ({
   handleSaveCustomer,
   handleCloseModal,
   loadingCustomer,
-  isEditing, // Recibe la nueva propiedad
+  isEditing,
 }) => {
   return (
-    <div>
-      <div className="modal">
-        <div className="">
-          <Title level={3} className="text-bold">
-            {isEditing ? "Editar Cliente" : "Agregar Nuevo Cliente"}
-          </Title>
-          <Separator orientation="horizontal" color="#ccc" thickness="1px" />
-          <Input
-            type="text"
-            placeholder="Nombre del cliente"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Input
-            type="email"
-            placeholder="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <Input
-            type="text"
-            placeholder="telefono"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-        </div>
-        <div className="flex-je-ac">
-          <Button onClick={handleCloseModal}>Cancelar</Button>
-          <Button
-            onClick={handleSaveCustomer}
-            disabled={loadingCustomer}
-            className="bg-green-500"
-            loading={loadingCustomer}
-          >
-            {loadingCustomer ? "Guardando..." : "Guardar"}
-          </Button>
-        </div>
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">
+          {isEditing ? "Editar cliente" : "Agregar cliente"}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Datos de contacto del cliente.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="c-name">Nombre</Label>
+        <Input
+          id="c-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nombre del cliente"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="c-email">Email</Label>
+        <Input
+          id="c-email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="cliente@mail.com"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="c-phone">Teléfono</Label>
+        <Input
+          id="c-phone"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="+54 11 1234 5678"
+        />
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={handleCloseModal}>
+          Cancelar
+        </Button>
+        <Button onClick={handleSaveCustomer} disabled={loadingCustomer}>
+          {loadingCustomer ? "Guardando..." : "Guardar"}
+        </Button>
       </div>
     </div>
   );
