@@ -24,8 +24,11 @@ api.interceptors.response.use(
 export const login = async (email: string, password: string) => {
   try {
     const data = await loginService(email, password);
-    if (data.token) {
-      localStorage.setItem('token', data.token);
+    // El backend (Fase 1+) devuelve { accessToken, refreshToken, user }.
+    if (data.accessToken) {
+      localStorage.setItem('token', data.accessToken);
+      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
       return true;
     }
     return false;

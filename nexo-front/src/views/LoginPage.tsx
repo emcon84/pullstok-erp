@@ -1,81 +1,103 @@
 import { useState } from "react";
-import "./LoginPage.css";
-import { login } from "../controllers/authController";
 import { useNavigate } from "react-router-dom";
-import { Input } from "../components/atoms/inputs";
-import { Card } from "../components/molecules/card";
-import { LogoMinWhiteText } from "../assets/logo";
-import { Button } from "../components/molecules/button";
-import { Validation } from "../types";
+import { Loader2 } from "lucide-react";
+import { login } from "../controllers/authController";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
 export const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     const success = await login(email, password);
+    setLoading(false);
     if (success) {
-      setLoading(false);
       navigate("/dashboard");
     } else {
-      setError("Invalid credentials. Please try again.");
+      setError("Credenciales inválidas. Probá de nuevo.");
     }
   };
 
-
-  const emailValidations: Validation[] = [
-    { rule: 'required', message: 'El correo electrónico es obligatorio' },
-    { rule: 'email', message: 'Por favor, ingresa un correo electrónico válido' },
-    { rule: 'noSQL', message: 'Entrada inválida' },
-  ];
-  
-  const passwordValidations: Validation[] = [
-    { rule: 'required', message: 'La contraseña es obligatoria' },
-    { rule: 'minLength', value: 8, message: 'La contraseña debe tener al menos 8 caracteres' },
-    { rule: 'noSQL', message: 'Entrada inválida' },
-  ];
-  
-
   return (
-    <>
-      <div className="login-container">
-        <LogoMinWhiteText />
-        <Card>
-          <form className="login-form" onSubmit={handleLogin}>
-            <div className="login-form__input__container">
-              <Input
-                type="text"
-                placeholder="Correo electrónico"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                validationRules={emailValidations}                
-              />
-            </div>
-            <div className="login-form__input__container">
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                validationRules={passwordValidations}
-              />
-            </div>
-            <div className="login-form__input__container">
-              <Button type="submit" disabled={loading} loading={loading}>
-                Login
+    <div className="relative z-10 w-full max-w-md">
+        <div className="mb-8 flex flex-col items-center gap-2 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl font-bold text-primary shadow-lg">
+            N
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            Nexo
+          </h1>
+          <p className="text-sm text-indigo-100">
+            Sistema de gestión de stock
+          </p>
+        </div>
+
+        <Card className="border-white/20 shadow-2xl">
+          <CardHeader>
+            <CardTitle className="text-xl">Iniciar sesión</CardTitle>
+            <CardDescription>
+              Ingresá tus credenciales para continuar
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Correo electrónico</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="vos@negocio.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+
+              {error && (
+                <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading && <Loader2 className="animate-spin" />}
+                {loading ? "Ingresando..." : "Ingresar"}
               </Button>
-              {error && <p style={{ color: "red" }}>{error}</p>}
-            </div>
-          </form>
+            </form>
+          </CardContent>
         </Card>
-      </div>
-    </>
+
+        <p className="mt-6 text-center text-xs text-indigo-100/80">
+          © {new Date().getFullYear()} Nexo · Gestión de stock
+        </p>
+    </div>
   );
 };
