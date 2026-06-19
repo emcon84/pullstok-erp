@@ -30,9 +30,11 @@ const createOrder = async (req: Request, res: Response) => {
           }))
         : products;
 
-    // Numeración del comprobante (por organización).
-    const sequenceNumber = await getNextSequenceValue(organizationId, "receipt");
-    const receiptNumber = sequenceNumber.toString().padStart(4, "0");
+    // Numeración por tipo: el pedido tiene su serie (PED-) y el remito la suya (REM-).
+    const orderSeq = await getNextSequenceValue(organizationId, "order");
+    const orderNumber = `PED-${orderSeq.toString().padStart(4, "0")}`;
+    const receiptSeq = await getNextSequenceValue(organizationId, "receipt");
+    const receiptNumber = `REM-${receiptSeq.toString().padStart(4, "0")}`;
 
     // El pedido es un BORRADOR editable: NO toca stock. Solo la venta descuenta
     // inventario. Por eso un pedido se puede editar/borrar libremente.
@@ -45,7 +47,7 @@ const createOrder = async (req: Request, res: Response) => {
           status: "PENDING",
           type: isSale ? "SALE" : "PURCHASE",
           quotationId: quotationId || null,
-          receipt: receiptNumber,
+          receipt: orderNumber,
           items: {
             create: orderProducts.map((p) => ({
               productId: p.productId,
@@ -173,10 +175,28 @@ const updateOrder = async (req: Request, res: Response) => {
   }
 };
 
+// Delete an order (es un borrador: no toca stock, se puede borrar)
+const deleteOrder = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const existing = await prisma.order.findFirst({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+    // Los items se borran en cascada (onDelete: Cascade en el schema).
+    await prisma.order.deleteMany({ where: { id } });
+    await prisma.receipt.deleteMany({ where: { relatedDocument: id } });
+    res.status(200).json({ message: "Pedido eliminado correctamente" });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 export default {
   createOrder,
   getOrders,
   getOrderById,
   updateOrderStatus,
   updateOrder,
+  deleteOrder,
 };

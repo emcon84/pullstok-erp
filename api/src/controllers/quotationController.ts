@@ -9,8 +9,11 @@ const createQuotation = async (req: Request, res: Response) => {
     const organizationId = requireOrganizationId();
     const { customer, products, totalAmount, validUntil } = req.body;
 
-    const sequenceNumber = await getNextSequenceValue(organizationId, "receipt");
-    const receiptNumber = sequenceNumber.toString().padStart(4, "0");
+    // Numeración por tipo: presupuesto (PRE-) y su remito asociado (REM-).
+    const quotationSeq = await getNextSequenceValue(organizationId, "quotation");
+    const quotationNumber = `PRE-${quotationSeq.toString().padStart(4, "0")}`;
+    const receiptSeq = await getNextSequenceValue(organizationId, "receipt");
+    const receiptNumber = `REM-${receiptSeq.toString().padStart(4, "0")}`;
 
     const newQuotation = await prisma.$transaction(async (tx) => {
       const quotation = await tx.quotation.create({
@@ -19,7 +22,7 @@ const createQuotation = async (req: Request, res: Response) => {
           customerId: customer,
           totalAmount,
           validUntil: new Date(validUntil),
-          receipt: receiptNumber,
+          receipt: quotationNumber,
           items: {
             create: products.map((p: any) => ({
               productId: p.product,
@@ -131,9 +134,32 @@ const updateQuotation = async (req: Request, res: Response) => {
   }
 };
 
+// Eliminar un presupuesto (es una cotización: no toca stock)
+const deleteQuotation = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const existing = await prisma.quotation.findFirst({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ message: "Quotation not found" });
+    }
+    // Desvincular pedidos que referencian este presupuesto (FK).
+    await prisma.order.updateMany({
+      where: { quotationId: id },
+      data: { quotationId: null },
+    });
+    // Los items se borran en cascada (onDelete: Cascade).
+    await prisma.quotation.deleteMany({ where: { id } });
+    await prisma.receipt.deleteMany({ where: { relatedDocument: id } });
+    res.status(200).json({ message: "Presupuesto eliminado correctamente" });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 export default {
   createQuotation,
   getQuotations,
   getQuotationById,
   updateQuotation,
+  deleteQuotation,
 };

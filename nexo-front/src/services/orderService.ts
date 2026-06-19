@@ -34,3 +34,12 @@ export const updateOrder = async (
     },
   });
 };
+
+export const deleteOrder = async (id: string): Promise<void> => {
+  const token = localStorage.getItem('token');
+  await axios.delete(`${API_URL}/orders/${id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};

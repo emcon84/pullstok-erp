@@ -11,6 +11,7 @@ import {
   useCreateOrder,
   useOrders,
   useUpdateOrder,
+  useDeleteOrder,
 } from "../components/hooks/useOrder";
 import { ProductsProps } from "../models/productsModel";
 import { useGetBudgetByID, useGetBudgets } from "../components/hooks/useBudget";
@@ -62,6 +63,14 @@ export const Orders: React.FC = () => {
   const { products } = usePorducts();
   const { submitOrder: createOrder } = useCreateOrder();
   const { updateOrder } = useUpdateOrder();
+  const { deleteOrder } = useDeleteOrder();
+
+  const handleDeleteOrder = (id: string) => {
+    deleteOrder(id, {
+      onSuccess: () => toast.success("Pedido eliminado"),
+      onError: () => toast.error("No se pudo eliminar el pedido"),
+    });
+  };
 
   const openCreate = () => {
     setEditingOrderId(null);
@@ -245,7 +254,12 @@ export const Orders: React.FC = () => {
           {paginatedOrders.map((order) => {
             const orderId = order.id || order._id || "";
             return (
-              <OrderDetail key={orderId} order={order} onEdit={openEdit} />
+              <OrderDetail
+                key={orderId}
+                order={order}
+                onEdit={openEdit}
+                onDelete={handleDeleteOrder}
+              />
             );
           })}
         </div>
@@ -278,9 +292,14 @@ export const Orders: React.FC = () => {
 interface OrderDetailProps {
   order: Order;
   onEdit: (order: Order) => void;
+  onDelete: (id: string) => void;
 }
 
-const OrderDetail: React.FC<OrderDetailProps> = ({ order, onEdit }) => {
+const OrderDetail: React.FC<OrderDetailProps> = ({
+  order,
+  onEdit,
+  onDelete,
+}) => {
   const { data: budget, isLoading } = useGetBudgetByID(order.quotation || "");
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -325,6 +344,7 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order, onEdit }) => {
       )}
       total={order.totalAmount}
       onEdit={() => onEdit(order)}
+      onDelete={() => onDelete(order.id || order._id || "")}
       onExportPDF={() => exportToPDF(buildExport(order))}
       onExportExcel={() => exportToExcel(buildExport(order))}
     />

@@ -38,6 +38,15 @@ export const updateBudget = async (
   });
 };
 
+export const deleteBudget = async (id: string): Promise<void> => {
+  const token = localStorage.getItem('token');
+  await axios.delete(`${API_URL}/quotations/${id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};
+
 export const getBudgetById = async (id: string): Promise<Budget> => {
   const token = localStorage.getItem('token');
   const response = await axios.get(`${API_URL}/quotations/${id}`, {

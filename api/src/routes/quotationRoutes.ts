@@ -23,5 +23,10 @@ router.put(
   validate(updateQuotationSchema),
   quotationController.updateQuotation,
 );
+router.delete(
+  "/:id",
+  authenticateJWT,
+  quotationController.deleteQuotation,
+);
 
 export default router;

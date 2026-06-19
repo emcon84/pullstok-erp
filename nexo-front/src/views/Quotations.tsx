@@ -9,6 +9,7 @@ import {
   useGetBudgets,
   useCreateBudget,
   useUpdateBudget,
+  useDeleteBudget,
 } from "../components/hooks/useBudget";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { ProductsProps } from "../models/productsModel";
@@ -37,6 +38,7 @@ export const Quotations = () => {
   const [initialCustomer, setInitialCustomer] = useState("");
   const { submitBudget } = useCreateBudget();
   const { updateBudget } = useUpdateBudget();
+  const { deleteBudget } = useDeleteBudget();
   const { customers } = useCustomers();
   const { products, getProducts } = usePorducts();
 
@@ -231,6 +233,13 @@ export const Quotations = () => {
                 )}
                 total={budget.totalAmount}
                 onEdit={() => openEdit(budget)}
+                onDelete={() =>
+                  deleteBudget(budgetId, {
+                    onSuccess: () => toast.success("Presupuesto eliminado"),
+                    onError: () =>
+                      toast.error("No se pudo eliminar el presupuesto"),
+                  })
+                }
                 onExportPDF={() => exportToPDF(buildExport(budget))}
                 onExportExcel={() => exportToExcel(buildExport(budget))}
               />

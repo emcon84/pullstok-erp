@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createOrder, getOrders, updateOrder } from '../../services/orderService';
+import { createOrder, getOrders, updateOrder, deleteOrder } from '../../services/orderService';
 import { CreateOrder, Order, UpdateOrder } from '../../models/orderModel';
 
 // Hook para obtener las órdenes
@@ -60,5 +60,20 @@ export const useUpdateOrder = () => {
     updateOrder: mutation.mutate,
     loading: mutation.isPending,
     error: mutation.isError ? mutation.error : null,
+  };
+};
+
+// Hook para eliminar una orden
+export const useDeleteOrder = () => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation<void, Error, string>({
+    mutationFn: deleteOrder,
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    },
+  });
+  return {
+    deleteOrder: mutation.mutate,
+    loading: mutation.isPending,
   };
 };

@@ -7,7 +7,7 @@ const createReceipt = async (req: Request, res: Response) => {
   try {
     const organizationId = requireOrganizationId();
     const sequenceNumber = await getNextSequenceValue(organizationId, "receipt");
-    const receiptNumber = sequenceNumber.toString().padStart(4, "0");
+    const receiptNumber = `REM-${sequenceNumber.toString().padStart(4, "0")}`;
 
     const receipt = await prisma.receipt.create({
       data: {

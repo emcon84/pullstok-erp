@@ -30,5 +30,6 @@ router.put(
   validate(updateOrderSchema),
   orderController.updateOrder,
 );
+router.delete("/:id", authenticateJWT, orderController.deleteOrder);
 
 export default router;

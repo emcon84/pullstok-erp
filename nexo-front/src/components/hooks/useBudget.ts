@@ -1,6 +1,6 @@
 // src/controllers/BudgetController.ts
 import { Budget, CreateBudget } from '../../models/budgetModel';
-import { createBudget, getBudgetById, getBudgets, updateBudget } from '../../services/budgetService';
+import { createBudget, getBudgetById, getBudgets, updateBudget, deleteBudget } from '../../services/budgetService';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 
@@ -66,5 +66,20 @@ export const useUpdateBudget = () => {
     updateBudget: mutation.mutate,
     loading: mutation.isPending,
     error: mutation.isError ? mutation.error : null,
+  };
+};
+
+// Hook para eliminar un presupuesto
+export const useDeleteBudget = () => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation<void, Error, string>({
+    mutationFn: deleteBudget,
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    },
+  });
+  return {
+    deleteBudget: mutation.mutate,
+    loading: mutation.isPending,
   };
 };

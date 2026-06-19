@@ -1,7 +1,17 @@
-import { ReactNode } from "react";
-import { Pencil } from "lucide-react";
+import { ReactNode, useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ExportButtons } from "../ExportButtons";
 
 interface DocItem {
@@ -19,6 +29,7 @@ interface DocumentCardProps {
   onExportPDF?: () => void;
   onExportExcel?: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
   badge?: ReactNode;
 }
 
@@ -33,8 +44,11 @@ export const DocumentCard = ({
   onExportPDF,
   onExportExcel,
   onEdit,
+  onDelete,
   badge,
 }: DocumentCardProps) => {
+  const [showDelete, setShowDelete] = useState(false);
+
   return (
     <Card className="gap-0 p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -62,6 +76,16 @@ export const DocumentCard = ({
               onExportPDF={onExportPDF ?? (() => {})}
               onExportExcel={onExportExcel ?? (() => {})}
             />
+          )}
+          {onDelete && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setShowDelete(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           )}
         </div>
       </div>
@@ -99,6 +123,34 @@ export const DocumentCard = ({
         <span className="text-sm text-muted-foreground">Total</span>
         <span className="text-lg font-bold tabular-nums">{money(total)}</span>
       </div>
+
+      {onDelete && (
+        <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                ¿Eliminar este {label.toLowerCase()}?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. {title} se borrará
+                definitivamente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => {
+                  onDelete();
+                  setShowDelete(false);
+                }}
+              >
+                Sí, eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </Card>
   );
 };
