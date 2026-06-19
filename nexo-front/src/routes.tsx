@@ -2,10 +2,17 @@ import { Suspense, lazy } from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import AuthLayout from "./layouts/AuthLayout";
 import ProtectedLayout from "./layouts/ProtectedLayout";
+import OnboardingLayout from "./layouts/OnboardingLayout";
 import { Loader } from "./components/atoms/loader";
 
 const LoginPage = lazy(() =>
   import("./views/LoginPage").then((m) => ({ default: m.LoginPage })),
+);
+const ChangePassword = lazy(() =>
+  import("./views/ChangePassword").then((m) => ({ default: m.ChangePassword })),
+);
+const Wizard = lazy(() =>
+  import("./views/Onboarding/Wizard").then((m) => ({ default: m.Wizard })),
 );
 const Dashboard = lazy(() =>
   import("./views/Dashboard").then((m) => ({ default: m.Dashboard })),
@@ -44,6 +51,42 @@ const AppRoutes = () => (
               <LoginPage />
             </Suspense>
           </AuthLayout>
+        }
+      />
+
+      {/* Gates previos al dashboard: cambio de contraseña forzado y wizard
+          de onboarding. Viven fuera de ProtectedLayout (no tienen sidebar)
+          pero requieren estar autenticado igual. */}
+      <Route
+        path="/cambiar-contrasena"
+        element={
+          <OnboardingLayout>
+            <Suspense
+              fallback={
+                <div className="flex min-h-[60vh] items-center justify-center">
+                  <Loader />
+                </div>
+              }
+            >
+              <ChangePassword />
+            </Suspense>
+          </OnboardingLayout>
+        }
+      />
+      <Route
+        path="/bienvenida"
+        element={
+          <OnboardingLayout>
+            <Suspense
+              fallback={
+                <div className="flex min-h-[60vh] items-center justify-center">
+                  <Loader />
+                </div>
+              }
+            >
+              <Wizard />
+            </Suspense>
+          </OnboardingLayout>
         }
       />
 

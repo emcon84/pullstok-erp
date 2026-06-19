@@ -14,7 +14,7 @@ export const useCreateSale = () => {
           name: item.product.name,
           price: item.product.price.toString(),
           description: item.product.description || "",
-          category: item.product.category,
+          category: item.product.category || "",
         })),
       };
       await createSale(saleRequest);

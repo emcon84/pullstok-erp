@@ -10,7 +10,11 @@ export interface DataItem {
   name: string;
   image?: string;
   description?: string;
-  category: string;
+  // Alta manual envía categoryId (FK real, ver decisión sdd/onboarding-wizard
+  // /category-contract). `category` queda opcional solo para datos legacy que
+  // todavía puedan traerlo como string de display.
+  categoryId?: string;
+  category?: string;
   price: number | string;
   quantity: number | string;
 }

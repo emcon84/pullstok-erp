@@ -1,13 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { API_URL } from "../../../../constants";
 import { ProductsProps } from "../../../../models/productsModel";
 import { useCreateProduct } from "../../../hooks/useProducts";
 import { DataItem } from "../../../../types";
 import { updateProduct } from "../../../../services/productService";
+import { Category, getCategories } from "../../../../services/onboardingService";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface ModalEditContentProps {
@@ -22,10 +30,17 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
   closeModalEdit,
 }) => {
   const [image, setImage] = useState<File | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const { createProduct, loading } = useCreateProduct();
   const queryClient = useQueryClient();
 
   const isEdit = !!(selectedData?._id || selectedData?.id);
+
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -137,14 +152,27 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="category">Categoría</Label>
-          <Input
-            id="category"
-            name="category"
-            placeholder="Ej: Herramientas"
-            value={selectedData?.category || ""}
-            onChange={handleChange}
-          />
+          <Label htmlFor="categoryId">Categoría</Label>
+          <Select
+            value={selectedData?.categoryId || ""}
+            onValueChange={(value) =>
+              setSelectedData((prevData) => {
+                if (prevData) return { ...prevData, categoryId: value };
+                return { categoryId: value } as unknown as DataItem;
+              })
+            }
+          >
+            <SelectTrigger id="categoryId" className="w-full">
+              <SelectValue placeholder="Elegí una categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="quantity">Cantidad</Label>

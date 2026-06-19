@@ -16,3 +16,23 @@ export const login = async (email: string, password: string) => {
     }
   }
 };
+
+export const changePassword = async (
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> => {
+  try {
+    const token = localStorage.getItem('token');
+    await axios.post(
+      `${API_URL}/auth/change-password`,
+      { currentPassword, newPassword },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || 'Change password failed');
+    } else {
+      throw new Error('An unknown error occurred');
+    }
+  }
+};
