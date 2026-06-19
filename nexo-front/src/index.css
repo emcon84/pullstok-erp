@@ -1,10 +1,5 @@
-/* Orden de cascada: `legacy` (CSS viejo) queda con MENOR prioridad que las
-   utilidades de Tailwind, así lo nuevo gana sin romper lo viejo. */
-@layer legacy, theme, base, components, utilities;
-
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./App.css" layer(legacy);
 
 @custom-variant dark (&:is(.dark *));
 

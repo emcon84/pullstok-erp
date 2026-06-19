@@ -7,7 +7,7 @@ import * as React from "react";
 function App() {
   return (
     <React.StrictMode>
-      <div className="container-app">
+      <div>
         <AppRoutes />
         <ToastContainer />
       </div>
