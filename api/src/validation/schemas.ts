@@ -17,6 +17,20 @@ export const refreshSchema = z.object({
   refreshToken: z.string().min(1, "refreshToken requerido"),
 });
 
+// ---------- Organización ----------
+export const updateOrganizationSchema = z.object({
+  name: z.string().min(1).optional(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  taxId: z.string().optional(),
+  industry: z.enum(["FERRETERIA", "KIOSCO", "INDUMENTARIA", "ALMACEN", "OTHER"]).optional(),
+});
+
+// ---------- Categorías ----------
+export const createCategoriesSchema = z.object({
+  names: z.array(z.string().min(1)).min(1, "Debe enviar al menos una categoría"),
+});
+
 // ---------- Plataforma / usuarios ----------
 export const createOrganizationSchema = z.object({
   organizationName: z.string().min(1),
@@ -35,7 +49,23 @@ export const createUserSchema = z.object({
 });
 
 // ---------- Productos ----------
+// Alta manual single (form de la UI): exige categoryId real, elegido de un
+// <select> poblado con GET /categories. El controller valida que pertenezca a
+// la organización actual antes de crear el producto (decisión #467 — evita
+// que texto libre ensucie el catálogo y evita fuga cross-tenant de categoryId).
 export const createProductSchema = z.object({
+  name: z.string().min(1, "El nombre es requerido"),
+  price: z.coerce.number().nonnegative("El precio no puede ser negativo"),
+  description: z.string().optional(),
+  categoryId: z.string().min(1, "La categoría es requerida"),
+  image: z.string().optional(),
+  quantity: z.coerce.number().int().nonnegative("La cantidad no puede ser negativa"),
+});
+export const updateProductSchema = createProductSchema.partial();
+
+// Bulk JSON / CSV: sigue con `category` (nombre, texto libre) — find-or-create
+// vía resolveCategoryId en productsService.ts. No tiene UI de dropdown.
+const bulkProductSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   price: z.coerce.number().nonnegative("El precio no puede ser negativo"),
   description: z.string().optional(),
@@ -43,8 +73,7 @@ export const createProductSchema = z.object({
   image: z.string().optional(),
   quantity: z.coerce.number().int().nonnegative("La cantidad no puede ser negativa"),
 });
-export const updateProductSchema = createProductSchema.partial();
-export const bulkProductsSchema = z.array(createProductSchema).min(1);
+export const bulkProductsSchema = z.array(bulkProductSchema).min(1);
 
 // ---------- Clientes ----------
 export const createCustomerSchema = z.object({

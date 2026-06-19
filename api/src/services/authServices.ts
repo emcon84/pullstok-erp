@@ -89,6 +89,30 @@ class AuthService {
     });
   }
 
+  /** Devuelve el usuario autenticado + datos de su organización (gates del front: cambio de contraseña, onboarding). */
+  static async me(userId: string) {
+    const user = await basePrisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        organization: {
+          select: { id: true, name: true, onboardingCompletedAt: true },
+        },
+      },
+    });
+    if (!user) {
+      throw new Error("Usuario no encontrado");
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      organizationId: user.organizationId,
+      mustChangePassword: user.mustChangePassword,
+      organization: user.organization,
+    };
+  }
+
   /** SUPERADMIN: crea una organización nueva junto a su usuario ADMIN. */
   static async createOrganizationWithAdmin(params: {
     organizationName: string;

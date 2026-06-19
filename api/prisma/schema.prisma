@@ -17,33 +17,47 @@ enum Role {
   EMPLOYEE
 }
 
+enum Industry {
+  FERRETERIA
+  KIOSCO
+  INDUMENTARIA
+  ALMACEN
+  OTHER
+}
+
 // El tenant: cada negocio que compra el ERP es una Organization.
 model Organization {
-  id         String      @id @default(uuid())
-  name       String
-  slug       String      @unique
-  isActive   Boolean     @default(true)
-  createdAt  DateTime    @default(now())
-  users      User[]
-  products   Product[]
-  customers  Customer[]
-  orders     Order[]
-  quotations Quotation[]
-  sales      Sale[]
-  receipts   Receipt[]
-  counters   Counter[]
+  id                    String      @id @default(uuid())
+  name                  String
+  slug                  String      @unique
+  isActive              Boolean     @default(true)
+  createdAt             DateTime    @default(now())
+  address               String?
+  phone                 String?
+  taxId                 String?
+  industry              Industry    @default(OTHER)
+  onboardingCompletedAt DateTime?
+  users                 User[]
+  products              Product[]
+  categories            Category[]
+  customers             Customer[]
+  orders                Order[]
+  quotations            Quotation[]
+  sales                 Sale[]
+  receipts              Receipt[]
+  counters              Counter[]
 
   @@map("organizations")
 }
 
 model User {
-  id                 String   @id @default(uuid())
-  email              String   @unique
+  id                 String        @id @default(uuid())
+  email              String        @unique
   password           String
-  role               Role     @default(EMPLOYEE)
-  mustChangePassword Boolean  @default(true)
-  isActive           Boolean  @default(true)
-  createdAt          DateTime @default(now())
+  role               Role          @default(EMPLOYEE)
+  mustChangePassword Boolean       @default(true)
+  isActive           Boolean       @default(true)
+  createdAt          DateTime      @default(now())
   // null SOLO para el SUPERADMIN (la plataforma). Todo otro usuario pertenece a una org.
   organizationId     String?
   organization       Organization? @relation(fields: [organizationId], references: [id])
@@ -68,12 +82,24 @@ model Customer {
   @@map("customers")
 }
 
+model Category {
+  id             String       @id @default(uuid())
+  name           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  products       Product[]
+
+  @@unique([organizationId, name])
+  @@map("categories")
+}
+
 model Product {
   id             String          @id @default(uuid())
   name           String
   price          Float
   description    String?
-  category       String
+  categoryId     String?
+  category       Category?       @relation(fields: [categoryId], references: [id])
   image          String?
   quantity       Int
   organizationId String
@@ -83,6 +109,7 @@ model Product {
   saleItems      SaleItem[]
 
   @@index([organizationId])
+  @@index([categoryId])
   @@map("products")
 }
 

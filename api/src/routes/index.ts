@@ -10,6 +10,9 @@ import receiptRoutes from "./receiptRoutes";
 import uploadRoutes from "./cloudinaryRoutes";
 import salesRoutes from "./salesRoutes";
 import healthRoutes from "./healthRoutes";
+import organizationRoutes from "./organizationRoutes";
+import categoryRoutes from "./categoryRoutes";
+import onboardingRoutes from "./onboardingRoutes";
 
 const router = Router();
 
@@ -24,5 +27,8 @@ router.use("/orders", orderRoutes);
 router.use("/quotations", quotationRoutes);
 router.use("/receipts", receiptRoutes);
 router.use("/health", healthRoutes);
+router.use("/organizations", organizationRoutes);
+router.use("/categories", categoryRoutes);
+router.use("/onboarding", onboardingRoutes);
 
 export default router;

@@ -1,13 +1,27 @@
 import { Request, Response } from "express";
 import { prisma } from "../config/db";
-import { bulkAddProducts } from "../services/productsService";
+import { bulkAddProducts, resolveCategoryId } from "../services/productsService";
 import { requireOrganizationId } from "../config/tenantContext";
 
-// Create a new product (organizationId lo inyecta la extension de Prisma)
+// Create a new product (organizationId lo inyecta la extension de Prisma).
+// Alta manual: exige categoryId real (elegido de un <select>), no nombre.
+// Se valida que la categoría exista y pertenezca a la org ANTES del create
+// (findFirst, no findUnique — bloqueado por la extensión multi-tenant de
+// db.ts) para no dejar reventar como error de FK 500 ni filtrar categoryId
+// de otra organización.
 const createProduct = async (req: Request, res: Response) => {
   try {
+    const { categoryId, ...data } = req.body;
+    const category = await prisma.category.findFirst({
+      where: { id: categoryId },
+    });
+    if (!category) {
+      return res
+        .status(400)
+        .json({ message: "La categoría indicada no existe" });
+    }
     const product = await prisma.product.create({
-      data: req.body,
+      data: { ...data, categoryId },
     });
     res.status(201).json(product);
   } catch (error: any) {
@@ -25,7 +39,16 @@ const bulkUploadProducts = async (req: Request, res: Response) => {
         .json({ message: "Request body must be an array of products" });
     }
 
-    const result = await prisma.product.createMany({ data: products });
+    const organizationId = requireOrganizationId();
+    // Secuencial (no Promise.all): si dos filas comparten nombre de categoría,
+    // la segunda debe reusar la Category creada por la primera, no competir.
+    const data = [];
+    for (const { category, ...rest } of products) {
+      const categoryId = await resolveCategoryId(category, organizationId);
+      data.push({ ...rest, categoryId });
+    }
+
+    const result = await prisma.product.createMany({ data });
     res
       .status(201)
       .json({ message: "Products added successfully", data: result });
@@ -60,7 +83,7 @@ const getProducts = async (req: Request, res: Response) => {
       where.name = { contains: name as string, mode: "insensitive" };
     }
     if (category) {
-      where.category = category as string;
+      where.category = { name: category as string };
     }
     if (minPrice || maxPrice) {
       where.price = {};

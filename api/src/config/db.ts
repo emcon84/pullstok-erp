@@ -16,6 +16,7 @@ const basePrisma = new PrismaClient({ adapter });
 // compuesta (organizationId + name) de forma explícita.
 const TENANT_MODELS = new Set([
   "Product",
+  "Category",
   "Customer",
   "Order",
   "Quotation",

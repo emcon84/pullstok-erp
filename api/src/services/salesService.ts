@@ -42,6 +42,7 @@ const createSale = async (saleRequest: ISaleRequest) => {
 
       const product = await tx.product.findFirst({
         where: { id: item.productId, organizationId },
+        include: { category: true },
       });
       if (!product) {
         throw new Error(`Producto ${item.productId} no encontrado`);
@@ -63,7 +64,10 @@ const createSale = async (saleRequest: ISaleRequest) => {
         productId: product.id,
         name: product.name,
         quantity,
-        category: product.category,
+        // SaleItem.category es snapshot histórico (string), no FK: queda
+        // congelado el nombre de categoría al momento de la venta aunque la
+        // Category se renombre o borre después.
+        category: product.category?.name ?? "Sin categoría",
         price,
       });
       totalAmount += price * quantity;

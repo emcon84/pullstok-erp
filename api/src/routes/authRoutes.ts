@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { login, refresh, changePassword } from "../controllers/authController";
+import { login, refresh, changePassword, me } from "../controllers/authController";
 import { authenticate } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validate";
 import {
@@ -12,6 +12,7 @@ const router = Router();
 
 router.post("/login", validate(loginSchema), login);
 router.post("/refresh", validate(refreshSchema), refresh);
+router.get("/me", authenticate, me);
 router.post(
   "/change-password",
   authenticate,
