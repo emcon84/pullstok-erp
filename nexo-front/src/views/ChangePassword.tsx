@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { changePassword } from "../services/authService";
+import { getMe } from "../services/onboardingService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,10 +29,12 @@ export const ChangePassword = () => {
     setError(null);
     try {
       await changePassword(currentPassword, newPassword);
-      // Invalida ['me'] para que el resto de la app vea mustChangePassword=false.
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
-      // Esta ruta vive fuera de ProtectedLayout, así que nadie reacciona a
-      // la invalidación: hay que navegar explícito al wizard de onboarding.
+      // Esta ruta vive fuera de ProtectedLayout (único observer de ['me']),
+      // así que invalidateQueries no dispara ningún fetch real (no hay
+      // observer activo) y el cache queda con la foto vieja. fetchQuery
+      // fuerza un fetch imperativo y deja el resultado fresco en cache
+      // ANTES de navegar, sin depender de observers montados.
+      await queryClient.fetchQuery({ queryKey: ["me"], queryFn: getMe });
       navigate("/bienvenida");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ocurrió un error");

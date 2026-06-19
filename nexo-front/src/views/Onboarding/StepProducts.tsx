@@ -26,6 +26,7 @@ import {
   Category,
   completeOnboarding,
   getCategories,
+  getMe,
 } from "../../services/onboardingService";
 
 interface StepProductsProps {
@@ -54,6 +55,31 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
       .then(setCategories)
       .catch(() => setCategories([]));
   }, []);
+
+  // Hay un producto "a medio cargar" si el usuario tocó cualquiera de los campos.
+  const hasPendingProduct =
+    name.trim() !== "" ||
+    price !== "" ||
+    quantity !== "" ||
+    categoryId !== "";
+
+  // Valida el form de alta manual. Devuelve un mensaje de error o null si está OK.
+  // Reusado por handleAddProduct y handleFinish para no divergir.
+  const validatePendingProduct = (): string | null => {
+    if (name.trim() === "") return "Ingresá un nombre para el producto que estás cargando";
+    const parsedPrice = parseFloat(price);
+    if (price === "" || Number.isNaN(parsedPrice) || parsedPrice < 0)
+      return "Ingresá un precio válido para el producto que estás cargando";
+    const parsedQuantity = Number(quantity);
+    if (
+      quantity === "" ||
+      !Number.isInteger(parsedQuantity) ||
+      parsedQuantity < 0
+    )
+      return "Ingresá una cantidad válida para el producto que estás cargando";
+    if (!categoryId) return "Elegí una categoría para el producto que estás cargando";
+    return null;
+  };
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,11 +110,40 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
   };
 
   const handleFinish = async () => {
-    setFinishing(true);
     setFinishError(null);
+
+    // Auto-agregar: si hay un producto a medio cargar, lo creamos antes de
+    // finalizar para no descartar silenciosamente los datos del form.
+    if (hasPendingProduct) {
+      const validationError = validatePendingProduct();
+      if (validationError) {
+        setFinishError(validationError);
+        return;
+      }
+    }
+
+    setFinishing(true);
     try {
+      if (hasPendingProduct) {
+        await createProduct({
+          name,
+          price: parseFloat(price || "0"),
+          quantity: parseInt(quantity || "0", 10),
+          categoryId,
+        });
+        setProductCount((prev) => prev + 1);
+        setName("");
+        setPrice("");
+        setQuantity("");
+        setCategoryId("");
+      }
       await completeOnboarding();
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      // Esta ruta vive fuera de ProtectedLayout (único observer de ['me']),
+      // así que invalidateQueries no dispara ningún fetch real (no hay
+      // observer activo) y el cache queda con la foto vieja. fetchQuery
+      // fuerza un fetch imperativo y deja el resultado fresco en cache
+      // ANTES de navegar, sin depender de observers montados.
+      await queryClient.fetchQuery({ queryKey: ["me"], queryFn: getMe });
       navigate("/dashboard");
     } catch (err) {
       setFinishError(err instanceof Error ? err.message : "Ocurrió un error");
@@ -204,7 +259,11 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
         <Button type="button" variant="outline" onClick={onBack}>
           Atrás
         </Button>
-        <Button type="button" onClick={handleFinish} disabled={finishing}>
+        <Button
+          type="button"
+          onClick={handleFinish}
+          disabled={finishing || addingProduct}
+        >
           {finishing && <Loader2 className="animate-spin" />}
           {finishing ? "Finalizando..." : "Finalizar"}
         </Button>
