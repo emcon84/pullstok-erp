@@ -1,0 +1,68 @@
+---
+const pains = [
+  {
+    icon: "eye",
+    title: "Stock a ojo",
+    description:
+      "No sabés qué te queda hasta que lo vas a buscar al depósito y no está. Comprás de más o te quedás sin vender por las dudas.",
+  },
+  {
+    icon: "book",
+    title: "Ventas en cuaderno",
+    description:
+      "Anotás en una libreta o en una planilla que se desactualiza sola. Si se rompe la compu o se pierde el cuaderno, perdés todo.",
+  },
+  {
+    icon: "chart",
+    title: "Decisiones a ciegas",
+    description:
+      "No tenés un número real de cuánto vendiste, qué se mueve y qué no. Decidís con la cabeza, no con datos.",
+  },
+];
+
+const icons: Record<string, string> = {
+  eye: `<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>`,
+  book: `<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>`,
+  chart: `<path d="M3 3v18h18"/><path d="M18.4 9 12 15.4 8.6 12 3.4 17.2"/>`,
+};
+---
+
+<section class="bg-muted/60 px-4 py-20 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-7xl">
+    <div class="mx-auto max-w-2xl text-center">
+      <h2 class="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+        ¿Te suena familiar?
+      </h2>
+      <p class="mt-4 text-lg text-muted-foreground">
+        Así laburan miles de comercios todos los días. No es tu culpa, es que
+        nadie te dio una herramienta hecha para vos.
+      </p>
+    </div>
+
+    <div class="mt-12 grid gap-6 sm:grid-cols-3">
+      {
+        pains.map((pain) => (
+          <div class="card items-start">
+            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                set:html={icons[pain.icon]}
+              />
+            </div>
+            <h3 class="text-lg font-semibold text-foreground">{pain.title}</h3>
+            <p class="text-sm text-muted-foreground">{pain.description}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

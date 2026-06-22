@@ -1,0 +1,112 @@
+---
+---
+
+<section class="relative overflow-hidden px-4 pt-16 pb-20 sm:px-6 sm:pt-24 sm:pb-28 lg:px-8">
+  <!-- Glow de marca decorativo -->
+  <div
+    class="pointer-events-none absolute inset-x-0 -top-40 -z-10 flex justify-center blur-3xl"
+    aria-hidden="true"
+  >
+    <div
+      class="h-72 w-[40rem] rounded-full opacity-30"
+      style="background: linear-gradient(120deg, var(--brand-cyan), var(--color-primary), var(--brand-orange));"
+    >
+    </div>
+  </div>
+
+  <div class="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2 lg:gap-16">
+    <div class="text-center lg:text-left">
+      <span class="badge mb-5 bg-accent text-accent-foreground">
+        Hecho para comercios de Argentina y LatAm
+      </span>
+      <h1 class="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+        Tu negocio ordenado, <span class="text-primary">sin planillas de Excel</span>
+      </h1>
+      <p class="mx-auto mt-6 max-w-xl text-lg text-muted-foreground lg:mx-0">
+        Nexo es el sistema de gestión para kioscos, almacenes, ferreterías e
+        indumentaria. Controlá stock, vendé y mirá tus números reales, todo
+        desde un solo lugar — sin cuaderno, sin planilla, sin dolores de cabeza.
+      </p>
+      <div class="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:items-start lg:justify-start">
+        <a href="#precios" class="btn btn-primary w-full sm:w-auto">
+          Probar gratis
+        </a>
+        <a href="#caracteristicas" class="btn btn-outline w-full sm:w-auto">
+          Ver características
+        </a>
+      </div>
+      <p class="mt-4 text-sm text-muted-foreground">
+        No necesitás tarjeta de crédito para empezar.
+      </p>
+    </div>
+
+    <div class="relative mx-auto w-full max-w-lg lg:mx-0">
+      <!-- Mockup placeholder del dashboard -->
+      <div class="card border-2 shadow-xl">
+        <div class="flex items-center justify-between border-b border-border pb-4">
+          <div class="flex items-center gap-2">
+            <span class="h-3 w-3 rounded-full bg-brand-red"></span>
+            <span class="h-3 w-3 rounded-full bg-brand-orange"></span>
+            <span class="h-3 w-3 rounded-full bg-success"></span>
+          </div>
+          <span class="text-xs font-medium text-muted-foreground">Dashboard · Hoy</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="rounded-lg bg-muted p-4">
+            <p class="text-xs text-muted-foreground">Ventas de hoy</p>
+            <p class="mt-1 text-2xl font-bold text-foreground">$ 184.350</p>
+            <p class="mt-1 text-xs font-medium text-success">+12% vs. ayer</p>
+          </div>
+          <div class="rounded-lg bg-muted p-4">
+            <p class="text-xs text-muted-foreground">Stock crítico</p>
+            <p class="mt-1 text-2xl font-bold text-foreground">7 ítems</p>
+            <p class="mt-1 text-xs font-medium text-warning">Revisar reposición</p>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <p class="text-xs font-semibold text-muted-foreground">Productos más vendidos</p>
+          {
+            [
+              { name: "Cemento Loma Negra 50kg", pct: 86 },
+              { name: "Cerveza Quilmes 1L", pct: 64 },
+              { name: "Remera básica algodón", pct: 41 },
+            ].map((item) => (
+              <div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-foreground">{item.name}</span>
+                  <span class="text-muted-foreground">{item.pct}%</span>
+                </div>
+                <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    class="h-full rounded-full bg-primary"
+                    style={`width: ${item.pct}%`}
+                  />
+                </div>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+
+      <!-- Badge flotante decorativo -->
+      <div
+        class="card absolute -bottom-6 -left-6 hidden w-44 gap-2 p-4 sm:flex"
+        aria-hidden="true"
+      >
+        <div class="flex items-center gap-2">
+          <span
+            class="flex h-8 w-8 items-center justify-center rounded-full bg-success/15 text-success"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+          </span>
+          <div>
+            <p class="text-xs font-semibold text-foreground">Venta registrada</p>
+            <p class="text-xs text-muted-foreground">Stock actualizado</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

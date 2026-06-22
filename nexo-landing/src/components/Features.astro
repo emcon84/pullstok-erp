@@ -1,0 +1,105 @@
+---
+const features = [
+  {
+    icon: "box",
+    title: "Stock en tiempo real",
+    description:
+      "Sabés exactamente qué tenés y cuánto, sin ir a contar al depósito. Se actualiza solo con cada venta.",
+  },
+  {
+    icon: "cart",
+    title: "Ventas",
+    description:
+      "Registrá ventas en segundos. Descuentan stock al toque y quedan guardadas, sin vuelta atrás ni dolores de cabeza.",
+  },
+  {
+    icon: "file-text",
+    title: "Presupuestos y pedidos",
+    description:
+      "Armá borradores editables para tus clientes. No tocan el stock hasta que se confirman como venta.",
+  },
+  {
+    icon: "truck",
+    title: "Remitos",
+    description:
+      "Generá el comprobante de entrega de mercadería en un click, prolijo y con tus datos.",
+  },
+  {
+    icon: "users",
+    title: "Clientes",
+    description:
+      "Tu cartera de clientes ordenada: datos de contacto, historial de compras y cuenta corriente.",
+  },
+  {
+    icon: "store",
+    title: "Usuarios y roles",
+    description:
+      "Sumá a tu equipo con accesos diferenciados según el rol de cada uno, sin compartir una sola cuenta para todos.",
+  },
+  {
+    icon: "wand",
+    title: "Onboarding guiado",
+    description:
+      "Un wizard te ayuda a cargar los datos de tu negocio, tu rubro y tus productos (manual o por CSV) desde el día uno.",
+  },
+  {
+    icon: "bar-chart",
+    title: "Reportes y dashboard",
+    description:
+      "Métricas claras de qué se vende, qué no, y cómo viene el mes. Para decidir con números, no a ojo.",
+  },
+];
+
+const icons: Record<string, string> = {
+  box: `<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/>`,
+  cart: `<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>`,
+  "file-text": `<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>`,
+  truck: `<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>`,
+  users: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>`,
+  store: `<path d="M2 7h20l-1.4 6.3a2 2 0 0 1-2 1.7H5.4a2 2 0 0 1-2-1.7L2 7Z"/><path d="M4 7V4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v3"/><path d="M9 21V14h6v7"/>`,
+  wand: `<path d="m6 21 12-12"/><path d="m15 6 3 3"/><path d="M9 3v3"/><path d="M3 9h3"/><path d="M18 3v3"/><path d="M21 9h-3"/>`,
+  "bar-chart": `<line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/>`,
+};
+---
+
+<section id="caracteristicas" class="px-4 py-20 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-7xl">
+    <div class="mx-auto max-w-2xl text-center">
+      <h2 class="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+        Todo lo que tu negocio necesita, en un solo lugar
+      </h2>
+      <p class="mt-4 text-lg text-muted-foreground">
+        Nada de módulos que no vas a usar. Lo justo y necesario para manejar
+        tu día a día sin perder tiempo.
+      </p>
+    </div>
+
+    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {
+        features.map((feature) => (
+          <div class="card gap-3 p-6">
+            <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                set:html={icons[feature.icon]}
+              />
+            </div>
+            <h3 class="text-base font-semibold text-foreground">
+              {feature.title}
+            </h3>
+            <p class="text-sm text-muted-foreground">{feature.description}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
