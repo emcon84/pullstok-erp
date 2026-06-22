@@ -5,6 +5,7 @@ import productController, {
 import { authenticateJWT } from "../middlewares/authMiddleware";
 import { upload } from "../middlewares/uploadMiddleware";
 import { validate } from "../middlewares/validate";
+import { checkProductLimit } from "../middlewares/planLimitMiddleware";
 import {
   createProductSchema,
   updateProductSchema,
@@ -17,6 +18,7 @@ router.post(
   "/",
   authenticateJWT,
   validate(createProductSchema),
+  checkProductLimit,
   productController.createProduct,
 );
 router.post(

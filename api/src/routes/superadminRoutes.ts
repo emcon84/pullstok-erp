@@ -1,11 +1,17 @@
 import { Router } from "express";
 import { authenticate, requireRole } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validate";
-import { createOrganizationSchema } from "../validation/schemas";
+import {
+  createOrganizationSchema,
+  updateOrganizationPlanSchema,
+  registerBillingPaymentSchema,
+} from "../validation/schemas";
 import {
   createOrganization,
   listOrganizations,
   setOrganizationActive,
+  updateOrganizationPlan,
+  registerOrganizationBilling,
 } from "../controllers/superadminController";
 
 const router = Router();
@@ -20,5 +26,15 @@ router.post(
 );
 router.get("/organizations", listOrganizations);
 router.patch("/organizations/:id/active", setOrganizationActive);
+router.patch(
+  "/organizations/:id/plan",
+  validate(updateOrganizationPlanSchema),
+  updateOrganizationPlan,
+);
+router.patch(
+  "/organizations/:id/billing",
+  validate(registerBillingPaymentSchema),
+  registerOrganizationBilling,
+);
 
 export default router;

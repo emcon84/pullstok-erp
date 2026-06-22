@@ -1,6 +1,6 @@
 import { basePrisma } from "../config/db";
 import bcrypt from "bcryptjs";
-import { Role } from "@prisma/client";
+import { Role, Plan } from "@prisma/client";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -9,9 +9,25 @@ import {
 
 class AuthService {
   static async login(email: string, password: string) {
-    const user = await basePrisma.user.findUnique({ where: { email } });
+    const user = await basePrisma.user.findUnique({
+      where: { email },
+      include: { organization: true },
+    });
     if (!user || !user.isActive) {
       throw new Error("Credenciales inválidas");
+    }
+
+    // Kill switch: si el usuario pertenece a una organización (el SUPERADMIN
+    // tiene organizationId=null y nunca pasa por este chequeo) y esa
+    // organización fue suspendida por el superadmin, se rechaza el login.
+    // Riesgo aceptado: una sesión ya iniciada antes de la suspensión sigue
+    // viva hasta que expire el access token (JWT_EXPIRES_IN, hasta 8h),
+    // porque el middleware `authenticate` no vuelve a consultar la DB en
+    // cada request (ver design de planes-y-billing).
+    if (user.organizationId && !user.organization?.isActive) {
+      throw new Error(
+        "Tu organización está suspendida, contactá al administrador.",
+      );
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -51,9 +67,21 @@ class AuthService {
       throw new Error("El token provisto no es un refresh token");
     }
 
-    const user = await basePrisma.user.findUnique({ where: { id: payload.id } });
+    const user = await basePrisma.user.findUnique({
+      where: { id: payload.id },
+      include: { organization: true },
+    });
     if (!user || !user.isActive) {
       throw new Error("Usuario no válido");
+    }
+
+    // Mismo kill switch que en login (ver comentario ahí): refresh también
+    // debe rechazar usuarios de una organización suspendida, si no el access
+    // token se sigue renovando indefinidamente sin re-chequear el estado.
+    if (user.organizationId && !user.organization?.isActive) {
+      throw new Error(
+        "Tu organización está suspendida, contactá al administrador.",
+      );
     }
 
     const accessToken = generateAccessToken({
@@ -95,7 +123,14 @@ class AuthService {
       where: { id: userId },
       include: {
         organization: {
-          select: { id: true, name: true, onboardingCompletedAt: true },
+          select: {
+            id: true,
+            name: true,
+            onboardingCompletedAt: true,
+            plan: true,
+            paidUntil: true,
+            isActive: true,
+          },
         },
       },
     });
@@ -119,8 +154,9 @@ class AuthService {
     slug: string;
     adminEmail: string;
     adminPassword: string;
+    plan?: Plan;
   }) {
-    const { organizationName, slug, adminEmail, adminPassword } = params;
+    const { organizationName, slug, adminEmail, adminPassword, plan } = params;
 
     const existing = await basePrisma.user.findUnique({
       where: { email: adminEmail },
@@ -134,6 +170,7 @@ class AuthService {
       data: {
         name: organizationName,
         slug,
+        plan: plan ?? Plan.BASICO,
         users: {
           create: {
             email: adminEmail,

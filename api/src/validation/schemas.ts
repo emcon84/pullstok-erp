@@ -40,6 +40,15 @@ export const createOrganizationSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "slug: solo minúsculas, números y guiones"),
   adminEmail: z.email(),
   adminPassword: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+  plan: z.enum(["BASICO", "PRO", "PREMIUM"]).optional(),
+});
+
+export const updateOrganizationPlanSchema = z.object({
+  plan: z.enum(["BASICO", "PRO", "PREMIUM"]),
+});
+
+export const registerBillingPaymentSchema = z.object({
+  action: z.literal("pay"),
 });
 
 export const createUserSchema = z.object({

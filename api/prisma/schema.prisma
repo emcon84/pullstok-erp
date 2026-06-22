@@ -25,6 +25,12 @@ enum Industry {
   OTHER
 }
 
+enum Plan {
+  BASICO
+  PRO
+  PREMIUM
+}
+
 // El tenant: cada negocio que compra el ERP es una Organization.
 model Organization {
   id                    String      @id @default(uuid())
@@ -37,6 +43,8 @@ model Organization {
   taxId                 String?
   industry              Industry    @default(OTHER)
   onboardingCompletedAt DateTime?
+  plan                  Plan        @default(BASICO)
+  paidUntil             DateTime?
   users                 User[]
   products              Product[]
   categories            Category[]
