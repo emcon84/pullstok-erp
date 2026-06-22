@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { login } from "../controllers/authController";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+const DEMO_EMAIL = "admin@demo.com";
+const DEMO_PASSWORD = "admin123";
+
 export const LoginPage = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [searchParams] = useSearchParams();
+  const isDemoMode = Boolean(searchParams.get("demo"));
+  const [email, setEmail] = useState(isDemoMode ? DEMO_EMAIL : "");
+  const [password, setPassword] = useState(isDemoMode ? DEMO_PASSWORD : "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -61,6 +66,12 @@ export const LoginPage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {isDemoMode && (
+              <p className="mb-4 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
+                🎯 Modo demo — credenciales de prueba ya cargadas. Hacé clic
+                en Ingresar para probar Pullstok.
+              </p>
+            )}
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Correo electrónico</Label>

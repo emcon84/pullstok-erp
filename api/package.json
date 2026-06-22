@@ -10,6 +10,7 @@
     "build": "node build.js",
     "start": "node dist/bundle.js",
     "seed": "ts-node prisma/seed.ts",
+    "reset:demo": "ts-node prisma/reset-demo.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"

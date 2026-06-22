@@ -2,6 +2,7 @@
 import Logo from "@/components/Logo.astro";
 
 const APP_URL = "https://app.pullstok.com";
+const DEMO_URL = "https://app.pullstok.com/?demo=1";
 
 const links = [
   { href: "#caracteristicas", label: "Características" },
@@ -43,7 +44,7 @@ const links = [
       >
         Ingresar
       </a>
-      <a href="#precios" class="btn btn-primary">Probar gratis</a>
+      <a href={DEMO_URL} class="btn btn-primary">Probá el demo gratis</a>
     </div>
 
     <!-- Toggle mobile -->
@@ -89,7 +90,7 @@ const links = [
         >
           Ingresar
         </a>
-        <a href="#precios" class="btn btn-primary mt-1 w-full">Probar gratis</a>
+        <a href={DEMO_URL} class="btn btn-primary mt-1 w-full">Probá el demo gratis</a>
       </div>
     </details>
   </nav>
