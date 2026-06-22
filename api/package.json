@@ -1,5 +1,5 @@
 {
-  "name": "api-pulse",
+  "name": "api-pullstok",
   "version": "1.0.0",
   "description": "",
   "main": "src/server.ts",

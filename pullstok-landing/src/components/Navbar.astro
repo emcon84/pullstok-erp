@@ -1,0 +1,96 @@
+---
+import Logo from "@/components/Logo.astro";
+
+const APP_URL = "https://app.pullstok.com";
+
+const links = [
+  { href: "#caracteristicas", label: "Características" },
+  { href: "#precios", label: "Precios" },
+  { href: "#faq", label: "FAQ" },
+];
+---
+
+<header
+  class="sticky top-0 z-50 w-full border-b border-border/80 bg-background/80 backdrop-blur-md"
+>
+  <nav
+    class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8"
+    aria-label="Navegación principal"
+  >
+    <a href="#" class="shrink-0" aria-label="Pullstok, ir al inicio">
+      <Logo class="h-7" />
+    </a>
+
+    <ul class="hidden items-center gap-8 md:flex">
+      {
+        links.map((link) => (
+          <li>
+            <a
+              href={link.href}
+              class="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {link.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+
+    <div class="hidden items-center gap-3 md:flex">
+      <a
+        href={APP_URL}
+        class="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        Ingresar
+      </a>
+      <a href="#precios" class="btn btn-primary">Probar gratis</a>
+    </div>
+
+    <!-- Toggle mobile -->
+    <details class="relative md:hidden">
+      <summary
+        class="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-md border border-border [&::-webkit-details-marker]:hidden"
+        aria-label="Abrir menú"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          ><line x1="4" x2="20" y1="6" y2="6"></line><line
+            x1="4"
+            x2="20"
+            y1="12"
+            y2="12"></line><line x1="4" x2="20" y1="18" y2="18"></line></svg
+        >
+      </summary>
+      <div
+        class="absolute right-0 top-12 flex w-56 flex-col gap-1 rounded-lg border border-border bg-card p-2 shadow-md"
+      >
+        {
+          links.map((link) => (
+            <a
+              href={link.href}
+              class="rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
+            >
+              {link.label}
+            </a>
+          ))
+        }
+        <hr class="my-1 border-border" />
+        <a
+          href={APP_URL}
+          class="rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
+        >
+          Ingresar
+        </a>
+        <a href="#precios" class="btn btn-primary mt-1 w-full">Probar gratis</a>
+      </div>
+    </details>
+  </nav>
+</header>

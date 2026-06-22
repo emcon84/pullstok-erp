@@ -1,12 +1,12 @@
 {
-  "name": "pulse-erp",
+  "name": "pullstok-erp",
   "private": true,
   "version": "1.0.0",
-  "description": "Pulse ERP - sistema de stock multi-tenant",
+  "description": "Pullstok ERP - sistema de stock multi-tenant",
   "scripts": {
     "dev:api": "pnpm --filter ./api dev",
-    "dev:front": "pnpm --filter ./pulse-front dev",
-    "dev:landing": "pnpm --filter ./pulse-landing dev",
+    "dev:front": "pnpm --filter ./pullstok-front dev",
+    "dev:landing": "pnpm --filter ./pullstok-landing dev",
     "build": "pnpm -r build"
   },
   "engines": {

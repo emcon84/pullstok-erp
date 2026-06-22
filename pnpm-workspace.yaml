@@ -1,4 +1,4 @@
 packages:
   - "api"
-  - "pulse-front"
-  - "pulse-landing"
+  - "pullstok-front"
+  - "pullstok-landing"
