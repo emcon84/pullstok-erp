@@ -1,476 +1,207 @@
-# Guía de Deployment - Pullstok en VPS Hostinger
+# Guía de Deployment — Pullstok ERP (VPS)
 
-Esta guía te ayudará a migrar tu aplicación Pullstok (Frontend + API) a tu VPS en Hostinger.
+Monorepo pnpm con tres workspaces: `api` (Express + Prisma 7 + PostgreSQL), `pullstok-front` (React + Vite SPA) y `pullstok-landing` (Astro estático). Deploy root en el VPS: `/var/www/pullstok`.
 
-## 📋 Prerequisitos
-
-- Acceso SSH a tu VPS de Hostinger
-- Dominio configurado (opcional, pero recomendado)
-- Credenciales de MongoDB (local en el VPS o MongoDB Atlas)
-
-## 🚀 Paso 1: Preparar el VPS
-
-### 1.1 Conectar al VPS via SSH
-
-```bash
-ssh usuario@tu-ip-vps
-# o
-ssh usuario@tu-dominio.com
-```
-
-### 1.2 Actualizar el sistema
+## Prerequisitos (instalar una sola vez en el VPS)
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-```
 
-### 1.3 Instalar Node.js (v18 o superior)
-
-```bash
-# Instalar Node.js 20.x LTS
+# Node.js 20 LTS
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
+node --version   # v20.x
 
-# Verificar instalación
-node --version
-npm --version
-```
+# pnpm 10 (vía corepack, viene con node 20+)
+sudo corepack enable
+corepack prepare pnpm@10 --activate
+pnpm --version   # 10.x
 
-### 1.4 Instalar PM2 (Process Manager)
-
-```bash
+# PM2
 sudo npm install -g pm2
-```
 
-### 1.5 Instalar Nginx
-
-```bash
+# Nginx
 sudo apt install -y nginx
-```
 
-### 1.6 Instalar MongoDB (si quieres DB local) - OPCIONAL
+# PostgreSQL 17
+sudo apt install -y postgresql-17
 
-```bash
-# MongoDB Community Edition
-curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-archive-keyring.gpg
+# Certbot
+sudo apt install -y certbot python3-certbot-nginx
 
-echo "deb [ signed-by=/usr/share/keyrings/mongodb-archive-keyring.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-
-sudo apt update
-sudo apt install -y mongodb-org
-
-# Iniciar MongoDB
-sudo systemctl start mongod
-sudo systemctl enable mongod
-```
-
-**Alternativa:** Puedes usar MongoDB Atlas (cloud) - más recomendado para producción.
-
-### 1.7 Instalar Git
-
-```bash
+# Git
 sudo apt install -y git
 ```
 
----
+## Setup inicial (una sola vez)
 
-## 📦 Paso 2: Clonar y Configurar el Proyecto
-
-### 2.1 Crear directorio para la aplicación
+### 1. Clonar el repo
 
 ```bash
 sudo mkdir -p /var/www
-cd /var/www
+sudo git clone https://github.com/emcon84/pullstok-erp.git /var/www/pullstok
+sudo chown -R "$USER":"$USER" /var/www/pullstok
+cd /var/www/pullstok
 ```
 
-### 2.2 Clonar tu repositorio (o subir archivos)
-
-**Opción A: Con Git**
+### 2. Crear la base de datos y el usuario
 
 ```bash
-sudo git clone https://github.com/tu-usuario/nexo.git
-cd nexo
+sudo -u postgres psql
 ```
 
-**Opción B: Subir archivos manualmente**
+```sql
+CREATE DATABASE pullstok;
+CREATE USER pullstok_user WITH ENCRYPTED PASSWORD 'elegí-una-password-segura';
+GRANT ALL PRIVILEGES ON DATABASE pullstok TO pullstok_user;
 
-```bash
-# Desde tu máquina local, comprime tu proyecto
-tar -czf nexo.tar.gz api/ nexo-front/
-
-# Sube al VPS usando scp
-scp nexo.tar.gz usuario@tu-ip-vps:/tmp/
-
-# En el VPS, descomprime
-cd /var/www
-sudo tar -xzf /tmp/nexo.tar.gz
-sudo mv nexo-* nexo  # Si el nombre es diferente
+-- PostgreSQL 17 revoca privilegios por default sobre el schema "public".
+-- Sin esto, Prisma falla al crear tablas con "permission denied for schema public".
+\c pullstok
+ALTER SCHEMA public OWNER TO pullstok_user;
+GRANT ALL ON SCHEMA public TO pullstok_user;
+\q
 ```
 
----
+### 3. Variables de entorno
 
-## ⚙️ Paso 3: Configurar la API
-
-### 3.1 Instalar dependencias
-
-```bash
-cd /var/www/nexo/api
-sudo npm install --production
-```
-
-### 3.2 Configurar variables de entorno
-
-```bash
-sudo nano .env
-```
-
-Agrega lo siguiente (ajusta con tus valores):
+**`api/.env`**:
 
 ```env
-MONGO_URI=mongodb://localhost:27017/nexo
-# o si usas MongoDB Atlas:
-# MONGO_URI=mongodb+srv://usuario:password@cluster.mongodb.net/nexo
-
-JWT_SECRET=tu_secret_key_muy_segura_aqui_123456789
-
-CLOUDINARY_CLOUD_NAME=tu_cloud_name
-CLOUDINARY_API_KEY=tu_api_key
-CLOUDINARY_API_SECRET=tu_api_secret
-
+DATABASE_URL="postgresql://pullstok_user:elegí-una-password-segura@localhost:5432/pullstok"
+JWT_SECRET="secreto-largo-y-random"
 PORT=5000
 NODE_ENV=production
+
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+
+# Overrides de seed (ver paso 7) — evitan dejar el superadmin default en prod
+SEED_SUPERADMIN_EMAIL=tu-email-real@dominio.com
+SEED_SUPERADMIN_PASSWORD=otra-password-segura-y-distinta
 ```
 
-Guarda con `Ctrl + X`, luego `Y`, luego `Enter`.
-
-### 3.3 Compilar el proyecto
-
-```bash
-sudo npm run build
-```
-
-### 3.4 Crear directorio de logs
-
-```bash
-sudo mkdir -p logs
-```
-
-### 3.5 Iniciar la API con PM2
-
-```bash
-sudo pm2 start ecosystem.config.js
-sudo pm2 save
-sudo pm2 startup
-```
-
-Esto ejecutará un comando que debes copiar y ejecutar para que PM2 se inicie automáticamente al reiniciar el servidor.
-
-### 3.6 Verificar que la API está corriendo
-
-```bash
-sudo pm2 status
-sudo pm2 logs nexo-api --lines 50
-```
-
----
-
-## 🎨 Paso 4: Configurar el Frontend
-
-### 4.1 Configurar variable de entorno
-
-```bash
-cd /var/www/nexo/nexo-front
-sudo nano .env
-```
-
-Agrega:
+**`pullstok-front/.env`** (se hornea en build time, Vite lo inyecta como string literal):
 
 ```env
-VITE_API_URL=https://tu-dominio.com/api
-# o si aún no tienes dominio:
-# VITE_API_URL=http://tu-ip-vps/api
+VITE_API_URL=https://app.pullstok.com/api
 ```
 
-### 4.2 Instalar dependencias
+### 4. Instalar dependencias (monorepo completo)
 
 ```bash
-sudo npm install
+cd /var/www/pullstok
+pnpm install --frozen-lockfile
 ```
 
-### 4.3 Compilar para producción
+### 5. Generar Prisma Client y compilar
 
 ```bash
-sudo npm run build
+pnpm --filter ./api exec prisma generate
+pnpm -r build
 ```
 
-Esto creará una carpeta `dist` con los archivos optimizados.
+Esto produce:
+- `api/dist/bundle.js` (esbuild bundle único)
+- `pullstok-front/dist/` (estáticos Vite)
+- `pullstok-landing/dist/` (estáticos Astro)
 
-### 4.4 Copiar archivos compilados a la carpeta de Nginx
+### 6. Migraciones
 
 ```bash
-sudo mkdir -p /var/www/nexo-front
-sudo cp -r dist/* /var/www/nexo-front/
-sudo chown -R www-data:www-data /var/www/nexo-front
+cd /var/www/pullstok/api
+set -a; . ./.env; set +a
+pnpm exec prisma migrate deploy
 ```
 
----
+### 7. Seed (manual, una sola vez)
 
-## 🌐 Paso 5: Configurar Nginx
-
-### 5.1 Crear archivo de configuración
+**Importante:** sin los overrides `SEED_SUPERADMIN_EMAIL` / `SEED_SUPERADMIN_PASSWORD` en `api/.env`, el seed crea el superadmin con credenciales públicas hardcodeadas en el repo (`superadmin@nexo.com` / `superadmin123`) — verdadero riesgo de seguridad en un repo público. Definí esas dos variables en `api/.env` ANTES de seedear.
 
 ```bash
-sudo nano /etc/nginx/sites-available/nexo
+cd /var/www/pullstok/api
+set -a; . ./.env; set +a
+pnpm exec ts-node prisma/seed.ts
 ```
 
-Copia el contenido del archivo `nginx-config.conf` que creé en el proyecto y **reemplaza `tu-dominio.com` con tu dominio real o IP**.
-
-### 5.2 Habilitar el sitio
+### 8. Arrancar la API con PM2
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/nexo /etc/nginx/sites-enabled/
+cd /var/www/pullstok/api
+set -a; . ./.env; set +a
+pm2 start dist/bundle.js --name pullstok-api
+pm2 save
+pm2 startup   # copiar y correr el comando que imprime, para que PM2 sobreviva reboots
 ```
 
-### 5.3 Eliminar configuración por defecto (opcional)
+### 9. Nginx (dos vhosts)
+
+Copiá `nginx-config.conf` (en la raíz del repo) a `/etc/nginx/sites-available/pullstok` — ya tiene los dos server blocks (landing en `pullstok.com`/`www.pullstok.com`, app+API en `app.pullstok.com`).
 
 ```bash
-sudo rm /etc/nginx/sites-enabled/default
-```
-
-### 5.4 Probar la configuración
-
-```bash
+sudo cp /var/www/pullstok/nginx-config.conf /etc/nginx/sites-available/pullstok
+sudo ln -s /etc/nginx/sites-available/pullstok /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
+sudo systemctl reload nginx
 ```
 
-Si todo está OK, verás:
-
-```
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-```
-
-### 5.5 Reiniciar Nginx
+### 10. HTTPS con certbot
 
 ```bash
-sudo systemctl restart nginx
-sudo systemctl enable nginx
+sudo certbot --nginx -d pullstok.com -d www.pullstok.com -d app.pullstok.com
 ```
 
----
-
-## 🔒 Paso 6: Configurar HTTPS con Let's Encrypt (OPCIONAL pero RECOMENDADO)
-
-### 6.1 Instalar Certbot
-
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-```
-
-### 6.2 Obtener certificado SSL
-
-```bash
-sudo certbot --nginx -d tu-dominio.com -d www.tu-dominio.com
-```
-
-Sigue las instrucciones. Certbot configurará automáticamente Nginx para HTTPS.
-
-### 6.3 Renovación automática
-
-Certbot instalará un cronjob automático, pero puedes verificar:
+Certbot agrega los bloques `listen 443 ssl`, instala los certificados y convierte los bloques `listen 80` en redirects HTTP→HTTPS. Verificá la renovación automática:
 
 ```bash
 sudo certbot renew --dry-run
 ```
 
----
+## Redeploy (cambios posteriores)
 
-## 🔥 Paso 7: Configurar Firewall
-
-```bash
-# Permitir OpenSSH
-sudo ufw allow OpenSSH
-
-# Permitir HTTP y HTTPS
-sudo ufw allow 'Nginx Full'
-
-# Habilitar firewall
-sudo ufw enable
-
-# Ver estado
-sudo ufw status
-```
-
----
-
-## ✅ Paso 8: Actualizar CORS en la API
-
-Ya tienes configurado el CORS en tu API, pero asegúrate de actualizar las URLs:
-
-```javascript
-// En api/src/app.ts
-app.use(
-  cors({
-    origin: [
-      "https://tu-dominio.com",
-      "http://tu-dominio.com",
-      "http://localhost:5173", // Para desarrollo local
-    ],
-  }),
-);
-```
-
-Después de modificar:
+Todo el flujo de arriba (pull, install, generate, build, migrate, restart PM2, reload nginx) está automatizado en `deploy.sh`:
 
 ```bash
-cd /var/www/nexo/api
-sudo npm run build
-sudo pm2 restart nexo-api
+cd /var/www/pullstok
+./deploy.sh
 ```
 
----
+El script es idempotente — seguro de re-correr. **No** corre el seed (es un paso manual, ver punto 7) y **nunca** toca `api/uploads/` (ahí vive el contenido subido por los usuarios; no se borra ni se sobreescribe en un redeploy).
 
-## 🧪 Paso 9: Probar la Aplicación
+## Backups
 
-1. Abre tu navegador
-2. Ve a `http://tu-dominio.com` o `http://tu-ip-vps`
-3. Deberías ver tu frontend de React
-4. Prueba el login y otras funcionalidades
-
----
-
-## 📊 Comandos Útiles
-
-### PM2 (Gestión de la API)
+`backup.sh` hace un `pg_dump` de la base `pullstok` en formato custom (`-Fc`, restaurable con `pg_restore`) y purga backups con más de 7 días. Pensado para correr por cron como root:
 
 ```bash
-sudo pm2 status              # Ver estado de procesos
-sudo pm2 logs nexo-api       # Ver logs en tiempo real
-sudo pm2 restart nexo-api    # Reiniciar la API
-sudo pm2 stop nexo-api       # Detener la API
-sudo pm2 delete nexo-api     # Eliminar del PM2
-sudo pm2 monit               # Monitor interactivo
+sudo crontab -e
+# 0 2 * * * /var/www/pullstok/backup.sh >> /var/log/pullstok-backup.log 2>&1
 ```
 
-### Nginx
+## Comandos útiles
 
 ```bash
-sudo nginx -t                     # Probar configuración
-sudo systemctl restart nginx      # Reiniciar Nginx
-sudo systemctl status nginx       # Ver estado
-sudo tail -f /var/log/nginx/error.log  # Ver errores
-```
-
-### Logs
-
-```bash
-# API
-sudo pm2 logs nexo-api
+# PM2
+pm2 status
+pm2 logs pullstok-api
+pm2 restart pullstok-api --update-env
 
 # Nginx
-sudo tail -f /var/log/nginx/access.log
+sudo nginx -t
+sudo systemctl reload nginx
 sudo tail -f /var/log/nginx/error.log
+
+# Postgres
+sudo -u postgres psql -d pullstok
 ```
 
----
+## Troubleshooting
 
-## 🔄 Actualizar la Aplicación
+**La API no arranca:** `pm2 logs pullstok-api --lines 100`. Revisar que `api/.env` tenga `DATABASE_URL` correcto y que postgres esté arriba (`sudo systemctl status postgresql`).
 
-### Actualizar la API
+**502 Bad Gateway:** la API no está escuchando en el puerto 5000, o no matchea con el `proxy_pass` de nginx. Chequear `pm2 status` y que `PORT=5000` en `api/.env`.
 
-```bash
-cd /var/www/nexo/api
-sudo git pull  # Si usas Git
-sudo npm install --production
-sudo npm run build
-sudo pm2 restart nexo-api
-```
+**El front no le pega a la API:** `VITE_API_URL` se hornea en build time — si lo cambiás, hay que volver a correr `pnpm --filter ./pullstok-front build` (o `pnpm -r build`), no alcanza con reiniciar nginx.
 
-### Actualizar el Frontend
-
-```bash
-cd /var/www/nexo/nexo-front
-sudo git pull  # Si usas Git
-sudo npm install
-sudo npm run build
-sudo cp -r dist/* /var/www/nexo-front/
-```
-
----
-
-## 🐛 Troubleshooting
-
-### La API no arranca
-
-```bash
-sudo pm2 logs nexo-api --lines 100
-# Revisa las variables de entorno en .env
-# Verifica que MongoDB esté corriendo: sudo systemctl status mongod
-```
-
-### Error 502 Bad Gateway
-
-```bash
-# Verifica que la API esté corriendo
-sudo pm2 status
-
-# Revisa logs de Nginx
-sudo tail -f /var/log/nginx/error.log
-```
-
-### El frontend no carga la API
-
-- Verifica la variable `VITE_API_URL` en el `.env` del frontend
-- Verifica la configuración de CORS en `api/src/app.ts`
-- Revisa la consola del navegador (F12) para ver errores
-
-### Problemas de permisos
-
-```bash
-# Frontend
-sudo chown -R www-data:www-data /var/www/nexo-front
-
-# API logs
-sudo chmod -R 755 /var/www/nexo/api/logs
-```
-
----
-
-## 📝 Checklist Final
-
-- [ ] VPS actualizado y configurado
-- [ ] Node.js, PM2, Nginx instalados
-- [ ] MongoDB configurado (local o Atlas)
-- [ ] API clonada y configurada con .env
-- [ ] API compilada y corriendo con PM2
-- [ ] Frontend compilado y copiado a /var/www/nexo-front
-- [ ] Nginx configurado y corriendo
-- [ ] CORS actualizado en la API
-- [ ] Firewall configurado
-- [ ] (Opcional) HTTPS con Let's Encrypt
-- [ ] Aplicación funcionando correctamente
-
----
-
-## 💡 Recomendaciones de Seguridad
-
-1. **Cambia el puerto SSH por defecto** (22) a otro puerto
-2. **Usa claves SSH** en lugar de contraseñas
-3. **Configura fail2ban** para proteger contra ataques de fuerza bruta
-4. **Mantén el sistema actualizado** regularmente
-5. **Usa variables de entorno seguras** y nunca las subas a Git
-6. **Habilita HTTPS** con Let's Encrypt
-7. **Realiza backups** regulares de tu base de datos
-
----
-
-## 🆘 Soporte
-
-Si encuentras problemas durante el deployment, revisa:
-
-- Logs de PM2: `sudo pm2 logs`
-- Logs de Nginx: `/var/log/nginx/error.log`
-- Estado de servicios: `sudo systemctl status nginx mongod`
-
----
-
-¡Listo! Tu aplicación Pullstok debería estar corriendo en tu VPS de Hostinger. 🎉
+**Error de permisos en schema `public` al migrar:** ver el paso 2 (`ALTER SCHEMA public OWNER TO pullstok_user`) — PostgreSQL 17 cambió los privilegios default sobre `public`.

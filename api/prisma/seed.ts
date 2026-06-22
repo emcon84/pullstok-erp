@@ -50,16 +50,16 @@ async function main() {
   // 3) Productos demo (scopeados a la org)
   await prisma.product.deleteMany({ where: { organizationId: org.id } });
   const baseProducts = [
-    { name: "Laptop HP Pavilion 15", price: 45999.99, description: "Intel i5, 8GB RAM, 512GB SSD", category: "Electrónica", quantity: 15 },
-    { name: "Mouse Logitech MX Master 3", price: 5999.0, description: "Mouse inalámbrico ergonómico", category: "Electrónica", quantity: 45 },
-    { name: "Teclado Mecánico RGB", price: 8500.5, description: "Switches blue retroiluminado", category: "Electrónica", quantity: 30 },
-    { name: "Monitor Samsung 27\"", price: 18999.99, description: "Full HD 75Hz", category: "Electrónica", quantity: 20 },
-    { name: "Silla Ergonómica", price: 12500.0, description: "Soporte lumbar ajustable", category: "Oficina", quantity: 25 },
-    { name: "Escritorio de Madera", price: 28000.0, description: "Madera maciza 150x80cm", category: "Oficina", quantity: 10 },
-    { name: "Cafetera Express", price: 15999.0, description: "Automática 19 bares", category: "Hogar", quantity: 12 },
-    { name: "Taladro Inalámbrico", price: 8999.0, description: "20V con 2 baterías", category: "Herramientas", quantity: 18 },
-    { name: "Auriculares Bluetooth", price: 4999.0, description: "Cancelación de ruido", category: "Electrónica", quantity: 55 },
-    { name: "Cargador USB-C 65W", price: 1500.0, description: "Carga rápida para laptops", category: "Accesorios", quantity: 60 },
+    { name: "Laptop HP Pavilion 15", price: 45999.99, description: "Intel i5, 8GB RAM, 512GB SSD", quantity: 15 },
+    { name: "Mouse Logitech MX Master 3", price: 5999.0, description: "Mouse inalámbrico ergonómico", quantity: 45 },
+    { name: "Teclado Mecánico RGB", price: 8500.5, description: "Switches blue retroiluminado", quantity: 30 },
+    { name: "Monitor Samsung 27\"", price: 18999.99, description: "Full HD 75Hz", quantity: 20 },
+    { name: "Silla Ergonómica", price: 12500.0, description: "Soporte lumbar ajustable", quantity: 25 },
+    { name: "Escritorio de Madera", price: 28000.0, description: "Madera maciza 150x80cm", quantity: 10 },
+    { name: "Cafetera Express", price: 15999.0, description: "Automática 19 bares", quantity: 12 },
+    { name: "Taladro Inalámbrico", price: 8999.0, description: "20V con 2 baterías", quantity: 18 },
+    { name: "Auriculares Bluetooth", price: 4999.0, description: "Cancelación de ruido", quantity: 55 },
+    { name: "Cargador USB-C 65W", price: 1500.0, description: "Carga rápida para laptops", quantity: 60 },
   ];
   const products = await prisma.product.createMany({
     data: baseProducts.map((p) => ({
