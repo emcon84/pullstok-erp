@@ -27,7 +27,13 @@ export const LoginPage = () => {
     const success = await login(email, password);
     setLoading(false);
     if (success) {
-      navigate("/dashboard");
+      // El SUPERADMIN va al panel de plataforma; el resto al dashboard del
+      // negocio. (ProtectedLayout igual rebota al superadmin si cae acá.)
+      const stored = localStorage.getItem("user");
+      const role = stored ? JSON.parse(stored).role : null;
+      navigate(
+        role === "SUPERADMIN" ? "/superadmin/organizaciones" : "/dashboard",
+      );
     } else {
       setError("Credenciales inválidas. Probá de nuevo.");
     }

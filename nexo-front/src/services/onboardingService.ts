@@ -8,6 +8,8 @@ export type Industry =
   | "ALMACEN"
   | "OTHER";
 
+export type Plan = "BASICO" | "PRO" | "PREMIUM";
+
 export interface Organization {
   id: string;
   name: string;
@@ -16,6 +18,14 @@ export interface Organization {
   taxId?: string | null;
   industry?: Industry;
   onboardingCompletedAt: string | null;
+  // Plan/billing (sdd/planes-y-billing): opcionales porque el backend de
+  // getMe (api/src/services/authServices.ts, AuthService.me) TODAVÍA no los
+  // incluye en el select de organization (solo id/name/onboardingCompletedAt
+  // a la fecha de esta fase) — quedan listos en el tipo para cuando viajen,
+  // y el gate de suspensión trata su ausencia como "activo" (ver ProtectedLayout).
+  plan?: Plan;
+  paidUntil?: string | null;
+  isActive?: boolean;
 }
 
 export interface Me {

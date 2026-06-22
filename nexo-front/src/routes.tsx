@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import AuthLayout from "./layouts/AuthLayout";
 import ProtectedLayout from "./layouts/ProtectedLayout";
 import OnboardingLayout from "./layouts/OnboardingLayout";
+import SuperadminLayout from "./layouts/SuperadminLayout";
 import { Loader } from "./components/atoms/loader";
 
 const LoginPage = lazy(() =>
@@ -13,6 +14,11 @@ const ChangePassword = lazy(() =>
 );
 const Wizard = lazy(() =>
   import("./views/Onboarding/Wizard").then((m) => ({ default: m.Wizard })),
+);
+const OrganizationSuspended = lazy(() =>
+  import("./views/OrganizationSuspended").then((m) => ({
+    default: m.OrganizationSuspended,
+  })),
 );
 const Dashboard = lazy(() =>
   import("./views/Dashboard").then((m) => ({ default: m.Dashboard })),
@@ -31,6 +37,11 @@ const SalesPage = lazy(() =>
 );
 const Customers = lazy(() =>
   import("./views/Customers").then((m) => ({ default: m.Customers })),
+);
+const OrganizationsList = lazy(() =>
+  import("./views/superadmin/OrganizationsList").then((m) => ({
+    default: m.OrganizationsList,
+  })),
 );
 
 const AppRoutes = () => (
@@ -89,6 +100,22 @@ const AppRoutes = () => (
           </OnboardingLayout>
         }
       />
+      <Route
+        path="/organizacion-suspendida"
+        element={
+          <OnboardingLayout>
+            <Suspense
+              fallback={
+                <div className="flex min-h-[60vh] items-center justify-center">
+                  <Loader />
+                </div>
+              }
+            >
+              <OrganizationSuspended />
+            </Suspense>
+          </OnboardingLayout>
+        }
+      />
 
       {/* Rutas autenticadas: MainLayout persistente, solo el contenido suspende */}
       <Route element={<ProtectedLayout />}>
@@ -98,6 +125,13 @@ const AppRoutes = () => (
         <Route path="/facturas" element={<Comprobations />} />
         <Route path="/Ventas" element={<SalesPage />} />
         <Route path="/Clientes" element={<Customers />} />
+      </Route>
+
+      {/* Panel superadmin (sdd/planes-y-billing): rutas de plataforma, fuera
+          de ProtectedLayout. Guard propio en SuperadminLayout (rol !==
+          SUPERADMIN -> /dashboard). */}
+      <Route element={<SuperadminLayout />}>
+        <Route path="/superadmin/organizaciones" element={<OrganizationsList />} />
       </Route>
     </Routes>
   </Router>
