@@ -1,4 +1,4 @@
 packages:
   - "api"
-  - "nexo-front"
-  - "nexo-landing"
+  - "pulse-front"
+  - "pulse-landing"

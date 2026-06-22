@@ -1,4 +1,4 @@
-# Nexo ERP — notas de trabajo
+# Pulse ERP — notas de trabajo
 
 ## Ruteo de modelos (ahorro de tokens — IMPORTANTE)
 - **Haiku** → exploración, análisis, lecturas masivas de archivos. Delegar a subagente (`Agent` con `model: "haiku"`) para no ensuciar el contexto principal.
@@ -13,6 +13,6 @@
 ## Stack / contexto
 Detalle completo en Engram (project `nexo-erp`).
 - **Backend** (`api/`): Express + Prisma 7 + PostgreSQL, multi-tenant (orgId + extension anti-fuga), auth 3 roles + JWT, Zod, pnpm.
-- **Front** (`nexo-front/`): React + Vite + Tailwind v4 + shadcn/ui (design system migrado completo).
+- **Front** (`pulse-front/`): React + Vite + Tailwind v4 + shadcn/ui (design system migrado completo).
 - **Dev**: DB docker `nexo_db_dev:5434`; API :5000; front :5173. Demo: `admin@demo.com` / `admin123`.
 - **PWA**: fuera de alcance por ahora (decisión del usuario).

@@ -4,7 +4,7 @@
 			"path": "api"
 		},
 		{
-			"path": "nexo-front"
+			"path": "pulse-front"
 		}
 	],
 	"settings": {}

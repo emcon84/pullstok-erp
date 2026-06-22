@@ -1,6 +1,6 @@
-# Guía de Deployment - Nexo en VPS Hostinger
+# Guía de Deployment - Pulse en VPS Hostinger
 
-Esta guía te ayudará a migrar tu aplicación Nexo (Frontend + API) a tu VPS en Hostinger.
+Esta guía te ayudará a migrar tu aplicación Pulse (Frontend + API) a tu VPS en Hostinger.
 
 ## 📋 Prerequisitos
 
@@ -473,4 +473,4 @@ Si encuentras problemas durante el deployment, revisa:
 
 ---
 
-¡Listo! Tu aplicación Nexo debería estar corriendo en tu VPS de Hostinger. 🎉
+¡Listo! Tu aplicación Pulse debería estar corriendo en tu VPS de Hostinger. 🎉

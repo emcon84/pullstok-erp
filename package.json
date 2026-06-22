@@ -1,12 +1,12 @@
 {
-  "name": "nexo-erp",
+  "name": "pulse-erp",
   "private": true,
   "version": "1.0.0",
-  "description": "Nexo ERP - sistema de stock multi-tenant",
+  "description": "Pulse ERP - sistema de stock multi-tenant",
   "scripts": {
     "dev:api": "pnpm --filter ./api dev",
-    "dev:front": "pnpm --filter ./nexo-front dev",
-    "dev:landing": "pnpm --filter ./nexo-landing dev",
+    "dev:front": "pnpm --filter ./pulse-front dev",
+    "dev:landing": "pnpm --filter ./pulse-landing dev",
     "build": "pnpm -r build"
   },
   "engines": {

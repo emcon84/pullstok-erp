@@ -1,0 +1,77 @@
+---
+// Acordeón accesible con <details>/<summary> nativo — sin JS, sin isla.
+// Cumple semántica e interactividad sin costo de hidratación.
+const faqs = [
+  {
+    question: "¿Necesito tarjeta para la prueba gratis?",
+    answer:
+      "No. Podés crear tu cuenta y usar Pulse sin poner ningún dato de pago. Cuando quieras pasar a un plan pago, ahí sí te lo vamos a pedir.",
+  },
+  {
+    question: "¿Puedo cambiar de plan más adelante?",
+    answer:
+      "Sí, en cualquier momento. Si tu negocio crece, subís de plan; si necesitás menos, bajás. Sin penalidades ni vueltas.",
+  },
+  {
+    question: "¿Sirve para mi rubro?",
+    answer:
+      "Pulse está pensado para ferreterías, kioscos, indumentaria, almacenes y comercios en general. En el onboarding elegís tu rubro y te configuramos las categorías sugeridas para arrancar más rápido.",
+  },
+  {
+    question: "¿Mis datos están seguros?",
+    answer:
+      "Sí. Cada negocio tiene sus datos completamente aislados del resto de los clientes de Pulse (arquitectura multi-tenant), y la información viaja siempre cifrada.",
+  },
+  {
+    question: "¿Cómo cargo mis productos?",
+    answer:
+      "Como prefieras: a mano, producto por producto, o todos de una vez importando un archivo Excel/CSV. El asistente de carga te guía en ambos casos.",
+  },
+  {
+    question: "¿Hay permanencia mínima?",
+    answer:
+      "No. Podés cancelar cuando quieras, no exigimos ningún contrato ni permanencia mínima.",
+  },
+];
+---
+
+<section id="faq" class="bg-muted/60 px-4 py-20 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-3xl">
+    <div class="text-center">
+      <h2 class="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+        Preguntas frecuentes
+      </h2>
+    </div>
+
+    <div class="mt-10 flex flex-col gap-3">
+      {
+        faqs.map((faq) => (
+          <details class="card group p-0 [&_summary::-webkit-details-marker]:hidden">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 p-5 text-left text-base font-semibold text-foreground">
+              {faq.question}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="shrink-0 text-muted-foreground transition-transform group-open:rotate-45"
+                aria-hidden="true"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </summary>
+            <p class="px-5 pb-5 text-sm text-muted-foreground">
+              {faq.answer}
+            </p>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>
