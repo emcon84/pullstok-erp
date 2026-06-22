@@ -1,34 +1,24 @@
-// uploadRoutes.ts
+// imageRoutes.ts — product image upload backed by Cloudflare R2.
+// (File name kept as cloudinaryRoutes for import-path back-compat; Cloudinary is no longer used.)
 import express from "express";
 import multer from "multer";
-import path from "path";
+import { uploadImageToR2 } from "../config/storage";
 
 const router = express.Router();
 
-// Configuración de multer para guardar imágenes localmente
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/"); // Carpeta donde se guardan las imágenes
-  },
-  filename: (req, file, cb) => {
-    // Generar nombre único: timestamp + extensión original
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
+// memoryStorage: handlers receive req.file.buffer (no disk writes) so we can
+// stream straight to R2.
+const upload = multer({ storage: multer.memoryStorage() });
 
-const upload = multer({ storage });
-
-// Ruta para subir imágenes
+// Ruta para subir imágenes -> POST /api/image/upload
 router.post("/upload", upload.single("image"), async (req, res) => {
-  console.log(req.file);
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Devolver la URL relativa de la imagen
-    const imageUrl = `/uploads/${req.file.filename}`;
-    res.json({ url: imageUrl });
+    const url = await uploadImageToR2(req.file, "products");
+    res.json({ url });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
