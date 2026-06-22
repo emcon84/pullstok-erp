@@ -37,8 +37,8 @@ async function main() {
   // 1) Upsert de la organización demo (existe siempre, incluso si un visitante la borró).
   const org = await prisma.organization.upsert({
     where: { slug: DEMO_SLUG },
-    update: { name: DEMO_ORG_NAME, isActive: true },
-    create: { name: DEMO_ORG_NAME, slug: DEMO_SLUG },
+    update: { name: DEMO_ORG_NAME, isActive: true, onboardingCompletedAt: new Date() },
+    create: { name: DEMO_ORG_NAME, slug: DEMO_SLUG, onboardingCompletedAt: new Date() },
   });
   console.log(`✅ Organización demo OK (id: ${org.id})`);
 

@@ -28,8 +28,8 @@ async function main() {
   // 2) Organización demo + su ADMIN
   const org = await prisma.organization.upsert({
     where: { slug: "demo" },
-    update: {},
-    create: { name: "Negocio Demo", slug: "demo" },
+    update: { onboardingCompletedAt: new Date() },
+    create: { name: "Negocio Demo", slug: "demo", onboardingCompletedAt: new Date() },
   });
 
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@demo.com";
