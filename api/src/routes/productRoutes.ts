@@ -10,6 +10,7 @@ import {
   createProductSchema,
   updateProductSchema,
   bulkProductsSchema,
+  publishProductSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -40,6 +41,12 @@ router.put(
   authenticateJWT,
   validate(updateProductSchema),
   productController.updateProduct,
+);
+router.patch(
+  "/:id/publish",
+  authenticateJWT,
+  validate(publishProductSchema),
+  productController.publishProduct,
 );
 router.delete("/:id", authenticateJWT, productController.deleteProduct);
 

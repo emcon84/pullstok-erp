@@ -38,6 +38,9 @@ const SalesPage = lazy(() =>
 const Customers = lazy(() =>
   import("./views/Customers").then((m) => ({ default: m.Customers })),
 );
+const Tienda = lazy(() =>
+  import("./views/Tienda").then((m) => ({ default: m.Tienda })),
+);
 const OrganizationsList = lazy(() =>
   import("./views/superadmin/OrganizationsList").then((m) => ({
     default: m.OrganizationsList,
@@ -125,6 +128,7 @@ const AppRoutes = () => (
         <Route path="/facturas" element={<Comprobations />} />
         <Route path="/Ventas" element={<SalesPage />} />
         <Route path="/Clientes" element={<Customers />} />
+        <Route path="/tienda" element={<Tienda />} />
       </Route>
 
       {/* Panel superadmin (sdd/planes-y-billing): rutas de plataforma, fuera

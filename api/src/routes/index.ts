@@ -14,6 +14,7 @@ import organizationRoutes from "./organizationRoutes";
 import categoryRoutes from "./categoryRoutes";
 import onboardingRoutes from "./onboardingRoutes";
 import storeRoutes from "./store";
+import storeSettingsRoutes from "./storeSettingsRoutes";
 
 const router = Router();
 
@@ -36,5 +37,6 @@ router.use("/health", healthRoutes);
 router.use("/organizations", organizationRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/onboarding", onboardingRoutes);
+router.use("/store-settings", storeSettingsRoutes);
 
 export default router;

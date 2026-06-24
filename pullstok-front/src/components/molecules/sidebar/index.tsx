@@ -6,6 +6,7 @@ import {
   ShoppingCart,
   Truck,
   Users,
+  Store,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ const navItems = [
   { to: "/Ventas", label: "Ventas", icon: ShoppingCart },
   { to: "/facturas", label: "Remitos", icon: Truck },
   { to: "/Clientes", label: "Clientes", icon: Users },
+  { to: "/tienda", label: "Tienda", icon: Store },
 ];
 
 interface SidebarContentProps {

@@ -126,6 +126,7 @@ class AuthService {
           select: {
             id: true,
             name: true,
+            slug: true,
             onboardingCompletedAt: true,
             plan: true,
             paidUntil: true,

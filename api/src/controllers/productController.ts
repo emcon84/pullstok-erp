@@ -139,6 +139,28 @@ const updateProduct = async (req: Request, res: Response) => {
   }
 };
 
+// Toggle "Publicar en tienda" (WS4 — UI dedicada de Tienda/listado de
+// productos). Acción de un solo campo, separada de updateProduct para que
+// la UI pueda togglear sin mandar el resto del producto.
+const publishProduct = async (req: Request, res: Response) => {
+  try {
+    const { publishedToStore } = req.body as { publishedToStore: boolean };
+    const result = await prisma.product.updateMany({
+      where: { id: req.params.id },
+      data: { publishedToStore },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    const product = await prisma.product.findFirst({
+      where: { id: req.params.id },
+    });
+    res.status(200).json(product);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 // Delete a product by ID
 const deleteProduct = async (req: Request, res: Response) => {
   try {
@@ -181,5 +203,6 @@ export default {
   getProducts,
   getProductById,
   updateProduct,
+  publishProduct,
   deleteProduct,
 };

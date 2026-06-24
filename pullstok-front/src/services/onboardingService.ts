@@ -13,6 +13,7 @@ export type Plan = "BASICO" | "PRO" | "PREMIUM";
 export interface Organization {
   id: string;
   name: string;
+  slug?: string;
   address?: string | null;
   phone?: string | null;
   taxId?: string | null;

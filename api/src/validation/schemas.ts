@@ -69,8 +69,18 @@ export const createProductSchema = z.object({
   categoryId: z.string().min(1, "La categoría es requerida"),
   image: z.string().optional(),
   quantity: z.coerce.number().int().nonnegative("La cantidad no puede ser negativa"),
+  // Visibilidad en la tienda online (WS4). Opcional en alta/edición general;
+  // el toggle dedicado de la UI usa publishProductSchema (PATCH /publish).
+  publishedToStore: z.boolean().optional(),
 });
 export const updateProductSchema = createProductSchema.partial();
+
+// Toggle dedicado "Publicar en tienda" (WS4 — UI de Tienda/listado de
+// productos). Separado de updateProductSchema porque es una acción de un
+// solo campo, no una edición general del producto.
+export const publishProductSchema = z.object({
+  publishedToStore: z.boolean(),
+});
 
 // Bulk JSON / CSV: sigue con `category` (nombre, texto libre) — find-or-create
 // vía resolveCategoryId en productsService.ts. No tiene UI de dropdown.
@@ -166,4 +176,27 @@ export const checkoutSchema = z.object({
     phone: z.string().min(1, "El teléfono es requerido"),
   }),
   items: z.array(checkoutItemSchema).min(1, "El carrito está vacío"),
+});
+
+// ---------- Tienda online (config ERP, WS4) ----------
+// Badges configurables de confianza (envío gratis, garantía, etc.) — máximo 3
+// (decisión de diseño: barra de confianza, no reviews/stars).
+const storeBadgeSchema = z.object({
+  title: z.string().min(1, "El título es requerido"),
+  subtitle: z.string().min(1, "El subtítulo es requerido"),
+});
+export const updateStoreSettingsSchema = z.object({
+  primaryColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Color inválido (formato #rrggbb)")
+    .optional(),
+  logoUrl: z.string().url("URL de logo inválida").nullable().optional(),
+  bannerUrl: z.string().url("URL de banner inválida").nullable().optional(),
+  tagline: z.string().nullable().optional(),
+  showNewsletter: z.boolean().optional(),
+  showBanner: z.boolean().optional(),
+  badges: z.array(storeBadgeSchema).max(3, "Máximo 3 badges").nullable().optional(),
+  contactEmail: z.email("Email inválido").nullable().optional(),
+  contactPhone: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
 });
