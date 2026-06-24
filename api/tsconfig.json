@@ -2,8 +2,7 @@
   "compilerOptions": {
     "target": "ES2020", // Versión de ECMAScript a la que se compilará el código
     "module": "CommonJS", // Sistema de módulos a utilizar
-    "outDir": "./dist", // Directorio de salida para los archivos compilados
-    "rootDir": "./src", // Directorio raíz para los archivos fuente
+    "outDir": "./dist", // Directorio de salida para los archivos compilados (el build real lo hace esbuild en build.js)
     "strict": true, // Habilita todas las opciones de verificación estricta
     "esModuleInterop": true, // Habilita la interoperabilidad con módulos ES6
     "skipLibCheck": true, // Omite la comprobación de tipos en los archivos de declaración de las librerías
@@ -17,10 +16,11 @@
     "declaration": false // Es una app (no una librería): no hace falta emitir .d.ts
   },
   "include": [
-    "src/**/*" // Incluye todos los archivos en el directorio src
+    "src/**/*", // Código de la app
+    "tests/**/*" // Tests: para que el editor (tsserver) cargue los tipos de jest y no los marque en rojo
   ],
   "exclude": [
     "node_modules", // Excluye el directorio node_modules
-    "**/*.test.ts" // Excluye archivos de prueba TypeScript
+    "dist" // Salida compilada
   ]
 }
