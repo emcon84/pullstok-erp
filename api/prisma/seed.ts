@@ -50,20 +50,21 @@ async function main() {
   // 3) Productos demo (scopeados a la org)
   await prisma.product.deleteMany({ where: { organizationId: org.id } });
   const baseProducts = [
-    { name: "Laptop HP Pavilion 15", price: 45999.99, description: "Intel i5, 8GB RAM, 512GB SSD", quantity: 15, image: "https://images.pullstok.com/products_5d01285d-248e-484f-ad76-f4de29c1aba0.webp" },
-    { name: "Mouse Logitech MX Master 3", price: 5999.0, description: "Mouse inalámbrico ergonómico", quantity: 45, image: "https://images.pullstok.com/products_5517bec1-a338-4bab-8917-d564b23525d5.webp" },
-    { name: "Teclado Mecánico RGB", price: 8500.5, description: "Switches blue retroiluminado", quantity: 30, image: "https://images.pullstok.com/products_2e12ef30-7f54-4234-ac67-a76b982a7a47.webp" },
-    { name: "Monitor Samsung 27\"", price: 18999.99, description: "Full HD 75Hz", quantity: 20, image: "https://images.pullstok.com/products_3355838e-5faa-42f5-be40-a63e6af19e36.webp" },
-    { name: "Silla Ergonómica", price: 12500.0, description: "Soporte lumbar ajustable", quantity: 25, image: "https://images.pullstok.com/products_8a0758e7-b00f-4f6d-afd3-a3dfdc64e7d2.webp" },
-    { name: "Escritorio de Madera", price: 28000.0, description: "Madera maciza 150x80cm", quantity: 10, image: "https://images.pullstok.com/products_4e321ebd-60a2-40ee-9cba-5255ce18a43d.webp" },
-    { name: "Cafetera Express", price: 15999.0, description: "Automática 19 bares", quantity: 12, image: "https://images.pullstok.com/products_cc877f72-577f-4ed3-99f7-66abfe473175.webp" },
-    { name: "Taladro Inalámbrico", price: 8999.0, description: "20V con 2 baterías", quantity: 18, image: "https://images.pullstok.com/products_60ba2528-5804-491c-a5bd-c070631aff63.webp" },
-    { name: "Auriculares Bluetooth", price: 4999.0, description: "Cancelación de ruido", quantity: 55, image: "https://images.pullstok.com/products_170617ca-bb11-4cbf-bccb-d4e2279936e2.webp" },
-    { name: "Cargador USB-C 65W", price: 1500.0, description: "Carga rápida para laptops", quantity: 60, image: "https://images.pullstok.com/products_73ea95d0-2932-447a-a560-14cce41e6aca.webp" },
+    { name: "Laptop HP Pavilion 15", price: 45999.99, description: "Intel i5, 8GB RAM, 512GB SSD", quantity: 15, image: "https://images.pullstok.com/demo_laptop.webp" },
+    { name: "Mouse Logitech MX Master 3", price: 5999.0, description: "Mouse inalámbrico ergonómico", quantity: 45, image: "https://images.pullstok.com/demo_mouse.webp" },
+    { name: "Teclado Mecánico RGB", price: 8500.5, description: "Switches blue retroiluminado", quantity: 30, image: "https://images.pullstok.com/demo_teclado.webp" },
+    { name: "Monitor Samsung 27\"", price: 18999.99, description: "Full HD 75Hz", quantity: 20, image: "https://images.pullstok.com/demo_monitor.webp" },
+    { name: "Silla Ergonómica", price: 12500.0, description: "Soporte lumbar ajustable", quantity: 25, image: "https://images.pullstok.com/demo_silla.webp" },
+    { name: "Escritorio de Madera", price: 28000.0, description: "Madera maciza 150x80cm", quantity: 10, image: "https://images.pullstok.com/demo_escritorio.webp" },
+    { name: "Cafetera Express", price: 15999.0, description: "Automática 19 bares", quantity: 12, image: "https://images.pullstok.com/demo_cafetera.webp" },
+    { name: "Taladro Inalámbrico", price: 8999.0, description: "20V con 2 baterías", quantity: 18, image: "https://images.pullstok.com/demo_taladro.webp" },
+    { name: "Auriculares Bluetooth", price: 4999.0, description: "Cancelación de ruido", quantity: 55, image: "https://images.pullstok.com/demo_auriculares.webp" },
+    { name: "Cargador USB-C 65W", price: 1500.0, description: "Carga rápida para laptops", quantity: 60, image: "https://images.pullstok.com/demo_cargador.webp" },
   ];
   const products = await prisma.product.createMany({
     data: baseProducts.map((p) => ({
       ...p,
+      publishedToStore: true, // demo: catálogo siempre visible en la tienda pública
       organizationId: org.id,
     })),
   });
