@@ -14,7 +14,7 @@ import { AuthedRequest } from "./authMiddleware";
 
 const planLimitExceeded = (
   res: Response,
-  resource: "users" | "products",
+  resource: "users" | "products" | "storeProducts",
   limit: number,
   current: number,
 ) =>
@@ -68,6 +68,43 @@ export const checkProductLimit = async (
     const current = await prisma.product.count({ where: { organizationId } });
     if (current >= limit) {
       return planLimitExceeded(res, "products", limit, current);
+    }
+    next();
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+/**
+ * Publica un producto en la tienda: bloquea si la org ya llegó al tope de
+ * productos publicables de su plan. Solo aplica al PUBLICAR
+ * (`publishedToStore === true`); despublicar siempre se permite. BASICO tiene
+ * tope 0 (no tiene tienda), así que no puede publicar ninguno.
+ */
+export const checkStoreProductLimit = async (
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { publishedToStore } = req.body as { publishedToStore?: boolean };
+    // Despublicar (o body sin el flag en true) nunca está limitado.
+    if (publishedToStore !== true) {
+      return next();
+    }
+    const organizationId = requireOrganizationId();
+    const org = await basePrisma.organization.findUniqueOrThrow({
+      where: { id: organizationId },
+    });
+    const limit = PLAN_LIMITS[org.plan].maxStoreProducts;
+    if (limit === null) {
+      return next();
+    }
+    const current = await prisma.product.count({
+      where: { organizationId, publishedToStore: true },
+    });
+    if (current >= limit) {
+      return planLimitExceeded(res, "storeProducts", limit, current);
     }
     next();
   } catch (error: any) {

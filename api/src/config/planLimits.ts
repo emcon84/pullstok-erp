@@ -1,21 +1,30 @@
 import { Plan } from "@prisma/client";
 
-// Límites y módulos habilitados por plan. `null` en maxUsers/maxProducts
-// significa "ilimitado" (no se chequea contra ningún tope). `modules` queda
-// definido para uso futuro (ej. ocultar ítems del sidebar según plan) —
-// por ahora solo se deja el dato listo, no se aplica enforcement con él.
+// Límites y módulos habilitados por plan. `null` en maxUsers/maxProducts/
+// maxStoreProducts significa "ilimitado" (no se chequea contra ningún tope).
+// `maxStoreProducts` = cuántos productos puede PUBLICAR en la tienda online
+// (BASICO = 0 porque no tiene tienda; el gate de acceso vive en
+// checkStoreEnabled.ts). `modules` queda definido para uso futuro (ej. ocultar
+// ítems del sidebar según plan) — por ahora solo se deja el dato listo.
 export const PLAN_LIMITS: Record<
   Plan,
-  { maxUsers: number | null; maxProducts: number | null; modules: string[] }
+  {
+    maxUsers: number | null;
+    maxProducts: number | null;
+    maxStoreProducts: number | null;
+    modules: string[];
+  }
 > = {
   BASICO: {
     maxUsers: 2,
     maxProducts: 500,
+    maxStoreProducts: 0,
     modules: ["stock", "ventas", "clientes"],
   },
   PRO: {
     maxUsers: 10,
     maxProducts: null,
+    maxStoreProducts: 100,
     modules: [
       "stock",
       "ventas",
@@ -24,11 +33,13 @@ export const PLAN_LIMITS: Record<
       "pedidos",
       "remitos",
       "reportes",
+      "tienda",
     ],
   },
   PREMIUM: {
     maxUsers: null,
     maxProducts: null,
+    maxStoreProducts: null,
     modules: [
       "stock",
       "ventas",
@@ -37,6 +48,7 @@ export const PLAN_LIMITS: Record<
       "pedidos",
       "remitos",
       "reportes",
+      "tienda",
     ],
   },
 };

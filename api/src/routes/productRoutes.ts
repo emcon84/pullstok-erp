@@ -5,7 +5,10 @@ import productController, {
 import { authenticateJWT } from "../middlewares/authMiddleware";
 import { upload } from "../middlewares/uploadMiddleware";
 import { validate } from "../middlewares/validate";
-import { checkProductLimit } from "../middlewares/planLimitMiddleware";
+import {
+  checkProductLimit,
+  checkStoreProductLimit,
+} from "../middlewares/planLimitMiddleware";
 import {
   createProductSchema,
   updateProductSchema,
@@ -46,6 +49,7 @@ router.patch(
   "/:id/publish",
   authenticateJWT,
   validate(publishProductSchema),
+  checkStoreProductLimit,
   productController.publishProduct,
 );
 router.delete("/:id", authenticateJWT, productController.deleteProduct);

@@ -1,5 +1,9 @@
 import { Response } from 'express';
-import { checkUserLimit, checkProductLimit } from '../../src/middlewares/planLimitMiddleware';
+import {
+  checkUserLimit,
+  checkProductLimit,
+  checkStoreProductLimit,
+} from '../../src/middlewares/planLimitMiddleware';
 import { basePrisma, prisma } from '../../src/config/db';
 import { requireOrganizationId } from '../../src/config/tenantContext';
 import { AuthedRequest } from '../../src/middlewares/authMiddleware';
@@ -146,6 +150,86 @@ describe('planLimitMiddleware', () => {
       const next = jest.fn();
 
       await checkProductLimit(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(mockedPrisma.product.count).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('checkStoreProductLimit', () => {
+    it('llama a next() sin tocar la DB si se está despublicando (publishedToStore=false)', async () => {
+      const req = { body: { publishedToStore: false } } as AuthedRequest;
+      const res = mockResponse();
+      const next = jest.fn();
+
+      await checkStoreProductLimit(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(mockedBasePrisma.organization.findUniqueOrThrow).not.toHaveBeenCalled();
+      expect(mockedPrisma.product.count).not.toHaveBeenCalled();
+    });
+
+    it('llama a next() al publicar si está por debajo del tope del plan (PRO=100)', async () => {
+      mockedBasePrisma.organization.findUniqueOrThrow.mockResolvedValue({ plan: 'PRO' });
+      mockedPrisma.product.count.mockResolvedValue(99);
+      const req = { body: { publishedToStore: true } } as AuthedRequest;
+      const res = mockResponse();
+      const next = jest.fn();
+
+      await checkStoreProductLimit(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(mockedPrisma.product.count).toHaveBeenCalledWith({
+        where: { organizationId: 'org-1', publishedToStore: true },
+      });
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('responde 403 PLAN_LIMIT al publicar si alcanzó el tope del plan (PRO=100)', async () => {
+      mockedBasePrisma.organization.findUniqueOrThrow.mockResolvedValue({ plan: 'PRO' });
+      mockedPrisma.product.count.mockResolvedValue(100);
+      const req = { body: { publishedToStore: true } } as AuthedRequest;
+      const res = mockResponse();
+      const next = jest.fn();
+
+      await checkStoreProductLimit(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'PLAN_LIMIT',
+        resource: 'storeProducts',
+        limit: 100,
+        current: 100,
+      });
+    });
+
+    it('BASICO no puede publicar ninguno (tope 0 → 403 en el primero)', async () => {
+      mockedBasePrisma.organization.findUniqueOrThrow.mockResolvedValue({ plan: 'BASICO' });
+      mockedPrisma.product.count.mockResolvedValue(0);
+      const req = { body: { publishedToStore: true } } as AuthedRequest;
+      const res = mockResponse();
+      const next = jest.fn();
+
+      await checkStoreProductLimit(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'PLAN_LIMIT',
+        resource: 'storeProducts',
+        limit: 0,
+        current: 0,
+      });
+    });
+
+    it('PREMIUM publica sin contar (maxStoreProducts null = ilimitado)', async () => {
+      mockedBasePrisma.organization.findUniqueOrThrow.mockResolvedValue({ plan: 'PREMIUM' });
+      const req = { body: { publishedToStore: true } } as AuthedRequest;
+      const res = mockResponse();
+      const next = jest.fn();
+
+      await checkStoreProductLimit(req, res, next);
 
       expect(next).toHaveBeenCalled();
       expect(mockedPrisma.product.count).not.toHaveBeenCalled();

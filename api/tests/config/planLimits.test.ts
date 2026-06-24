@@ -28,6 +28,18 @@ describe('PLAN_LIMITS', () => {
     expect(PLAN_LIMITS.PREMIUM.maxProducts).toBeNull();
   });
 
+  it('tope de productos de tienda: BASICO=0, PRO=100, PREMIUM=ilimitado (null)', () => {
+    expect(PLAN_LIMITS.BASICO.maxStoreProducts).toBe(0);
+    expect(PLAN_LIMITS.PRO.maxStoreProducts).toBe(100);
+    expect(PLAN_LIMITS.PREMIUM.maxStoreProducts).toBeNull();
+  });
+
+  it('solo PRO y PREMIUM incluyen el módulo "tienda"', () => {
+    expect(PLAN_LIMITS.BASICO.modules).not.toContain('tienda');
+    expect(PLAN_LIMITS.PRO.modules).toContain('tienda');
+    expect(PLAN_LIMITS.PREMIUM.modules).toContain('tienda');
+  });
+
   it('los módulos son acumulativos: BASICO ⊂ PRO == PREMIUM', () => {
     PLAN_LIMITS.BASICO.modules.forEach((m) => {
       expect(PLAN_LIMITS.PRO.modules).toContain(m);
