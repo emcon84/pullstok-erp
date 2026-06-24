@@ -1,25 +1,37 @@
 ---
+const DEMO_URL = "https://app.pullstok.com/?demo=1";
 ---
 
 <section class="px-4 py-20 sm:px-6 lg:px-8">
   <div
-    class="mx-auto max-w-5xl rounded-2xl px-6 py-14 text-center sm:px-12"
-    style="background: linear-gradient(120deg, var(--color-primary), var(--brand-blue));"
+    class="relative mx-auto max-w-5xl overflow-hidden rounded-[2.5rem] px-6 py-16 text-center sm:px-12"
+    style="background: linear-gradient(135deg, #2a8bea 0%, #51ccee 55%, #ff9d00 130%);"
   >
-    <h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-      Probá Pullstok gratis hoy
-    </h2>
-    <p class="mx-auto mt-4 max-w-xl text-lg text-white/85">
-      Sumate a los comercios que ya dejaron el cuaderno. Te lleva cinco
-      minutos arrancar.
-    </p>
-    <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-      <a
-        href="https://app.pullstok.com/?demo=1"
-        class="btn w-full bg-white text-primary hover:bg-white/90 sm:w-auto"
-      >
-        Probar Demo Gratis
-      </a>
+    <!-- Blobs decorativos dentro del card -->
+    <div class="blob absolute -left-10 -top-10 h-48 w-48 opacity-25" style="background: #ffffff;" aria-hidden="true"></div>
+    <div class="blob absolute -bottom-12 right-0 h-56 w-56 opacity-20" style="background: var(--brand-red);" aria-hidden="true"></div>
+
+    <div class="relative">
+      <span class="badge bg-white/25 text-white backdrop-blur-sm">🚀 Empezá hoy</span>
+      <h2 class="mt-5 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
+        Dejá el cuaderno.<br />Tu negocio te lo agradece.
+      </h2>
+      <p class="mx-auto mt-5 max-w-xl text-lg text-white/90">
+        Sumate a los comercios que ya ordenaron su día a día con Pullstok.
+        Te lleva cinco minutos arrancar.
+      </p>
+      <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <a
+          href={DEMO_URL}
+          class="btn w-full bg-white text-primary shadow-[0_12px_30px_-10px_rgba(0,0,0,0.35)] hover:-translate-y-0.5 sm:w-auto"
+        >
+          Probá el demo gratis
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+      <p class="mt-5 text-sm font-medium text-white/80">
+        Sin tarjeta de crédito · Cancelás cuando quieras
+      </p>
     </div>
   </div>
 </section>

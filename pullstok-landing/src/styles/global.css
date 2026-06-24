@@ -1,55 +1,68 @@
 @import "tailwindcss";
 
 /*
-  Design tokens robados 1:1 de pullstok-front/src/index.css (paleta light)
-  + colores de marca extraídos del logo (pullstok-front/src/assets/logo.tsx)
-  para que la landing se sienta del mismo producto que la app.
+  ──────────────────────────────────────────────────────────────────────────
+  Pullstok — Sistema de diseño "LatAm vibrante / humano"
+  Cálido, cercano y con carácter. Paleta de marca (naranja/cyan/rojo/azul)
+  usada con alegría sobre fondo crema. Tipografía con personalidad
+  (Bricolage Grotesque display + Plus Jakarta Sans cuerpo). Acentos a mano,
+  blobs de color y micro-animaciones suaves. Nada de "SaaS genérico".
+  ──────────────────────────────────────────────────────────────────────────
 */
 :root {
-  --radius: 0.75rem;
+  --radius: 1.25rem;
 
-  --background: #ffffff;
-  --foreground: #0f172a;
+  /* Fondo crema cálido en vez de blanco clínico */
+  --background: #fff8ef;
+  --foreground: #241c15;
 
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #241c15;
 
-  --primary: #6366f1;
+  /* Azul de marca como acción principal (cálido y confiable) */
+  --primary: #2a8bea;
   --primary-foreground: #ffffff;
 
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
+  --secondary: #fff1dd;
+  --secondary-foreground: #6b4b16;
 
-  --muted: #f8fafc;
-  --muted-foreground: #64748b;
+  --muted: #fbf2e6;
+  --muted-foreground: #897a67;
 
-  --accent: #eef2ff;
-  --accent-foreground: #4338ca;
+  --accent: #e8f5fd;
+  --accent-foreground: #155a96;
 
-  --destructive: #ef4444;
+  --destructive: #f73c5c;
   --destructive-foreground: #ffffff;
 
-  --success: #10b981;
+  --success: #16a34a;
   --success-foreground: #ffffff;
-  --warning: #f59e0b;
-  --warning-foreground: #ffffff;
+  --warning: #ff9d00;
+  --warning-foreground: #3b2a00;
 
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #6366f1;
+  --border: #f0e3d0;
+  --input: #f0e3d0;
+  --ring: #2a8bea;
 
   /* Colores de marca tomados del isotipo de Pullstok (logo.tsx) */
   --brand-orange: #ff9d00;
   --brand-cyan: #51ccee;
   --brand-red: #f73c5c;
   --brand-blue: #2a8bea;
+
+  /* Tinte suave de cada color de marca, para fondos de blobs / chips */
+  --brand-orange-soft: #ffe9c2;
+  --brand-cyan-soft: #d3f1fa;
+  --brand-red-soft: #ffd7de;
+  --brand-blue-soft: #cfe6fb;
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 12px);
+  --radius-md: calc(var(--radius) - 8px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+  --radius-2xl: calc(var(--radius) + 16px);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -77,8 +90,53 @@
   --color-brand-cyan: var(--brand-cyan);
   --color-brand-red: var(--brand-red);
   --color-brand-blue: var(--brand-blue);
+  --color-brand-orange-soft: var(--brand-orange-soft);
+  --color-brand-cyan-soft: var(--brand-cyan-soft);
+  --color-brand-red-soft: var(--brand-red-soft);
+  --color-brand-blue-soft: var(--brand-blue-soft);
 
-  --font-sans: "Inter", "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Plus Jakarta Sans", ui-sans-serif,
+    system-ui, sans-serif;
+
+  /* Animaciones de marca */
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-slow: float 9s ease-in-out infinite;
+  --animate-wiggle: wiggle 2.5s ease-in-out infinite;
+  --animate-blob: blob 14s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes blob {
+  0%,
+  100% {
+    border-radius: 42% 58% 63% 37% / 42% 38% 62% 58%;
+  }
+  33% {
+    border-radius: 64% 36% 37% 63% / 55% 48% 52% 45%;
+  }
+  66% {
+    border-radius: 39% 61% 55% 45% / 61% 38% 62% 39%;
+  }
 }
 
 @layer base {
@@ -93,71 +151,146 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings: "ss01" 1, "cv11" 1, "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background-color: var(--brand-orange);
+    color: #3b2a00;
   }
 }
 
 @layer components {
-  /* Imitación visual del shadcn Button (variant default + outline) sin React */
+  /* ── Botones chunky con personalidad (pill + sombra de color suave) ── */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     white-space: nowrap;
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: all 150ms ease;
-    height: 2.75rem;
-    padding-inline: 1.5rem;
+    border-radius: 999px;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    transition:
+      transform 150ms ease,
+      box-shadow 150ms ease,
+      background-color 150ms ease;
+    height: 3rem;
+    padding-inline: 1.75rem;
     outline: none;
   }
 
   .btn:focus-visible {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 50%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-ring) 35%, transparent);
   }
 
   .btn-primary {
     background-color: var(--color-primary);
     color: var(--color-primary-foreground);
+    box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--brand-blue) 75%, transparent);
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 26px -10px color-mix(in srgb, var(--brand-blue) 80%, transparent);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
   }
 
-  .btn-primary:hover {
-    background-color: color-mix(in srgb, var(--color-primary) 90%, transparent);
+  .btn-accent {
+    background-color: var(--brand-orange);
+    color: #3b2a00;
+    box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--brand-orange) 85%, transparent);
+  }
+  .btn-accent:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 26px -10px color-mix(in srgb, var(--brand-orange) 90%, transparent);
+  }
+  .btn-accent:active {
+    transform: translateY(0);
   }
 
   .btn-outline {
-    background-color: var(--color-background);
-    border: 1px solid var(--color-border);
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    background-color: var(--color-card);
+    border: 1.5px solid var(--color-border);
+    color: var(--color-foreground);
+    box-shadow: 0 6px 16px -10px rgb(120 80 20 / 0.25);
   }
-
   .btn-outline:hover {
-    background-color: var(--color-accent);
-    color: var(--color-accent-foreground);
+    transform: translateY(-2px);
+    background-color: var(--color-secondary);
+  }
+  .btn-outline:active {
+    transform: translateY(0);
   }
 
-  /* Imitación visual del shadcn Card */
+  /* ── Cards cálidas con borde definido ── */
   .card {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.25rem;
     border-radius: var(--radius-lg);
-    border: 1px solid var(--color-border);
+    border: 1.5px solid var(--color-border);
     background-color: var(--color-card);
     color: var(--color-card-foreground);
     padding: 1.5rem;
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    box-shadow: 0 10px 30px -12px rgb(120 80 20 / 0.12);
+  }
+
+  /* Card destacada: un poco más elevada y definida que la base, pero suave */
+  .card-pop {
+    border: 1.5px solid var(--color-border);
+    box-shadow: 0 18px 44px -20px rgb(120 80 20 / 0.28);
   }
 
   .badge {
     display: inline-flex;
     align-items: center;
+    gap: 0.4rem;
     border-radius: 999px;
-    padding: 0.125rem 0.625rem;
-    font-size: 0.75rem;
-    font-weight: 600;
+    padding: 0.35rem 0.85rem;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 700;
     line-height: 1rem;
+  }
+
+  /* ── Blob de color decorativo (animado) ── */
+  .blob {
+    position: absolute;
+    border-radius: 42% 58% 63% 37% / 42% 38% 62% 58%;
+    filter: blur(2px);
+    animation: var(--animate-blob);
+    pointer-events: none;
+  }
+}
+
+@layer utilities {
+  /* Subrayado "a mano" para resaltar palabras clave */
+  .underline-hand {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='14' viewBox='0 0 120 14' fill='none'%3E%3Cpath d='M2 9c20-5 49-7 78-5 13 .9 26 2.4 38 5' stroke='%23FF9D00' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: bottom left;
+    background-size: 100% 0.5em;
+    padding-bottom: 0.1em;
+  }
+
+  /* Respeta a quien pide menos movimiento */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-float,
+    .animate-float-slow,
+    .animate-wiggle,
+    .blob {
+      animation: none !important;
+    }
   }
 }

@@ -50,6 +50,14 @@ const features = [
   },
 ];
 
+// Tile de color por feature, rotando la paleta de marca
+const tiles = [
+  "bg-brand-blue-soft text-brand-blue",
+  "bg-brand-orange-soft text-[#b86e00]",
+  "bg-brand-cyan-soft text-[#1796bd]",
+  "bg-brand-red-soft text-[#d62744]",
+];
+
 const icons: Record<string, string> = {
   box: `<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/>`,
   cart: `<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>`,
@@ -65,8 +73,9 @@ const icons: Record<string, string> = {
 <section id="caracteristicas" class="px-4 py-20 sm:px-6 lg:px-8">
   <div class="mx-auto max-w-7xl">
     <div class="mx-auto max-w-2xl text-center">
-      <h2 class="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-        Todo lo que tu negocio necesita, en un solo lugar
+      <span class="badge bg-brand-blue-soft text-brand-blue">✨ Todo en un lugar</span>
+      <h2 class="mt-4 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
+        Todo lo que tu negocio necesita
       </h2>
       <p class="mt-4 text-lg text-muted-foreground">
         Nada de módulos que no vas a usar. Lo justo y necesario para manejar
@@ -74,26 +83,26 @@ const icons: Record<string, string> = {
       </p>
     </div>
 
-    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
       {
-        features.map((feature) => (
-          <div class="card gap-3 p-6">
-            <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        features.map((feature, i) => (
+          <div class="card gap-3 p-6 transition-transform duration-200 hover:-translate-y-1">
+            <div class={`flex h-12 w-12 items-center justify-center rounded-2xl ${tiles[i % tiles.length]}`}>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="22"
-                height="22"
+                width="24"
+                height="24"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                stroke-width="2"
+                stroke-width="2.2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 aria-hidden="true"
                 set:html={icons[feature.icon]}
               />
             </div>
-            <h3 class="text-base font-semibold text-foreground">
+            <h3 class="text-base font-bold text-foreground">
               {feature.title}
             </h3>
             <p class="text-sm text-muted-foreground">{feature.description}</p>

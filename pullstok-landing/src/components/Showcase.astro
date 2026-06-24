@@ -1,0 +1,92 @@
+---
+// Capturas REALES del producto (tomadas del demo en vivo):
+//   /screenshots/erp-dashboard.png  → app.pullstok.com (demo)
+//   /screenshots/tienda.png         → demo.pullstok.com (storefront)
+const shots = [
+  {
+    eyebrow: "El ERP",
+    eyebrowClass: "bg-brand-blue-soft text-brand-blue",
+    title: "Tu centro de control",
+    description:
+      "Stock, ventas, productos y números reales del negocio en una sola pantalla. Todo actualizado al instante, sin planillas ni cuadernos.",
+    bullets: ["Stock en tiempo real", "Carga manual o por CSV", "Dashboard con tus métricas"],
+    img: "/screenshots/erp-dashboard.png",
+    url: "app.pullstok.com",
+    alt: "Dashboard del ERP de Pullstok mostrando ventas, stock y listado de productos",
+  },
+  {
+    eyebrow: "La tienda online",
+    eyebrowClass: "bg-brand-orange-soft text-[#b86e00]",
+    title: "Lista para vender en un clic",
+    description:
+      "Publicás tus productos del ERP y tu negocio tiene su propia tienda online en negocio.pullstok.com — con tu marca, búsqueda y carrito. Sin programar nada.",
+    bullets: ["Tu subdominio propio", "Catálogo y carrito incluidos", "Se nutre del mismo stock"],
+    img: "/screenshots/tienda.png",
+    url: "negocio.pullstok.com",
+    alt: "Tienda online pública de Pullstok mostrando el catálogo de productos",
+  },
+];
+---
+
+<section class="relative overflow-hidden px-4 py-20 sm:px-6 lg:px-8">
+  <div class="blob absolute left-[-6rem] top-32 -z-10 h-80 w-80 opacity-[0.10]" style="background: var(--brand-cyan);" aria-hidden="true"></div>
+
+  <div class="mx-auto max-w-7xl">
+    <div class="mx-auto max-w-2xl text-center">
+      <span class="badge bg-brand-cyan-soft text-[#1796bd]">👀 Por dentro</span>
+      <h2 class="mt-4 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
+        Mirá Pullstok por dentro
+      </h2>
+      <p class="mt-4 text-lg text-muted-foreground">
+        No te lo contamos: te lo mostramos. Esto es el producto real, funcionando.
+      </p>
+    </div>
+
+    <div class="mt-16 flex flex-col gap-20">
+      {
+        shots.map((s, i) => (
+          <div class="grid items-center gap-8 lg:grid-cols-2 lg:gap-14">
+            <div class={i % 2 === 1 ? "lg:order-2" : ""}>
+              <span class={`badge ${s.eyebrowClass}`}>{s.eyebrow}</span>
+              <h3 class="mt-4 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+                {s.title}
+              </h3>
+              <p class="mt-3 text-lg text-muted-foreground">{s.description}</p>
+              <ul class="mt-6 flex flex-col gap-3">
+                {s.bullets.map((b) => (
+                  <li class="flex items-center gap-3 font-medium text-foreground">
+                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                    </span>
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Marco "ventana de navegador" con la captura real */}
+            <div class={`card-pop overflow-hidden rounded-2xl bg-card p-0 ${i % 2 === 1 ? "lg:order-1" : ""}`}>
+              <div class="flex items-center gap-2 border-b border-border bg-muted/70 px-4 py-3">
+                <span class="h-3 w-3 rounded-full bg-brand-red" />
+                <span class="h-3 w-3 rounded-full bg-brand-orange" />
+                <span class="h-3 w-3 rounded-full bg-success" />
+                <span class="ml-3 flex-1 truncate rounded-full bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+                  {s.url}
+                </span>
+              </div>
+              <img
+                src={s.img}
+                alt={s.alt}
+                width="1440"
+                height="900"
+                loading="lazy"
+                decoding="async"
+                class="block h-auto w-full"
+              />
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

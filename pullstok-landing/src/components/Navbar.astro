@@ -6,29 +6,28 @@ const DEMO_URL = "https://app.pullstok.com/?demo=1";
 
 const links = [
   { href: "#caracteristicas", label: "Características" },
+  { href: "#como-funciona", label: "Cómo funciona" },
   { href: "#precios", label: "Precios" },
   { href: "#faq", label: "FAQ" },
 ];
 ---
 
-<header
-  class="sticky top-0 z-50 w-full border-b border-border/80 bg-background/80 backdrop-blur-md"
->
+<header class="sticky top-0 z-50 w-full px-3 pt-3 sm:px-6">
   <nav
-    class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8"
+    class="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-full border-[1.5px] border-border bg-card/85 px-4 py-2.5 shadow-[0_10px_30px_-14px_rgba(120,80,20,0.18)] backdrop-blur-md sm:px-5"
     aria-label="Navegación principal"
   >
     <a href="#" class="shrink-0" aria-label="Pullstok, ir al inicio">
       <Logo class="h-7" />
     </a>
 
-    <ul class="hidden items-center gap-8 md:flex">
+    <ul class="hidden items-center gap-1 md:flex">
       {
         links.map((link) => (
           <li>
             <a
               href={link.href}
-              class="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              class="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               {link.label}
             </a>
@@ -37,20 +36,20 @@ const links = [
       }
     </ul>
 
-    <div class="hidden items-center gap-3 md:flex">
+    <div class="hidden items-center gap-2 md:flex">
       <a
         href={APP_URL}
-        class="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        class="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
       >
         Ingresar
       </a>
-      <a href={DEMO_URL} class="btn btn-primary">Probá el demo gratis</a>
+      <a href={DEMO_URL} class="btn btn-accent h-10 px-5 text-sm">Probá el demo</a>
     </div>
 
     <!-- Toggle mobile -->
     <details class="relative md:hidden">
       <summary
-        class="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-md border border-border [&::-webkit-details-marker]:hidden"
+        class="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-[1.5px] border-border [&::-webkit-details-marker]:hidden"
         aria-label="Abrir menú"
       >
         <svg
@@ -60,7 +59,7 @@ const links = [
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          stroke-width="2"
+          stroke-width="2.5"
           stroke-linecap="round"
           stroke-linejoin="round"
           ><line x1="4" x2="20" y1="6" y2="6"></line><line
@@ -71,13 +70,13 @@ const links = [
         >
       </summary>
       <div
-        class="absolute right-0 top-12 flex w-56 flex-col gap-1 rounded-lg border border-border bg-card p-2 shadow-md"
+        class="absolute right-0 top-12 flex w-60 flex-col gap-1 rounded-3xl border-[1.5px] border-border bg-card p-2.5 shadow-xl"
       >
         {
           links.map((link) => (
             <a
               href={link.href}
-              class="rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
+              class="rounded-xl px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary"
             >
               {link.label}
             </a>
@@ -86,11 +85,13 @@ const links = [
         <hr class="my-1 border-border" />
         <a
           href={APP_URL}
-          class="rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
+          class="rounded-xl px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary"
         >
           Ingresar
         </a>
-        <a href={DEMO_URL} class="btn btn-primary mt-1 w-full">Probá el demo gratis</a>
+        <a href={DEMO_URL} class="btn btn-accent mt-1 h-11 w-full text-sm">
+          Probá el demo
+        </a>
       </div>
     </details>
   </nav>

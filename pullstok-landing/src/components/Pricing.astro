@@ -5,42 +5,43 @@ const plans = [
   {
     name: "Básico",
     tagline: "Para el kiosco o almacén que arranca",
-    monthly: "$20.000",
-    annual: "$192.000",
+    monthly: "$35.000",
+    annual: "$336.000",
     featured: false,
     features: [
       "2 usuarios",
       "Hasta 500 productos",
       "Control de stock",
-      "Ventas",
-      "Clientes",
+      "Ventas y clientes",
+      "Sin tienda online",
     ],
   },
   {
     name: "Pro",
-    tagline: "Para el negocio que crece",
-    monthly: "$45.000",
-    annual: "$432.000",
+    tagline: "Para el negocio que crece y vende online",
+    monthly: "$70.000",
+    annual: "$672.000",
     featured: true,
     features: [
       "10 usuarios",
       "Productos ilimitados",
       "Todo lo del Básico",
-      "Presupuestos y pedidos",
-      "Remitos",
+      "Tienda online (hasta 100 productos)",
+      "Presupuestos, pedidos y remitos",
       "Reportes y dashboard",
     ],
   },
   {
     name: "Premium",
     tagline: "Para la cadena que necesita todo",
-    monthly: "$70.000",
-    annual: "$672.000",
+    monthly: "$130.000",
+    annual: "$1.248.000",
     featured: false,
     features: [
       "Usuarios ilimitados",
       "Productos ilimitados",
       "Todo lo del Pro",
+      "Tienda online ilimitada",
       "Soporte prioritario",
       "Multi-sucursal (próximamente)",
     ],
@@ -51,7 +52,8 @@ const plans = [
 <section id="precios" class="px-4 py-20 sm:px-6 lg:px-8">
   <div class="mx-auto max-w-7xl">
     <div class="mx-auto max-w-2xl text-center">
-      <h2 class="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+      <span class="badge bg-brand-orange-soft text-[#b86e00]">💸 Precios claros</span>
+      <h2 class="mt-4 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
         Un plan para cada etapa de tu negocio
       </h2>
       <p class="mt-4 text-lg text-muted-foreground">
@@ -69,13 +71,13 @@ const plans = [
           <div
             class={`card relative gap-6 ${
               plan.featured
-                ? "border-2 border-primary shadow-lg lg:-translate-y-2"
+                ? "border-2 border-brand-blue bg-accent/40 shadow-[0_24px_50px_-24px_rgba(42,139,234,0.55)] lg:-translate-y-3"
                 : ""
             }`}
           >
             {plan.featured && (
-              <span class="badge absolute -top-3 right-6 bg-primary text-primary-foreground">
-                Más popular
+              <span class="badge absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-orange text-[#3b2a00] shadow-[0_8px_18px_-8px_rgba(255,157,0,0.9)]">
+                ⭐ Más popular
               </span>
             )}
 
@@ -86,7 +88,7 @@ const plans = [
 
             <div class="flex items-baseline gap-1">
               <span
-                class="text-4xl font-extrabold tracking-tight text-foreground"
+                class="font-display text-5xl font-extrabold tracking-tight text-foreground"
                 data-price
                 data-price-monthly={plan.monthly}
                 data-price-annual={plan.annual}
