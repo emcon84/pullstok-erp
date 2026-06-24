@@ -1,0 +1,41 @@
+---
+import "@/styles/global.css";
+import type { StoreSettings } from "@/lib/storeApi";
+
+interface Props {
+  settings: StoreSettings;
+  title?: string;
+}
+
+const { settings, title } = Astro.props;
+const pageTitle = title ? `${title} — ${settings.storeName}` : settings.storeName;
+---
+
+<!doctype html>
+<!--
+  Theming server-side: --brand se fija via inline style en <html>, calculado
+  server-side desde StoreSettings.primaryColor. Se resuelve ANTES del primer
+  paint (atributo del HTML inicial, no JS de cliente) -> no hay FOUC con el
+  color default mientras carga el CSS externo. Todo lo que use var(--brand)
+  en global.css/componentes lee este valor real.
+-->
+<html lang="es" style={`--brand: ${settings.primaryColor}`}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{pageTitle}</title>
+    {settings.tagline && <meta name="description" content={settings.tagline} />}
+    <meta name="theme-color" content={settings.primaryColor} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="font-sans antialiased">
+    <slot />
+  </body>
+</html>

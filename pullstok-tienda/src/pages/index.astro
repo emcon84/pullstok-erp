@@ -1,0 +1,50 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Nav from "@/components/Nav.astro";
+import Hero from "@/components/Hero.astro";
+import BadgeBar from "@/components/BadgeBar.astro";
+import ProductGrid from "@/components/ProductGrid.astro";
+import Newsletter from "@/components/Newsletter.astro";
+import Footer from "@/components/Footer.astro";
+import {
+  resolveSlugFromHost,
+  getStoreSettings,
+  getStoreProducts,
+  StoreNotAvailableError,
+  StoreNotFoundError,
+} from "@/lib/storeApi";
+
+const slug = resolveSlugFromHost(Astro.request.headers.get("host"));
+
+// Búsqueda server-side: ?q=... viaja directo al endpoint público
+// (GET /api/store/products?q=...). Sin estado de cliente, sin JS extra.
+const searchQuery = Astro.url.searchParams.get("q")?.trim() || undefined;
+
+let settings;
+let products;
+try {
+  [settings, products] = await Promise.all([
+    getStoreSettings(slug),
+    getStoreProducts(slug, searchQuery),
+  ]);
+} catch (error) {
+  if (error instanceof StoreNotAvailableError) {
+    return new Response("Tienda no disponible para este plan.", { status: 403 });
+  }
+  if (error instanceof StoreNotFoundError) {
+    return new Response("Tienda no encontrada.", { status: 404 });
+  }
+  throw error;
+}
+---
+
+<BaseLayout settings={settings}>
+  <Nav settings={settings} searchQuery={searchQuery} />
+  <main>
+    {!searchQuery && settings.showBanner && <Hero settings={settings} />}
+    {!searchQuery && <BadgeBar badges={settings.badges} />}
+    <ProductGrid products={products} searchQuery={searchQuery} />
+    {!searchQuery && settings.showNewsletter && <Newsletter />}
+  </main>
+  <Footer settings={settings} />
+</BaseLayout>

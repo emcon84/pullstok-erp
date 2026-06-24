@@ -1,0 +1,44 @@
+---
+import type { StoreProduct } from "@/lib/storeApi";
+import ProductCard from "@/components/ProductCard.astro";
+
+interface Props {
+  products: StoreProduct[];
+  // Si viene de una búsqueda (?q=...), cambia el heading + empty state para
+  // dar feedback honesto de "resultados para X" en vez del "Catálogo" fijo.
+  searchQuery?: string;
+}
+
+const { products, searchQuery } = Astro.props;
+const isSearch = Boolean(searchQuery);
+---
+
+<section id="catalogo" class="mx-auto max-w-6xl px-6 py-20">
+  <h2 class="mb-2 text-2xl font-bold tracking-tight">
+    {isSearch ? "Resultados de búsqueda" : "Catálogo"}
+  </h2>
+  {
+    isSearch && (
+      <p class="mb-10 text-sm text-muted-foreground">
+        {products.length > 0 ? `Resultados para "${searchQuery}"` : `Sin resultados para "${searchQuery}"`}
+      </p>
+    )
+  }
+  {!isSearch && <div class="mb-10" />}
+
+  {
+    products.length === 0 ? (
+      <p class="text-muted-foreground">
+        {isSearch
+          ? "Probá con otra palabra o revisá el catálogo completo."
+          : "Todavía no hay productos publicados."}
+      </p>
+    ) : (
+      <div class="grid grid-cols-2 gap-x-6 gap-y-12 md:grid-cols-3 lg:grid-cols-4">
+        {products.map((product) => (
+          <ProductCard product={product} />
+        ))}
+      </div>
+    )
+  }
+</section>

@@ -1,0 +1,45 @@
+---
+// "Stay in the loop": sección visual estilo Bloom. EL SUBMIT NO PERSISTE
+// NADA todavía — no hay backend de captura de email en v1. Es un stub
+// honesto: previene el submit real del form y muestra feedback en pantalla
+// en vez de pretender que se suscribió a algo.
+// TODO(tienda-online): cuando exista un endpoint de newsletter (tabla +
+// API), reemplazar el preventDefault por un fetch real a /api/store/newsletter.
+---
+
+<section class="border-y border-border bg-muted">
+  <div class="mx-auto flex max-w-2xl flex-col items-center gap-4 px-6 py-16 text-center">
+    <h2 class="text-2xl font-bold tracking-tight">Mantenete al tanto</h2>
+    <p class="text-muted-foreground">
+      Sumate para enterarte de nuevos productos y novedades de la tienda.
+    </p>
+    <form id="newsletter-form" class="flex w-full max-w-md flex-col gap-3 sm:flex-row">
+      <label for="newsletter-email" class="sr-only">Email</label>
+      <input
+        id="newsletter-email"
+        type="email"
+        required
+        placeholder="tu@email.com"
+        class="h-11 flex-1 rounded-md border border-border bg-background px-4 text-sm outline-none focus:border-[var(--brand)]"
+      />
+      <button type="submit" class="btn-brand shrink-0">Suscribirme</button>
+    </form>
+    <p id="newsletter-feedback" class="hidden text-sm text-muted-foreground" role="status"></p>
+  </div>
+</section>
+
+<script>
+  // Stub: no hay backend de newsletter todavía (ver TODO arriba). Esto solo
+  // da feedback visual local, NO envía ni guarda el email en ningún lado.
+  const form = document.getElementById("newsletter-form");
+  const feedback = document.getElementById("newsletter-feedback");
+
+  form?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (feedback) {
+      feedback.textContent = "¡Gracias! (función de suscripción próximamente)";
+      feedback.classList.remove("hidden");
+    }
+    (form as HTMLFormElement).reset();
+  });
+</script>

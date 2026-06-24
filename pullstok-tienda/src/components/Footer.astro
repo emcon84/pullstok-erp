@@ -1,0 +1,63 @@
+---
+import type { StoreSettings } from "@/lib/storeApi";
+
+interface Props {
+  settings: StoreSettings;
+}
+
+const { settings } = Astro.props;
+const year = new Date().getFullYear();
+const hasContact = settings.contactEmail || settings.contactPhone || settings.address;
+---
+
+<footer class="border-t border-border bg-muted">
+  <div class="mx-auto max-w-6xl px-6 py-12">
+    <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
+      <div>
+        <p class="text-lg font-bold">{settings.storeName}</p>
+        {settings.tagline && <p class="mt-2 text-sm text-muted-foreground">{settings.tagline}</p>}
+      </div>
+
+      <div>
+        <p class="text-sm font-semibold text-foreground">Tienda</p>
+        <ul class="mt-3 space-y-2 text-sm text-muted-foreground">
+          <li><a href="/" class="hover:text-foreground">Catálogo</a></li>
+          {settings.contactEmail && (
+            <li>
+              <a href={`mailto:${settings.contactEmail}`} class="hover:text-foreground">Contacto</a>
+            </li>
+          )}
+        </ul>
+      </div>
+
+      {
+        hasContact ? (
+          <div>
+            <p class="text-sm font-semibold text-foreground">Contacto</p>
+            <ul class="mt-3 space-y-2 text-sm text-muted-foreground">
+              {settings.contactEmail && <li>{settings.contactEmail}</li>}
+              {settings.contactPhone && <li>{settings.contactPhone}</li>}
+              {settings.address && <li>{settings.address}</li>}
+            </ul>
+          </div>
+        ) : (
+          <div>
+            <p class="text-sm font-semibold text-foreground">Powered by</p>
+            <ul class="mt-3 space-y-2 text-sm text-muted-foreground">
+              <li><a href="https://pullstok.com" class="hover:text-foreground">Pullstok</a></li>
+            </ul>
+          </div>
+        )
+      }
+    </div>
+
+    <div class="mt-10 flex flex-col gap-2 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <p>© {year} {settings.storeName}. Todos los derechos reservados.</p>
+      {hasContact && (
+        <p>
+          Powered by <a href="https://pullstok.com" class="font-medium hover:text-foreground">Pullstok</a>
+        </p>
+      )}
+    </div>
+  </div>
+</footer>

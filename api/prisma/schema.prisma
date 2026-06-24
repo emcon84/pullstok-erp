@@ -54,6 +54,7 @@ model Organization {
   sales                 Sale[]
   receipts              Receipt[]
   counters              Counter[]
+  storeSettings         StoreSettings?
 
   @@map("organizations")
 }
@@ -102,19 +103,22 @@ model Category {
 }
 
 model Product {
-  id             String          @id @default(uuid())
-  name           String
-  price          Float
-  description    String?
-  categoryId     String?
-  category       Category?       @relation(fields: [categoryId], references: [id])
-  image          String?
-  quantity       Int
-  organizationId String
-  organization   Organization    @relation(fields: [organizationId], references: [id])
-  orderItems     OrderItem[]
-  quotationItems QuotationItem[]
-  saleItems      SaleItem[]
+  id               String          @id @default(uuid())
+  name             String
+  price            Float
+  description      String?
+  categoryId       String?
+  category         Category?       @relation(fields: [categoryId], references: [id])
+  image            String?
+  quantity         Int
+  // Visibilidad en la tienda online pública (negocio.pullstok.com). Default
+  // false: un producto nunca aparece publicado sin que el dueño lo decida.
+  publishedToStore Boolean         @default(false)
+  organizationId   String
+  organization     Organization    @relation(fields: [organizationId], references: [id])
+  orderItems       OrderItem[]
+  quotationItems   QuotationItem[]
+  saleItems        SaleItem[]
 
   @@index([organizationId])
   @@index([categoryId])
@@ -129,6 +133,9 @@ model Order {
   totalAmount    Float
   status         OrderStatus  @default(PENDING)
   type           OrderType
+  // Canal de origen: STORE (tienda online pública) vs INTERNAL (ERP). Default
+  // INTERNAL para que las filas/flujos existentes no cambien de comportamiento.
+  source         OrderSource  @default(INTERNAL)
   quotationId    String?
   quotation      Quotation?   @relation(fields: [quotationId], references: [id])
   receipt        String?
@@ -241,4 +248,36 @@ enum OrderStatus {
 enum OrderType {
   SALE
   PURCHASE
+}
+
+enum OrderSource {
+  STORE
+  INTERNAL
+}
+
+// Configuración de branding de la tienda online pública, 1:1 con Organization.
+// A PROPÓSITO fuera de TENANT_MODELS (ver db.ts): es un modelo de fila única
+// por org, se accede vía basePrisma filtrando por organizationId directamente
+// (no necesita el scope automático de la extensión multi-tenant).
+model StoreSettings {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  primaryColor   String       @default("#111827")
+  logoUrl        String?
+  bannerUrl      String?
+  tagline        String?
+  showNewsletter Boolean      @default(true)
+  showBanner     Boolean      @default(true)
+  // Badges configurables de confianza (envío gratis, garantía, etc.). Array
+  // de hasta 3 objetos { title, subtitle } — NO hardcodeado, NO reviews/stars
+  // (no tenemos backend para eso). El storefront solo muestra la barra si
+  // este campo no es null/vacío.
+  badges         Json?
+  contactEmail   String?
+  contactPhone   String?
+  address        String?
+  updatedAt      DateTime     @updatedAt
+
+  @@map("store_settings")
 }

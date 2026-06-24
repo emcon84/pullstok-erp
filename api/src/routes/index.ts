@@ -13,8 +13,14 @@ import healthRoutes from "./healthRoutes";
 import organizationRoutes from "./organizationRoutes";
 import categoryRoutes from "./categoryRoutes";
 import onboardingRoutes from "./onboardingRoutes";
+import storeRoutes from "./store";
 
 const router = Router();
+
+// Router público de la tienda online: sin authenticateJWT (resuelve tenant
+// por slug de subdominio, ver tenantBySlug). Montado antes/separado de las
+// rutas autenticadas para que quede explícito que no comparte la cadena JWT.
+router.use("/store", storeRoutes);
 
 router.use("/auth", authRoutes);
 router.use("/superadmin", superadminRoutes);

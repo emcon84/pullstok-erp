@@ -1,0 +1,34 @@
+---
+import type { StoreSettings } from "@/lib/storeApi";
+
+interface Props {
+  settings: StoreSettings;
+}
+
+const { settings } = Astro.props;
+---
+
+<section
+  class="border-b border-border bg-muted"
+  style={settings.bannerUrl ? `background-image: linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), url(${settings.bannerUrl}); background-size: cover; background-position: center;` : undefined}
+>
+  <div class="mx-auto flex max-w-3xl flex-col items-center gap-5 px-6 py-24 text-center md:py-32">
+    <h1
+      class:list={[
+        "text-4xl font-extrabold tracking-tight md:text-6xl",
+        settings.bannerUrl ? "text-white" : "text-[var(--brand)]",
+      ]}
+    >
+      {settings.storeName}
+    </h1>
+    <p
+      class:list={[
+        "max-w-xl text-lg",
+        settings.bannerUrl ? "text-white/90" : "text-muted-foreground",
+      ]}
+    >
+      {settings.tagline ?? `Productos elegidos por ${settings.storeName}, calidad garantizada.`}
+    </p>
+    <a href="#catalogo" class="btn-brand mt-2">Ver catálogo</a>
+  </div>
+</section>

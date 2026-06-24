@@ -1,0 +1,23 @@
+---
+import type { StoreProduct } from "@/lib/storeApi";
+import ProductCard from "@/components/ProductCard.astro";
+
+interface Props {
+  products: StoreProduct[];
+}
+
+const { products } = Astro.props;
+---
+
+{
+  products.length > 0 && (
+    <section class="mx-auto max-w-6xl px-6 py-20">
+      <h2 class="mb-10 text-2xl font-bold tracking-tight">Productos relacionados</h2>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-12 md:grid-cols-3 lg:grid-cols-4">
+        {products.map((product) => (
+          <ProductCard product={product} />
+        ))}
+      </div>
+    </section>
+  )
+}

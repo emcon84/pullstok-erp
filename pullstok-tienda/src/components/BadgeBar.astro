@@ -1,0 +1,40 @@
+---
+import type { StoreBadge } from "@/lib/storeApi";
+
+interface Props {
+  badges: StoreBadge[] | null;
+}
+
+const { badges } = Astro.props;
+
+// Solo se renderiza si la org configuró badges (StoreSettings.badges). Sin
+// reviews/stars/wishlist — esos no existen en el backend, no se inventan.
+const items = (badges ?? []).slice(0, 3);
+---
+
+{
+  items.length > 0 && (
+    <section class="border-b border-border bg-muted/60">
+      <div class="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-6 py-8 sm:grid-cols-3">
+        {items.map((badge) => (
+          <div class="flex items-center justify-center gap-3 text-center sm:text-left sm:justify-start">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              class="h-8 w-8 shrink-0 text-[var(--brand)]"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <div>
+              <p class="text-sm font-semibold text-foreground">{badge.title}</p>
+              <p class="text-xs text-muted-foreground">{badge.subtitle}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}

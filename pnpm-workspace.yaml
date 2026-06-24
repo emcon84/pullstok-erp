@@ -2,3 +2,4 @@ packages:
   - "api"
   - "pullstok-front"
   - "pullstok-landing"
+  - "pullstok-tienda"

@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/*
+  Tokens base inspirados en pullstok-landing/src/styles/global.css, pero el
+  storefront tiene un dato extra que la landing no tiene: --brand, inyectado
+  server-side por BaseLayout.astro desde StoreSettings.primaryColor (1 color
+  por organización -> tienda "se tiñe" del color del negocio, ver referencia
+  Bloom obs #537). Todo lo que sea acento de marca usa var(--brand), nunca un
+  color fijo, para que el theming funcione sin rebuild de Tailwind.
+*/
+:root {
+  --radius: 0.75rem;
+
+  --background: #ffffff;
+  --foreground: #18181b;
+
+  --card: #ffffff;
+  --card-foreground: #18181b;
+
+  --muted: #f8fafc;
+  --muted-foreground: #71717a;
+
+  --border: #e4e4e7;
+
+  /* Default; BaseLayout.astro lo pisa con define:vars usando el color real
+     de la organización (StoreSettings.primaryColor). */
+  --brand: #6d28d9;
+  --brand-foreground: #ffffff;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .btn-brand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    height: 2.75rem;
+    padding-inline: 1.5rem;
+    background-color: var(--color-brand);
+    color: var(--color-brand-foreground);
+    transition: opacity 150ms ease;
+  }
+
+  .btn-brand:hover {
+    opacity: 0.88;
+  }
+
+  .btn-brand:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Outline variant: usado en "Quick View" sobre la imagen del producto y en
+     CTAs secundarios (ej. "Buy Now"). Mismo --brand, sin relleno. */
+  .btn-brand-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    height: 2.75rem;
+    padding-inline: 1.5rem;
+    background-color: var(--color-background);
+    color: var(--color-brand);
+    border: 1.5px solid var(--color-brand);
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .btn-brand-outline:hover {
+    background-color: var(--color-brand);
+    color: var(--color-brand-foreground);
+  }
+}

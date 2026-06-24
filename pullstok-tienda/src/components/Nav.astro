@@ -1,0 +1,75 @@
+---
+import type { StoreSettings } from "@/lib/storeApi";
+
+interface Props {
+  settings: StoreSettings;
+  // Query de búsqueda activa (si venimos de /?q=...) para precargar el input.
+  searchQuery?: string;
+}
+
+const { settings, searchQuery } = Astro.props;
+
+// Logo "a dos tonos" estilo Bloom (BLOOM+SHOP): primera palabra en color de
+// texto normal, segunda palabra (o resto) en --brand. Si la org configuró un
+// logoUrl real, ese gana siempre — esto es solo el fallback tipográfico.
+const words = settings.storeName.trim().split(/\s+/);
+const firstWord = words[0] ?? settings.storeName;
+const restWords = words.slice(1).join(" ");
+---
+
+<header class="sticky top-0 z-50 border-b border-border bg-background/95 shadow-sm backdrop-blur">
+  <nav class="mx-auto flex max-w-6xl items-center gap-6 px-6 py-4">
+    <a href="/" class="flex shrink-0 items-center gap-2">
+      {
+        settings.logoUrl ? (
+          <img src={settings.logoUrl} alt={settings.storeName} class="h-8 w-auto" />
+        ) : (
+          <span class="text-xl font-extrabold tracking-tight">
+            {firstWord}
+            {restWords && <span class="text-[var(--brand)]">{restWords}</span>}
+          </span>
+        )
+      }
+    </a>
+
+    {settings.contactEmail && (
+      <a
+        href={`mailto:${settings.contactEmail}`}
+        class="hidden shrink-0 text-sm font-medium text-foreground/70 transition hover:text-foreground md:block"
+      >
+        Contacto
+      </a>
+    )}
+
+    <form action="/" method="get" class="mx-auto flex w-full max-w-md flex-1 items-center">
+      <label for="store-search" class="sr-only">Buscar productos</label>
+      <div class="relative w-full">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <input
+          id="store-search"
+          type="search"
+          name="q"
+          value={searchQuery ?? ""}
+          placeholder="Buscar productos..."
+          class="w-full rounded-full border border-border bg-muted/60 py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[var(--brand)] focus:bg-background"
+        />
+      </div>
+    </form>
+
+    <!-- Carrito: placeholder visual para este batch. La lógica real de
+         carrito/checkout es un batch posterior (WS3.6/3.5 en tasks). -->
+    <button
+      type="button"
+      aria-label="Carrito (próximamente)"
+      title="Carrito — próximamente"
+      class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border text-foreground/70 transition hover:border-[var(--brand)] hover:text-[var(--brand)]"
+      disabled
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-5 w-5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.872-3.876 2.617-6.16a.75.75 0 0 0-.65-.987l-13.45.022-.6-2.225M7.5 14.25 5.106 5.272M5.106 5.272 4.5 3" />
+      </svg>
+    </button>
+  </nav>
+</header>
