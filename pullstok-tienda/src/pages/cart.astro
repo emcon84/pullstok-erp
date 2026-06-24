@@ -1,0 +1,139 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Nav from "@/components/Nav.astro";
+import Footer from "@/components/Footer.astro";
+import {
+  resolveSlugFromHost,
+  getStoreSettings,
+  StoreNotAvailableError,
+  StoreNotFoundError,
+} from "@/lib/storeApi";
+
+const slug = resolveSlugFromHost(Astro.request.headers.get("host"));
+
+let settings;
+try {
+  settings = await getStoreSettings(slug);
+} catch (error) {
+  if (error instanceof StoreNotAvailableError) {
+    return new Response("Tienda no disponible para este plan.", { status: 403 });
+  }
+  if (error instanceof StoreNotFoundError) {
+    return new Response("Tienda no encontrada.", { status: 404 });
+  }
+  throw error;
+}
+---
+
+<BaseLayout settings={settings} title="Carrito">
+  <Nav settings={settings} />
+  <main>
+    <div class="mx-auto max-w-4xl px-6 py-16">
+      <h1 class="text-3xl font-bold tracking-tight">Tu carrito</h1>
+
+      <!-- Todo el contenido real se hidrata client-side desde cart.ts
+           (nanostores + localStorage) — no hay nada que el server pueda
+           saber del carrito de este visitante. -->
+      <div id="cart-empty" class="mt-10 hidden flex-col items-center gap-4 text-center">
+        <p class="text-muted-foreground">Tu carrito está vacío.</p>
+        <a href="/" class="btn-brand w-fit">Ver catálogo</a>
+      </div>
+
+      <div id="cart-content" class="mt-10 hidden flex-col gap-8 md:flex-row">
+        <ul id="cart-items" class="flex-1 divide-y divide-border"></ul>
+
+        <div class="w-full shrink-0 rounded-xl border border-border p-6 md:w-72">
+          <p class="flex items-center justify-between text-sm text-muted-foreground">
+            <span>Subtotal</span>
+            <span id="cart-subtotal" class="font-semibold text-foreground">$0</span>
+          </p>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Los costos de envío se coordinan después de la compra.
+          </p>
+          <a href="/checkout" id="checkout-cta" class="btn-brand mt-6 w-full">
+            Finalizar compra
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+  <Footer settings={settings} />
+</BaseLayout>
+
+<script>
+  import { cartItems, setItemQuantity, removeFromCart, type CartItem } from "@/lib/cart";
+
+  const emptyEl = document.getElementById("cart-empty")!;
+  const contentEl = document.getElementById("cart-content")!;
+  const listEl = document.getElementById("cart-items")!;
+  const subtotalEl = document.getElementById("cart-subtotal")!;
+
+  const priceFormatter = new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  });
+
+  function renderItem(item: CartItem): HTMLElement {
+    const li = document.createElement("li");
+    li.className = "flex items-center gap-4 py-4";
+    li.innerHTML = `
+      <div class="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+        ${
+          item.image
+            ? `<img src="${item.image}" alt="${item.name}" class="h-full w-full object-cover" />`
+            : `<div class="flex h-full w-full items-center justify-center text-xs text-muted-foreground">Sin imagen</div>`
+        }
+      </div>
+      <div class="flex-1">
+        <p class="font-medium text-foreground">${item.name}</p>
+        <p class="text-sm text-muted-foreground">${priceFormatter.format(item.price)}</p>
+      </div>
+      <div class="flex items-center rounded-md border border-border">
+        <button type="button" class="qty-decrement flex h-8 w-8 items-center justify-center text-foreground/70 hover:text-foreground" aria-label="Restar cantidad">&minus;</button>
+        <span class="w-8 text-center text-sm font-semibold">${item.quantity}</span>
+        <button type="button" class="qty-increment flex h-8 w-8 items-center justify-center text-foreground/70 hover:text-foreground" aria-label="Sumar cantidad">&#43;</button>
+      </div>
+      <p class="w-20 shrink-0 text-right text-sm font-semibold text-[var(--brand)]">${priceFormatter.format(item.price * item.quantity)}</p>
+      <button type="button" class="remove-item shrink-0 text-muted-foreground hover:text-destructive" aria-label="Quitar producto" title="Quitar">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-5 w-5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+        </svg>
+      </button>
+    `;
+
+    li.querySelector(".qty-decrement")?.addEventListener("click", () => {
+      setItemQuantity(item.productId, item.quantity - 1);
+    });
+    li.querySelector(".qty-increment")?.addEventListener("click", () => {
+      setItemQuantity(item.productId, Math.min(item.quantity + 1, item.maxQuantity || item.quantity + 1));
+    });
+    li.querySelector(".remove-item")?.addEventListener("click", () => {
+      removeFromCart(item.productId);
+    });
+
+    return li;
+  }
+
+  function render(items: readonly CartItem[]) {
+    if (items.length === 0) {
+      emptyEl.classList.remove("hidden");
+      emptyEl.classList.add("flex");
+      contentEl.classList.add("hidden");
+      contentEl.classList.remove("flex");
+      return;
+    }
+
+    emptyEl.classList.add("hidden");
+    emptyEl.classList.remove("flex");
+    contentEl.classList.remove("hidden");
+    contentEl.classList.add("flex");
+
+    listEl.replaceChildren(...items.map(renderItem));
+
+    const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    subtotalEl.textContent = priceFormatter.format(subtotal);
+  }
+
+  cartItems.subscribe(render);
+</script>

@@ -56,9 +56,12 @@ const priceFormatted = new Intl.NumberFormat("es-AR", {
       ) : (
         <button
           type="button"
-          class="btn-brand mt-3 w-full"
-          disabled
-          title="Carrito — próximamente"
+          class="btn-brand mt-3 w-full add-to-cart-btn"
+          data-product-id={product.id}
+          data-product-name={product.name}
+          data-product-price={product.price}
+          data-product-image={product.image ?? ""}
+          data-product-max={product.quantity}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-4 w-4">
             <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.872-3.876 2.617-6.16a.75.75 0 0 0-.65-.987l-13.45.022-.6-2.225M7.5 14.25 5.106 5.272M5.106 5.272 4.5 3" />
@@ -69,3 +72,34 @@ const priceFormatted = new Intl.NumberFormat("es-AR", {
     }
   </div>
 </article>
+
+<script>
+  // Add to cart desde la card del catálogo: cantidad fija en 1 (no hay
+  // selector de cantidad acá, eso vive en el detalle del producto). Carga
+  // perezosa de cart.ts (nanostores) — el listener se registra una sola vez
+  // por botón en el DOM, Astro re-ejecuta este script por cada instancia
+  // del componente en la página.
+  import { addToCart } from "@/lib/cart";
+
+  document.querySelectorAll<HTMLButtonElement>(".add-to-cart-btn").forEach((btn) => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", () => {
+      addToCart(
+        {
+          productId: btn.dataset.productId!,
+          name: btn.dataset.productName!,
+          price: Number(btn.dataset.productPrice),
+          image: btn.dataset.productImage || null,
+          maxQuantity: Number(btn.dataset.productMax),
+        },
+        1,
+      );
+      btn.textContent = "¡Agregado!";
+      setTimeout(() => {
+        btn.innerHTML =
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.872-3.876 2.617-6.16a.75.75 0 0 0-.65-.987l-13.45.022-.6-2.225M7.5 14.25 5.106 5.272M5.106 5.272 4.5 3" /></svg>Agregar al carrito';
+      }, 1200);
+    });
+  });
+</script>

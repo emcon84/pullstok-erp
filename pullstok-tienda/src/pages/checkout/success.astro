@@ -1,0 +1,128 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Nav from "@/components/Nav.astro";
+import Footer from "@/components/Footer.astro";
+import {
+  resolveSlugFromHost,
+  getStoreSettings,
+  StoreNotAvailableError,
+  StoreNotFoundError,
+} from "@/lib/storeApi";
+
+const slug = resolveSlugFromHost(Astro.request.headers.get("host"));
+
+let settings;
+try {
+  settings = await getStoreSettings(slug);
+} catch (error) {
+  if (error instanceof StoreNotAvailableError) {
+    return new Response("Tienda no disponible para este plan.", { status: 403 });
+  }
+  if (error instanceof StoreNotFoundError) {
+    return new Response("Tienda no encontrada.", { status: 404 });
+  }
+  throw error;
+}
+---
+
+<BaseLayout settings={settings} title="Pedido confirmado">
+  <Nav settings={settings} />
+  <main>
+    <div class="mx-auto max-w-2xl px-6 py-20 text-center">
+      <!-- El detalle del pedido (orderId, items, total) viene de
+           sessionStorage, seteado por checkout.astro justo antes de
+           redirigir acá — es la única forma de tener esos datos sin
+           guardar nada server-side (la confirmación no es una URL
+           navegable/recargable con datos persistentes, a propósito: el
+           pedido ya quedó en la DB, esto es solo el "recibo" visual de
+           esta sesión). -->
+      <div id="no-order" class="hidden flex-col items-center gap-4">
+        <p class="text-muted-foreground">No encontramos un pedido reciente.</p>
+        <a href="/" class="btn-brand w-fit">Volver al catálogo</a>
+      </div>
+
+      <div id="order-confirmation" class="hidden flex-col items-center gap-6">
+        <span class="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--brand)]/10 text-[var(--brand)]">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-8 w-8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        </span>
+
+        <div>
+          <h1 class="text-3xl font-bold tracking-tight">¡Gracias por tu compra!</h1>
+          <p class="mt-2 text-muted-foreground">
+            Pedido <span id="order-id" class="font-mono font-semibold text-foreground"></span>
+          </p>
+        </div>
+
+        <div class="w-full rounded-xl border border-border p-6 text-left">
+          <ul id="order-items" class="space-y-2 text-sm"></ul>
+          <div class="mt-4 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold">
+            <span>Total</span>
+            <span id="order-total" class="text-[var(--brand)]"></span>
+          </div>
+        </div>
+
+        <p class="text-sm text-muted-foreground">
+          Te vamos a contactar a <span id="order-email" class="font-medium text-foreground"></span> para coordinar la entrega.
+        </p>
+
+        <a href="/" class="btn-brand w-fit">Seguir comprando</a>
+      </div>
+    </div>
+  </main>
+  <Footer settings={settings} />
+</BaseLayout>
+
+<script>
+  interface CheckoutResponse {
+    orderId: string;
+    total: number;
+    items: { productId: string; quantity: number; price: number }[];
+    customer: { name: string; email: string; phone: string };
+  }
+
+  const noOrderEl = document.getElementById("no-order")!;
+  const confirmationEl = document.getElementById("order-confirmation")!;
+
+  const raw = sessionStorage.getItem("pullstok-tienda:last-order");
+
+  const priceFormatter = new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  });
+
+  if (!raw) {
+    noOrderEl.classList.remove("hidden");
+    noOrderEl.classList.add("flex");
+  } else {
+    try {
+      const order: CheckoutResponse = JSON.parse(raw);
+
+      document.getElementById("order-id")!.textContent = `#${order.orderId.slice(0, 8).toUpperCase()}`;
+      document.getElementById("order-total")!.textContent = priceFormatter.format(order.total);
+      document.getElementById("order-email")!.textContent = order.customer.email;
+
+      document.getElementById("order-items")!.replaceChildren(
+        ...order.items.map((item) => {
+          const li = document.createElement("li");
+          li.className = "flex items-center justify-between gap-2 text-muted-foreground";
+          li.innerHTML = `<span>${item.quantity}x producto</span><span class="text-foreground">${priceFormatter.format(item.price * item.quantity)}</span>`;
+          return li;
+        }),
+      );
+
+      confirmationEl.classList.remove("hidden");
+      confirmationEl.classList.add("flex");
+
+      // Limpio el dato apenas se muestra: si el usuario recarga, ya no
+      // debería ver el mismo "recibo" (es una confirmación de UNA compra,
+      // no una página de historial).
+      sessionStorage.removeItem("pullstok-tienda:last-order");
+    } catch {
+      noOrderEl.classList.remove("hidden");
+      noOrderEl.classList.add("flex");
+    }
+  }
+</script>

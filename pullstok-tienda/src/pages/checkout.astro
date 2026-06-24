@@ -1,0 +1,210 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Nav from "@/components/Nav.astro";
+import Footer from "@/components/Footer.astro";
+import {
+  resolveSlugFromHost,
+  getStoreSettings,
+  StoreNotAvailableError,
+  StoreNotFoundError,
+} from "@/lib/storeApi";
+
+const slug = resolveSlugFromHost(Astro.request.headers.get("host"));
+
+let settings;
+try {
+  settings = await getStoreSettings(slug);
+} catch (error) {
+  if (error instanceof StoreNotAvailableError) {
+    return new Response("Tienda no disponible para este plan.", { status: 403 });
+  }
+  if (error instanceof StoreNotFoundError) {
+    return new Response("Tienda no encontrada.", { status: 404 });
+  }
+  throw error;
+}
+---
+
+<BaseLayout settings={settings} title="Checkout">
+  <Nav settings={settings} />
+  <main>
+    <div class="mx-auto max-w-4xl px-6 py-16">
+      <h1 class="text-3xl font-bold tracking-tight">Finalizar compra</h1>
+
+      <!-- Carrito vacío: no tiene sentido mostrar el form. Se decide
+           client-side (el server no sabe qué hay en el carrito). -->
+      <div id="checkout-empty" class="mt-10 hidden flex-col items-center gap-4 text-center">
+        <p class="text-muted-foreground">Tu carrito está vacío.</p>
+        <a href="/" class="btn-brand w-fit">Ver catálogo</a>
+      </div>
+
+      <div id="checkout-content" class="mt-10 hidden flex-col gap-8 md:flex-row">
+        <form id="checkout-form" class="flex-1 space-y-5">
+          <div>
+            <label for="name" class="text-sm font-medium text-foreground">Nombre completo</label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              required
+              class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[var(--brand)]"
+            />
+            <p class="field-error mt-1 text-xs text-destructive" data-field="name"></p>
+          </div>
+
+          <div>
+            <label for="email" class="text-sm font-medium text-foreground">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[var(--brand)]"
+            />
+            <p class="field-error mt-1 text-xs text-destructive" data-field="email"></p>
+          </div>
+
+          <div>
+            <label for="phone" class="text-sm font-medium text-foreground">Teléfono</label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              required
+              class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[var(--brand)]"
+            />
+            <p class="field-error mt-1 text-xs text-destructive" data-field="phone"></p>
+          </div>
+
+          <p id="checkout-error" class="hidden rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"></p>
+
+          <button type="submit" id="checkout-submit" class="btn-brand w-full">
+            Confirmar pedido
+          </button>
+        </form>
+
+        <div class="w-full shrink-0 rounded-xl border border-border p-6 md:w-72">
+          <p class="text-sm font-semibold text-foreground">Resumen del pedido</p>
+          <ul id="checkout-items" class="mt-4 space-y-2 text-sm"></ul>
+          <div class="mt-4 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold">
+            <span>Total</span>
+            <span id="checkout-total" class="text-[var(--brand)]">$0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <Footer settings={settings} />
+</BaseLayout>
+
+<script>
+  import { cartItems, clearCart, type CartItem } from "@/lib/cart";
+
+  const emptyEl = document.getElementById("checkout-empty")!;
+  const contentEl = document.getElementById("checkout-content")!;
+  const itemsEl = document.getElementById("checkout-items")!;
+  const totalEl = document.getElementById("checkout-total")!;
+  const form = document.getElementById("checkout-form") as HTMLFormElement;
+  const submitBtn = document.getElementById("checkout-submit") as HTMLButtonElement;
+  const errorEl = document.getElementById("checkout-error")!;
+
+  const priceFormatter = new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  });
+
+  function renderSummary(items: readonly CartItem[]) {
+    if (items.length === 0) {
+      emptyEl.classList.remove("hidden");
+      emptyEl.classList.add("flex");
+      contentEl.classList.add("hidden");
+      contentEl.classList.remove("flex");
+      return;
+    }
+
+    emptyEl.classList.add("hidden");
+    emptyEl.classList.remove("flex");
+    contentEl.classList.remove("hidden");
+    contentEl.classList.add("flex");
+
+    itemsEl.replaceChildren(
+      ...items.map((item) => {
+        const li = document.createElement("li");
+        li.className = "flex items-center justify-between gap-2 text-muted-foreground";
+        li.innerHTML = `<span>${item.quantity}x ${item.name}</span><span class="shrink-0 text-foreground">${priceFormatter.format(item.price * item.quantity)}</span>`;
+        return li;
+      }),
+    );
+
+    const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    totalEl.textContent = priceFormatter.format(total);
+  }
+
+  cartItems.subscribe(renderSummary);
+
+  function clearFieldErrors() {
+    document.querySelectorAll(".field-error").forEach((el) => (el.textContent = ""));
+    errorEl.classList.add("hidden");
+    errorEl.textContent = "";
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearFieldErrors();
+
+    const items = cartItems.get();
+    if (items.length === 0) return;
+
+    const formData = new FormData(form);
+    const payload = {
+      customer: {
+        name: String(formData.get("name") ?? "").trim(),
+        email: String(formData.get("email") ?? "").trim(),
+        phone: String(formData.get("phone") ?? "").trim(),
+      },
+      items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Procesando...";
+
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 400 && Array.isArray(data.errors)) {
+          for (const err of data.errors) {
+            const fieldKey = err.campo?.split(".")[1] ?? err.campo;
+            const fieldEl = document.querySelector(`.field-error[data-field="${fieldKey}"]`);
+            if (fieldEl) fieldEl.textContent = err.error;
+          }
+          errorEl.textContent = "Revisá los datos ingresados.";
+        } else {
+          errorEl.textContent = data.message ?? "No pudimos procesar tu pedido. Intentá de nuevo.";
+        }
+        errorEl.classList.remove("hidden");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Confirmar pedido";
+        return;
+      }
+
+      // Éxito: limpiar carrito y mandar a la confirmación con los datos
+      // devueltos por el server (orderId real, totales recalculados).
+      clearCart();
+      sessionStorage.setItem("pullstok-tienda:last-order", JSON.stringify(data));
+      window.location.href = "/checkout/success";
+    } catch {
+      errorEl.textContent = "Error de conexión. Intentá de nuevo.";
+      errorEl.classList.remove("hidden");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Confirmar pedido";
+    }
+  });
+</script>

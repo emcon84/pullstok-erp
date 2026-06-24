@@ -151,3 +151,19 @@ export const updateQuotationSchema = z.object({
 export const createReceiptSchema = z.object({
   relatedDocument: z.string().min(1),
 });
+
+// ---------- Tienda online (checkout público) ----------
+// Sin precios en el payload: el endpoint SIEMPRE recalcula desde la DB (ver
+// storeController.checkout). El cliente solo manda productId + cantidad.
+const checkoutItemSchema = z.object({
+  productId: z.string().min(1, "productId es requerido"),
+  quantity: z.coerce.number().int().positive("La cantidad debe ser mayor a 0"),
+});
+export const checkoutSchema = z.object({
+  customer: z.object({
+    name: z.string().min(1, "El nombre es requerido"),
+    email: z.email("Email inválido"),
+    phone: z.string().min(1, "El teléfono es requerido"),
+  }),
+  items: z.array(checkoutItemSchema).min(1, "El carrito está vacío"),
+});

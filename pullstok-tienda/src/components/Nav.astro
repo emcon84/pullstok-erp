@@ -58,18 +58,44 @@ const restWords = words.slice(1).join(" ");
       </div>
     </form>
 
-    <!-- Carrito: placeholder visual para este batch. La lógica real de
-         carrito/checkout es un batch posterior (WS3.6/3.5 en tasks). -->
-    <button
-      type="button"
-      aria-label="Carrito (próximamente)"
-      title="Carrito — próximamente"
+    <!-- Carrito: el contador (badge) se hidrata client-side desde el store
+         de nanostores (cart.ts) — el conteo vive en localStorage, no hay
+         forma de conocerlo en SSR. Arranca oculto (sin contenido) para no
+         mostrar "0" mientras carga el script. -->
+    <a
+      href="/cart"
+      aria-label="Carrito"
+      title="Carrito"
+      id="nav-cart-link"
       class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border text-foreground/70 transition hover:border-[var(--brand)] hover:text-[var(--brand)]"
-      disabled
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-5 w-5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.872-3.876 2.617-6.16a.75.75 0 0 0-.65-.987l-13.45.022-.6-2.225M7.5 14.25 5.106 5.272M5.106 5.272 4.5 3" />
       </svg>
-    </button>
+      <span
+        id="nav-cart-count"
+        class="absolute -right-1 -top-1 hidden h-5 min-w-5 items-center justify-center rounded-full bg-[var(--brand)] px-1 text-[11px] font-bold leading-none text-[var(--brand-foreground)]"
+      >
+        0
+      </span>
+    </a>
   </nav>
 </header>
+
+<script>
+  // Suscripción al store del carrito: actualiza el badge en CUALQUIER página
+  // que monte Nav.astro, ante cualquier cambio (agregar/quitar/editar qty),
+  // incluyendo cambios hechos en otra pestaña (persistentAtom escucha el
+  // evento "storage").
+  import { cartCount } from "@/lib/cart";
+
+  const countEl = document.getElementById("nav-cart-count");
+
+  if (countEl) {
+    cartCount.subscribe((count) => {
+      countEl.textContent = String(count);
+      countEl.classList.toggle("hidden", count === 0);
+      countEl.classList.toggle("flex", count > 0);
+    });
+  }
+</script>

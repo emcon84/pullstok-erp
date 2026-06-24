@@ -111,15 +111,24 @@ const priceFormatted = new Intl.NumberFormat("es-AR", {
                 </div>
 
                 <div class="mt-2 flex flex-wrap gap-3">
-                  <button type="button" class="btn-brand w-fit" disabled title="Carrito — próximamente">
+                  <button
+                    type="button"
+                    id="add-to-cart-btn"
+                    class="btn-brand w-fit"
+                    data-product-id={product.id}
+                    data-product-name={product.name}
+                    data-product-price={product.price}
+                    data-product-image={product.image ?? ""}
+                    data-product-max={product.quantity}
+                  >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-4 w-4">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.872-3.876 2.617-6.16a.75.75 0 0 0-.65-.987l-13.45.022-.6-2.225M7.5 14.25 5.106 5.272M5.106 5.272 4.5 3" />
                     </svg>
                     Agregar al carrito
                   </button>
-                  <button type="button" class="btn-brand-outline w-fit" disabled title="Carrito — próximamente">
+                  <a href="/cart" id="buy-now-link" class="btn-brand-outline w-fit">
                     Comprar ahora
-                  </button>
+                  </a>
                 </div>
               </Fragment>
             )
@@ -135,15 +144,21 @@ const priceFormatted = new Intl.NumberFormat("es-AR", {
 </BaseLayout>
 
 <script>
-  // Selector de cantidad: solo UI local, no hay carrito todavía que consuma
-  // este valor (ver comentario arriba del botón "Agregar al carrito").
+  // Selector de cantidad + Agregar al carrito: el valor de `qty` vive en este
+  // closure y es lo que se manda a addToCart() al click (respeta el +/- de
+  // pantalla, no fuerza 1 como hace la card del catálogo).
+  import { addToCart } from "@/lib/cart";
+
   const valueEl = document.getElementById("qty-value");
   const decrementBtn = document.getElementById("qty-decrement");
   const incrementBtn = document.getElementById("qty-increment");
+  const addBtn = document.getElementById("add-to-cart-btn") as HTMLButtonElement | null;
+  const buyNowLink = document.getElementById("buy-now-link") as HTMLAnchorElement | null;
+
+  let qty = 1;
 
   if (valueEl && decrementBtn && incrementBtn) {
     const max = Number(valueEl.dataset.max ?? "1");
-    let qty = 1;
 
     const render = () => {
       valueEl.textContent = String(qty);
@@ -157,6 +172,44 @@ const priceFormatted = new Intl.NumberFormat("es-AR", {
     incrementBtn.addEventListener("click", () => {
       qty = Math.min(max || 1, qty + 1);
       render();
+    });
+  }
+
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      addToCart(
+        {
+          productId: addBtn.dataset.productId!,
+          name: addBtn.dataset.productName!,
+          price: Number(addBtn.dataset.productPrice),
+          image: addBtn.dataset.productImage || null,
+          maxQuantity: Number(addBtn.dataset.productMax),
+        },
+        qty,
+      );
+      addBtn.textContent = "¡Agregado!";
+      setTimeout(() => {
+        addBtn.textContent = "Agregar al carrito";
+      }, 1200);
+    });
+  }
+
+  // "Comprar ahora": agrega al carrito con la cantidad elegida y va directo
+  // al carrito (no hay checkout de un solo producto separado — simplifica el
+  // flujo, el carrito ya muestra "Finalizar compra").
+  if (buyNowLink) {
+    buyNowLink.addEventListener("click", () => {
+      if (!addBtn) return;
+      addToCart(
+        {
+          productId: addBtn.dataset.productId!,
+          name: addBtn.dataset.productName!,
+          price: Number(addBtn.dataset.productPrice),
+          image: addBtn.dataset.productImage || null,
+          maxQuantity: Number(addBtn.dataset.productMax),
+        },
+        qty,
+      );
     });
   }
 </script>
