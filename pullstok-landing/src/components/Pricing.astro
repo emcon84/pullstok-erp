@@ -1,6 +1,20 @@
 ---
 import PricingToggle from "@/components/PricingToggle.astro";
 
+// 👉 Access key de Web3Forms. Generá la tuya GRATIS en https://web3forms.com
+//    poniendo el email destino (pedidos@pullstok.com) y pegá acá la key que
+//    te llega por mail. Los pedidos van a llegar a ESE email.
+const WEB3FORMS_KEY = "REEMPLAZAR_CON_TU_ACCESS_KEY";
+
+const rubros = [
+  "Kiosco",
+  "Almacén / Minimercado",
+  "Ferretería",
+  "Indumentaria",
+  "Gastronomía",
+  "Otro",
+];
+
 const plans = [
   {
     name: "Básico",
@@ -123,14 +137,16 @@ const plans = [
               ))}
             </ul>
 
-            <a
-              href="https://app.pullstok.com/?demo=1"
+            <button
+              type="button"
+              data-plan-cta
+              data-plan={plan.name}
               class={`btn mt-auto w-full ${
                 plan.featured ? "btn-primary" : "btn-outline"
               }`}
             >
               Empezar
-            </a>
+            </button>
           </div>
         ))
       }
@@ -140,4 +156,181 @@ const plans = [
       * Precios en pesos argentinos, IVA incluido.
     </p>
   </div>
+
+  <!-- Modal de pedido (se abre al tocar "Empezar") -->
+  <dialog id="lead-modal" class="lead-modal w-[92vw] max-w-lg rounded-3xl border-[1.5px] border-border bg-card p-0 text-foreground shadow-2xl backdrop:bg-foreground/40 backdrop:backdrop-blur-sm">
+    <!-- Estado: formulario -->
+    <form id="lead-form" class="flex flex-col gap-4 p-6 sm:p-8">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h3 class="text-2xl font-extrabold tracking-tight">Empezá con Pullstok</h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            Dejanos tus datos y te contactamos para activar tu cuenta.
+          </p>
+        </div>
+        <button type="button" data-close aria-label="Cerrar" class="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <span class="badge w-fit bg-brand-blue-soft text-brand-blue" id="lead-plan-chip">Plan</span>
+
+      <!-- Campos ocultos para Web3Forms -->
+      <input type="hidden" name="access_key" value={WEB3FORMS_KEY} />
+      <input type="hidden" name="subject" value="Nuevo pedido de plan — Pullstok" />
+      <input type="hidden" name="from_name" value="Landing Pullstok" />
+      <input type="hidden" name="plan" value="" />
+      <!-- Honeypot anti-spam (debe quedar vacío) -->
+      <input type="checkbox" name="botcheck" class="hidden" style="display:none" tabindex="-1" autocomplete="off" />
+
+      <div class="grid gap-4 sm:grid-cols-2">
+        <label class="flex flex-col gap-1.5 text-sm font-semibold">
+          Nombre y apellido
+          <input name="nombre" required type="text" autocomplete="name" class="lead-input" placeholder="Juan Pérez" />
+        </label>
+        <label class="flex flex-col gap-1.5 text-sm font-semibold">
+          Nombre del negocio
+          <input name="negocio" required type="text" class="lead-input" placeholder="Almacén Don Juan" />
+        </label>
+        <label class="flex flex-col gap-1.5 text-sm font-semibold">
+          Email
+          <input name="email" required type="email" autocomplete="email" class="lead-input" placeholder="vos@negocio.com" />
+        </label>
+        <label class="flex flex-col gap-1.5 text-sm font-semibold">
+          WhatsApp
+          <input name="whatsapp" required type="tel" autocomplete="tel" class="lead-input" placeholder="+54 9 11 ..." />
+        </label>
+      </div>
+
+      <label class="flex flex-col gap-1.5 text-sm font-semibold">
+        Rubro
+        <select name="rubro" required class="lead-input">
+          <option value="" disabled selected>Elegí tu rubro</option>
+          {rubros.map((r) => <option value={r}>{r}</option>)}
+        </select>
+      </label>
+
+      <label class="flex flex-col gap-1.5 text-sm font-semibold">
+        Mensaje <span class="font-normal text-muted-foreground">(opcional)</span>
+        <textarea name="mensaje" rows="2" class="lead-input resize-none" placeholder="Contanos algo de tu negocio..."></textarea>
+      </label>
+
+      <p id="lead-error" class="hidden text-sm font-medium text-destructive"></p>
+
+      <button type="submit" class="btn btn-accent mt-1 w-full">Enviar pedido</button>
+      <p class="text-center text-xs text-muted-foreground">No es un pago. Te contactamos para activar tu plan.</p>
+    </form>
+
+    <!-- Estado: éxito -->
+    <div id="lead-success" hidden class="flex flex-col items-center gap-3 p-8 text-center">
+      <span class="flex h-16 w-16 items-center justify-center rounded-full bg-success/15 text-success">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+      <h3 class="text-2xl font-extrabold tracking-tight">¡Pedido enviado! 🎉</h3>
+      <p class="max-w-xs text-muted-foreground">Te vamos a contactar a la brevedad para activar tu cuenta. ¡Gracias por elegir Pullstok!</p>
+      <button type="button" data-close class="btn btn-outline mt-2">Cerrar</button>
+    </div>
+  </dialog>
 </section>
+
+<style>
+  .lead-input {
+    border-radius: 0.75rem;
+    border: 1.5px solid var(--color-border);
+    background: var(--color-background);
+    padding: 0.6rem 0.85rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--color-foreground);
+    outline: none;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+  .lead-input::placeholder {
+    color: var(--color-muted-foreground);
+    font-weight: 400;
+  }
+  .lead-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 25%, transparent);
+  }
+  .lead-modal {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    max-height: 92vh;
+  }
+  .lead-modal[open] {
+    animation: lead-pop 180ms ease;
+  }
+  @keyframes lead-pop {
+    from { transform: translateY(12px) scale(0.98); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+</style>
+
+<script>
+  function setupLeadModal() {
+    const modal = document.getElementById("lead-modal") as HTMLDialogElement | null;
+    const form = document.getElementById("lead-form") as HTMLFormElement | null;
+    if (!modal || !form) return;
+
+    const planField = form.querySelector<HTMLInputElement>('[name="plan"]')!;
+    const planChip = document.getElementById("lead-plan-chip")!;
+    const errorEl = document.getElementById("lead-error")!;
+    const successEl = document.getElementById("lead-success") as HTMLElement;
+    const submitBtn = form.querySelector<HTMLButtonElement>('[type="submit"]')!;
+
+    document.querySelectorAll<HTMLButtonElement>("[data-plan-cta]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const plan = btn.dataset.plan ?? "";
+        planField.value = plan;
+        planChip.textContent = "Plan " + plan;
+        // reset estados
+        form.hidden = false;
+        successEl.hidden = true;
+        errorEl.classList.add("hidden");
+        form.reset();
+        planField.value = plan;
+        modal.showModal();
+      });
+    });
+
+    modal.querySelectorAll("[data-close]").forEach((b) =>
+      b.addEventListener("click", () => modal.close())
+    );
+    // Cerrar al clickear el backdrop
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.close();
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.classList.add("hidden");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Enviando...";
+      try {
+        const res = await fetch("https://api.web3forms.com/submit", {
+          method: "POST",
+          body: new FormData(form),
+        });
+        const data = await res.json();
+        if (data.success) {
+          form.hidden = true;
+          successEl.hidden = false;
+        } else {
+          throw new Error(data.message || "Error");
+        }
+      } catch (err) {
+        errorEl.textContent =
+          "No pudimos enviar el pedido. Probá de nuevo o escribinos por WhatsApp.";
+        errorEl.classList.remove("hidden");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Enviar pedido";
+      }
+    });
+  }
+
+  setupLeadModal();
+  document.addEventListener("astro:after-swap", setupLeadModal);
+</script>
