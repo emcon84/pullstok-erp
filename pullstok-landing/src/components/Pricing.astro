@@ -299,8 +299,11 @@ const plans = [
           throw new Error(data.message || "Error");
         }
       } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
         errorEl.textContent =
-          "No pudimos enviar el pedido. Probá de nuevo o escribinos por WhatsApp.";
+          msg && msg !== "Failed to fetch"
+            ? `No se pudo enviar: ${msg}`
+            : "No pudimos enviar el pedido. Probá de nuevo o escribinos por WhatsApp.";
         errorEl.classList.remove("hidden");
       } finally {
         submitBtn.disabled = false;

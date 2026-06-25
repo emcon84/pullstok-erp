@@ -82,8 +82,11 @@ import { WEB3FORMS_KEY } from "@/consts";
           throw new Error(data.message || "Error");
         }
       } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
         errorEl.textContent =
-          "No pudimos enviar tu consulta. Probá de nuevo en un momento.";
+          msg && msg !== "Failed to fetch"
+            ? `No se pudo enviar: ${msg}`
+            : "No pudimos enviar tu consulta. Probá de nuevo en un momento.";
         errorEl.classList.remove("hidden");
       } finally {
         submitBtn.disabled = false;
