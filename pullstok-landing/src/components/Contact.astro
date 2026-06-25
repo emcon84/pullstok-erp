@@ -1,0 +1,97 @@
+---
+import { WEB3FORMS_KEY } from "@/consts";
+---
+
+<section id="contacto" class="relative overflow-hidden px-4 py-20 sm:px-6 lg:px-8">
+  <div class="blob absolute right-[-5rem] bottom-10 -z-10 h-72 w-72 opacity-[0.10]" style="background: var(--brand-orange);" aria-hidden="true"></div>
+
+  <div class="mx-auto max-w-xl">
+    <div class="text-center">
+      <span class="badge bg-brand-blue-soft text-brand-blue">📬 Contacto</span>
+      <h2 class="mt-4 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
+        ¿Tenés alguna duda?
+      </h2>
+      <p class="mt-4 text-lg text-muted-foreground">
+        Escribinos y te respondemos a la brevedad. Sin compromiso.
+      </p>
+    </div>
+
+    <div class="card card-pop mt-10 p-6 sm:p-8">
+      <form id="contact-form" class="flex flex-col gap-4">
+        <input type="hidden" name="access_key" value={WEB3FORMS_KEY} />
+        <input type="hidden" name="subject" value="Nueva consulta desde la landing — Pullstok" />
+        <input type="hidden" name="from_name" value="Contacto Pullstok" />
+        <input type="checkbox" name="botcheck" class="hidden" style="display:none" tabindex="-1" autocomplete="off" />
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="flex flex-col gap-1.5 text-sm font-semibold">
+            Nombre
+            <input name="nombre" required type="text" autocomplete="name" class="lead-input" placeholder="Tu nombre" />
+          </label>
+          <label class="flex flex-col gap-1.5 text-sm font-semibold">
+            Email
+            <input name="email" required type="email" autocomplete="email" class="lead-input" placeholder="vos@email.com" />
+          </label>
+        </div>
+
+        <label class="flex flex-col gap-1.5 text-sm font-semibold">
+          Mensaje
+          <textarea name="mensaje" required rows="4" class="lead-input resize-none" placeholder="Contanos en qué te podemos ayudar..."></textarea>
+        </label>
+
+        <p id="contact-error" class="hidden text-sm font-medium text-destructive"></p>
+
+        <button type="submit" class="btn btn-primary mt-1 w-full">Enviar consulta</button>
+      </form>
+
+      <div id="contact-success" hidden class="flex flex-col items-center gap-3 py-6 text-center">
+        <span class="flex h-16 w-16 items-center justify-center rounded-full bg-success/15 text-success">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </span>
+        <h3 class="text-2xl font-extrabold tracking-tight">¡Mensaje enviado! 🎉</h3>
+        <p class="max-w-xs text-muted-foreground">Gracias por escribirnos. Te respondemos a la brevedad.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  function setupContactForm() {
+    const form = document.getElementById("contact-form") as HTMLFormElement | null;
+    if (!form) return;
+    const errorEl = document.getElementById("contact-error")!;
+    const successEl = document.getElementById("contact-success") as HTMLElement;
+    const submitBtn = form.querySelector<HTMLButtonElement>('[type="submit"]')!;
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.classList.add("hidden");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Enviando...";
+      try {
+        const res = await fetch("https://api.web3forms.com/submit", {
+          method: "POST",
+          headers: { Accept: "application/json" },
+          body: new FormData(form),
+        });
+        const data = await res.json();
+        if (data.success) {
+          form.hidden = true;
+          successEl.hidden = false;
+        } else {
+          throw new Error(data.message || "Error");
+        }
+      } catch (err) {
+        errorEl.textContent =
+          "No pudimos enviar tu consulta. Probá de nuevo en un momento.";
+        errorEl.classList.remove("hidden");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Enviar consulta";
+      }
+    });
+  }
+
+  setupContactForm();
+  document.addEventListener("astro:after-swap", setupContactForm);
+</script>

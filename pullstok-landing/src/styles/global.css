@@ -264,6 +264,29 @@
     line-height: 1rem;
   }
 
+  /* Inputs de formularios (pedidos + contacto) */
+  .lead-input {
+    border-radius: 0.75rem;
+    border: 1.5px solid var(--color-border);
+    background: var(--color-background);
+    padding: 0.6rem 0.85rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--color-foreground);
+    outline: none;
+    transition:
+      border-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+  .lead-input::placeholder {
+    color: var(--color-muted-foreground);
+    font-weight: 400;
+  }
+  .lead-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 25%, transparent);
+  }
+
   /* ── Blob de color decorativo (animado) ── */
   .blob {
     position: absolute;

@@ -1,10 +1,6 @@
 ---
 import PricingToggle from "@/components/PricingToggle.astro";
-
-// 👉 Access key de Web3Forms. Generá la tuya GRATIS en https://web3forms.com
-//    poniendo el email destino (pedidos@pullstok.com) y pegá acá la key que
-//    te llega por mail. Los pedidos van a llegar a ESE email.
-const WEB3FORMS_KEY = "801be60c-1a7a-4f43-bcfb-e8c12af2e8cf";
+import { WEB3FORMS_KEY } from "@/consts";
 
 const rubros = [
   "Kiosco",
@@ -234,25 +230,6 @@ const plans = [
 </section>
 
 <style>
-  .lead-input {
-    border-radius: 0.75rem;
-    border: 1.5px solid var(--color-border);
-    background: var(--color-background);
-    padding: 0.6rem 0.85rem;
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: var(--color-foreground);
-    outline: none;
-    transition: border-color 120ms ease, box-shadow 120ms ease;
-  }
-  .lead-input::placeholder {
-    color: var(--color-muted-foreground);
-    font-weight: 400;
-  }
-  .lead-input:focus {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 25%, transparent);
-  }
   .lead-modal {
     position: fixed;
     inset: 0;
