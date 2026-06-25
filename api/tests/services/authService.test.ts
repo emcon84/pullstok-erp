@@ -74,6 +74,7 @@ describe('AuthService', () => {
           role: 'ADMIN',
           organizationId: 'org-1',
           mustChangePassword: false,
+          plan: null,
         },
       });
     });

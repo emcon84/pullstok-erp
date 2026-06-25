@@ -1,11 +1,12 @@
-import { Plan } from "@prisma/client";
+// DEUDA TÉCNICA DOCUMENTADA: copia manual de `api/src/config/planLimits.ts`.
+// No existe (todavía) un endpoint compartido que expusiera esta tabla al
+// front, así que el shape y los valores se duplican a mano. Si se agrega o
+// quita un módulo de un plan en el backend, hay que actualizar este archivo
+// en el mismo commit o el sidebar quedará desincronizado con el backend real.
+// Ver decisión documentada en sdd/facturacion-servicios/design (engram).
 
-// Límites y módulos habilitados por plan. `null` en maxUsers/maxProducts/
-// maxStoreProducts significa "ilimitado" (no se chequea contra ningún tope).
-// `maxStoreProducts` = cuántos productos puede PUBLICAR en la tienda online
-// (BASICO = 0 porque no tiene tienda; el gate de acceso vive en
-// checkStoreEnabled.ts). `modules` queda definido para uso futuro (ej. ocultar
-// ítems del sidebar según plan) — por ahora solo se deja el dato listo.
+export type Plan = "BASICO" | "PRO" | "PREMIUM";
+
 export const PLAN_LIMITS: Record<
   Plan,
   {

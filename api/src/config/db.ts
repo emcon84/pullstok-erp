@@ -22,6 +22,7 @@ const TENANT_MODELS = new Set([
   "Quotation",
   "Sale",
   "Receipt",
+  "Invoice",
 ]);
 
 /**

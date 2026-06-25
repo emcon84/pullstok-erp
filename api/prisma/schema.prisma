@@ -45,6 +45,7 @@ model Organization {
   onboardingCompletedAt DateTime?
   plan                  Plan        @default(BASICO)
   paidUntil             DateTime?
+  taxCondition          String?
   users                 User[]
   products              Product[]
   categories            Category[]
@@ -55,6 +56,7 @@ model Organization {
   receipts              Receipt[]
   counters              Counter[]
   storeSettings         StoreSettings?
+  invoices              Invoice[]
 
   @@map("organizations")
 }
@@ -80,10 +82,14 @@ model Customer {
   name           String
   email          String
   phone          String?
+  taxId          String?
+  taxCondition   String?
+  address        String?
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   orders         Order[]
   quotations     Quotation[]
+  invoices       Invoice[]
 
   // Email único POR organización (dos negocios pueden tener el mismo cliente).
   @@unique([organizationId, email])
@@ -253,6 +259,60 @@ enum OrderType {
 enum OrderSource {
   STORE
   INTERNAL
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+model Invoice {
+  id              String        @id @default(uuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  customerId      String
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  number          String? // null en DRAFT; "FAC-0001" asignado solo al ISSUED
+  issueDate       DateTime      @default(now())
+  dueDate         DateTime?
+  items           InvoiceItem[]
+  subtotal        Float         @default(0)
+  taxAmount       Float         @default(0)
+  totalAmount     Float         @default(0)
+  status          InvoiceStatus @default(DRAFT)
+  paymentStatus   PaymentStatus @default(PENDING)
+  notes           String?
+  // --- Fase 2 (AFIP/ARCA WSFEv1), nullable, sin lógica ---
+  tipoComprobante String?
+  puntoVenta      Int?
+  cae             String?
+  caeVencimiento  DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([organizationId, number])
+  @@index([organizationId])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float
+  unitPrice   Float
+  taxRate     Float   @default(21)
+  lineTotal   Float // snapshot: quantity * unitPrice (sin IVA)
+
+  @@map("invoice_items")
 }
 
 // Configuración de branding de la tienda online pública, 1:1 con Organization.

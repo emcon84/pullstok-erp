@@ -46,6 +46,15 @@ const OrganizationsList = lazy(() =>
     default: m.OrganizationsList,
   })),
 );
+const Invoices = lazy(() =>
+  import("./views/Invoices").then((m) => ({ default: m.Invoices })),
+);
+const InvoiceForm = lazy(() =>
+  import("./views/InvoiceForm").then((m) => ({ default: m.InvoiceForm })),
+);
+const InvoiceDetail = lazy(() =>
+  import("./views/InvoiceDetail").then((m) => ({ default: m.InvoiceDetail })),
+);
 
 const AppRoutes = () => (
   <Router>
@@ -129,6 +138,10 @@ const AppRoutes = () => (
         <Route path="/Ventas" element={<SalesPage />} />
         <Route path="/Clientes" element={<Customers />} />
         <Route path="/tienda" element={<Tienda />} />
+        <Route path="/facturacion" element={<Invoices />} />
+        <Route path="/facturacion/nueva" element={<InvoiceForm />} />
+        <Route path="/facturacion/:id" element={<InvoiceDetail />} />
+        <Route path="/facturacion/:id/editar" element={<InvoiceForm />} />
       </Route>
 
       {/* Panel superadmin (sdd/planes-y-billing): rutas de plataforma, fuera
