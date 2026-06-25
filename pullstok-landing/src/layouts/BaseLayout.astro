@@ -12,7 +12,39 @@ const {
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-const ogImage = new URL("/og-image.svg", Astro.site);
+const ogImage = new URL("/og-image.png", Astro.site);
+
+// Datos estructurados (JSON-LD) para Google: organización + el producto/software
+// con sus planes. Ayuda a rich results y a que Google entienda qué es Pullstok.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://pullstok.com/#organization",
+      name: "Pullstok",
+      url: "https://pullstok.com",
+      logo: "https://pullstok.com/og-image.png",
+      description:
+        "Sistema de gestión, stock y tienda online para comercios de Argentina y LatAm.",
+      areaServed: "AR",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Pullstok",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://pullstok.com",
+      description:
+        "ERP simple para kioscos, almacenes, ferreterías e indumentaria: stock en tiempo real, ventas, clientes, reportes y tienda online.",
+      offers: [
+        { "@type": "Offer", name: "Básico", price: "35000", priceCurrency: "ARS" },
+        { "@type": "Offer", name: "Pro", price: "70000", priceCurrency: "ARS" },
+        { "@type": "Offer", name: "Premium", price: "130000", priceCurrency: "ARS" },
+      ],
+    },
+  ],
+};
 ---
 
 <!doctype html>
@@ -34,6 +66,9 @@ const ogImage = new URL("/og-image.svg", Astro.site);
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:locale" content="es_AR" />
     <meta property="og:site_name" content="Pullstok" />
 
@@ -42,6 +77,9 @@ const ogImage = new URL("/og-image.svg", Astro.site);
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+
+    <!-- Datos estructurados para Google -->
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
