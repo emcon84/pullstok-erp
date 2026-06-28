@@ -201,6 +201,7 @@ model Sale {
   saleDate       DateTime     @default(now())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
+  invoice        Invoice?
 
   @@index([organizationId])
   @@map("sales")
@@ -294,6 +295,9 @@ model Invoice {
   puntoVenta      Int?
   cae             String?
   caeVencimiento  DateTime?
+  // --- Puente Sale→Invoice (opcional; facturas de servicio no tienen venta) ---
+  saleId          String?       @unique
+  sale            Sale?         @relation(fields: [saleId], references: [id])
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 

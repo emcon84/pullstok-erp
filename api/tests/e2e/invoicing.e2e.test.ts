@@ -91,15 +91,15 @@ describe('E2E: Módulo de Facturación de Servicios', () => {
       expect(res.body.error).toBe('INVOICING_NOT_AVAILABLE');
     });
 
-    it('org PRO también recibe 403 (solo PREMIUM tiene facturación)', async () => {
+    it('org PRO puede acceder (PRO+PREMIUM tienen facturación)', async () => {
       const { token } = await createOrgWithPlan('PRO', 'pro');
 
       const res = await request(app)
         .get('/api/invoices')
         .set('Authorization', `Bearer ${token}`);
 
-      expect(res.status).toBe(403);
-      expect(res.body.error).toBe('INVOICING_NOT_AVAILABLE');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
     });
 
     it('org PREMIUM puede acceder normalmente', async () => {

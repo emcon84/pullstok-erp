@@ -40,4 +40,6 @@ export interface Sale {
   saleDate: string;
   createdAt?: string;
   __v?: number;
+  /** Presente cuando el backend incluye el select de invoice (getAllSales WS3). */
+  invoice?: { id: string } | null;
 }

@@ -129,3 +129,39 @@ export const cancelInvoice = async (id: string): Promise<Invoice> => {
     throw new Error(extractErrorMessage(error, "Error al cancelar la factura"));
   }
 };
+
+export interface CreateInvoiceFromSaleBody {
+  customerId: string;
+  dueDate?: string;
+  notes?: string;
+}
+
+/**
+ * WS3 — Facturar una venta existente.
+ * POST /api/sales/:saleId/invoice
+ * Respuesta 201: Invoice DRAFT con ítems mapeados automáticamente de la venta.
+ * 409 SALE_ALREADY_INVOICED → lanza error con mensaje legible.
+ */
+export const createInvoiceFromSale = async (
+  saleId: string,
+  body: CreateInvoiceFromSaleBody,
+): Promise<Invoice> => {
+  try {
+    const response = await axios.post<Invoice>(
+      `${API_URL}/sales/${saleId}/invoice`,
+      body,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 409) {
+      const code = error.response?.data?.code;
+      if (code === "SALE_ALREADY_INVOICED") {
+        throw new Error("Esta venta ya tiene una factura asociada.");
+      }
+    }
+    throw new Error(
+      extractErrorMessage(error, "Error al facturar la venta"),
+    );
+  }
+};

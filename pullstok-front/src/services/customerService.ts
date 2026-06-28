@@ -25,15 +25,20 @@ export const getCustomers = async (): Promise<Customer[]> => {
 
 export const createCustomer = async (
   customerData: CreateCustomer,
-): Promise<void> => {
+): Promise<Customer> => {
   const token = localStorage.getItem("token"); // Obtén el token de autenticación
 
   try {
-    await axios.post(`${API_URL}/customers`, customerData, {
-      headers: {
-        Authorization: `Bearer ${token}`, // Añade el token de autorización a las cabeceras
+    const response = await axios.post<Customer>(
+      `${API_URL}/customers`,
+      customerData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`, // Añade el token de autorización a las cabeceras
+        },
       },
-    });
+    );
+    return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(

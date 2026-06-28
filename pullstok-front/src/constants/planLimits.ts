@@ -35,6 +35,7 @@ export const PLAN_LIMITS: Record<
       "remitos",
       "reportes",
       "tienda",
+      "facturacion",
     ],
   },
   PREMIUM: {

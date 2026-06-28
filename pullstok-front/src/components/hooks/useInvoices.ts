@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   cancelInvoice,
   createInvoice,
+  createInvoiceFromSale,
+  CreateInvoiceFromSaleBody,
   deleteInvoice,
   getInvoiceById,
   getInvoices,
@@ -146,5 +148,32 @@ export const useCancelInvoice = () => {
   return {
     cancelInvoice: mutation.mutate,
     loadingCancel: mutation.isPending,
+  };
+};
+
+/**
+ * WS3 — Hook para facturar una venta existente.
+ * Invalida tanto ["invoices"] como ["sales"] para que la lista de ventas
+ * actualice el badge "Facturada".
+ */
+export const useCreateInvoiceFromSale = () => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation<
+    Invoice,
+    Error,
+    { saleId: string; body: CreateInvoiceFromSaleBody }
+  >({
+    mutationFn: ({ saleId, body }) => createInvoiceFromSale(saleId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+    },
+  });
+
+  return {
+    invoiceFromSale: mutation.mutateAsync,
+    loadingInvoiceFromSale: mutation.isPending,
+    errorInvoiceFromSale: mutation.error,
   };
 };

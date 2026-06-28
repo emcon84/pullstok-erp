@@ -4,14 +4,16 @@ import { Request } from "express";
 import { basePrisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
 
-// Facturación es PREMIUM-only. A diferencia de checkStoreEnabled (que lee
-// req.org.plan ya resuelto por tenantBySlug en el router público), esta ruta
-// usa authenticateJWT: el JWT NO trae `plan` en el payload (solo
+// Facturación disponible para PRO y PREMIUM (cambio decidido en
+// facturar-ventas: el módulo completo de facturación pasa de PREMIUM-only
+// a PRO+PREMIUM). A diferencia de checkStoreEnabled (que lee req.org.plan
+// ya resuelto por tenantBySlug en el router público), esta ruta usa
+// authenticateJWT: el JWT NO trae `plan` en el payload (solo
 // userId/role/organizationId, ver jwtUtils.AccessTokenPayload), así que hay
 // que resolverlo con una query liviana por PK a Organization. Se usa
 // basePrisma (no el cliente scopeado) porque Organization no está en
 // TENANT_MODELS y el lookup es por clave primaria simple.
-const INVOICING_PLANS: Plan[] = ["PREMIUM"];
+const INVOICING_PLANS: Plan[] = ["PRO", "PREMIUM"];
 
 export const checkInvoicingEnabled = async (
   req: Request,

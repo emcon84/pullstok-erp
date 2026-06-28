@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Receipt, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +30,7 @@ interface DocumentCardProps {
   onExportExcel?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onInvoice?: () => void;
   badge?: ReactNode;
 }
 
@@ -45,6 +46,7 @@ export const DocumentCard = ({
   onExportExcel,
   onEdit,
   onDelete,
+  onInvoice,
   badge,
 }: DocumentCardProps) => {
   const [showDelete, setShowDelete] = useState(false);
@@ -65,6 +67,12 @@ export const DocumentCard = ({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {onInvoice && (
+            <Button variant="outline" size="sm" onClick={onInvoice}>
+              <Receipt className="h-4 w-4" />
+              Facturar
+            </Button>
+          )}
           {onEdit && (
             <Button variant="outline" size="sm" onClick={onEdit}>
               <Pencil className="h-4 w-4" />

@@ -12,6 +12,9 @@ export interface Customer {
 
 export interface CreateCustomer {
   name: string;
-  email: string;
-  phone: string;
+  email?: string;
+  phone?: string;
+  taxId?: string;
+  taxCondition?: string;
+  address?: string;
 }

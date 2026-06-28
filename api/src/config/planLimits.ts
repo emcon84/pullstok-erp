@@ -34,12 +34,18 @@ export const PLAN_LIMITS: Record<
       "remitos",
       "reportes",
       "tienda",
+      "facturacion",
     ],
   },
   PREMIUM: {
     maxUsers: null,
     maxProducts: null,
     maxStoreProducts: null,
+    // Arrays PLANOS sin herencia: cada plan lista TODOS sus módulos. PREMIUM
+    // es superconjunto de PRO, así que repite todos sus módulos + "facturacion".
+    // El sidebar del front (filterNavItemsByPlan) chequea este array directo,
+    // por eso "facturacion" DEBE estar también acá (ver copia espejo en
+    // pullstok-front/src/constants/planLimits.ts).
     modules: [
       "stock",
       "ventas",

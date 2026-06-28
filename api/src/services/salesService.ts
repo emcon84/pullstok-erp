@@ -86,7 +86,12 @@ const createSale = async (saleRequest: ISaleRequest) => {
 
 const getAllSales = async () => {
   return prisma.sale.findMany({
-    include: { items: { include: { product: true } } },
+    include: {
+      items: { include: { product: true } },
+      // Expone si la venta ya tiene factura y su id (para que el front
+      // muestre el botón "Facturar" solo cuando invoice === null).
+      invoice: { select: { id: true } },
+    },
   });
 };
 
