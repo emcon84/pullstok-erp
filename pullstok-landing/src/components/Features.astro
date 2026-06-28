@@ -1,80 +1,23 @@
 ---
-const features = [
-  {
-    icon: "box",
-    title: "Stock en tiempo real",
-    description:
-      "Sabés exactamente qué tenés y cuánto, sin ir a contar al depósito. Se actualiza solo con cada venta.",
-  },
-  {
-    icon: "cart",
-    title: "Ventas",
-    description:
-      "Registrá ventas en segundos. Descuentan stock al toque y quedan guardadas, sin vuelta atrás ni dolores de cabeza.",
-  },
-  {
-    icon: "file-text",
-    title: "Presupuestos y pedidos",
-    description:
-      "Armá borradores editables para tus clientes. No tocan el stock hasta que se confirman como venta.",
-  },
-  {
-    icon: "truck",
-    title: "Remitos",
-    description:
-      "Generá el comprobante de entrega de mercadería en un click, prolijo y con tus datos.",
-  },
-  {
-    icon: "receipt",
-    title: "Facturación",
-    description:
-      "Generá facturas y comprobantes con tus datos fiscales y los del cliente. Conceptos libres para servicios, o facturá una venta sin recargar nada.",
-  },
-  {
-    icon: "users",
-    title: "Clientes",
-    description:
-      "Tu cartera de clientes ordenada: datos de contacto, historial de compras y cuenta corriente.",
-  },
-  {
-    icon: "store",
-    title: "Usuarios y roles",
-    description:
-      "Sumá a tu equipo con accesos diferenciados según el rol de cada uno, sin compartir una sola cuenta para todos.",
-  },
-  {
-    icon: "wand",
-    title: "Onboarding guiado",
-    description:
-      "Un wizard te ayuda a cargar los datos de tu negocio, tu rubro y tus productos (manual o por CSV) desde el día uno.",
-  },
-  {
-    icon: "bar-chart",
-    title: "Reportes y dashboard",
-    description:
-      "Métricas claras de qué se vende, qué no, y cómo viene el mes. Para decidir con números, no a ojo.",
-  },
+// Sección "Features" rediseñada como BENTO GRID con capturas REALES del
+// producto (tomadas del demo en vivo app.pullstok.com → /public/screenshots/).
+// Reemplaza la grilla genérica de cards con iconos. Cada tile grande muestra un
+// módulo real funcionando; el último tile agrupa el resto de las capacidades.
+// Cada captura es clickeable y abre un visor (lightbox <dialog> nativo).
+
+const extras = [
+  "Presupuestos",
+  "Pedidos",
+  "Remitos",
+  "Reportes y dashboard",
+  "Usuarios y roles",
+  "Onboarding guiado",
+  "Tienda online",
 ];
 
-// Tile de color por feature, rotando la paleta de marca
-const tiles = [
-  "bg-brand-blue-soft text-brand-blue",
-  "bg-brand-orange-soft text-[#b86e00]",
-  "bg-brand-cyan-soft text-[#1796bd]",
-  "bg-brand-red-soft text-[#d62744]",
-];
-
-const icons: Record<string, string> = {
-  box: `<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/>`,
-  cart: `<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>`,
-  "file-text": `<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>`,
-  truck: `<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>`,
-  receipt: `<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>`,
-  users: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>`,
-  store: `<path d="M2 7h20l-1.4 6.3a2 2 0 0 1-2 1.7H5.4a2 2 0 0 1-2-1.7L2 7Z"/><path d="M4 7V4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v3"/><path d="M9 21V14h6v7"/>`,
-  wand: `<path d="m6 21 12-12"/><path d="m15 6 3 3"/><path d="M9 3v3"/><path d="M3 9h3"/><path d="M18 3v3"/><path d="M21 9h-3"/>`,
-  "bar-chart": `<line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/>`,
-};
+const check = `<path d="M20 6 9 17l-5-5"/>`;
+// Ícono "ampliar" (maximize) para el afordance de hover sobre las capturas.
+const expand = `<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>`;
 ---
 
 <section id="caracteristicas" class="px-4 py-20 sm:px-6 lg:px-8">
@@ -85,37 +28,294 @@ const icons: Record<string, string> = {
         Todo lo que tu negocio necesita
       </h2>
       <p class="mt-4 text-lg text-muted-foreground">
-        Nada de módulos que no vas a usar. Lo justo y necesario para manejar
-        tu día a día sin perder tiempo.
+        No te lo contamos con iconitos: te mostramos el producto real,
+        funcionando. Tocá cualquier captura para verla en grande.
       </p>
     </div>
 
-    <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-      {
-        features.map((feature, i) => (
-          <div class="card gap-3 p-6 transition-transform duration-200 hover:-translate-y-1">
-            <div class={`flex h-12 w-12 items-center justify-center rounded-2xl ${tiles[i % tiles.length]}`}>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-                set:html={icons[feature.icon]}
-              />
-            </div>
-            <h3 class="text-base font-bold text-foreground">
-              {feature.title}
-            </h3>
-            <p class="text-sm text-muted-foreground">{feature.description}</p>
+    <div class="mt-12 grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-6 lg:auto-rows-[minmax(0,1fr)]">
+      <!-- STOCK — tile grande (4 cols, 2 filas) -->
+      <article class="card overflow-hidden p-0 lg:col-span-4 lg:row-span-2">
+        <div class="flex flex-col gap-1 p-6 pb-4">
+          <div class="flex items-center gap-2">
+            <span class="badge bg-brand-blue-soft text-brand-blue">Stock</span>
           </div>
-        ))
-      }
+          <h3 class="mt-1 text-xl font-extrabold tracking-tight text-foreground">
+            Tu inventario en tiempo real
+          </h3>
+          <p class="text-sm text-muted-foreground">
+            Cada venta lo actualiza solo. Sabés qué tenés y cuánto, sin contar
+            al depósito ni planillas paralelas.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="zoom-trigger group/zoom relative mt-auto block w-full cursor-zoom-in overflow-hidden rounded-t-xl border-t border-border bg-muted/40"
+          aria-label="Ampliar captura del inventario"
+        >
+          <img
+            src="/screenshots/mod-dashboard.png"
+            alt="Dashboard de Pullstok con la tabla de productos, stock y precios en tiempo real"
+            width="1440"
+            height="900"
+            loading="lazy"
+            decoding="async"
+            class="block h-full w-full origin-top object-cover object-top transition-transform duration-500 group-hover/zoom:scale-[1.02]"
+          />
+          <span class="zoom-hint" aria-hidden="true" set:html={expand} />
+        </button>
+      </article>
+
+      <!-- FACTURACIÓN — destacada (2 cols) -->
+      <article class="card overflow-hidden p-0 lg:col-span-2">
+        <div class="flex flex-col gap-1 p-6 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="badge bg-brand-orange-soft text-[#b86e00]">Facturación</span>
+            <span class="badge bg-brand-blue text-white">Pro</span>
+          </div>
+          <h3 class="mt-1 text-lg font-extrabold tracking-tight text-foreground">
+            Facturás en un clic
+          </h3>
+          <p class="text-sm text-muted-foreground">
+            Comprobantes con tus datos fiscales, o desde una venta.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="zoom-trigger group/zoom relative mt-auto block h-44 w-full cursor-zoom-in overflow-hidden rounded-t-xl border-t border-border bg-muted/40 sm:h-52"
+          aria-label="Ampliar captura de facturación"
+        >
+          <img
+            src="/screenshots/mod-facturacion.png"
+            alt="Listado de facturas emitidas en Pullstok con número, cliente, total y estado"
+            width="1440"
+            height="900"
+            loading="lazy"
+            decoding="async"
+            class="absolute inset-0 h-full w-full object-cover object-left-top transition-transform duration-500 group-hover/zoom:scale-[1.02]"
+          />
+          <span class="zoom-hint" aria-hidden="true" set:html={expand} />
+        </button>
+      </article>
+
+      <!-- VENTAS — (2 cols) -->
+      <article class="card overflow-hidden p-0 lg:col-span-2">
+        <div class="flex flex-col gap-1 p-6 pb-3">
+          <span class="badge w-fit bg-brand-cyan-soft text-[#1796bd]">Ventas</span>
+          <h3 class="mt-1 text-lg font-extrabold tracking-tight text-foreground">
+            Vendé en segundos
+          </h3>
+          <p class="text-sm text-muted-foreground">
+            Registrás la venta y descuenta stock al toque.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="zoom-trigger group/zoom relative mt-auto block h-44 w-full cursor-zoom-in overflow-hidden rounded-t-xl border-t border-border bg-muted/40 sm:h-52"
+          aria-label="Ampliar captura de ventas"
+        >
+          <img
+            src="/screenshots/mod-ventas.png"
+            alt="Listado de ventas en Pullstok con productos, totales y opción de facturar"
+            width="1440"
+            height="900"
+            loading="lazy"
+            decoding="async"
+            class="absolute inset-0 h-full w-full object-cover object-left-top transition-transform duration-500 group-hover/zoom:scale-[1.02]"
+          />
+          <span class="zoom-hint" aria-hidden="true" set:html={expand} />
+        </button>
+      </article>
+
+      <!-- CLIENTES — (3 cols) -->
+      <article class="card overflow-hidden p-0 lg:col-span-3">
+        <div class="grid h-full sm:grid-cols-2">
+          <div class="flex flex-col justify-center gap-1 p-6">
+            <span class="badge w-fit bg-brand-red-soft text-[#d62744]">Clientes</span>
+            <h3 class="mt-1 text-lg font-extrabold tracking-tight text-foreground">
+              Tu cartera, ordenada
+            </h3>
+            <p class="text-sm text-muted-foreground">
+              Contacto, historial de compras y cuenta corriente de cada cliente.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="zoom-trigger group/zoom relative block h-40 w-full cursor-zoom-in overflow-hidden border-t border-border bg-muted/40 sm:h-full sm:border-l sm:border-t-0"
+            aria-label="Ampliar captura de clientes"
+          >
+            <img
+              src="/screenshots/mod-clientes.png"
+              alt="Listado de clientes en Pullstok con nombre, email y teléfono"
+              width="1440"
+              height="900"
+              loading="lazy"
+              decoding="async"
+              class="absolute inset-0 h-full w-full object-cover object-left-top transition-transform duration-500 group-hover/zoom:scale-[1.02]"
+            />
+            <span class="zoom-hint" aria-hidden="true" set:html={expand} />
+          </button>
+        </div>
+      </article>
+
+      <!-- Y ADEMÁS — (3 cols) -->
+      <article class="card justify-center gap-4 p-6 lg:col-span-3">
+        <h3 class="text-lg font-extrabold tracking-tight text-foreground">
+          Y todo lo demás que necesitás
+        </h3>
+        <ul class="flex flex-wrap gap-2.5">
+          {
+            extras.map((e) => (
+              <li class="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/50 px-3 py-1.5 text-sm font-medium text-foreground">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="shrink-0 text-success"
+                  aria-hidden="true"
+                  set:html={check}
+                />
+                {e}
+              </li>
+            ))
+          }
+        </ul>
+      </article>
     </div>
   </div>
+
+  <!-- Visor de imágenes (lightbox) -->
+  <dialog id="shot-lightbox" class="shot-lightbox" aria-label="Visor de captura ampliada">
+    <button type="button" data-close aria-label="Cerrar visor" class="shot-lightbox-close">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <img id="shot-lightbox-img" src="" alt="" decoding="async" />
+  </dialog>
 </section>
+
+<style>
+  /* Afordance "ampliar" sobre cada captura */
+  .zoom-hint {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    display: flex;
+    height: 2rem;
+    width: 2rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--foreground) 78%, transparent);
+    color: var(--background);
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 200ms ease, transform 200ms ease;
+    pointer-events: none;
+  }
+  .zoom-hint :global(svg) {
+    width: 1rem;
+    height: 1rem;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .zoom-trigger:hover .zoom-hint,
+  .zoom-trigger:focus-visible .zoom-hint {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* Visor (lightbox) */
+  .shot-lightbox {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: 100vw;
+    max-height: 100vh;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    padding: clamp(1rem, 4vw, 3rem);
+    overflow: hidden;
+  }
+  .shot-lightbox::backdrop {
+    background: color-mix(in srgb, var(--foreground) 72%, transparent);
+    backdrop-filter: blur(4px);
+  }
+  .shot-lightbox[open] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: shot-pop 180ms ease;
+  }
+  #shot-lightbox-img {
+    max-width: min(1200px, 100%);
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    border-radius: 0.75rem;
+    box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.55);
+    background: var(--card);
+  }
+  .shot-lightbox-close {
+    position: fixed;
+    top: clamp(0.75rem, 3vw, 1.5rem);
+    right: clamp(0.75rem, 3vw, 1.5rem);
+    display: flex;
+    height: 2.75rem;
+    width: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--foreground) 85%, transparent);
+    color: var(--background);
+    border: 0;
+    cursor: pointer;
+    transition: transform 150ms ease, background 150ms ease;
+  }
+  .shot-lightbox-close:hover {
+    transform: scale(1.06);
+  }
+  @keyframes shot-pop {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+  }
+</style>
+
+<script>
+  function setupShotLightbox() {
+    const dlg = document.getElementById("shot-lightbox") as HTMLDialogElement | null;
+    const img = document.getElementById("shot-lightbox-img") as HTMLImageElement | null;
+    if (!dlg || !img) return;
+
+    document.querySelectorAll<HTMLButtonElement>(".zoom-trigger").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const shot = btn.querySelector("img");
+        if (!shot) return;
+        img.src = shot.getAttribute("src") ?? "";
+        img.alt = shot.getAttribute("alt") ?? "";
+        dlg.showModal();
+      });
+    });
+
+    dlg.querySelectorAll<HTMLElement>("[data-close]").forEach((b) =>
+      b.addEventListener("click", () => dlg.close())
+    );
+    // Cerrar al clickear el backdrop (área fuera de la imagen)
+    dlg.addEventListener("click", (e) => {
+      if (e.target === dlg) dlg.close();
+    });
+  }
+
+  setupShotLightbox();
+  document.addEventListener("astro:after-swap", setupShotLightbox);
+</script>
