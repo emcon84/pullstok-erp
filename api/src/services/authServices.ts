@@ -51,6 +51,12 @@ class AuthService {
         role: user.role,
         organizationId: user.organizationId,
         mustChangePassword: user.mustChangePassword,
+        // Plan de la organización para gating client-side (ej. sidebar).
+        // null para SUPERADMIN (organizationId null, sin organization).
+        // NO se agrega al JWT firmado a propósito (ver checkInvoicingEnabled.ts):
+        // un plan cacheado en el token se desincroniza si el admin lo cambia
+        // sin forzar relogin; el backend siempre revalida con query propia.
+        plan: user.organization?.plan ?? null,
       },
     };
   }

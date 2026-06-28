@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCustomers,  createCustomer, updateCustomer, deleteCustomer } from '../../services/customerService'; // Asegúrate de importar correctamente
-import { CreateCustomer } from '../../models/customerModel';
-import { Customer } from '../../models/budgetModel';
+import { CreateCustomer, Customer } from '../../models/customerModel';
 
 export const useCustomers = () => {
   const { data, error, isLoading, isError } = useQuery<Customer[], Error>({
@@ -17,25 +16,21 @@ export const useCustomers = () => {
 };
 
 export const useCreateCustomer = () => {
-  const mutation = useMutation<void, Error, CreateCustomer>({
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation<Customer, Error, CreateCustomer>({
     mutationFn: createCustomer, // Función que realiza la mutación (creación del cliente)
-    onMutate: () => {
-      // Opcional: lógica antes de iniciar la mutación
-    },
     onError: (error) => {
       console.error('Error creating customer:', error.message);
     },
     onSuccess: () => {
-      // Lógica cuando la mutación es exitosa
-      console.log('Customer created successfully');
-    },
-    onSettled: () => {
-      // Lógica después de que la mutación ha finalizado, ya sea con éxito o con error
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
     },
   });
 
   return {
     submitCustomer: mutation.mutate,
+    submitCustomerAsync: mutation.mutateAsync,
     loadingCustomer: mutation.status === 'pending', // Verifica si está en estado de carga
     errorCustomer: mutation.isError ? mutation.error : null, // Verifica si hay un error
     successCustomer: mutation.isSuccess, // Verifica si fue exitoso

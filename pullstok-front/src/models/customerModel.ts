@@ -4,11 +4,17 @@ export interface Customer {
   name: string;
   email: string;
   phone: string;
+  taxId?: string | null;
+  taxCondition?: string | null;
+  address?: string | null;
   __v?: number;
 }
 
 export interface CreateCustomer {
   name: string;
-  email: string;
-  phone: string;
+  email?: string;
+  phone?: string;
+  taxId?: string;
+  taxCondition?: string;
+  address?: string;
 }

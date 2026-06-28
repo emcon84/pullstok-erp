@@ -17,6 +17,7 @@ export interface Organization {
   address?: string | null;
   phone?: string | null;
   taxId?: string | null;
+  taxCondition?: string | null;
   industry?: Industry;
   onboardingCompletedAt: string | null;
   // Plan/billing (sdd/planes-y-billing): opcionales porque el backend de

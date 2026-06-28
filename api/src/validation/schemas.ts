@@ -97,8 +97,11 @@ export const bulkProductsSchema = z.array(bulkProductSchema).min(1);
 // ---------- Clientes ----------
 export const createCustomerSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
-  email: z.email(),
+  email: z.email().or(z.literal("")).optional(),
   phone: z.string().optional(),
+  taxId: z.string().optional(),
+  taxCondition: z.string().optional(),
+  address: z.string().optional(),
 });
 export const updateCustomerSchema = createCustomerSchema.partial();
 
@@ -160,6 +163,38 @@ export const updateQuotationSchema = z.object({
 // ---------- Comprobantes ----------
 export const createReceiptSchema = z.object({
   relatedDocument: z.string().min(1),
+});
+
+// ---------- Facturación de servicios ----------
+// Conceptos libres (sin productId): a diferencia de Sale/Quotation, una
+// Invoice factura servicios, no productos de stock.
+export const invoiceItemSchema = z.object({
+  description: z.string().min(1, "La descripción es requerida"),
+  quantity: z.coerce.number().positive("La cantidad debe ser mayor a 0"),
+  unitPrice: z.coerce.number().nonnegative(),
+  taxRate: z.coerce.number().nonnegative().default(21),
+});
+export const createInvoiceSchema = z.object({
+  customerId: z.string().min(1, "El cliente es requerido"),
+  items: z.array(invoiceItemSchema).min(1, "La factura debe tener al menos un ítem"),
+  dueDate: z.string().min(1).optional(),
+  notes: z.string().optional(),
+});
+export const updateInvoiceSchema = z.object({
+  customerId: z.string().min(1).optional(),
+  items: z.array(invoiceItemSchema).min(1, "La factura debe tener al menos un ítem"),
+  dueDate: z.string().min(1).optional(),
+  notes: z.string().optional(),
+});
+
+// ---------- Facturar desde venta ----------
+// Body del endpoint POST /sales/:saleId/invoice. Los ítems se mapean de la
+// venta (SaleItem → InvoiceLineInput con taxRate 21%); el body solo pide
+// el cliente de facturación, vencimiento opcional y notas.
+export const createSaleInvoiceSchema = z.object({
+  customerId: z.string().min(1, "El cliente es requerido"),
+  dueDate: z.string().min(1).optional(),
+  notes: z.string().optional(),
 });
 
 // ---------- Tienda online (checkout público) ----------

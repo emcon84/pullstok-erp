@@ -1,27 +1,9 @@
 import { NavLink } from "react-router-dom";
-import {
-  LayoutDashboard,
-  FileText,
-  ClipboardList,
-  ShoppingCart,
-  Truck,
-  Users,
-  Store,
-  LogOut,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { logout } from "../../../controllers/authController";
-
-const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/presupuestos", label: "Presupuestos", icon: FileText },
-  { to: "/pedidos", label: "Pedidos", icon: ClipboardList },
-  { to: "/Ventas", label: "Ventas", icon: ShoppingCart },
-  { to: "/facturas", label: "Remitos", icon: Truck },
-  { to: "/Clientes", label: "Clientes", icon: Users },
-  { to: "/tienda", label: "Tienda", icon: Store },
-];
+import { navItems, filterNavItemsByPlan } from "./navItems";
 
 interface SidebarContentProps {
   onNavigate?: () => void;
@@ -48,7 +30,7 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
 
       {/* Navegación */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {filterNavItemsByPlan(navItems, user?.plan).map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
