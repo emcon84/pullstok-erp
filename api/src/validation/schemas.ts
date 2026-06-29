@@ -30,6 +30,9 @@ export const updateOrganizationSchema = z.object({
 export const createCategoriesSchema = z.object({
   names: z.array(z.string().min(1)).min(1, "Debe enviar al menos una categoría"),
 });
+export const updateCategorySchema = z.object({
+  name: z.string().min(1, "El nombre es requerido"),
+});
 
 // ---------- Plataforma / usuarios ----------
 export const createOrganizationSchema = z.object({

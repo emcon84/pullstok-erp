@@ -28,6 +28,35 @@ class CategoryService {
   static async list() {
     return prisma.category.findMany({ orderBy: { name: "asc" } });
   }
+
+  /**
+   * Renombra una categoría de la organización actual. Usa updateMany (el
+   * cliente scopeado inyecta organizationId en el where → tenant-safe). Si no
+   * existe en la org, devuelve null. Un nombre duplicado choca con
+   * @@unique([organizationId, name]) y lanza (lo maneja el controller).
+   */
+  static async rename(id: string, name: string) {
+    const res = await prisma.category.updateMany({
+      where: { id },
+      data: { name: name.trim() },
+    });
+    if (res.count === 0) return null;
+    return prisma.category.findFirst({ where: { id } });
+  }
+
+  /**
+   * Borra una categoría. Los productos que la usaban quedan SIN categoría
+   * (categoryId = null), NO se borran. Devuelve la cantidad borrada (0 si no
+   * existía en la org).
+   */
+  static async remove(id: string) {
+    await prisma.product.updateMany({
+      where: { categoryId: id },
+      data: { categoryId: null },
+    });
+    const res = await prisma.category.deleteMany({ where: { id } });
+    return res.count;
+  }
 }
 
 export default CategoryService;
