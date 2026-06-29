@@ -157,3 +157,39 @@ export const getCategories = async (): Promise<Category[]> => {
     throw new Error("An unknown error occurred");
   }
 };
+
+export const updateCategory = async (
+  id: string,
+  name: string,
+): Promise<Category> => {
+  try {
+    const response = await axios.put<Category>(
+      `${API_URL}/categories/${id}`,
+      { name },
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error updating category",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+export const deleteCategory = async (id: string): Promise<void> => {
+  try {
+    await axios.delete(`${API_URL}/categories/${id}`, {
+      headers: authHeaders(),
+    });
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error deleting category",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};

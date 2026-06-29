@@ -7,6 +7,7 @@ import {
   Users,
   Store,
   Receipt,
+  Tags,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 
@@ -35,6 +36,7 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, moduleKey: null },
+  { to: "/categorias", label: "Categorías", icon: Tags, moduleKey: null },
   { to: "/presupuestos", label: "Presupuestos", icon: FileText, moduleKey: null },
   { to: "/pedidos", label: "Pedidos", icon: ClipboardList, moduleKey: null },
   { to: "/Ventas", label: "Ventas", icon: ShoppingCart, moduleKey: null },
