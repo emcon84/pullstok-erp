@@ -99,10 +99,13 @@ async function main() {
   console.log(`✅ ADMIN demo restaurado: ${DEMO_ADMIN_EMAIL} / ${DEMO_ADMIN_PASSWORD}`);
 
   // 3) Borrado de datos transaccionales, respetando FKs.
-  //    OrderItem/QuotationItem/SaleItem tienen onDelete: Cascade desde su padre,
-  //    así que borrar Order/Quotation/Sale ya borra sus items.
-  //    Pero hay que borrar esos padres ANTES de borrar Product/Customer,
-  //    porque OrderItem/QuotationItem/SaleItem referencian productId sin cascade.
+  //    OrderItem/QuotationItem/SaleItem/InvoiceItem tienen onDelete: Cascade
+  //    desde su padre, así que borrar Order/Quotation/Sale/Invoice ya borra sus
+  //    items. Pero hay que borrar esos padres ANTES de borrar Product/Customer,
+  //    porque sus items referencian productId sin cascade.
+  //    Invoice va PRIMERO: referencia customerId Y saleId, así que se borra
+  //    antes que Sale y Customer (si no, viola invoices_customerId_fkey).
+  const deletedInvoices = await prisma.invoice.deleteMany({ where: { organizationId: org.id } });
   const deletedOrders = await prisma.order.deleteMany({ where: { organizationId: org.id } });
   const deletedQuotations = await prisma.quotation.deleteMany({ where: { organizationId: org.id } });
   const deletedSales = await prisma.sale.deleteMany({ where: { organizationId: org.id } });
@@ -115,7 +118,7 @@ async function main() {
   });
 
   console.log(
-    `✅ Datos transaccionales limpiados: ${deletedOrders.count} órdenes, ${deletedQuotations.count} cotizaciones, ${deletedSales.count} ventas, ${deletedReceipts.count} comprobantes, ${resetCounters.count} contadores reseteados a 0`
+    `✅ Datos transaccionales limpiados: ${deletedInvoices.count} facturas, ${deletedOrders.count} órdenes, ${deletedQuotations.count} cotizaciones, ${deletedSales.count} ventas, ${deletedReceipts.count} comprobantes, ${resetCounters.count} contadores reseteados a 0`
   );
 
   // 4) Productos y clientes demo: borrar y recrear exactamente como en seed.ts.
