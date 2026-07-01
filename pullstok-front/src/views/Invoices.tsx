@@ -21,6 +21,7 @@ import {
   useCancelInvoice,
 } from "../components/hooks/useInvoices";
 import { Invoice, InvoiceStatus, PaymentStatus } from "../models/invoiceModel";
+import { useConfirm } from "../components/hooks/useConfirm";
 import { exportToPDF } from "../utils/exportToPDF";
 
 /**
@@ -88,11 +89,15 @@ export const Invoices = () => {
   const { markAsPaid, loadingMarkAsPaid } = useMarkInvoiceAsPaid();
   const { cancelInvoice, loadingCancel } = useCancelInvoice();
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+  const confirm = useConfirm();
 
-  const handleIssue = (invoice: Invoice) => {
-    if (!window.confirm(`¿Emitir la factura de ${invoice.customer?.name}? No podrá editarse después.`)) {
-      return;
-    }
+  const handleIssue = async (invoice: Invoice) => {
+    const ok = await confirm({
+      title: "¿Emitir factura?",
+      description: `Vas a emitir la factura de ${invoice.customer?.name}. Una vez emitida no se podrá editar.`,
+      confirmLabel: "Sí, emitir",
+    });
+    if (!ok) return;
     setPendingActionId(invoice.id);
     issueInvoice(invoice.id, {
       onSuccess: () => toast.success("Factura emitida con éxito"),
@@ -110,10 +115,14 @@ export const Invoices = () => {
     });
   };
 
-  const handleCancel = (invoice: Invoice) => {
-    if (!window.confirm(`¿Cancelar la factura ${invoice.number}? Esta acción no se puede revertir.`)) {
-      return;
-    }
+  const handleCancel = async (invoice: Invoice) => {
+    const ok = await confirm({
+      title: "¿Cancelar factura?",
+      description: `Vas a cancelar la factura ${invoice.number}. Esta acción no se puede revertir.`,
+      confirmLabel: "Sí, cancelar",
+      danger: true,
+    });
+    if (!ok) return;
     setPendingActionId(invoice.id);
     cancelInvoice(invoice.id, {
       onSuccess: () => toast.success("Factura cancelada"),

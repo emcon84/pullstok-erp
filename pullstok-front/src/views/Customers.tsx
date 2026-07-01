@@ -13,6 +13,16 @@ import {
   useUpdateCustomer,
 } from "../components/hooks/useCustomer";
 import { Loader } from "../components/atoms/loader";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Customers = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,6 +35,11 @@ export const Customers = () => {
   const [updatedCustomerName, setUpdatedCustomerName] = useState("");
   const [updatedCustomerEmail, setUpdatedCustomerEmail] = useState("");
   const [updatedCustomerPhone, setUpdatedCustomerPhone] = useState("");
+
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const { customers, loadingCustomer: loading, errorCustomer } = useCustomers();
   const { submitCustomer, loadingCustomer } = useCreateCustomer();
@@ -55,9 +70,12 @@ export const Customers = () => {
     );
   };
 
-  const handleDeleteCustomer = (customerId: string) => {
-    if (!window.confirm("¿Eliminar este cliente?")) return;
-    deleteCustomer(customerId, {
+  const askDeleteCustomer = (id: string, name: string) =>
+    setDeleteTarget({ id, name });
+
+  const confirmDeleteCustomer = () => {
+    if (!deleteTarget) return;
+    deleteCustomer(deleteTarget.id, {
       onSuccess: () => {
         toast.success("Cliente eliminado con éxito");
         queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -66,6 +84,7 @@ export const Customers = () => {
         toast.error(`Error al eliminar cliente: ${error.message}`);
       },
     });
+    setDeleteTarget(null);
   };
 
   const handleEditCustomer = (customerId: string) => {
@@ -190,7 +209,7 @@ export const Customers = () => {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => handleDeleteCustomer(customerId)}
+                      onClick={() => askDeleteCustomer(customerId, customer.name)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -235,6 +254,30 @@ export const Customers = () => {
           isEditing={true}
         />
       </GenericModal>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar cliente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a eliminar a <strong>{deleteTarget?.name}</strong>. Esta acción
+              no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteCustomer}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Sí, eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

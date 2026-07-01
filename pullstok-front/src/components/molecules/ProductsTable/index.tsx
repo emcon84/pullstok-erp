@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useDeleteProduct } from "../../hooks/useProducts";
+import { useConfirm } from "../../hooks/useConfirm";
 import { API_URL } from "../../../constants";
 import { DataItem } from "../../../types";
 
@@ -42,13 +43,22 @@ interface ProductsTableProps {
 export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
   const [page, setPage] = useState(1);
   const { deleteProduct, loading } = useDeleteProduct();
+  const confirm = useConfirm();
 
   const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
   const current = Math.min(page, totalPages);
   const slice = products.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
-  const handleDelete = (id?: string) => {
-    if (id && window.confirm("¿Eliminar este producto?")) deleteProduct(id);
+  const handleDelete = async (id?: string) => {
+    if (!id) return;
+    const ok = await confirm({
+      title: "¿Eliminar producto?",
+      description:
+        "El producto se eliminará de tu inventario. Esta acción no se puede deshacer.",
+      confirmLabel: "Sí, eliminar",
+      danger: true,
+    });
+    if (ok) deleteProduct(id);
   };
 
   return (

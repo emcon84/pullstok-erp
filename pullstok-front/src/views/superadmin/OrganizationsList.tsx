@@ -28,6 +28,7 @@ import {
 import { Loader } from "../../components/atoms/loader";
 import { Plan } from "../../services/onboardingService";
 import { SuperadminOrganization } from "../../services/superadminService";
+import { useConfirm } from "../../components/hooks/useConfirm";
 import {
   useOrganizations,
   useRegisterOrganizationBilling,
@@ -84,12 +85,19 @@ export const OrganizationsList = () => {
     });
   };
 
-  const handleToggleActive = (org: SuperadminOrganization) => {
+  const confirm = useConfirm();
+
+  const handleToggleActive = async (org: SuperadminOrganization) => {
     const nextActive = !org.isActive;
-    const confirmMessage = nextActive
-      ? `¿Reactivar ${org.name}?`
-      : `¿Suspender ${org.name}? El acceso de sus usuarios quedará bloqueado.`;
-    if (!window.confirm(confirmMessage)) return;
+    const ok = await confirm({
+      title: nextActive ? "¿Reactivar organización?" : "¿Suspender organización?",
+      description: nextActive
+        ? `Vas a reactivar ${org.name}.`
+        : `Vas a suspender ${org.name}. El acceso de sus usuarios quedará bloqueado.`,
+      confirmLabel: nextActive ? "Sí, reactivar" : "Sí, suspender",
+      danger: !nextActive,
+    });
+    if (!ok) return;
     toggleActive(
       { id: org.id, isActive: nextActive },
       {
