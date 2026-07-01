@@ -12,6 +12,7 @@ import {
   deleteCategory,
 } from "../services/onboardingService";
 import { Loader } from "../components/atoms/loader";
+import { useConfirm } from "../components/hooks/useConfirm";
 
 export const Categories = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -22,6 +23,7 @@ export const Categories = () => {
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const confirm = useConfirm();
 
   const load = async () => {
     try {
@@ -86,12 +88,13 @@ export const Categories = () => {
   };
 
   const handleDelete = async (cat: Category) => {
-    if (
-      !window.confirm(
-        `¿Eliminar la categoría "${cat.name}"? Los productos que la usen quedarán sin categoría.`,
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "¿Eliminar categoría?",
+      description: `Vas a eliminar "${cat.name}". Los productos que la usen quedarán sin categoría.`,
+      confirmLabel: "Sí, eliminar",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await deleteCategory(cat.id);
       await load();
