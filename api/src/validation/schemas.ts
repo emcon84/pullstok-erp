@@ -76,7 +76,16 @@ export const createProductSchema = z.object({
   // el toggle dedicado de la UI usa publishProductSchema (PATCH /publish).
   publishedToStore: z.boolean().optional(),
 });
-export const updateProductSchema = createProductSchema.partial();
+// En edición, categoryId puede venir null: un producto sin categoría es válido
+// (la FK es nullable en la DB). createProductSchema lo exige string min(1), así
+// que lo sobrescribimos para aceptar null (desasignar) o string válido.
+export const updateProductSchema = createProductSchema.partial().extend({
+  categoryId: z
+    .string()
+    .min(1, "La categoría es requerida")
+    .nullable()
+    .optional(),
+});
 
 // Toggle dedicado "Publicar en tienda" (WS4 — UI de Tienda/listado de
 // productos). Separado de updateProductSchema porque es una acción de un
