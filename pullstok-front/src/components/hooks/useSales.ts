@@ -28,6 +28,7 @@ export const useCreateSale = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] }); // Invalidar específicamente la query de sales
+      queryClient.invalidateQueries({ queryKey: ["orders"] }); // Invalidar orders: si la venta viene de un pedido, el backend lo marca COMPLETED y la pill debe refrescarse
     },
   });
 
