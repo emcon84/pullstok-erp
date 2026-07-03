@@ -2,6 +2,7 @@ import { Response } from "express";
 import { basePrisma, prisma } from "../config/db";
 import { PublicStoreRequest } from "../middlewares/tenantBySlug";
 import { requireOrganizationId } from "../config/tenantContext";
+import getNextSequenceValue from "../services/secuenceService";
 import { sendMail } from "../services/mailService";
 import { orderReceivedEmail } from "../services/mailTemplates";
 import { emitOrdersChanged } from "../realtime/socket";
@@ -209,6 +210,19 @@ const checkout = async (req: PublicStoreRequest, res: Response) => {
           customerId = created.id;
         }
 
+        // Numeración de pedido: MISMA serie que el ERP interno (PED-####). Se
+        // genera acá DENTRO de la tx y recién después de validar stock, así el
+        // número solo se consume si la Order realmente se crea (evita quemar
+        // números en checkouts que fallan por falta de stock). El incremento
+        // del Counter es atómico → sin colisiones bajo concurrencia. El Counter
+        // NO es tenant-model, pero se scopea explícito por organizationId.
+        const orderSeq = await getNextSequenceValue(
+          organizationId,
+          "order",
+          tx,
+        );
+        const orderNumber = `PED-${orderSeq.toString().padStart(4, "0")}`;
+
         const order = await tx.order.create({
           data: {
             organizationId,
@@ -217,6 +231,7 @@ const checkout = async (req: PublicStoreRequest, res: Response) => {
             status: "PENDING",
             type: "SALE",
             source: "STORE",
+            receipt: orderNumber,
             items: { create: orderItemsData },
           },
           include: { items: true, customer: true },
