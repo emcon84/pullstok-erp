@@ -5,8 +5,12 @@ import { CartItem, Sale } from "../../models/salesModel";
 export const useCreateSale = () => {
   const queryClient = useQueryClient();
 
-  const mutation = useMutation<void, Error, CartItem[]>({
-    mutationFn: async (cart: CartItem[]) => {
+  const mutation = useMutation<
+    void,
+    Error,
+    { cart: CartItem[]; orderId?: string }
+  >({
+    mutationFn: async ({ cart, orderId }) => {
       const saleRequest = {
         products: cart.map((item) => ({
           productId: item.product._id || item.product.id || "",
@@ -17,7 +21,7 @@ export const useCreateSale = () => {
           category: item.product.category || "",
         })),
       };
-      await createSale(saleRequest);
+      await createSale(saleRequest, orderId);
     },
     onError: (error) => {
       console.error("Error creating sale:", error.message);

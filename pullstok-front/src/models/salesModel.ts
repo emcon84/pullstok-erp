@@ -15,6 +15,7 @@ export interface SaleRequest {
     description: string;
     category: string;
   }[];
+  orderId?: string;
 }
 
 export interface Sale {

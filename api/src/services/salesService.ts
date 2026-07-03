@@ -1,5 +1,7 @@
-import { prisma } from "../config/db";
+import { prisma, basePrisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
+import { sendMail } from "./mailService";
+import { saleConfirmedEmail } from "./mailTemplates";
 
 interface IProductSale {
   productId: string;
@@ -11,6 +13,9 @@ interface IProductSale {
 
 interface ISaleRequest {
   products: IProductSale[];
+  // Opcional: pedido de la tienda online que esta venta procesa. Si viene, la
+  // Order se cierra (COMPLETED), se enlaza a la Sale y se manda mail al cliente.
+  orderId?: string;
 }
 
 const createSale = async (saleRequest: ISaleRequest) => {
@@ -20,9 +25,11 @@ const createSale = async (saleRequest: ISaleRequest) => {
     throw new Error("La venta debe incluir al menos un producto");
   }
 
+  const orderId = saleRequest.orderId;
+
   // Toda la venta se ejecuta en una transacción: o se descuenta TODO el stock
   // y se crea la venta, o no se toca nada. Evita el "stock fantasma".
-  return prisma.$transaction(async (tx) => {
+  const sale = await prisma.$transaction(async (tx) => {
     let totalAmount = 0;
     const saleItems: {
       productId: string;
@@ -73,15 +80,83 @@ const createSale = async (saleRequest: ISaleRequest) => {
       totalAmount += price * quantity;
     }
 
-    return tx.sale.create({
+    // Si la venta procesa un pedido de la tienda, validar la Order ANTES de
+    // crear la venta. tx.order.findFirst está scoped por la extensión anti-fuga
+    // (una Order de otra org devuelve null → 404 efectivo). No re-procesar un
+    // pedido ya cerrado (evita doble venta / doble mail).
+    if (orderId) {
+      const order = await tx.order.findFirst({ where: { id: orderId } });
+      if (!order) {
+        throw new Error(`Pedido ${orderId} no encontrado`);
+      }
+      if (order.status === "COMPLETED") {
+        throw new Error("El pedido ya fue procesado");
+      }
+    }
+
+    const created = await tx.sale.create({
       data: {
         organizationId,
         totalAmount,
+        ...(orderId ? { orderId } : {}),
         items: { create: saleItems },
       },
       include: { items: true },
     });
+
+    // Cerrar el pedido: update singular está bloqueado en modelos tenant, se usa
+    // updateMany (scoped a la org por la extensión).
+    if (orderId) {
+      await tx.order.updateMany({
+        where: { id: orderId },
+        data: { status: "COMPLETED" },
+      });
+    }
+
+    return created;
   });
+
+  // Mail "Tu compra fue confirmada" — FUERA de la transacción (ya commiteó). Un
+  // fallo de mail NO revierte la venta: try/catch no-bloqueante. Solo se manda
+  // si la venta cerró un pedido de tienda (tiene customer con email).
+  if (orderId) {
+    try {
+      const order = await prisma.order.findFirst({
+        where: { id: orderId },
+        include: { customer: true },
+      });
+      const organization = await basePrisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { name: true },
+      });
+      const storeSettings = await basePrisma.storeSettings.findUnique({
+        where: { organizationId },
+      });
+
+      if (order?.customer?.email && organization) {
+        const { subject, html } = saleConfirmedEmail({
+          org: { name: organization.name },
+          storeSettings,
+          customerName: order.customer.name,
+          orderRef: order.id.slice(0, 8).toUpperCase(),
+          items: sale.items.map((i) => ({
+            name: i.name,
+            quantity: i.quantity,
+            price: i.price,
+          })),
+          total: sale.totalAmount,
+        });
+        await sendMail({ to: order.customer.email, subject, html });
+      }
+    } catch (mailError: any) {
+      console.error(
+        `[salesService.createSale] Fallo al enviar mail de confirmación (order=${orderId}):`,
+        mailError?.message ?? mailError,
+      );
+    }
+  }
+
+  return sale;
 };
 
 const getAllSales = async () => {

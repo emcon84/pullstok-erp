@@ -19,6 +19,7 @@ import { Order } from "../models/orderModel";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { useCustomers } from "../components/hooks/useCustomer";
 import { usePorducts } from "../components/hooks/useProducts";
+import { useCreateSale } from "../components/hooks/useSales";
 import { CartItem } from "../models/salesModel";
 import { Pagination } from "../components/molecules/pagination";
 import { DocumentCard } from "../components/molecules/DocumentCard";
@@ -52,6 +53,18 @@ const statusBadge = (status?: string) => {
   );
 };
 
+const sourceBadge = (source?: string) => {
+  if (source !== "STORE") return null;
+  return (
+    <Badge
+      variant="outline"
+      className="border-primary/30 bg-primary/10 font-medium text-primary"
+    >
+      🛒 Tienda
+    </Badge>
+  );
+};
+
 export const Orders: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
@@ -64,6 +77,38 @@ export const Orders: React.FC = () => {
   const { submitOrder: createOrder } = useCreateOrder();
   const { updateOrder } = useUpdateOrder();
   const { deleteOrder } = useDeleteOrder();
+  const { createSale } = useCreateSale();
+
+  // Estado del drawer para crear una VENTA desde un pedido
+  const [saleDrawerOpen, setSaleDrawerOpen] = useState(false);
+  const [saleInitialCart, setSaleInitialCart] = useState<CartItem[]>([]);
+  const [saleOrderId, setSaleOrderId] = useState("");
+
+  const openCreateSale = (order: Order) => {
+    const items = (order.items || order.products || []).filter((i) => i.product);
+    setSaleInitialCart(
+      items.map((i) => ({
+        product: i.product as unknown as ProductsProps,
+        quantity: i.quantity,
+        totalPrice: i.quantity * i.price,
+      })),
+    );
+    setSaleOrderId(order.id || order._id || "");
+    setSaleDrawerOpen(true);
+  };
+
+  const handleConfirmSaleFromOrder = (cart: CartItem[]) => {
+    createSale(
+      { cart, orderId: saleOrderId || undefined },
+      {
+        onSuccess: () => toast.success("Venta creada desde el pedido"),
+        onError: () => toast.error("No se pudo crear la venta"),
+      },
+    );
+    setSaleDrawerOpen(false);
+    setSaleInitialCart([]);
+    setSaleOrderId("");
+  };
 
   const handleDeleteOrder = (id: string) => {
     deleteOrder(id, {
@@ -259,6 +304,7 @@ export const Orders: React.FC = () => {
                 order={order}
                 onEdit={openEdit}
                 onDelete={handleDeleteOrder}
+                onCreateSale={openCreateSale}
               />
             );
           })}
@@ -285,6 +331,18 @@ export const Orders: React.FC = () => {
         initialCustomerId={initialCustomer}
         onConfirm={handleDrawerConfirm}
       />
+
+      {/* Drawer para crear una VENTA a partir de un pedido (carrito precargado) */}
+      <SalesDrawer
+        isOpen={saleDrawerOpen}
+        onClose={() => setSaleDrawerOpen(false)}
+        products={products || []}
+        title="Crear Venta desde Pedido"
+        editing
+        initialCart={saleInitialCart}
+        warning="Una vez confirmada, la venta descuenta el stock y no se puede editar ni deshacer."
+        onConfirm={handleConfirmSaleFromOrder}
+      />
     </div>
   );
 };
@@ -293,12 +351,14 @@ interface OrderDetailProps {
   order: Order;
   onEdit: (order: Order) => void;
   onDelete: (id: string) => void;
+  onCreateSale: (order: Order) => void;
 }
 
 const OrderDetail: React.FC<OrderDetailProps> = ({
   order,
   onEdit,
   onDelete,
+  onCreateSale,
 }) => {
   const { data: budget, isLoading } = useGetBudgetByID(order.quotation || "");
 
@@ -333,7 +393,15 @@ const OrderDetail: React.FC<OrderDetailProps> = ({
       subtitle={`Cliente: ${order.customer?.name || budget?.customer?.name || "—"} · Creado ${formatDate(
         order.createdAt,
       )}`}
-      badge={statusBadge(order.status)}
+      badge={
+        <>
+          {statusBadge(order.status)}
+          {sourceBadge(order.source)}
+        </>
+      }
+      onCreateSale={
+        order.status === "PENDING" ? () => onCreateSale(order) : undefined
+      }
       items={(order.items || order.products || []).map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (item: any) => ({

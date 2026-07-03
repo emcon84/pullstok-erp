@@ -13,8 +13,8 @@ const invoiceInclude = {
 // Create a new sale
 const createSale = async (req: Request, res: Response) => {
     try {
-        const saleRequest = req.body;
-        const sale = await SaleService.createSale(saleRequest);
+        const { products, orderId } = req.body;
+        const sale = await SaleService.createSale({ products, orderId });
         res.status(201).json(sale);
     } catch (error: any) {
         res.status(400).json({ message: error.message });

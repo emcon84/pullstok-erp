@@ -29,6 +29,7 @@ export interface Order {
   totalAmount: number;
   status: string;
   type: string;
+  source?: "STORE" | "INTERNAL";
   quotation?: string;
   createdAt: string;
   __v?: number;
