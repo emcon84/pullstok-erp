@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent } from "react";
+import React, { useState, useMemo, ChangeEvent } from "react";
 import { Plus, Search } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
   useCreateOrder,
@@ -143,21 +150,44 @@ export const Orders: React.FC = () => {
   const [filterDate, setFilterDate] = useState("");
   const [filterCustomerName, setFilterCustomerName] = useState("");
   const [filterReceipt, setFilterReceipt] = useState("");
+  const [filterSource, setFilterSource] = useState<"ALL" | "STORE" | "INTERNAL">(
+    "ALL",
+  );
+  const [filterStatus, setFilterStatus] = useState<
+    "ALL" | "PENDING" | "COMPLETED" | "CANCELLED"
+  >("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const filteredOrders = orders.filter((order) => {
-    const orderDate = new Date(order.createdAt).toLocaleDateString("en-CA");
-    const matchesDate = filterDate ? orderDate === filterDate : true;
-    const matchesCustomer = filterCustomerName
-      ? order.customer &&
-        order.customer.name.toLowerCase().includes(filterCustomerName)
-      : true;
-    const matchesReceipt = filterReceipt
-      ? order.receipt?.toLowerCase().includes(filterReceipt.toLowerCase())
-      : true;
-    return matchesDate && matchesCustomer && matchesReceipt;
-  });
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const orderDate = new Date(order.createdAt).toLocaleDateString("en-CA");
+      const matchesDate = filterDate ? orderDate === filterDate : true;
+      const matchesCustomer = filterCustomerName
+        ? order.customer &&
+          order.customer.name.toLowerCase().includes(filterCustomerName)
+        : true;
+      const matchesReceipt = filterReceipt
+        ? order.receipt?.toLowerCase().includes(filterReceipt.toLowerCase())
+        : true;
+      // source undefined se trata como "Interno" (no-Tienda)
+      const matchesSource =
+        filterSource === "ALL"
+          ? true
+          : filterSource === "STORE"
+            ? order.source === "STORE"
+            : order.source !== "STORE";
+      const matchesStatus =
+        filterStatus === "ALL" ? true : order.status === filterStatus;
+      return (
+        matchesDate &&
+        matchesCustomer &&
+        matchesReceipt &&
+        matchesSource &&
+        matchesStatus
+      );
+    });
+  }, [orders, filterDate, filterCustomerName, filterReceipt, filterSource, filterStatus]);
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   const paginatedOrders = filteredOrders.slice(
@@ -288,11 +318,56 @@ export const Orders: React.FC = () => {
             onChange={(e) => setFilterReceipt(e.target.value.toLowerCase())}
           />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="o-source">Origen</Label>
+          <Select
+            value={filterSource}
+            onValueChange={(v) =>
+              setFilterSource(v as "ALL" | "STORE" | "INTERNAL")
+            }
+          >
+            <SelectTrigger id="o-source" className="w-full sm:w-40">
+              <SelectValue placeholder="Origen" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos</SelectItem>
+              <SelectItem value="STORE">Tienda</SelectItem>
+              <SelectItem value="INTERNAL">Interno</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="o-status">Estado</Label>
+          <Select
+            value={filterStatus}
+            onValueChange={(v) =>
+              setFilterStatus(
+                v as "ALL" | "PENDING" | "COMPLETED" | "CANCELLED",
+              )
+            }
+          >
+            <SelectTrigger id="o-status" className="w-full sm:w-40">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos</SelectItem>
+              <SelectItem value="PENDING">Pendiente</SelectItem>
+              <SelectItem value="COMPLETED">Completado</SelectItem>
+              <SelectItem value="CANCELLED">Cancelado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {paginatedOrders.length === 0 ? (
         <Card className="p-12 text-center text-muted-foreground">
-          No hay pedidos para mostrar.
+          {filterDate ||
+          filterCustomerName ||
+          filterReceipt ||
+          filterSource !== "ALL" ||
+          filterStatus !== "ALL"
+            ? "No hay pedidos con estos filtros."
+            : "No hay pedidos para mostrar."}
         </Card>
       ) : (
         <div className="space-y-4">
