@@ -251,3 +251,16 @@ export const updateStoreSettingsSchema = z.object({
   contactPhone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
 });
+
+// ---------- Chat cliente↔operador (FASE A) ----------
+// Inicio de conversación desde la tienda pública: el visitante se presenta con
+// nombre + email (sin cuenta). El token de invitado se emite en la respuesta.
+export const chatStartSchema = z.object({
+  name: z.string().min(1, "El nombre es requerido"),
+  email: z.email("Email inválido"),
+});
+// Envío de un mensaje (tanto guest como operador). El conversationId NUNCA
+// viaja en el body: sale del token (guest) o de la URL + ownership (operador).
+export const chatMessageSchema = z.object({
+  body: z.string().min(1, "El mensaje no puede estar vacío"),
+});

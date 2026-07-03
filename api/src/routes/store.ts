@@ -1,10 +1,16 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import storeController from "../controllers/storeController";
+import chatController from "../controllers/chatController";
 import { tenantBySlug } from "../middlewares/tenantBySlug";
 import { checkStoreEnabled } from "../middlewares/checkStoreEnabled";
+import { requireGuest } from "../middlewares/requireGuest";
 import { validate } from "../middlewares/validate";
-import { checkoutSchema } from "../validation/schemas";
+import {
+  checkoutSchema,
+  chatStartSchema,
+  chatMessageSchema,
+} from "../validation/schemas";
 
 // Router PÚBLICO de la tienda online (negocio.pullstok.com/api/store/...).
 // Sin authenticateJWT: el tenant se resuelve por slug de subdominio, no por
@@ -34,6 +40,18 @@ router.post(
   checkoutRateLimit,
   validate(checkoutSchema),
   storeController.checkout,
+);
+
+// Chat cliente↔operador (FASE A). /start emite el guest token; /message escribe
+// en la conversación del token (requireGuest). El mismo rate limit que checkout
+// protege el envío de mensajes del anti-spam.
+router.post("/chat/start", validate(chatStartSchema), chatController.startChat);
+router.post(
+  "/chat/message",
+  checkoutRateLimit,
+  requireGuest,
+  validate(chatMessageSchema),
+  chatController.postGuestMessage,
 );
 
 export default router;
