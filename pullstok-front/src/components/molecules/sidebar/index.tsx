@@ -2,14 +2,18 @@ import { NavLink } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { logout } from "../../../controllers/authController";
 import { navItems, filterNavItemsByPlan } from "./navItems";
+import { usePendingOrdersCount } from "../../hooks/useOrder";
 
 interface SidebarContentProps {
   onNavigate?: () => void;
 }
 
 export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
+  const { count: pendingOrders } = usePendingOrdersCount();
+
   const user = (() => {
     try {
       return JSON.parse(localStorage.getItem("user") || "null");
@@ -46,6 +50,14 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
           >
             <Icon className="h-4 w-4 shrink-0" />
             {label}
+            {to === "/pedidos" && pendingOrders > 0 && (
+              <Badge
+                variant="destructive"
+                className="ml-auto h-5 min-w-5 px-1.5 text-xs"
+              >
+                {pendingOrders}
+              </Badge>
+            )}
           </NavLink>
         ))}
       </nav>

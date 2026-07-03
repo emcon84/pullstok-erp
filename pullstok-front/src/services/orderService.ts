@@ -43,3 +43,17 @@ export const deleteOrder = async (id: string): Promise<void> => {
     },
   });
 };
+
+// Conteo de pedidos pendientes (PENDING) de la organización actual.
+export const getPendingOrdersCount = async (): Promise<{ count: number }> => {
+  const token = localStorage.getItem('token');
+  const response = await axios.get<{ count: number }>(
+    `${API_URL}/orders/pending-count`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  return response.data;
+};

@@ -4,6 +4,7 @@ import { PublicStoreRequest } from "../middlewares/tenantBySlug";
 import { requireOrganizationId } from "../config/tenantContext";
 import { sendMail } from "../services/mailService";
 import { orderReceivedEmail } from "../services/mailTemplates";
+import { emitOrdersChanged } from "../realtime/socket";
 
 // Defaults cuando la organización todavía no configuró su StoreSettings
 // (StoreSettings es 1:1 y NO está en TENANT_MODELS — se lee directo por
@@ -225,6 +226,18 @@ const checkout = async (req: PublicStoreRequest, res: Response) => {
       },
       { isolationLevel: "Serializable" },
     );
+
+    // Señal de tiempo real: entró un pedido nuevo desde la tienda pública →
+    // los operadores del comercio refetchean su lista/badge. Try/catch: un
+    // fallo del socket NUNCA debe romper el checkout ni el response 201.
+    try {
+      emitOrdersChanged(organizationId);
+    } catch (socketError: any) {
+      console.error(
+        `[storeController.checkout] emitOrdersChanged falló (order=${result.id}):`,
+        socketError?.message ?? socketError,
+      );
+    }
 
     // Mail transaccional "Recibimos tu pedido" — FUERA de la transacción (ya
     // commiteó). Envuelto en try/catch: un fallo de mail NUNCA debe hacer que

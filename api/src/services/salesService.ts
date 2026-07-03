@@ -2,6 +2,7 @@ import { prisma, basePrisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
 import { sendMail } from "./mailService";
 import { saleConfirmedEmail } from "./mailTemplates";
+import { emitOrdersChanged } from "../realtime/socket";
 
 interface IProductSale {
   productId: string;
@@ -115,6 +116,20 @@ const createSale = async (saleRequest: ISaleRequest) => {
 
     return created;
   });
+
+  // Si esta venta cerró un pedido de tienda (order → COMPLETED), el conteo de
+  // pendientes bajó → señal de tiempo real para refetchear. Try/catch: un fallo
+  // del socket NO debe afectar la venta ya commiteada.
+  if (orderId) {
+    try {
+      emitOrdersChanged(organizationId);
+    } catch (socketError: any) {
+      console.error(
+        `[salesService.createSale] emitOrdersChanged falló (order=${orderId}):`,
+        socketError?.message ?? socketError,
+      );
+    }
+  }
 
   // Mail "Tu compra fue confirmada" — FUERA de la transacción (ya commiteó). Un
   // fallo de mail NO revierte la venta: try/catch no-bloqueante. Solo se manda
