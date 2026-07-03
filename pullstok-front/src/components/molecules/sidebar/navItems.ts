@@ -8,6 +8,7 @@ import {
   Store,
   Receipt,
   Tags,
+  MessageSquare,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 
@@ -43,6 +44,7 @@ export const navItems: NavItem[] = [
   { to: "/facturas", label: "Remitos", icon: Truck, moduleKey: null },
   { to: "/Clientes", label: "Clientes", icon: Users, moduleKey: null },
   { to: "/tienda", label: "Tienda", icon: Store, moduleKey: null },
+  { to: "/mensajes", label: "Mensajes", icon: MessageSquare, moduleKey: null },
   { to: "/facturacion", label: "Facturación", icon: Receipt, moduleKey: "facturacion" },
 ];
 

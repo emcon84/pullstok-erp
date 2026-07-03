@@ -58,6 +58,9 @@ const InvoiceForm = lazy(() =>
 const InvoiceDetail = lazy(() =>
   import("./views/InvoiceDetail").then((m) => ({ default: m.InvoiceDetail })),
 );
+const Messages = lazy(() =>
+  import("./views/Messages").then((m) => ({ default: m.Messages })),
+);
 
 const AppRoutes = () => (
   <Router>
@@ -142,6 +145,7 @@ const AppRoutes = () => (
         <Route path="/Clientes" element={<Customers />} />
         <Route path="/categorias" element={<Categories />} />
         <Route path="/tienda" element={<Tienda />} />
+        <Route path="/mensajes" element={<Messages />} />
         <Route path="/facturacion" element={<Invoices />} />
         <Route path="/facturacion/nueva" element={<InvoiceForm />} />
         <Route path="/facturacion/:id" element={<InvoiceDetail />} />
