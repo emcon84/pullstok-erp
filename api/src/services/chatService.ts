@@ -1,6 +1,10 @@
 import { Message, MessageSender } from "@prisma/client";
 import { prisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
+// Helpers de emisión del socket. Import UNIDIRECCIONAL (service → realtime): el
+// módulo realtime NO importa este service en runtime → sin ciclo. Mismo patrón
+// que emitOrdersChanged.
+import { emitChatMessage, emitConversationUpdated } from "../realtime/socket";
 
 /**
  * Lógica de dominio del chat cliente↔operador (FASE A).
@@ -52,8 +56,8 @@ export const persistMessage = async (input: {
   body: string;
 }): Promise<Message> => {
   const now = new Date();
-  return prisma.$transaction(async (tx) => {
-    const message = await tx.message.create({
+  const message = await prisma.$transaction(async (tx) => {
+    const created = await tx.message.create({
       data: {
         conversationId: input.conversationId,
         sender: input.sender,
@@ -70,8 +74,25 @@ export const persistMessage = async (input: {
       where: { id: input.conversationId },
       data: { lastMessageAt: now },
     });
-    return message;
+    return created;
   });
+
+  // FASE B (tiempo real): DESPUÉS de commitear, emitimos por socket. Envuelto en
+  // try/catch: un fallo de socket NUNCA debe romper la persistencia ni el
+  // response REST (el mensaje ya está guardado). El organizationId sale del
+  // tenant context activo (requireOrganizationId), sin query extra.
+  try {
+    const dto = toMessageDTO(message);
+    const organizationId = requireOrganizationId();
+    // → room de la conversación: guest + operador que la tenga abierta.
+    emitChatMessage(message.conversationId, dto);
+    // → room de la org: refresco de lista/badge de no-leídos de los operadores.
+    emitConversationUpdated(organizationId, message.conversationId);
+  } catch (err) {
+    console.error("[chat] socket emit failed (mensaje persistido igual)", err);
+  }
+
+  return message;
 };
 
 /**
