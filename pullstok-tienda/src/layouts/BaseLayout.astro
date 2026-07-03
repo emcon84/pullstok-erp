@@ -1,6 +1,7 @@
 ---
 import "@/styles/global.css";
 import type { StoreSettings } from "@/lib/storeApi";
+import ChatWidget from "@/components/ChatWidget";
 
 interface Props {
   settings: StoreSettings;
@@ -37,5 +38,15 @@ const pageTitle = title ? `${title} — ${settings.storeName}` : settings.storeN
   </head>
   <body class="font-sans antialiased">
     <slot />
+    <!--
+      Widget de chat del visitante (Fase C2). client:idle: no es crítico para el
+      primer paint, hidrata cuando el navegador está ocioso. Recibe el branding
+      del negocio para teñirse con su color.
+    -->
+    <ChatWidget
+      client:idle
+      primaryColor={settings.primaryColor}
+      storeName={settings.storeName}
+    />
   </body>
 </html>
