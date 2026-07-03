@@ -10,6 +10,9 @@ import { basePrisma } from "../config/db";
 // import TYPE-only: se borra en compilación → NO crea ciclo en runtime
 // (chatService importa los helpers de emisión de este módulo, nunca al revés).
 import type { MessageDTO } from "../services/chatService";
+// markRead vive en su propio módulo (services/chatReads) que NO importa realtime,
+// así el socket lo usa sin formar ciclo. Ver services/chatReads.ts.
+import { markRead } from "../services/chatReads";
 
 /**
  * Infra de tiempo real (socket.io). Emite SEÑALES livianas (sin datos de
@@ -51,7 +54,191 @@ let io: Server | undefined;
 // `org:<id>`  → todos los operadores de una organización.
 // `conv:<id>` → participantes de UNA conversación (guest + operador que la abrió).
 const orgRoom = (organizationId: string): string => `org:${organizationId}`;
-const convRoom = (conversationId: string): string => `conv:${conversationId}`;
+const CONV_PREFIX = "conv:";
+const convRoom = (conversationId: string): string =>
+  `${CONV_PREFIX}${conversationId}`;
+
+// ===========================================================================
+// FASE D — eventos efímeros: typing, presencia y read receipts.
+// Ver el CONTRATO de eventos en el resumen de la feature. Nada de esto persiste
+// (salvo el marcado de "visto", que reusa markRead → solo toca Message.readAt).
+// ===========================================================================
+
+// El "lado" de la conversación al que pertenece un socket. Coincide 1:1 con los
+// valores de MessageSender ("GUEST" | "OPERATOR"), así markRead recibe el rol tal
+// cual sin traducción.
+type Party = "GUEST" | "OPERATOR";
+const partyOf = (data: SocketData): Party =>
+  data.kind === "guest" ? "GUEST" : "OPERATOR";
+
+/**
+ * Cuenta cuántos sockets de un `party` están presentes en la room de una
+ * conversación (base de la presencia con múltiples pestañas). `excludeSocketId`
+ * permite descontar al propio socket cuando todavía figura en la room (p.ej. en
+ * `disconnecting`, antes de que socket.io lo saque, o justo antes de un leave).
+ */
+const countPartyInRoom = async (
+  conversationId: string,
+  party: Party,
+  excludeSocketId?: string,
+): Promise<number> => {
+  if (!io) return 0;
+  const sockets = await io.in(convRoom(conversationId)).fetchSockets();
+  return sockets.filter(
+    (s) =>
+      s.id !== excludeSocketId && partyOf(s.data as SocketData) === party,
+  ).length;
+};
+
+/**
+ * Pertenencia LIVIANA para eventos efímeros de alta frecuencia (typing): el
+ * guest solo puede hablar de SU conversación (la del token); el operador, de una
+ * conv en cuya room ya está (haber entrado con chat:join ya validó que es de su
+ * org → sin query extra por cada tecla).
+ */
+const socketBelongsToConv = (
+  socket: Socket,
+  conversationId: string,
+): boolean => {
+  const data = socket.data as SocketData;
+  if (data.kind === "guest") return data.conversationId === conversationId;
+  return socket.rooms.has(convRoom(conversationId));
+};
+
+/**
+ * Pertenencia AUTORITATIVA para escritura (read receipts, que tocan DB): guest =
+ * su conv; operador = si ya está en la room vale (join ya validó la org), y si no
+ * se verifica contra la DB con scope de org a mano (basePrisma, igual que
+ * chat:join) para no confiar en el conversationId crudo.
+ */
+const socketOwnsConvForWrite = async (
+  socket: Socket,
+  conversationId: string,
+): Promise<boolean> => {
+  const data = socket.data as SocketData;
+  if (data.kind === "guest") return data.conversationId === conversationId;
+  if (socket.rooms.has(convRoom(conversationId))) return true;
+  const conv = await basePrisma.conversation.findFirst({
+    where: { id: conversationId, organizationId: data.organizationId },
+    select: { id: true },
+  });
+  return Boolean(conv);
+};
+
+/**
+ * Presencia al ENTRAR a la room de una conversación (guest al conectar; operador
+ * en chat:join). Debe llamarse DESPUÉS del socket.join. Hace dos cosas:
+ *  1. Si soy el PRIMER socket de mi party → aviso a la contraparte que este lado
+ *     pasó a `online: true` (transición; segundas pestañas no re-emiten).
+ *  2. SNAPSHOT: le informo al que entra el `online` REAL de la contraparte, para
+ *     que sepa si el otro ya estaba conectado (calculado mirando la room).
+ */
+const announcePresenceOnJoin = async (
+  socket: Socket,
+  conversationId: string,
+): Promise<void> => {
+  if (!io) return;
+  const party = partyOf(socket.data as SocketData);
+  const counterparty: Party = party === "GUEST" ? "OPERATOR" : "GUEST";
+
+  const mineBefore = await countPartyInRoom(conversationId, party, socket.id);
+  if (mineBefore === 0) {
+    socket
+      .to(convRoom(conversationId))
+      .emit("chat:presence", { conversationId, party, online: true });
+  }
+
+  const counterCount = await countPartyInRoom(conversationId, counterparty);
+  socket.emit("chat:presence", {
+    conversationId,
+    party: counterparty,
+    online: counterCount > 0,
+  });
+};
+
+/**
+ * Presencia al SALIR de la room (operador en chat:leave o desconexión de
+ * cualquiera). Debe llamarse mientras el socket TODAVÍA figura en la room (se lo
+ * descuenta por id). Emite `online: false` a la contraparte SOLO si no queda
+ * ningún otro socket de mi party → maneja bien el caso multi-pestaña.
+ */
+const announcePresenceOnLeave = async (
+  socket: Socket,
+  conversationId: string,
+): Promise<void> => {
+  const party = partyOf(socket.data as SocketData);
+  const remaining = await countPartyInRoom(conversationId, party, socket.id);
+  if (remaining === 0) {
+    socket
+      .to(convRoom(conversationId))
+      .emit("chat:presence", { conversationId, party, online: false });
+  }
+};
+
+/**
+ * Registra los handlers efímeros comunes a guest y operador: `chat:typing`
+ * (relay puro, sin DB) y `chat:read` (marca "visto" y avisa al emisor original).
+ * Todo envuelto en try/catch: un error de un evento efímero JAMÁS debe tirar la
+ * conexión.
+ */
+const registerEphemeralHandlers = (socket: Socket): void => {
+  const party = partyOf(socket.data as SocketData);
+
+  // typing — efímero, NO toca DB. Se valida solo pertenencia a la room y se
+  // relaya al resto (nunca al emisor).
+  socket.on(
+    "chat:typing",
+    (payload: { conversationId?: string; isTyping?: boolean }) => {
+      try {
+        const conversationId = payload?.conversationId;
+        if (!conversationId || typeof payload?.isTyping !== "boolean") return;
+        if (!socketBelongsToConv(socket, conversationId)) return;
+        socket.to(convRoom(conversationId)).emit("chat:typing", {
+          conversationId,
+          from: party,
+          isTyping: payload.isTyping,
+        });
+      } catch (err) {
+        console.error("[socket] chat:typing failed", err);
+      }
+    },
+  );
+
+  // read receipts — marca como leídos los mensajes de la CONTRAPARTE y avisa a la
+  // room (excepto al emisor) para que el emisor original vea el "visto" en vivo.
+  socket.on("chat:read", async (payload: { conversationId?: string }) => {
+    try {
+      const conversationId = payload?.conversationId;
+      if (!conversationId) return;
+      if (!(await socketOwnsConvForWrite(socket, conversationId))) return;
+      const readAt = await markRead(conversationId, party);
+      socket.to(convRoom(conversationId)).emit("chat:read", {
+        conversationId,
+        reader: party,
+        readAt: readAt.toISOString(),
+      });
+    } catch (err) {
+      console.error("[socket] chat:read failed", err);
+    }
+  });
+
+  // Presencia OFFLINE al desconectar: en `disconnecting` el socket todavía figura
+  // en sus rooms, así que podemos calcular quién queda. Recorremos SUS rooms de
+  // conversación (un operador puede tener varias abiertas; un guest, una).
+  socket.on("disconnecting", async () => {
+    try {
+      const convRooms = [...socket.rooms].filter((r) =>
+        r.startsWith(CONV_PREFIX),
+      );
+      for (const room of convRooms) {
+        const conversationId = room.slice(CONV_PREFIX.length);
+        await announcePresenceOnLeave(socket, conversationId);
+      }
+    } catch (err) {
+      console.error("[socket] presence on disconnecting failed", err);
+    }
+  });
+};
 
 /**
  * Inicializa socket.io sobre el http server dado. Reusa el MISMO allowlist de
@@ -131,6 +318,10 @@ export const initSocket = (httpServer: HttpServer): Server => {
   io.on("connection", (socket: Socket) => {
     const data = socket.data as SocketData;
 
+    // FASE D: handlers efímeros comunes (typing, read, presencia-offline). Se
+    // registran para AMBOS tipos de socket antes de bifurcar.
+    registerEphemeralHandlers(socket);
+
     // --- GUEST ---
     // Un visitante vive SOLO en la room de su conversación (nunca en `org:`):
     // no puede recibir mensajes de otras conversaciones ni de otros comercios.
@@ -140,6 +331,9 @@ export const initSocket = (httpServer: HttpServer): Server => {
       console.log(
         `[socket] connected guest=${data.guestEmail} conv=${data.conversationId} org=${data.organizationId} id=${socket.id}`,
       );
+      // Presencia: aviso "GUEST online" a la room + snapshot del estado del
+      // operador para el guest que recién entra.
+      void announcePresenceOnJoin(socket, data.conversationId);
 
       socket.on("disconnect", (reason) => {
         console.log(
@@ -182,6 +376,9 @@ export const initSocket = (httpServer: HttpServer): Server => {
           return;
         }
         socket.join(convRoom(conversationId));
+        // Presencia: aviso "OPERATOR online" a la room + snapshot del estado del
+        // guest para el operador que abre la conversación.
+        await announcePresenceOnJoin(socket, conversationId);
       } catch (err) {
         console.error("[socket] chat:join failed", err);
         socket.emit("chat:error", {
@@ -192,9 +389,16 @@ export const initSocket = (httpServer: HttpServer): Server => {
       }
     });
 
-    socket.on("chat:leave", (payload: { conversationId?: string }) => {
+    socket.on("chat:leave", async (payload: { conversationId?: string }) => {
       const conversationId = payload?.conversationId;
       if (!conversationId) return;
+      try {
+        // Presencia: se calcula ANTES del leave (el socket aún figura en la room
+        // y se descuenta por id). Si no queda otra pestaña del operador → offline.
+        await announcePresenceOnLeave(socket, conversationId);
+      } catch (err) {
+        console.error("[socket] presence on chat:leave failed", err);
+      }
       socket.leave(convRoom(conversationId));
     });
 

@@ -1,6 +1,9 @@
 import { Message, MessageSender } from "@prisma/client";
 import { prisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
+// Marcado de "visto" centralizado (FASE D). En módulo aparte para que el socket
+// pueda reusarlo sin importar chatService (evita ciclo service ↔ realtime).
+import { markRead } from "./chatReads";
 // Helpers de emisión del socket. Import UNIDIRECCIONAL (service → realtime): el
 // módulo realtime NO importa este service en runtime → sin ciclo. Mismo patrón
 // que emitOrdersChanged.
@@ -196,15 +199,12 @@ export const findOrgConversation = (id: string) =>
 /**
  * Historial de una conversación. Marca como leídos los mensajes de GUEST sin
  * leer (el operador está abriendo la conversación) para que el contador de
- * no-leídos quede en 0.
+ * no-leídos quede en 0. Reusa `markRead` (misma lógica que el socket `chat:read`).
  */
 export const getConversationMessages = async (
   conversationId: string,
 ): Promise<Message[]> => {
-  await prisma.message.updateMany({
-    where: { conversationId, sender: "GUEST", readAt: null },
-    data: { readAt: new Date() },
-  });
+  await markRead(conversationId, "OPERATOR");
   return prisma.message.findMany({
     where: { conversationId },
     orderBy: { createdAt: "asc" },
