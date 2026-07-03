@@ -17,6 +17,13 @@ router.post(
   orderController.createOrder,
 );
 router.get("/", authenticateJWT, orderController.getOrders);
+// IMPORTANTE: /pending-count debe ir ANTES de /:id, si no Express lo matchea
+// como un id ("pending-count") y nunca llega a este handler.
+router.get(
+  "/pending-count",
+  authenticateJWT,
+  orderController.getPendingOrdersCount,
+);
 router.get("/:id", authenticateJWT, orderController.getOrderById);
 router.put(
   "/:id/status",

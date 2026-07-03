@@ -2,6 +2,20 @@ import { Request, Response } from "express";
 import { prisma } from "../config/db";
 import getNextSequenceValue from "../services/secuenceService";
 import { requireOrganizationId } from "../config/tenantContext";
+import { emitOrdersChanged } from "../realtime/socket";
+
+// Notifica a los clientes del comercio que la lista de pedidos cambió. Envuelto
+// en try/catch: un fallo del socket NUNCA debe romper la operación HTTP.
+const notifyOrdersChanged = () => {
+  try {
+    emitOrdersChanged(requireOrganizationId());
+  } catch (err: any) {
+    console.error(
+      "[orderController] emitOrdersChanged falló:",
+      err?.message ?? err,
+    );
+  }
+};
 
 // Create a new order (sale or purchase)
 const createOrder = async (req: Request, res: Response) => {
@@ -71,6 +85,7 @@ const createOrder = async (req: Request, res: Response) => {
       return order;
     });
 
+    notifyOrdersChanged();
     res.status(201).json(newOrder);
   } catch (error: any) {
     console.error(error);
@@ -127,6 +142,7 @@ const updateOrderStatus = async (req: Request, res: Response) => {
     const order = await prisma.order.findFirst({
       where: { id: req.params.id },
     });
+    notifyOrdersChanged();
     res.status(200).json(order);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -169,6 +185,7 @@ const updateOrder = async (req: Request, res: Response) => {
       });
     });
 
+    notifyOrdersChanged();
     res.status(200).json(order);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -186,9 +203,24 @@ const deleteOrder = async (req: Request, res: Response) => {
     // Los items se borran en cascada (onDelete: Cascade en el schema).
     await prisma.order.deleteMany({ where: { id } });
     await prisma.receipt.deleteMany({ where: { relatedDocument: id } });
+    notifyOrdersChanged();
     res.status(200).json({ message: "Pedido eliminado correctamente" });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
+  }
+};
+
+// Conteo de pedidos PENDIENTES de la org actual. El prisma SCOPED ya filtra por
+// organización (extensión anti-fuga dentro de runWithTenant); solo agregamos el
+// filtro de estado. Pensado para alimentar un badge en el front.
+const getPendingOrdersCount = async (_req: Request, res: Response) => {
+  try {
+    const count = await prisma.order.count({
+      where: { status: "PENDING" },
+    });
+    res.status(200).json({ count });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -199,4 +231,5 @@ export default {
   updateOrderStatus,
   updateOrder,
   deleteOrder,
+  getPendingOrdersCount,
 };

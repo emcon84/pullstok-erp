@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createOrder, getOrders, updateOrder, deleteOrder } from '../../services/orderService';
+import { createOrder, getOrders, updateOrder, deleteOrder, getPendingOrdersCount } from '../../services/orderService';
 import { CreateOrder, Order, UpdateOrder } from '../../models/orderModel';
 
 // Hook para obtener las órdenes
@@ -14,6 +14,18 @@ export const useOrders = () => {
     loading: isLoading,
     error,
   };
+};
+
+// Hook para el conteo de pedidos pendientes. La queryKey empieza con 'orders'
+// a propósito: la invalidación por prefijo del socket (['orders']) también
+// refetchea este conteo, manteniendo el badge de la sidebar sincronizado.
+export const usePendingOrdersCount = () => {
+  const { data } = useQuery<{ count: number }, Error>({
+    queryKey: ['orders', 'pending-count'],
+    queryFn: getPendingOrdersCount,
+  });
+
+  return { count: data?.count ?? 0 };
 };
 
 // Hook para crear una nueva orden

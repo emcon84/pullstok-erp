@@ -4,6 +4,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import MainLayout from "./MainLayout";
 import { Loader } from "../components/atoms/loader";
 import { getMe } from "../services/onboardingService";
+import { useOrdersRealtime } from "../components/hooks/useOrdersRealtime";
 
 /**
  * Layout persistente para las rutas autenticadas. El MainLayout (sidebar) se
@@ -24,6 +25,11 @@ const ProtectedLayout = () => {
     queryFn: getMe,
     enabled: isAuthenticated,
   });
+
+  // Conexión WebSocket de tiempo real, montada UNA vez en el árbol
+  // autenticado: vive toda la sesión y no se recrea al navegar. El hook no
+  // conecta si no hay token en localStorage.
+  useOrdersRealtime();
 
   if (!isAuthenticated) {
     return <Navigate to="/" replace />;
