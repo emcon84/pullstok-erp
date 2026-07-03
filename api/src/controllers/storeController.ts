@@ -2,6 +2,8 @@ import { Response } from "express";
 import { basePrisma, prisma } from "../config/db";
 import { PublicStoreRequest } from "../middlewares/tenantBySlug";
 import { requireOrganizationId } from "../config/tenantContext";
+import { sendMail } from "../services/mailService";
+import { orderReceivedEmail } from "../services/mailTemplates";
 
 // Defaults cuando la organización todavía no configuró su StoreSettings
 // (StoreSettings es 1:1 y NO está en TENANT_MODELS — se lee directo por
@@ -223,6 +225,44 @@ const checkout = async (req: PublicStoreRequest, res: Response) => {
       },
       { isolationLevel: "Serializable" },
     );
+
+    // Mail transaccional "Recibimos tu pedido" — FUERA de la transacción (ya
+    // commiteó). Envuelto en try/catch: un fallo de mail NUNCA debe hacer que
+    // el checkout devuelva error al cliente (la Order ya existe). El branding
+    // sale de StoreSettings (basePrisma, mismo patrón que getSettings); los
+    // OrderItem no guardan el nombre del producto, así que se resuelven acá.
+    try {
+      const org = req.org!;
+      const storeSettings = await basePrisma.storeSettings.findUnique({
+        where: { organizationId: org.id },
+      });
+
+      const products = await prisma.product.findMany({
+        where: { id: { in: result.items.map((i) => i.productId) } },
+        select: { id: true, name: true },
+      });
+      const nameById = new Map(products.map((p) => [p.id, p.name]));
+
+      const { subject, html } = orderReceivedEmail({
+        org,
+        storeSettings,
+        customerName: result.customer.name,
+        orderRef: result.id.slice(0, 8).toUpperCase(),
+        items: result.items.map((i) => ({
+          name: nameById.get(i.productId) ?? "Producto",
+          quantity: i.quantity,
+          price: i.price,
+        })),
+        total: result.totalAmount,
+      });
+
+      await sendMail({ to: result.customer.email, subject, html });
+    } catch (mailError: any) {
+      console.error(
+        `[storeController.checkout] Fallo al enviar mail de pedido (order=${result.id}):`,
+        mailError?.message ?? mailError,
+      );
+    }
 
     res.status(201).json({
       orderId: result.id,

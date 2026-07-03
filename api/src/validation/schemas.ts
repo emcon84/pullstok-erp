@@ -127,6 +127,10 @@ const saleProductSchema = z.object({
 });
 export const createSaleSchema = z.object({
   products: z.array(saleProductSchema).min(1, "La venta debe tener al menos un producto"),
+  // Opcional: si la venta se genera procesando un pedido de la tienda online,
+  // apunta a esa Order. La venta la marca COMPLETED y dispara el mail de
+  // "compra confirmada" al cliente (ver salesService.createSale).
+  orderId: z.string().min(1).optional(),
 });
 
 // ---------- Órdenes ----------

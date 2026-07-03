@@ -2,10 +2,14 @@ import axios from "axios";
 import { API_URL } from "../constants";
 import { Sale, SaleRequest } from "../models/salesModel";
 
-export const createSale = async (saleRequest: SaleRequest): Promise<void> => {
+export const createSale = async (
+  saleRequest: SaleRequest,
+  orderId?: string,
+): Promise<void> => {
   const token = localStorage.getItem("token");
+  const body = orderId ? { ...saleRequest, orderId } : saleRequest;
   try {
-    const response = await axios.post(`${API_URL}/sales`, saleRequest, {
+    const response = await axios.post(`${API_URL}/sales`, body, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

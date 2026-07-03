@@ -148,6 +148,9 @@ model Order {
   createdAt      DateTime     @default(now())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
+  // Puente Order→Sale: una Order de la tienda se cierra creando una Sale desde
+  // el ERP. Opcional (Orders de compra/internas pueden no tener Sale asociada).
+  sale           Sale?
 
   @@index([organizationId])
   @@map("orders")
@@ -202,6 +205,10 @@ model Sale {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   invoice        Invoice?
+  // Puente Sale→Order: si la venta se generó procesando un pedido de la tienda
+  // online, apunta a esa Order (1:1, @unique). null en ventas manuales del ERP.
+  orderId        String?      @unique
+  order          Order?       @relation(fields: [orderId], references: [id])
 
   @@index([organizationId])
   @@map("sales")

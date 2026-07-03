@@ -171,10 +171,10 @@ export const SalesPage = () => {
   const handleConfirmSale = async (
     cart: CartItem[],
     _customerId?: string,
-    _orderId?: string,
+    orderId?: string,
   ) => {
     try {
-      await createSale(cart);
+      await createSale({ cart, orderId: orderId || undefined });
       toast.success("Venta creada con éxito");
       setIsOpen(false);
     } catch (error) {
