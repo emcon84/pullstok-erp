@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { logout } from "../../../controllers/authController";
 import { navItems, filterNavItemsByPlan } from "./navItems";
 import { usePendingOrdersCount } from "../../hooks/useOrder";
+import { useUnreadMessagesCount } from "../../hooks/useChat";
 
 interface SidebarContentProps {
   onNavigate?: () => void;
@@ -13,6 +14,7 @@ interface SidebarContentProps {
 
 export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
   const { count: pendingOrders } = usePendingOrdersCount();
+  const { count: unreadMessages } = useUnreadMessagesCount();
 
   const user = (() => {
     try {
@@ -56,6 +58,14 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
                 className="ml-auto h-5 min-w-5 px-1.5 text-xs"
               >
                 {pendingOrders}
+              </Badge>
+            )}
+            {to === "/mensajes" && unreadMessages > 0 && (
+              <Badge
+                variant="destructive"
+                className="ml-auto h-5 min-w-5 px-1.5 text-xs"
+              >
+                {unreadMessages}
               </Badge>
             )}
           </NavLink>

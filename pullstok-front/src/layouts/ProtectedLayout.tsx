@@ -5,6 +5,7 @@ import MainLayout from "./MainLayout";
 import { Loader } from "../components/atoms/loader";
 import { getMe } from "../services/onboardingService";
 import { useOrdersRealtime } from "../components/hooks/useOrdersRealtime";
+import { useChatConversationsRealtime } from "../components/hooks/useChatRealtime";
 
 /**
  * Layout persistente para las rutas autenticadas. El MainLayout (sidebar) se
@@ -26,10 +27,15 @@ const ProtectedLayout = () => {
     enabled: isAuthenticated,
   });
 
-  // Conexión WebSocket de tiempo real, montada UNA vez en el árbol
-  // autenticado: vive toda la sesión y no se recrea al navegar. El hook no
-  // conecta si no hay token en localStorage.
+  // Tiempo real montado UNA vez en el árbol autenticado: vive toda la sesión
+  // y no se recrea al navegar. Ambos hooks comparten la MISMA conexión socket
+  // (lib/socket.ts). No conectan si no hay token en localStorage.
+  // - orders: invalida ['orders'] ante orders:changed (lista + badge pedidos).
+  // - chat conversations: invalida ['chat','conversations'] ante
+  //   chat:conversation-updated (bandeja + badge de no-leídos), incluso fuera
+  //   de la vista de Mensajes.
   useOrdersRealtime();
+  useChatConversationsRealtime();
 
   if (!isAuthenticated) {
     return <Navigate to="/" replace />;

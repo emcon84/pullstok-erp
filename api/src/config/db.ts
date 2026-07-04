@@ -23,6 +23,10 @@ const TENANT_MODELS = new Set([
   "Sale",
   "Receipt",
   "Invoice",
+  // Chat: la conversación es tenant-scoped (tiene organizationId) → scope
+  // automático anti-fuga en los endpoints del operador. Message NO se agrega:
+  // no tiene organizationId propio, se scopea vía su Conversation.
+  "Conversation",
 ]);
 
 /**

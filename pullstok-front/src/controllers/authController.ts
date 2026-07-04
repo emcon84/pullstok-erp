@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { login as loginService } from '../services/authService';
 import { API_URL } from '../constants';
+import { disconnectSocket } from '../lib/socket';
 
 
 // Crea una instancia de Axios
@@ -40,8 +41,11 @@ export const login = async (email: string, password: string) => {
 
 export const logout = () => {
   try {
+    // Cierra el socket compartido (pedidos + chat) antes de tirar el token:
+    // no queremos una conexión colgada autenticada con un token invalidado.
+    disconnectSocket();
     localStorage.removeItem('token');
-    window.location.href = '/'; 
+    window.location.href = '/';
     return true;
   } catch (error) {
     console.error(error);

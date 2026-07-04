@@ -57,6 +57,7 @@ model Organization {
   counters              Counter[]
   storeSettings         StoreSettings?
   invoices              Invoice[]
+  conversations         Conversation[]
 
   @@map("organizations")
 }
@@ -90,6 +91,7 @@ model Customer {
   orders         Order[]
   quotations     Quotation[]
   invoices       Invoice[]
+  conversations  Conversation[]
 
   // Email único POR organización (dos negocios pueden tener el mismo cliente).
   @@unique([organizationId, email])
@@ -351,4 +353,65 @@ model StoreSettings {
   updatedAt      DateTime     @updatedAt
 
   @@map("store_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Chat cliente↔operador (FASE A: cimiento de datos)
+// ---------------------------------------------------------------------------
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+enum MessageSender {
+  GUEST
+  OPERATOR
+}
+
+// Una conversación de chat entre un visitante (guest) de la tienda pública y
+// los operadores del comercio. Es tenant-scoped (organizationId): pertenece a
+// la org y está en TENANT_MODELS (db.ts) → scope automático anti-fuga en los
+// endpoints del operador. El guest se identifica por nombre/email (sin cuenta);
+// si el email matchea un Customer de la org, se linkea vía customerId.
+model Conversation {
+  id             String             @id @default(uuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  guestName      String
+  guestEmail     String
+  // Link opcional al Customer de la org cuando el email matchea. No es FK
+  // obligatoria: un visitante puede escribir sin haber comprado nunca.
+  customerId     String?
+  customer       Customer?          @relation(fields: [customerId], references: [id])
+  status         ConversationStatus @default(OPEN)
+  // Timestamp del último mensaje (para ordenar la bandeja del operador). Null
+  // hasta que se escribe el primer mensaje.
+  lastMessageAt  DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  messages       Message[]
+
+  @@index([organizationId, lastMessageAt])
+  @@map("conversations")
+}
+
+// Un mensaje dentro de una conversación. NO tiene organizationId propio (se
+// scopea vía la Conversation, que sí es tenant-model) → a propósito FUERA de
+// TENANT_MODELS. onDelete Cascade: borrar la conversación borra sus mensajes.
+model Message {
+  id             String        @id @default(uuid())
+  conversationId String
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         MessageSender
+  // Id del User operador cuando sender=OPERATOR; null cuando sender=GUEST.
+  senderUserId   String?
+  body           String
+  // Marca de lectura (para el contador de no-leídos del operador). Los mensajes
+  // del GUEST arrancan readAt=null hasta que el operador los lee.
+  readAt         DateTime?
+  createdAt      DateTime      @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
 }

@@ -16,6 +16,7 @@ import onboardingRoutes from "./onboardingRoutes";
 import storeRoutes from "./store";
 import storeSettingsRoutes from "./storeSettingsRoutes";
 import invoiceRoutes from "./invoiceRoutes";
+import chatRoutes from "./chatRoutes";
 
 const router = Router();
 
@@ -40,5 +41,6 @@ router.use("/categories", categoryRoutes);
 router.use("/onboarding", onboardingRoutes);
 router.use("/store-settings", storeSettingsRoutes);
 router.use("/invoices", invoiceRoutes);
+router.use("/chat", chatRoutes);
 
 export default router;

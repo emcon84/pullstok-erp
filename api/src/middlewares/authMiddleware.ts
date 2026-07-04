@@ -24,6 +24,13 @@ export const authenticate = (
 
   try {
     const payload = verifyToken<AccessTokenPayload>(token);
+    // Los guest tokens del chat de la tienda usan el MISMO secreto pero NO son
+    // operadores: llevan role "GUEST" y solo habilitan su propia conversación.
+    // No deben pasar la auth del ERP (si no, un anónimo listaría las
+    // conversaciones de la org). requireGuest es el único que los acepta.
+    if ((payload.role as string) === "GUEST") {
+      return res.status(401).json({ message: "Token inválido o expirado." });
+    }
     req.user = payload;
     runWithTenant(
       {
