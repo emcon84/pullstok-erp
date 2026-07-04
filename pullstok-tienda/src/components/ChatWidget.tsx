@@ -38,10 +38,62 @@ export default function ChatWidget({ primaryColor, storeName }: Props) {
   const [starting, setStarting] = useState(false);
   const [sending, setSending] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [operatorOnline, setOperatorOnline] = useState(false);
+  const [operatorTyping, setOperatorTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Refs para leer estado "vivo" dentro de handlers del socket / timers sin
+  // recrear el socket (que dispararía reconexión). Se sincronizan por efecto.
+  const openRef = useRef(open);
+  const sessionRef = useRef(session);
+  useEffect(() => { openRef.current = open; }, [open]);
+  useEffect(() => { sessionRef.current = session; }, [session]);
+
+  // Typing (emisión): typingSentRef = si ya emitimos isTyping:true; idleTimer =
+  // corta con isTyping:false tras la inactividad. Así no emitimos por tecla.
+  const typingSentRef = useRef(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Timeout de seguridad para ocultar "escribiendo…" del operador si nunca
+  // llega el isTyping:false.
+  const operatorTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Emite chat:read para la conversación actual (visto de mensajes del operador).
+  const emitRead = useCallback(() => {
+    const socket = socketRef.current;
+    const convId = sessionRef.current?.conversationId;
+    if (socket?.connected && convId) socket.emit("chat:read", { conversationId: convId });
+  }, []);
+
+  // Emite chat:typing con el estado dado.
+  const emitTyping = useCallback((isTyping: boolean) => {
+    const socket = socketRef.current;
+    const convId = sessionRef.current?.conversationId;
+    if (socket?.connected && convId) socket.emit("chat:typing", { conversationId: convId, isTyping });
+  }, []);
+
+  // Corta el "escribiendo…" propio: limpia el timer y emite false si estaba activo.
+  const stopTyping = useCallback(() => {
+    if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
+    if (typingSentRef.current) { typingSentRef.current = false; emitTyping(false); }
+  }, [emitTyping]);
+
+  // onChange del input: emite true una sola vez y reprograma el corte a 2s de
+  // inactividad (throttle real: nunca emitimos en cada tecla).
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInput(value);
+    if (!value.trim()) { stopTyping(); return; }
+    if (!typingSentRef.current) { typingSentRef.current = true; emitTyping(true); }
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      typingSentRef.current = false;
+      emitTyping(false);
+      idleTimerRef.current = null;
+    }, 2000);
+  }, [emitTyping, stopTyping]);
 
   // Append con dedup por id: el socket nos re-emite NUESTRO propio mensaje (el
   // emisor está en su room), y además appendeamos la respuesta del POST → sin
@@ -99,23 +151,80 @@ export default function ChatWidget({ primaryColor, storeName }: Props) {
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => setConnected(true));
-    socket.on("disconnect", () => setConnected(false));
-    socket.on("chat:message", (msg: ChatMessage) => appendMessage(msg));
+    socket.on("connect", () => {
+      setConnected(true);
+      // Si el panel ya estaba abierto al (re)conectar, marcamos visto.
+      if (openRef.current) emitRead();
+    });
+    socket.on("disconnect", () => {
+      setConnected(false);
+      setOperatorTyping(false);
+    });
+
+    socket.on("chat:message", (msg: ChatMessage) => {
+      appendMessage(msg);
+      // El operador ya dejó de escribir cuando manda el mensaje.
+      if (msg.sender === "OPERATOR") {
+        setOperatorTyping(false);
+        if (operatorTypingTimerRef.current) clearTimeout(operatorTypingTimerRef.current);
+        // Si el visitante lo está viendo, marcamos visto al instante.
+        if (openRef.current) emitRead();
+      }
+    });
+
+    // "Escribiendo…" del operador. Ocultamos con isTyping:false o, por las
+    // dudas, con un timeout de seguridad de 4s si nunca llega el false.
+    socket.on("chat:typing", (p: { from: "GUEST" | "OPERATOR"; isTyping: boolean }) => {
+      if (p.from !== "OPERATOR") return;
+      setOperatorTyping(p.isTyping);
+      if (operatorTypingTimerRef.current) clearTimeout(operatorTypingTimerRef.current);
+      if (p.isTyping) {
+        operatorTypingTimerRef.current = setTimeout(() => setOperatorTyping(false), 4000);
+      }
+    });
+
+    // Presencia del operador (snapshot al conectar + updates en vivo).
+    socket.on("chat:presence", (p: { party: "GUEST" | "OPERATOR"; online: boolean }) => {
+      if (p.party === "OPERATOR") setOperatorOnline(p.online);
+    });
+
+    // Visto/leído: el operador leyó mis mensajes → marco como leídos los GUEST
+    // con createdAt <= readAt (sin pisar los que ya tenían readAt).
+    socket.on("chat:read", (p: { reader: "GUEST" | "OPERATOR"; readAt: string }) => {
+      if (p.reader !== "OPERATOR") return;
+      const readTime = new Date(p.readAt).getTime();
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.sender === "GUEST" && !m.readAt && new Date(m.createdAt).getTime() <= readTime
+            ? { ...m, readAt: p.readAt }
+            : m,
+        ),
+      );
+    });
 
     return () => {
       socket.off();
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);
+      setOperatorOnline(false);
+      setOperatorTyping(false);
+      if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
+      if (operatorTypingTimerRef.current) { clearTimeout(operatorTypingTimerRef.current); operatorTypingTimerRef.current = null; }
+      typingSentRef.current = false;
     };
-  }, [session?.token, appendMessage]);
+  }, [session?.token, appendMessage, emitRead]);
+
+  // Al abrir el panel (o cambiar de sesión con panel abierto): marcar visto.
+  useEffect(() => {
+    if (open && session) emitRead();
+  }, [open, session, emitRead]);
 
   // Autoscroll al último mensaje (y al abrir el panel).
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, open]);
+  }, [messages, open, operatorTyping]);
 
   async function startChat(e: React.FormEvent) {
     e.preventDefault();
@@ -170,6 +279,7 @@ export default function ChatWidget({ primaryColor, storeName }: Props) {
         return;
       }
       setInput("");
+      stopTyping(); // dejo de "escribir" al enviar
       appendMessage(data); // dedup con el eco del socket
     } catch {
       setError("Error de conexión. Intentá de nuevo.");
@@ -197,9 +307,11 @@ export default function ChatWidget({ primaryColor, storeName }: Props) {
               <p className="flex items-center gap-1.5 text-xs opacity-90">
                 <span
                   className="inline-block h-2 w-2 rounded-full"
-                  style={{ backgroundColor: connected ? "#4ade80" : "#e5e7eb" }}
+                  style={{
+                    backgroundColor: !connected ? "#e5e7eb" : operatorOnline ? "#4ade80" : "#fbbf24",
+                  }}
                 />
-                {connected ? "En línea" : "Conectando…"}
+                {!connected ? "Conectando…" : operatorOnline ? "En línea" : "Te responderemos pronto"}
               </p>
             </div>
             <button
@@ -276,13 +388,41 @@ export default function ChatWidget({ primaryColor, storeName }: Props) {
                         style={own ? { backgroundColor: primaryColor } : undefined}
                       >
                         <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                        <p className={"mt-1 text-[10px] " + (own ? "text-white/70" : "text-muted-foreground")}>
+                        <p className={"mt-1 flex items-center justify-end gap-1 text-[10px] " + (own ? "text-white/70" : "text-muted-foreground")}>
                           {timeFmt.format(new Date(m.createdAt))}
+                          {own && (
+                            <span className="inline-flex items-center gap-0.5" aria-label={m.readAt ? "Visto" : "Enviado"}>
+                              {m.readAt ? (
+                                <>
+                                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M1 13l4 4L15 7" />
+                                    <path d="M9 13l4 4L23 7" />
+                                  </svg>
+                                  <span className="text-[9px]">Visto</span>
+                                </>
+                              ) : (
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M4 12l5 5L20 6" />
+                                </svg>
+                              )}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
                   );
                 })}
+
+                {/* "Escribiendo…" del operador */}
+                {operatorTyping && (
+                  <div className="flex justify-start">
+                    <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-border bg-card px-3 py-2.5" aria-label="El operador está escribiendo">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "0ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "150ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "300ms" }} />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {error && (
@@ -293,7 +433,7 @@ export default function ChatWidget({ primaryColor, storeName }: Props) {
                 <input
                   type="text"
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={handleInputChange}
                   placeholder="Escribí un mensaje…"
                   aria-label="Mensaje"
                   className="min-w-0 flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none focus:border-[var(--brand)]"

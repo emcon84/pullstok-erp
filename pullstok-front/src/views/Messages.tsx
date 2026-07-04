@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, MessageSquare, Send } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, MessageSquare, Send } from "lucide-react";
 import { toast } from "react-toastify";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -205,20 +205,34 @@ const ChatThread: React.FC<ChatThreadProps> = ({ conversation, onBack }) => {
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Suscripción socket a ESTA conversación (join/leave + append de mensajes).
-  useChatThreadRealtime(convId);
+  // Suscripción socket a ESTA conversación (join/leave + append de mensajes)
+  // + indicadores PRO (Fase D): escribiendo, presencia y visto.
+  const { guestTyping, guestOnline, notifyTyping, stopTyping } =
+    useChatThreadRealtime(convId);
 
   const list = messages ?? [];
 
-  // Autoscroll al fondo cuando cambian los mensajes o la conversación.
+  // Id del último mensaje MÍO (OPERATOR) que el guest ya vio, para pintar el
+  // "Visto" una sola vez, bajo la última burbuja leída.
+  const lastSeenOperatorId = useMemo(() => {
+    for (let i = list.length - 1; i >= 0; i--) {
+      const m = list[i];
+      if (m.sender === "OPERATOR" && m.readAt) return m.id;
+    }
+    return null;
+  }, [list]);
+
+  // Autoscroll al fondo cuando cambian los mensajes, la conversación o aparece
+  // el indicador "escribiendo…".
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [list.length, convId]);
+  }, [list.length, convId, guestTyping]);
 
   const handleSend = () => {
     const body = draft.trim();
     if (!body || sending) return;
+    stopTyping();
     sendMessage(
       { conversationId: convId, body },
       {
@@ -226,6 +240,13 @@ const ChatThread: React.FC<ChatThreadProps> = ({ conversation, onBack }) => {
       },
     );
     setDraft("");
+  };
+
+  const handleDraftChange = (
+    e: React.ChangeEvent<HTMLTextAreaElement>,
+  ) => {
+    setDraft(e.target.value);
+    if (e.target.value.trim()) notifyTyping();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -256,11 +277,21 @@ const ChatThread: React.FC<ChatThreadProps> = ({ conversation, onBack }) => {
           <p className="truncate text-sm font-medium">
             {guestLabel(conversation)}
           </p>
-          {conversation.guestEmail && (
-            <p className="truncate text-xs text-muted-foreground">
-              {conversation.guestEmail}
-            </p>
-          )}
+          <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+            <span
+              className={cn(
+                "inline-block h-2 w-2 shrink-0 rounded-full",
+                guestOnline ? "bg-green-500" : "bg-muted-foreground/40",
+              )}
+              aria-hidden
+            />
+            <span className="shrink-0">
+              {guestOnline ? "En línea" : "Desconectado"}
+            </span>
+            {conversation.guestEmail && (
+              <span className="truncate">· {conversation.guestEmail}</span>
+            )}
+          </p>
         </div>
       </div>
 
@@ -270,13 +301,22 @@ const ChatThread: React.FC<ChatThreadProps> = ({ conversation, onBack }) => {
           <div className="flex h-full items-center justify-center">
             <Loader />
           </div>
-        ) : list.length === 0 ? (
+        ) : list.length === 0 && !guestTyping ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
             <MessageSquare className="h-8 w-8 opacity-40" />
             <p className="text-sm">Todavía no hay mensajes en esta conversación.</p>
           </div>
         ) : (
-          list.map((m) => <MessageBubble key={m.id} message={m} />)
+          <>
+            {list.map((m) => (
+              <MessageBubble
+                key={m.id}
+                message={m}
+                seen={m.id === lastSeenOperatorId}
+              />
+            ))}
+            {guestTyping && <TypingIndicator />}
+          </>
         )}
       </div>
 
@@ -284,7 +324,7 @@ const ChatThread: React.FC<ChatThreadProps> = ({ conversation, onBack }) => {
       <div className="flex items-end gap-2 border-t p-3">
         <Textarea
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={handleDraftChange}
           onKeyDown={handleKeyDown}
           placeholder="Escribí una respuesta…"
           className="max-h-32 min-h-[2.5rem] flex-1 resize-none"
@@ -303,7 +343,10 @@ const ChatThread: React.FC<ChatThreadProps> = ({ conversation, onBack }) => {
   );
 };
 
-const MessageBubble: React.FC<{ message: MessageDTO }> = ({ message }) => {
+const MessageBubble: React.FC<{ message: MessageDTO; seen?: boolean }> = ({
+  message,
+  seen,
+}) => {
   const isOperator = message.sender === "OPERATOR";
   return (
     <div
@@ -321,17 +364,38 @@ const MessageBubble: React.FC<{ message: MessageDTO }> = ({ message }) => {
         )}
       >
         <p className="whitespace-pre-wrap break-words">{message.body}</p>
-        <p
+        <div
           className={cn(
-            "mt-1 text-right text-[10px]",
+            "mt-1 flex items-center justify-end gap-1 text-[10px]",
             isOperator
               ? "text-primary-foreground/70"
               : "text-muted-foreground",
           )}
         >
-          {formatTime(message.createdAt)}
-        </p>
+          <span>{formatTime(message.createdAt)}</span>
+          {isOperator &&
+            (seen ? (
+              <span className="flex items-center gap-0.5">
+                <CheckCheck className="h-3 w-3" />
+                Visto
+              </span>
+            ) : (
+              <Check className="h-3 w-3" />
+            ))}
+        </div>
       </div>
     </div>
   );
 };
+
+// "Escribiendo…" del cliente: tres puntitos animados en una burbuja tipo
+// mensaje entrante (izquierda), consistente con el hilo.
+const TypingIndicator: React.FC = () => (
+  <div className="flex justify-start">
+    <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-muted px-3 py-3 shadow-sm">
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
+    </div>
+  </div>
+);
