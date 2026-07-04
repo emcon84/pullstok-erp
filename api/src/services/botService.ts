@@ -5,7 +5,7 @@ import { runWithTenant } from "../config/tenantContext";
 // importan botService → sin ciclo. persistMessage es el ÚNICO punto de escritura
 // de mensajes (emite chat:message al room); emitChatTyping muestra el
 // "escribiendo…" del lado OPERATOR mientras Groq genera.
-import { persistMessage } from "./chatService";
+import { persistMessage, escalateConversation } from "./chatService";
 import { emitChatTyping } from "../realtime/socket";
 import getNextSequenceValue from "./secuenceService";
 
@@ -84,6 +84,31 @@ interface GroqMessage {
   content: string;
 }
 
+// Tool (function calling, formato OpenAI que Groq acepta) para el handoff a
+// humano de FASE 2. Sin parámetros: es una señal ("derivá a un humano"), la
+// decisión de cuándo llamarlo la toma el modelo según el system prompt.
+const HANDOFF_TOOL = {
+  type: "function",
+  function: {
+    name: "request_human_handoff",
+    description:
+      "Llamar cuando el usuario pide explícitamente hablar con una persona/humano/asesor, o cuando el bot no puede resolver la consulta.",
+    parameters: { type: "object", properties: {} },
+  },
+} as const;
+
+// Resultado del bot: o una respuesta de texto normal, o la señal de handoff
+// (el modelo llamó a request_human_handoff → hay que escalar, no persistir texto).
+// null se reserva para "el bot no responde" (sin key, error, respuesta vacía).
+export type BotReply = { kind: "text"; content: string } | { kind: "handoff" };
+
+// Shape parcial del `message` que devuelve Groq en cada choice (solo lo que
+// consumimos: texto y/o tool_calls).
+interface GroqChoiceMessage {
+  content?: string | null;
+  tool_calls?: { function?: { name?: string } }[];
+}
+
 // System prompt: define al bot como asistente del comercio, en español
 // rioplatense, y lo ata a responder SOLO con la base de conocimiento (si no sabe,
 // lo dice y ofrece derivar a un humano). Dejado listo para extenderse en FASE 2
@@ -99,8 +124,8 @@ const buildSystemPrompt = (org: Organization, botConfig: BotConfig): string => {
     `Sos el asistente de atención al cliente de "${org.name}".`,
     "Respondé SIEMPRE en español rioplatense, con tono cordial y cercano pero profesional.",
     "Usá EXCLUSIVAMENTE la información de la BASE DE CONOCIMIENTO de abajo para responder.",
-    "Si la respuesta no está en la base de conocimiento, decilo con honestidad y ofrecé derivar la consulta a un asesor humano.",
-    "NO inventes datos (precios, stock, horarios, envíos, políticas). Ante la duda, derivá a un humano.",
+    "Si el usuario pide explícitamente hablar con una persona/humano/asesor, o si NO podés resolver la consulta con la base de conocimiento, NO respondas con texto: llamá a la herramienta request_human_handoff para derivar la conversación a un operador humano.",
+    "NO inventes datos (precios, stock, horarios, envíos, políticas). Ante la duda, derivá a un humano con request_human_handoff.",
     "Sé breve y claro: respuestas cortas, sin relleno.",
     "",
     "--- BASE DE CONOCIMIENTO ---",
@@ -131,7 +156,7 @@ export const generateBotReply = async ({
   botConfig: BotConfig;
   org: Organization;
   messages: Message[];
-}): Promise<string | null> => {
+}): Promise<BotReply | null> => {
   const apiKey = resolveGroqKey(botConfig);
   if (!apiKey) {
     if (!warnedNoKey) {
@@ -144,40 +169,67 @@ export const generateBotReply = async ({
     return null;
   }
 
-  const payload = {
-    model: botConfig.model,
-    max_tokens: MAX_TOKENS,
-    temperature: 0.4,
-    messages: [
-      { role: "system", content: buildSystemPrompt(org, botConfig) },
-      ...mapHistory(messages),
-    ] as GroqMessage[],
-  };
+  const chatMessages = [
+    { role: "system", content: buildSystemPrompt(org, botConfig) },
+    ...mapHistory(messages),
+  ] as GroqMessage[];
 
-  try {
-    const res = await fetch(GROQ_URL, {
+  // Un solo POST a Groq. `withTools` decide si mandamos el tool de handoff:
+  // permite reintentar SIN tools si el modelo elegido no los soporta.
+  const callGroq = (withTools: boolean): Promise<Response> =>
+    fetch(GROQ_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        model: botConfig.model,
+        max_tokens: MAX_TOKENS,
+        temperature: 0.4,
+        messages: chatMessages,
+        ...(withTools
+          ? { tools: [HANDOFF_TOOL], tool_choice: "auto" }
+          : {}),
+      }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
+  try {
+    let res = await callGroq(true);
+
+    // Degradación con gracia: si el modelo no soporta tools (o Groq rechaza el
+    // request con tools por cualquier motivo), reintentamos UNA vez sin tools
+    // para al menos dar una respuesta de texto normal en vez de quedar mudos.
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
       console.error(
-        `[botService] Groq respondió ${res.status}: ${detail.slice(0, 300)}`,
+        `[botService] Groq respondió ${res.status} (con tools): ${detail.slice(0, 300)} — reintento sin tools`,
       );
-      return null;
+      res = await callGroq(false);
+      if (!res.ok) {
+        const detail2 = await res.text().catch(() => "");
+        console.error(
+          `[botService] Groq respondió ${res.status} (sin tools): ${detail2.slice(0, 300)}`,
+        );
+        return null;
+      }
     }
 
     const data = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
+      choices?: { message?: GroqChoiceMessage }[];
     };
-    const content = data.choices?.[0]?.message?.content?.trim();
-    return content && content.length > 0 ? content : null;
+    const message = data.choices?.[0]?.message;
+
+    // Handoff tiene PRIORIDAD sobre el texto: si el modelo llamó al tool (aun si
+    // además devolvió algo de texto), escalamos y descartamos ese texto.
+    const wantsHandoff = (message?.tool_calls ?? []).some(
+      (t) => t.function?.name === "request_human_handoff",
+    );
+    if (wantsHandoff) return { kind: "handoff" };
+
+    const content = message?.content?.trim();
+    return content && content.length > 0 ? { kind: "text", content } : null;
   } catch (err) {
     console.error("[botService] fallo llamando a Groq (bot en silencio)", err);
     return null;
@@ -253,6 +305,14 @@ const handleBotReply = async (
     const reply = await generateBotReply({ botConfig, org, messages: history });
     if (!reply) return; // Groq falló o no hay key → nada que mandar
 
+    // FASE 2 — HANDOFF: el modelo llamó a request_human_handoff. En vez de
+    // responder texto, escalamos la conversación a HUMAN (el bot se calla, se
+    // avisa a los operadores). No contamos uso: no hubo respuesta de conocimiento.
+    if (reply.kind === "handoff") {
+      await escalateConversation(conversationId, organizationId);
+      return;
+    }
+
     // Persiste como respuesta del bot: sender=OPERATOR (fluye igual que un
     // humano), senderUserId=null, isBot=true. persistMessage emite chat:message.
     await persistMessage({
@@ -260,7 +320,7 @@ const handleBotReply = async (
       sender: "OPERATOR",
       senderUserId: null,
       isBot: true,
-      body: reply,
+      body: reply.content,
     });
 
     // Recién acá contamos el uso: el contador refleja respuestas REALMENTE

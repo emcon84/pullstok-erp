@@ -10,6 +10,7 @@ import {
   getConversationMessages,
   findOrgConversation,
   toMessageDTO,
+  escalateConversation,
 } from "../services/chatService";
 import { maybeReplyToGuestMessage } from "../services/botService";
 
@@ -73,6 +74,21 @@ const postGuestMessage = async (req: GuestRequest, res: Response) => {
   }
 };
 
+// POST /api/store/chat/escalate — protegido por requireGuest. FASE 2: escalado
+// MANUAL (el visitante toca "hablar con una persona" en el widget). Escala SU
+// conversación (la del token) a HUMAN; el bot se calla y se avisa a los
+// operadores. Idempotente (escalar una conversación ya en HUMAN es no-op). No
+// recibe body.
+const escalateChat = async (req: GuestRequest, res: Response) => {
+  try {
+    const { conversationId, organizationId } = req.guest!;
+    await escalateConversation(conversationId, organizationId);
+    res.status(200).json({ ok: true, mode: "HUMAN" });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // ===========================================================================
 // ERP (operador — auth JWT, scoped por org)
 // ===========================================================================
@@ -129,6 +145,7 @@ const postOperatorMessage = async (req: AuthedRequest, res: Response) => {
 export default {
   startChat,
   postGuestMessage,
+  escalateChat,
   getConversations,
   getMessages,
   postOperatorMessage,

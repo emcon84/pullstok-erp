@@ -497,5 +497,25 @@ export const emitChatTyping = (
   });
 };
 
+/**
+ * FASE 2 (handoff a humano): avisa a TODOS los operadores del comercio (room
+ * `org:`) que una conversación se escaló de BOT a HUMAN — el visitante pidió
+ * hablar con una persona (por botón del widget o porque el bot lo detectó). El
+ * front del operador puede resaltar la conversación / disparar una notificación.
+ * Va con datos MÍNIMOS de identificación del visitante (nombre/email), sin
+ * historial. No-op seguro si socket.io aún no se inicializó.
+ */
+export const emitChatEscalated = (
+  organizationId: string,
+  payload: {
+    conversationId: string;
+    guestName: string;
+    guestEmail: string;
+  },
+): void => {
+  if (!io) return;
+  io.to(orgRoom(organizationId)).emit("chat:escalated", payload);
+};
+
 /** Acceso a la instancia (por si se necesita en el futuro, p.ej. chat). */
 export const getIo = (): Server | undefined => io;
