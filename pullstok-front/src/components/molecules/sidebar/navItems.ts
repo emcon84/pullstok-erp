@@ -9,6 +9,7 @@ import {
   Receipt,
   Tags,
   MessageSquare,
+  Bot,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 
@@ -46,6 +47,7 @@ export const navItems: NavItem[] = [
   { to: "/tienda", label: "Tienda", icon: Store, moduleKey: null },
   { to: "/mensajes", label: "Mensajes", icon: MessageSquare, moduleKey: null },
   { to: "/facturacion", label: "Facturación", icon: Receipt, moduleKey: "facturacion" },
+  { to: "/asistente-ia", label: "Asistente IA", icon: Bot, moduleKey: "bot" },
 ];
 
 /**

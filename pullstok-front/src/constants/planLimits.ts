@@ -52,6 +52,10 @@ export const PLAN_LIMITS: Record<
       "reportes",
       "tienda",
       "facturacion",
+      // "bot" (Asistente IA) es EXCLUSIVO de PREMIUM: no aparece en PRO ni
+      // BASICO. Feature premium (chat-bot-groq). Si se agrega al backend en
+      // otro plan, replicar acá.
+      "bot",
     ],
   },
 };
