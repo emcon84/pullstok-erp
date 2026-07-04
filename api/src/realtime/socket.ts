@@ -250,9 +250,33 @@ export const initSocket = (httpServer: HttpServer): Server => {
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+  // Los stores de la tienda son multi-tenant por subdominio (`*.pullstok.com`),
+  // así que una lista fija no alcanza para el widget de chat (socket directo
+  // browser→API desde `<slug>.pullstok.com`). CORS_ORIGIN_SUFFIXES permite
+  // habilitar un sufijo comodín (ej. ".pullstok.com") sin enumerar cada comercio.
+  // El HTTP de la tienda va server-to-server (proxy Astro), no toca este CORS.
+  const wildcardSuffixes = (process.env.CORS_ORIGIN_SUFFIXES ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const isAllowedOrigin = (origin?: string): boolean => {
+    if (!origin) return true; // clientes no-browser (server-to-server, tests)
+    if (allowedOrigins.includes(origin)) return true;
+    try {
+      const { hostname, protocol } = new URL(origin);
+      if (protocol !== "https:" && protocol !== "http:") return false;
+      return wildcardSuffixes.some(
+        (suf) => hostname === suf.replace(/^\./, "") || hostname.endsWith(suf),
+      );
+    } catch {
+      return false;
+    }
+  };
+
   io = new Server(httpServer, {
     cors: {
-      origin: allowedOrigins,
+      origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
     },
   });
 
