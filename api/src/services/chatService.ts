@@ -29,6 +29,9 @@ export interface MessageDTO {
   conversationId: string;
   sender: MessageSender;
   senderUserId: string | null;
+  // true si el mensaje lo generó el bot IA (sender=OPERATOR, senderUserId=null).
+  // Deja que la UI del operador distinga una respuesta del bot de la de un humano.
+  isBot: boolean;
   body: string;
   readAt: string | null;
   createdAt: string;
@@ -39,6 +42,7 @@ export const toMessageDTO = (m: Message): MessageDTO => ({
   conversationId: m.conversationId,
   sender: m.sender,
   senderUserId: m.senderUserId,
+  isBot: m.isBot,
   body: m.body,
   readAt: m.readAt ? m.readAt.toISOString() : null,
   createdAt: m.createdAt.toISOString(),
@@ -56,6 +60,9 @@ export const persistMessage = async (input: {
   conversationId: string;
   sender: MessageSender;
   senderUserId?: string | null;
+  // Marca la respuesta como generada por el bot IA (ver botService). Solo tiene
+  // sentido con sender=OPERATOR y senderUserId=null. Default false.
+  isBot?: boolean;
   body: string;
 }): Promise<Message> => {
   const now = new Date();
@@ -65,6 +72,7 @@ export const persistMessage = async (input: {
         conversationId: input.conversationId,
         sender: input.sender,
         senderUserId: input.senderUserId ?? null,
+        isBot: input.isBot ?? false,
         body: input.body,
         // Los mensajes del operador nacen "leídos" (no cuentan como no-leídos);
         // los del guest nacen sin leer hasta que el operador los abre.

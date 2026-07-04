@@ -476,5 +476,26 @@ export const emitConversationUpdated = (
   });
 };
 
+/**
+ * Emite un indicador de "escribiendo…" a la room de una conversación DESDE EL
+ * SERVIDOR (no desde un socket). Lo usa el bot IA (botService) para mostrar el
+ * "escribiendo…" del lado OPERATOR mientras Groq genera la respuesta. Reusa el
+ * mismo evento y shape que el relay de sockets (registerEphemeralHandlers), así
+ * el front no distingue si el typing vino de un humano o del bot. No-op seguro
+ * si socket.io aún no se inicializó.
+ */
+export const emitChatTyping = (
+  conversationId: string,
+  from: Party,
+  isTyping: boolean,
+): void => {
+  if (!io) return;
+  io.to(convRoom(conversationId)).emit("chat:typing", {
+    conversationId,
+    from,
+    isTyping,
+  });
+};
+
 /** Acceso a la instancia (por si se necesita en el futuro, p.ej. chat). */
 export const getIo = (): Server | undefined => io;

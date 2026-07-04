@@ -11,6 +11,7 @@ import {
   findOrgConversation,
   toMessageDTO,
 } from "../services/chatService";
+import { maybeReplyToGuestMessage } from "../services/botService";
 
 // ===========================================================================
 // TIENDA (guest — público, tenant por slug/token)
@@ -56,6 +57,17 @@ const postGuestMessage = async (req: GuestRequest, res: Response) => {
     });
 
     res.status(201).json(toMessageDTO(message));
+
+    // Bot IA (FASE 1): DESPUÉS de persistir el mensaje del guest y responder el
+    // HTTP, disparamos la respuesta del bot FIRE-AND-FORGET (nunca se espera →
+    // no bloquea al visitante). El botService decide adentro si corresponde
+    // responder (org PREMIUM, BotConfig.enabled, conversación en mode=BOT, bajo
+    // el límite diario) y abre su propio contexto de tenant. Cualquier fallo se
+    // traga adentro; el mensaje del guest ya está guardado y respondido.
+    maybeReplyToGuestMessage({
+      conversationId,
+      organizationId: req.guest!.organizationId,
+    });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
