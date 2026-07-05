@@ -92,7 +92,7 @@ const HANDOFF_TOOL = {
   function: {
     name: "request_human_handoff",
     description:
-      "Llamar cuando el usuario pide explícitamente hablar con una persona/humano/asesor, o cuando el bot no puede resolver la consulta.",
+      "Llamar ÚNICAMENTE cuando el usuario pide EXPLÍCITAMENTE hablar con una persona, un humano, un asesor o un representante. NO llamar para consultas normales que se pueden responder con la base de conocimiento.",
     parameters: { type: "object", properties: {} },
   },
 } as const;
@@ -124,8 +124,8 @@ const buildSystemPrompt = (org: Organization, botConfig: BotConfig): string => {
     `Sos el asistente de atención al cliente de "${org.name}".`,
     "Respondé SIEMPRE en español rioplatense, con tono cordial y cercano pero profesional.",
     "Usá EXCLUSIVAMENTE la información de la BASE DE CONOCIMIENTO de abajo para responder.",
-    "Si el usuario pide explícitamente hablar con una persona/humano/asesor, o si NO podés resolver la consulta con la base de conocimiento, NO respondas con texto: llamá a la herramienta request_human_handoff para derivar la conversación a un operador humano.",
-    "NO inventes datos (precios, stock, horarios, envíos, políticas). Ante la duda, derivá a un humano con request_human_handoff.",
+    "Tu tarea es RESPONDER las consultas del cliente con la base de conocimiento. Derivá a un humano (llamando a request_human_handoff) SOLO si el cliente pide explícitamente hablar con una persona, un humano o un asesor. Para cualquier otra consulta, respondé con texto.",
+    "NO inventes datos (precios, stock, horarios, envíos, políticas) que no estén en la base de conocimiento. Si te falta un dato puntual, decilo con amabilidad y comentá que puede pedir hablar con una persona si lo necesita — pero NO derives por tu cuenta, solo si el cliente lo pide.",
     "Sé breve y claro: respuestas cortas, sin relleno.",
     "",
     "--- BASE DE CONOCIMIENTO ---",
