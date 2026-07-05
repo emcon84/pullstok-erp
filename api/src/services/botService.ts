@@ -109,6 +109,19 @@ interface GroqChoiceMessage {
   tool_calls?: { function?: { name?: string } }[];
 }
 
+// Los modelos chicos (ej. llama-3.1-8b) a veces NO usan el canal `tool_calls` y
+// en su lugar escupen la llamada como TEXTO dentro del content, ej:
+//   "…texto… <function=request_human_handoff>{}</function>"
+// Este helper saca cualquier etiqueta <function ...> (con o sin cierre) para que
+// esa basura NUNCA se le muestre al cliente.
+const stripFunctionTags = (text: string): string =>
+  text
+    .replace(/<function[^>]*>[\s\S]*?<\/function>/gi, "")
+    .replace(/<function[^>]*>\s*\{[\s\S]*?\}/gi, "")
+    .replace(/<\/?function[^>]*>/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
 // System prompt: define al bot como asistente del comercio, en español
 // rioplatense, y lo ata a responder SOLO con la base de conocimiento (si no sabe,
 // lo dice y ofrece derivar a un humano). Dejado listo para extenderse en FASE 2
@@ -221,15 +234,20 @@ export const generateBotReply = async ({
     };
     const message = data.choices?.[0]?.message;
 
-    // Handoff tiene PRIORIDAD sobre el texto: si el modelo llamó al tool (aun si
-    // además devolvió algo de texto), escalamos y descartamos ese texto.
-    const wantsHandoff = (message?.tool_calls ?? []).some(
+    // Handoff tiene PRIORIDAD sobre el texto. Lo detectamos por DOS vías porque
+    // el modelo puede llamar al tool por el canal estructurado (tool_calls) O
+    // escupirlo como texto plano en el content ("<function=request_human_handoff>…").
+    const rawContent = message?.content ?? "";
+    const toolHandoff = (message?.tool_calls ?? []).some(
       (t) => t.function?.name === "request_human_handoff",
     );
-    if (wantsHandoff) return { kind: "handoff" };
+    const inlineHandoff = /request_human_handoff/i.test(rawContent);
+    if (toolHandoff || inlineHandoff) return { kind: "handoff" };
 
-    const content = message?.content?.trim();
-    return content && content.length > 0 ? { kind: "text", content } : null;
+    // Red de seguridad: aunque no sea handoff, limpiamos cualquier etiqueta
+    // <function ...> filtrada al texto para no mostrarle basura al cliente.
+    const content = stripFunctionTags(rawContent);
+    return content.length > 0 ? { kind: "text", content } : null;
   } catch (err) {
     console.error("[botService] fallo llamando a Groq (bot en silencio)", err);
     return null;
