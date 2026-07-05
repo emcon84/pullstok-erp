@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { Plus, CreditCard, Ban, CheckCircle2 } from "lucide-react";
+import { Plus, CreditCard, Ban, CheckCircle2, MessageSquareX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ import { Plan } from "../../services/onboardingService";
 import { SuperadminOrganization } from "../../services/superadminService";
 import { useConfirm } from "../../components/hooks/useConfirm";
 import {
+  useClearOrganizationConversations,
   useOrganizations,
   useRegisterOrganizationBilling,
   useSetOrganizationActive,
@@ -58,6 +59,8 @@ export const OrganizationsList = () => {
   const { changePlan, loadingPlanChange } = useUpdateOrganizationPlan();
   const { registerPayment, loadingPayment } = useRegisterOrganizationBilling();
   const { toggleActive, loadingToggleActive } = useSetOrganizationActive();
+  const { clearConversations, loadingClearConversations } =
+    useClearOrganizationConversations();
 
   const handlePlanChange = (org: SuperadminOrganization, plan: Plan) => {
     if (plan === org.plan) return;
@@ -111,6 +114,26 @@ export const OrganizationsList = () => {
         },
       },
     );
+  };
+
+  const handleClearConversations = async (org: SuperadminOrganization) => {
+    const ok = await confirm({
+      title: "¿Borrar todas las conversaciones?",
+      description: `¿Borrar todas las conversaciones de ${org.name}? Esta acción no se puede deshacer.`,
+      confirmLabel: "Sí, borrar chats",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const { deleted } = await clearConversations(org.id);
+      toast.success(`Se borraron ${deleted} chats de ${org.name}`);
+    } catch (error) {
+      toast.error(
+        `Error al borrar los chats: ${
+          error instanceof Error ? error.message : "desconocido"
+        }`,
+      );
+    }
   };
 
   if (loadingOrganizations) {
@@ -222,6 +245,16 @@ export const OrganizationsList = () => {
                         onClick={() => handleRegisterPayment(org)}
                       >
                         <CreditCard className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Limpiar chats"
+                        disabled={loadingClearConversations}
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => handleClearConversations(org)}
+                      >
+                        <MessageSquareX className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"

@@ -117,6 +117,25 @@ export const registerOrganizationBilling = async (
   }
 };
 
+export const clearOrganizationConversations = async (
+  id: string,
+): Promise<{ deleted: number }> => {
+  try {
+    const response = await axios.delete<{ deleted: number }>(
+      `${API_URL}/superadmin/organizations/${id}/conversations`,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error clearing conversations",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
 export const setOrganizationActive = async ({
   id,
   isActive,

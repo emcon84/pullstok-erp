@@ -12,6 +12,7 @@ import {
   setOrganizationActive,
   updateOrganizationPlan,
   registerOrganizationBilling,
+  clearOrganizationConversations,
 } from "../controllers/superadminController";
 
 const router = Router();
@@ -35,6 +36,10 @@ router.patch(
   "/organizations/:id/billing",
   validate(registerBillingPaymentSchema),
   registerOrganizationBilling,
+);
+router.delete(
+  "/organizations/:id/conversations",
+  clearOrganizationConversations,
 );
 
 export default router;

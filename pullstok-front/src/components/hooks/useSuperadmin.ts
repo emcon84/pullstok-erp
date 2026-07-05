@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  clearOrganizationConversations,
   createOrganization,
   getOrganizations,
   registerOrganizationBilling,
@@ -84,6 +85,22 @@ export const useRegisterOrganizationBilling = () => {
   return {
     registerPayment: mutation.mutate,
     loadingPayment: mutation.isPending,
+  };
+};
+
+export const useClearOrganizationConversations = () => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation<{ deleted: number }, Error, string>({
+    mutationFn: clearOrganizationConversations,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+    },
+  });
+
+  return {
+    clearConversations: mutation.mutateAsync,
+    loadingClearConversations: mutation.isPending,
   };
 };
 
