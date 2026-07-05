@@ -90,6 +90,37 @@ export const updateOrganizationPlan = async (
   }
 };
 
+/**
+ * Borra TODAS las conversaciones de un comercio (y sus mensajes en cascada,
+ * onDelete Cascade en Message). Uso: limpiar los chats de prueba que quedan
+ * pegados. Como es acción de plataforma sobre CUALQUIER org, usa basePrisma
+ * (sin scope automático) y filtra explícito por organizationId. Message NO es
+ * tenant-model: se borra vía cascade de Conversation, no hace falta borrarlo
+ * aparte.
+ */
+export const clearOrganizationConversations = async (
+  req: AuthedRequest,
+  res: Response,
+) => {
+  const { id } = req.params;
+  try {
+    const org = await basePrisma.organization.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!org) {
+      return res.status(404).json({ message: "Organización no encontrada." });
+    }
+
+    const { count } = await basePrisma.conversation.deleteMany({
+      where: { organizationId: id },
+    });
+    res.status(200).json({ deleted: count });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 /** Registra un pago manual: extiende paidUntil un mes desde hoy (no acumula). */
 export const registerOrganizationBilling = async (
   req: AuthedRequest,
