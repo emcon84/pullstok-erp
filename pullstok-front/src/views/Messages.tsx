@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, CheckCheck, MessageSquare, Send } from "lucide-react";
+import { ArrowLeft, Bell, Check, CheckCheck, MessageSquare, Send } from "lucide-react";
 import { toast } from "react-toastify";
+import { ensureNotificationPermission } from "../lib/notify";
+import {
+  clearEscalated,
+  useEscalatedConversations,
+} from "../stores/escalatedConversations";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +51,18 @@ export const Messages: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const list = conversations ?? [];
+
+  // Pedimos permiso de notificaciones al entrar a Mensajes (no en cada carga de
+  // la app): acá el operador ya mostró intención de atender el chat.
+  useEffect(() => {
+    void ensureNotificationPermission();
+  }, []);
+
+  // Al abrir una conversación limpiamos su flag de "pide atención".
+  const handleSelect = (id: string) => {
+    clearEscalated(id);
+    setSelectedId(id);
+  };
 
   // Auto-seleccionar la primera conversación en desktop la primera vez.
   useEffect(() => {
@@ -96,7 +113,7 @@ export const Messages: React.FC = () => {
           <ConversationList
             conversations={list}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={handleSelect}
           />
         </aside>
 
@@ -137,6 +154,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
   selectedId,
   onSelect,
 }) => {
+  const escalated = useEscalatedConversations();
+
   if (conversations.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
@@ -150,6 +169,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
     <div className="flex-1 overflow-y-auto">
       {conversations.map((c) => {
         const active = c.id === selectedId;
+        const needsHuman = escalated.has(c.id);
         return (
           <button
             key={c.id}
@@ -158,6 +178,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
             className={cn(
               "flex w-full items-start gap-3 border-b px-4 py-3 text-left transition-colors",
               active ? "bg-muted" : "hover:bg-muted/50",
+              needsHuman && "bg-amber-50 dark:bg-amber-950/30",
             )}
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold uppercase text-accent-foreground">
@@ -165,7 +186,15 @@ const ConversationList: React.FC<ConversationListProps> = ({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-sm font-medium">{guestLabel(c)}</p>
+                <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-medium">
+                  {needsHuman && (
+                    <Bell
+                      className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                      aria-label="Pide atención"
+                    />
+                  )}
+                  <span className="truncate">{guestLabel(c)}</span>
+                </p>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {formatListTime(c.lastMessageAt)}
                 </span>
