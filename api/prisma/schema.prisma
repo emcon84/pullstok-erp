@@ -58,6 +58,7 @@ model Organization {
   storeSettings         StoreSettings?
   invoices              Invoice[]
   conversations         Conversation[]
+  botConfig             BotConfig?
 
   @@map("organizations")
 }
@@ -369,6 +370,15 @@ enum MessageSender {
   OPERATOR
 }
 
+// Modo de atención de una conversación. En FASE 1, el bot (Groq) responde SOLO
+// si mode=BOT. La FASE 2 (handoff a humano) flipeará a HUMAN cuando un operador
+// tome la conversación, silenciando al bot. Default BOT: toda conversación nueva
+// arranca atendida por el bot (si la org lo tiene habilitado).
+enum ConversationMode {
+  BOT
+  HUMAN
+}
+
 // Una conversación de chat entre un visitante (guest) de la tienda pública y
 // los operadores del comercio. Es tenant-scoped (organizationId): pertenece a
 // la org y está en TENANT_MODELS (db.ts) → scope automático anti-fuga en los
@@ -385,6 +395,14 @@ model Conversation {
   customerId     String?
   customer       Customer?          @relation(fields: [customerId], references: [id])
   status         ConversationStatus @default(OPEN)
+  // Modo de atención (FASE 1 bot IA): BOT = el asistente Groq responde
+  // automáticamente; HUMAN = lo atiende un operador (handoff de FASE 2). Default
+  // BOT para que el bot responda desde el primer mensaje si la org lo habilitó.
+  mode           ConversationMode   @default(BOT)
+  // Handoff a humano (FASE 2): timestamp del momento en que la conversación se
+  // escaló de BOT a HUMAN (por botón del widget o porque el bot lo detectó).
+  // Null = nunca escalada. Al escalar se setea mode=HUMAN + escalatedAt=now.
+  escalatedAt    DateTime?
   // Timestamp del último mensaje (para ordenar la bandeja del operador). Null
   // hasta que se escribe el primer mensaje.
   lastMessageAt  DateTime?
@@ -406,6 +424,10 @@ model Message {
   sender         MessageSender
   // Id del User operador cuando sender=OPERATOR; null cuando sender=GUEST.
   senderUserId   String?
+  // true si la respuesta la generó el bot IA (Groq). Nace como sender=OPERATOR
+  // con senderUserId=null e isBot=true → la UI del operador puede distinguir una
+  // respuesta del bot de la de un humano. Default false: todo mensaje humano.
+  isBot          Boolean       @default(false)
   body           String
   // Marca de lectura (para el contador de no-leídos del operador). Los mensajes
   // del GUEST arrancan readAt=null hasta que el operador los lee.
@@ -414,4 +436,38 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+// ---------------------------------------------------------------------------
+// Bot de atención IA (FASE 1: motor Groq)
+// ---------------------------------------------------------------------------
+
+// Configuración del bot por comercio (1:1 con Organization). Es tenant-scoped
+// (organizationId @unique) y está en TENANT_MODELS (db.ts) → scope automático
+// anti-fuga en los endpoints del operador (FASE 2). El bot responde en el chat
+// cliente↔operador cuando enabled=true y la conversación está en mode=BOT.
+model BotConfig {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  // Interruptor maestro: si false, el bot no responde nunca para esta org.
+  enabled        Boolean      @default(false)
+  // Base de conocimiento que el dueño escribe (info del negocio: horarios,
+  // envíos, políticas, catálogo, etc.). Se inyecta como contexto en el system
+  // prompt (truncada a un cap de caracteres). Default vacío.
+  knowledgeBase  String       @default("")
+  // Modelo Groq a usar (configurable por comercio). Default: modelo chico y
+  // barato de Groq. Ver generateBotReply en botService.
+  model          String       @default("llama-3.1-8b-instant")
+  // Placeholder para BYO-key (bring-your-own-key): cuando se implemente, ENCRIPTAR
+  // antes de guardar. HOY nadie la usa: resolveGroqKey siempre cae en la key de
+  // plataforma (env GROQ_API_KEY). Nullable a propósito.
+  apiKey         String?
+  // Freno de costo: máximo de respuestas del bot por día para esta org. Al
+  // llegar al tope, el bot queda en silencio el resto del día (ver botService).
+  dailyLimit     Int          @default(200)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("bot_configs")
 }

@@ -27,6 +27,10 @@ const TENANT_MODELS = new Set([
   // automático anti-fuga en los endpoints del operador. Message NO se agrega:
   // no tiene organizationId propio, se scopea vía su Conversation.
   "Conversation",
+  // Bot IA: config 1:1 por org (organizationId @unique). Scope automático en los
+  // endpoints del operador (FASE 2). Recordá: en modelos tenant NO se permite
+  // findUnique/upsert (la extensión los bloquea) → usar findFirst / updateMany.
+  "BotConfig",
 ]);
 
 /**

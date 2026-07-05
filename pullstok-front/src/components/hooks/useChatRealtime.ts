@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 import { getSocket } from "../../lib/socket";
 import { chatKeys } from "./useChat";
+import { playAlert, showEscalationNotification } from "../../lib/notify";
+import { markEscalated } from "../../stores/escalatedConversations";
 import type { ChatSender, MessageDTO } from "../../services/chatService";
 
 /** Payloads de los eventos PRO (Fase D) que recibe el operador. */
@@ -72,10 +75,28 @@ export const useChatConversationsRealtime = () => {
       queryClient.invalidateQueries({ queryKey: chatKeys.conversations });
     };
 
+    // El visitante pidió una persona: alertamos al operador (sonido + notif web +
+    // toast), marcamos la conversación como "pide atención" y refrescamos la lista.
+    const handleEscalated = (evt: {
+      conversationId: string;
+      guestName?: string | null;
+      guestEmail?: string | null;
+    }) => {
+      const who =
+        evt.guestName?.trim() || evt.guestEmail?.trim() || "Un cliente";
+      markEscalated(evt.conversationId);
+      playAlert();
+      showEscalationNotification(who);
+      toast.info(`🙋 ${who} pidió hablar con una persona`);
+      queryClient.invalidateQueries({ queryKey: chatKeys.conversations });
+    };
+
     socket.on("chat:conversation-updated", handleConversationUpdated);
+    socket.on("chat:escalated", handleEscalated);
 
     return () => {
       socket.off("chat:conversation-updated", handleConversationUpdated);
+      socket.off("chat:escalated", handleEscalated);
     };
   }, [queryClient]);
 };

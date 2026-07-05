@@ -17,6 +17,7 @@ import storeRoutes from "./store";
 import storeSettingsRoutes from "./storeSettingsRoutes";
 import invoiceRoutes from "./invoiceRoutes";
 import chatRoutes from "./chatRoutes";
+import botRoutes from "./botRoutes";
 
 const router = Router();
 
@@ -42,5 +43,6 @@ router.use("/onboarding", onboardingRoutes);
 router.use("/store-settings", storeSettingsRoutes);
 router.use("/invoices", invoiceRoutes);
 router.use("/chat", chatRoutes);
+router.use("/bot", botRoutes);
 
 export default router;

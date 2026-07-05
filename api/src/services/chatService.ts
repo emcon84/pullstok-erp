@@ -7,7 +7,11 @@ import { markRead } from "./chatReads";
 // Helpers de emisión del socket. Import UNIDIRECCIONAL (service → realtime): el
 // módulo realtime NO importa este service en runtime → sin ciclo. Mismo patrón
 // que emitOrdersChanged.
-import { emitChatMessage, emitConversationUpdated } from "../realtime/socket";
+import {
+  emitChatMessage,
+  emitConversationUpdated,
+  emitChatEscalated,
+} from "../realtime/socket";
 
 /**
  * Lógica de dominio del chat cliente↔operador (FASE A).
@@ -29,6 +33,9 @@ export interface MessageDTO {
   conversationId: string;
   sender: MessageSender;
   senderUserId: string | null;
+  // true si el mensaje lo generó el bot IA (sender=OPERATOR, senderUserId=null).
+  // Deja que la UI del operador distinga una respuesta del bot de la de un humano.
+  isBot: boolean;
   body: string;
   readAt: string | null;
   createdAt: string;
@@ -39,6 +46,7 @@ export const toMessageDTO = (m: Message): MessageDTO => ({
   conversationId: m.conversationId,
   sender: m.sender,
   senderUserId: m.senderUserId,
+  isBot: m.isBot,
   body: m.body,
   readAt: m.readAt ? m.readAt.toISOString() : null,
   createdAt: m.createdAt.toISOString(),
@@ -56,6 +64,9 @@ export const persistMessage = async (input: {
   conversationId: string;
   sender: MessageSender;
   senderUserId?: string | null;
+  // Marca la respuesta como generada por el bot IA (ver botService). Solo tiene
+  // sentido con sender=OPERATOR y senderUserId=null. Default false.
+  isBot?: boolean;
   body: string;
 }): Promise<Message> => {
   const now = new Date();
@@ -65,6 +76,7 @@ export const persistMessage = async (input: {
         conversationId: input.conversationId,
         sender: input.sender,
         senderUserId: input.senderUserId ?? null,
+        isBot: input.isBot ?? false,
         body: input.body,
         // Los mensajes del operador nacen "leídos" (no cuentan como no-leídos);
         // los del guest nacen sin leer hasta que el operador los abre.
@@ -96,6 +108,73 @@ export const persistMessage = async (input: {
   }
 
   return message;
+};
+
+// Mensaje puente que ve el visitante al escalar a humano. Lo emite el bot como
+// último acto antes de callarse (sender=OPERATOR, isBot=true).
+const HANDOFF_BRIDGE_BODY =
+  "Te conecto con una persona del equipo 🙌 En un momento te responden.";
+
+/**
+ * FASE 2 — HANDOFF A HUMANO. Escala una conversación de BOT a HUMAN: el bot deja
+ * de responder (el gate `mode===BOT` de handleBotReply lo silencia) y se avisa a
+ * los operadores del comercio para que la tomen. Punto ÚNICO de escalado, reusado
+ * por el botón del widget (endpoint /chat/escalate) y por el tool calling de Groq
+ * (request_human_handoff).
+ *
+ * IDEMPOTENTE: si la conversación ya está en mode=HUMAN → no-op (no re-escala, no
+ * duplica el mensaje puente ni el aviso). ROBUSTO: todo el efecto va en try/catch
+ * y nunca propaga — un fallo acá no debe romper el flujo REST (guest) ni el
+ * disparo fire-and-forget del bot que la llamó.
+ *
+ * DEBE llamarse dentro de un contexto de tenant activo (runWithTenant): lo ponen
+ * requireGuest (endpoint manual) y maybeReplyToGuestMessage (bot). Así el scope
+ * anti-fuga aplica y `organizationId` coincide con el de la conversación.
+ */
+export const escalateConversation = async (
+  conversationId: string,
+  organizationId: string,
+): Promise<void> => {
+  try {
+    // Conversation es tenant-model → findFirst scopeado (ownership implícito por
+    // org). Sirve de gate de idempotencia y de validación de pertenencia.
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId },
+    });
+    if (!conversation) return;
+    // Ya escalada → no-op (evita re-escalar / duplicar aviso y mensaje puente).
+    if (conversation.mode === "HUMAN") return;
+
+    // Flip a HUMAN + marca de tiempo. Conversation es tenant-model → update
+    // singular está bloqueado por la extensión anti-fuga: se usa updateMany.
+    await prisma.conversation.updateMany({
+      where: { id: conversationId },
+      data: { mode: "HUMAN", escalatedAt: new Date() },
+    });
+
+    // Mensaje puente visible para el visitante. Nace como respuesta de operador
+    // marcada isBot (fluye por la misma infra; persistMessage emite chat:message
+    // + chat:conversation-updated). senderUserId=null: no lo escribió un humano.
+    await persistMessage({
+      conversationId,
+      sender: "OPERATOR",
+      senderUserId: null,
+      isBot: true,
+      body: HANDOFF_BRIDGE_BODY,
+    });
+
+    // Aviso a los operadores del comercio: hay una conversación esperando humano.
+    // emitChatEscalated → notificación/resalte; emitConversationUpdated → refresca
+    // la lista/badge aunque no la tengan abierta.
+    emitChatEscalated(organizationId, {
+      conversationId,
+      guestName: conversation.guestName,
+      guestEmail: conversation.guestEmail,
+    });
+    emitConversationUpdated(organizationId, conversationId);
+  } catch (err) {
+    console.error("[chat] escalateConversation failed", err);
+  }
 };
 
 /**

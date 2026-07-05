@@ -53,5 +53,8 @@ router.post(
   validate(chatMessageSchema),
   chatController.postGuestMessage,
 );
+// FASE 2 — handoff MANUAL: el visitante pide hablar con una persona desde el
+// widget. Solo requireGuest (el token trae conversationId + org); sin body.
+router.post("/chat/escalate", requireGuest, chatController.escalateChat);
 
 export default router;

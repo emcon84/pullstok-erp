@@ -24,11 +24,20 @@ const SOCKET_ORIGIN = import.meta.env.PUBLIC_SOCKET_ORIGIN ?? "http://localhost:
 interface Props {
   primaryColor: string;
   storeName: string;
+  // Número de contacto del negocio (StoreSettings.contactPhone). Si es null/vacío
+  // no se muestra el botón "Seguir por WhatsApp".
+  whatsappPhone?: string | null;
 }
 
 const timeFmt = new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" });
 
-export default function ChatWidget({ primaryColor, storeName }: Props) {
+// Deja solo dígitos: saca +, espacios, guiones, paréntesis, etc. wa.me espera el
+// número en formato internacional sin símbolos (código de país incluido).
+function toWaDigits(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+export default function ChatWidget({ primaryColor, storeName, whatsappPhone }: Props) {
   const [open, setOpen] = useState(false);
   const [session, setSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -41,6 +50,10 @@ export default function ChatWidget({ primaryColor, storeName }: Props) {
   const [operatorOnline, setOperatorOnline] = useState(false);
   const [operatorTyping, setOperatorTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Handoff a humano: se prende al hacer POST /api/chat/escalate con éxito. El
+  // mensaje puente ("Te conecto con una persona 🙌") llega solo por socket.
+  const [escalated, setEscalated] = useState(false);
+  const [escalating, setEscalating] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -288,6 +301,45 @@ export default function ChatWidget({ primaryColor, storeName }: Props) {
     }
   }
 
+  // Handoff a humano: marca la conversación para atención humana. El bot deja de
+  // responder y el mensaje puente llega solo por socket (chat:message) → acá solo
+  // marcamos escalated para ocultar el botón.
+  async function escalateToHuman() {
+    if (!session || escalating || escalated) return;
+    setEscalating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/chat/escalate", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+      if (!res.ok) {
+        setError("No pudimos conectarte con una persona. Intentá de nuevo.");
+        return;
+      }
+      setEscalated(true);
+    } catch {
+      setError("Error de conexión. Intentá de nuevo.");
+    } finally {
+      setEscalating(false);
+    }
+  }
+
+  // Abre WhatsApp en pestaña nueva con un mensaje pre-cargado. El número se
+  // sanitiza a solo dígitos (wa.me no acepta símbolos).
+  function openWhatsApp() {
+    if (!whatsappPhone) return;
+    const digits = toWaDigits(whatsappPhone);
+    if (!digits) return;
+    const text = encodeURIComponent(
+      `¡Hola! Vengo del chat de ${storeName} y quería hacer una consulta.`,
+    );
+    window.open(`https://wa.me/${digits}?text=${text}`, "_blank", "noopener,noreferrer");
+  }
+
+  const waDigits = whatsappPhone ? toWaDigits(whatsappPhone) : "";
+  const showWhatsApp = waDigits.length > 0;
+
   return (
     <>
       {/* Panel */}
@@ -325,6 +377,43 @@ export default function ChatWidget({ primaryColor, storeName }: Props) {
               </svg>
             </button>
           </div>
+
+          {/* Barra de acciones: handoff a humano + seguir por WhatsApp. Solo con
+              conversación activa; sutil, no compite con el hilo. */}
+          {session && (!escalated || showWhatsApp) && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
+              {!escalated && (
+                <button
+                  type="button"
+                  onClick={escalateToHuman}
+                  disabled={escalating}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                  {escalating ? "Conectando…" : "Hablar con una persona"}
+                </button>
+              )}
+
+              {showWhatsApp && (
+                <button
+                  type="button"
+                  onClick={openWhatsApp}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white transition hover:brightness-95"
+                  style={{ backgroundColor: "#25D366" }}
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+                    <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 1.67c2.2 0 4.28.86 5.84 2.42a8.22 8.22 0 0 1 2.42 5.83c0 4.54-3.7 8.24-8.25 8.24a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.11.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24Zm4.52 9.83c-.25-.12-1.46-.72-1.69-.8-.23-.09-.39-.13-.56.12-.16.25-.64.8-.79.97-.14.16-.29.18-.54.06-.25-.12-1.04-.38-1.99-1.22-.73-.66-1.23-1.47-1.37-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.13-.14.17-.25.25-.41.08-.16.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.42l-.48-.01c-.16 0-.43.06-.65.31-.23.25-.86.84-.86 2.06 0 1.21.88 2.38 1 2.55.13.16 1.74 2.66 4.22 3.73.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.46-.6 1.66-1.17.21-.58.21-1.07.14-1.17-.06-.11-.22-.17-.47-.29Z" />
+                  </svg>
+                  Seguir por WhatsApp
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Cuerpo */}
           {!session ? (

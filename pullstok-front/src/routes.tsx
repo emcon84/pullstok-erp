@@ -61,6 +61,9 @@ const InvoiceDetail = lazy(() =>
 const Messages = lazy(() =>
   import("./views/Messages").then((m) => ({ default: m.Messages })),
 );
+const BotConfig = lazy(() =>
+  import("./views/BotConfig").then((m) => ({ default: m.BotConfig })),
+);
 
 const AppRoutes = () => (
   <Router>
@@ -146,6 +149,7 @@ const AppRoutes = () => (
         <Route path="/categorias" element={<Categories />} />
         <Route path="/tienda" element={<Tienda />} />
         <Route path="/mensajes" element={<Messages />} />
+        <Route path="/asistente-ia" element={<BotConfig />} />
         <Route path="/facturacion" element={<Invoices />} />
         <Route path="/facturacion/nueva" element={<InvoiceForm />} />
         <Route path="/facturacion/:id" element={<InvoiceDetail />} />

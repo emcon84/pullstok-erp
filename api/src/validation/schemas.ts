@@ -264,3 +264,22 @@ export const chatStartSchema = z.object({
 export const chatMessageSchema = z.object({
   body: z.string().min(1, "El mensaje no puede estar vacío"),
 });
+
+// ---------- Bot IA (config del comercio) ----------
+// Config del bot que edita el operador (PUT /api/bot/config). `enabled` y
+// `knowledgeBase` son obligatorios (la KB permite vacío). `model` y `dailyLimit`
+// son opcionales: si no vienen, caen en los @default del schema.prisma. Caps de
+// costo/contexto: KB máx. 8000 chars, dailyLimit entre 0 y 5000.
+export const botConfigSchema = z.object({
+  enabled: z.boolean(),
+  knowledgeBase: z
+    .string()
+    .max(8000, "La base de conocimiento no puede superar los 8000 caracteres"),
+  model: z.string().min(1, "El modelo no puede estar vacío").optional(),
+  dailyLimit: z
+    .number()
+    .int("El límite diario debe ser un número entero")
+    .min(0, "El límite diario no puede ser negativo")
+    .max(5000, "El límite diario no puede superar 5000")
+    .optional(),
+});

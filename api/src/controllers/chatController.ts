@@ -10,7 +10,9 @@ import {
   getConversationMessages,
   findOrgConversation,
   toMessageDTO,
+  escalateConversation,
 } from "../services/chatService";
+import { maybeReplyToGuestMessage } from "../services/botService";
 
 // ===========================================================================
 // TIENDA (guest — público, tenant por slug/token)
@@ -56,6 +58,32 @@ const postGuestMessage = async (req: GuestRequest, res: Response) => {
     });
 
     res.status(201).json(toMessageDTO(message));
+
+    // Bot IA (FASE 1): DESPUÉS de persistir el mensaje del guest y responder el
+    // HTTP, disparamos la respuesta del bot FIRE-AND-FORGET (nunca se espera →
+    // no bloquea al visitante). El botService decide adentro si corresponde
+    // responder (org PREMIUM, BotConfig.enabled, conversación en mode=BOT, bajo
+    // el límite diario) y abre su propio contexto de tenant. Cualquier fallo se
+    // traga adentro; el mensaje del guest ya está guardado y respondido.
+    maybeReplyToGuestMessage({
+      conversationId,
+      organizationId: req.guest!.organizationId,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// POST /api/store/chat/escalate — protegido por requireGuest. FASE 2: escalado
+// MANUAL (el visitante toca "hablar con una persona" en el widget). Escala SU
+// conversación (la del token) a HUMAN; el bot se calla y se avisa a los
+// operadores. Idempotente (escalar una conversación ya en HUMAN es no-op). No
+// recibe body.
+const escalateChat = async (req: GuestRequest, res: Response) => {
+  try {
+    const { conversationId, organizationId } = req.guest!;
+    await escalateConversation(conversationId, organizationId);
+    res.status(200).json({ ok: true, mode: "HUMAN" });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -117,6 +145,7 @@ const postOperatorMessage = async (req: AuthedRequest, res: Response) => {
 export default {
   startChat,
   postGuestMessage,
+  escalateChat,
   getConversations,
   getMessages,
   postOperatorMessage,
