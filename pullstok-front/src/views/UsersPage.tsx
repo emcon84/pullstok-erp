@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import { Loader } from "@/components/atoms/loader";
 import { useUsers, useDeleteUser } from "@/components/hooks/useUsers";
+import { useConfirm } from "@/components/hooks/useConfirm";
 import {
   createUser as createUserApi,
   setUserActive as setUserActiveApi,
@@ -51,6 +52,7 @@ function formatDate(dateStr: string): string {
 export const UsersPage = () => {
   const { users: initialUsers, loading, refetch } = useUsers();
   const { deleteUser: deleteUserMut } = useDeleteUser();
+  const confirm = useConfirm();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -108,7 +110,13 @@ export const UsersPage = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este usuario? Esta acción no se puede deshacer.")) return;
+    const ok = await confirm({
+      title: "¿Eliminar usuario?",
+      description: "Esta acción no se puede deshacer. El usuario se eliminará permanentemente.",
+      confirmLabel: "Eliminar",
+      danger: true,
+    });
+    if (!ok) return;
     setDeletingId(id);
     try {
       deleteUserMut(id, {

@@ -39,6 +39,7 @@ import {
   type OrgUser,
 } from "@/services/superadminService";
 import { ROLE_DISPLAY, type Role } from "@/constants/rolePermissions";
+import { useConfirm } from "@/components/hooks/useConfirm";
 
 const ORG_ROLES: Role[] = ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER", "EMPLOYEE"];
 
@@ -52,6 +53,7 @@ function formatDate(dateStr: string): string {
 
 export const SuperadminUsersPage = () => {
   const { orgId } = useParams<{ orgId: string }>();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<OrgUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -116,7 +118,13 @@ export const SuperadminUsersPage = () => {
 
   const handleDelete = async (id: string) => {
     if (!orgId) return;
-    if (!confirm("¿Eliminar este usuario? Esta acción no se puede deshacer.")) return;
+    const ok = await confirm({
+      title: "¿Eliminar usuario?",
+      description: "Esta acción no se puede deshacer. El usuario se eliminará permanentemente.",
+      confirmLabel: "Eliminar",
+      danger: true,
+    });
+    if (!ok) return;
     setDeletingId(id);
     try {
       await deleteOrgUser(orgId, id);
