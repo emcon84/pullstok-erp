@@ -70,9 +70,12 @@ const ProtectedLayout = () => {
     return <Navigate to="/organizacion-suspendida" replace />;
   }
 
-  // El wizard es ADMIN-only: un EMPLOYEE nunca lo ve, sin importar el estado
-  // de onboarding de su organización (spec: sdd/onboarding-wizard/spec).
-  if (me.role === "ADMIN" && !me.organization.onboardingCompletedAt) {
+  // El wizard es para ADMIN y MANAGEMENT: otros roles (VENDEDOR, CASHIER,
+  // EMPLOYEE) nunca lo ven, sin importar el estado del onboarding.
+  if (
+    (me.role === "ADMIN" || me.role === "MANAGEMENT") &&
+    !me.organization.onboardingCompletedAt
+  ) {
     return <Navigate to="/bienvenida" replace />;
   }
 
