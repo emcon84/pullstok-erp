@@ -58,6 +58,10 @@ export const SuperadminUsersPage = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<string>("EMPLOYEE");
   const [creating, setCreating] = useState(false);
@@ -88,9 +92,21 @@ export const SuperadminUsersPage = () => {
     }
     setCreating(true);
     try {
-      await createOrgUser(orgId, { email: email.trim(), password, role });
+      await createOrgUser(orgId, {
+        email: email.trim() || undefined,
+        username: username.trim() || undefined,
+        name: name.trim() || undefined,
+        phone: phone.trim() || undefined,
+        address: address.trim() || undefined,
+        password,
+        role,
+      });
       toast.success("Usuario creado");
       setEmail("");
+      setUsername("");
+      setName("");
+      setPhone("");
+      setAddress("");
       setPassword("");
       setRole("EMPLOYEE");
       setDialogOpen(false);
@@ -188,6 +204,38 @@ export const SuperadminUsersPage = () => {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="su-name">Nombre completo</Label>
+                <Input
+                  id="su-name"
+                  type="text"
+                  placeholder="Juan Pérez"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="su-phone">Teléfono</Label>
+                  <Input
+                    id="su-phone"
+                    type="text"
+                    placeholder="+54 11 1234-5678"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="su-address">Dirección</Label>
+                  <Input
+                    id="su-address"
+                    type="text"
+                    placeholder="Av. Siempreviva 742"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="su-password">Contraseña</Label>
                 <Input
                   id="su-password"
@@ -247,7 +295,9 @@ export const SuperadminUsersPage = () => {
             <TableBody>
               {users.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.email}</TableCell>
+                  <TableCell className="font-medium">
+                    {user.name || user.email || user.username}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="capitalize">
                       {ROLE_DISPLAY[user.role as Role] ?? user.role}

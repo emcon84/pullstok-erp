@@ -79,6 +79,9 @@ export const createUserSchema = z
         "Usuario: solo minúsculas, números, puntos, guiones y guiones bajos",
       )
       .optional(),
+    name: z.string().optional(),
+    phone: z.string().optional(),
+    address: z.string().optional(),
     password: z
       .string()
       .min(8, "La contraseña debe tener al menos 8 caracteres"),

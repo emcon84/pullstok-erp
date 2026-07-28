@@ -162,6 +162,7 @@ export const listOrgUsers = async (req: AuthedRequest, res: Response) => {
         id: true,
         email: true,
         username: true,
+        name: true,
         role: true,
         isActive: true,
         createdAt: true,
@@ -176,7 +177,7 @@ export const listOrgUsers = async (req: AuthedRequest, res: Response) => {
 /** SUPERADMIN: crea un usuario en una organización específica. */
 export const createOrgUser = async (req: AuthedRequest, res: Response) => {
   const { orgId } = req.params;
-  const { email, username, password, role } = req.body;
+  const { email, username, name, phone, address, password, role } = req.body;
   if ((!email && !username) || !password) {
     return res
       .status(400)
@@ -223,6 +224,9 @@ export const createOrgUser = async (req: AuthedRequest, res: Response) => {
       data: {
         email: email ?? null,
         username: username ?? null,
+        name: name ?? null,
+        phone: phone ?? null,
+        address: address ?? null,
         password: hashed,
         role: role ?? "EMPLOYEE",
         organizationId: orgId,

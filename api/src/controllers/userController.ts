@@ -6,7 +6,7 @@ import { requireOrganizationId } from "../config/tenantContext";
 
 /** ADMIN o MANAGEMENT: crea un usuario dentro de SU organización. */
 export const createUser = async (req: AuthedRequest, res: Response) => {
-  const { email, username, password, role } = req.body;
+  const { email, username, name, phone, address, password, role } = req.body;
   if ((!email && !username) || !password) {
     return res
       .status(400)
@@ -18,6 +18,9 @@ export const createUser = async (req: AuthedRequest, res: Response) => {
       organizationId,
       email,
       username,
+      name,
+      phone,
+      address,
       password,
       role,
     });
@@ -37,6 +40,7 @@ export const listUsers = async (_req: AuthedRequest, res: Response) => {
         id: true,
         email: true,
         username: true,
+        name: true,
         role: true,
         isActive: true,
         createdAt: true,

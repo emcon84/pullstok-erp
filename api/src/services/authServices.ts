@@ -374,10 +374,13 @@ class AuthService {
     organizationId: string;
     email?: string;
     username?: string;
+    name?: string;
+    phone?: string;
+    address?: string;
     password: string;
     role?: Role;
   }) {
-    const { organizationId, email, username, password, role } = params;
+    const { organizationId, email, username, name, phone, address, password, role } = params;
 
     if (email) {
       const existing = await basePrisma.user.findFirst({
@@ -404,6 +407,9 @@ class AuthService {
       data: {
         email: email ?? null,
         username: username ?? null,
+        name: name ?? null,
+        phone: phone ?? null,
+        address: address ?? null,
         password: hashed,
         role: role ?? Role.EMPLOYEE,
         organizationId,
@@ -413,6 +419,7 @@ class AuthService {
         id: true,
         email: true,
         username: true,
+        name: true,
         role: true,
         organizationId: true,
       },

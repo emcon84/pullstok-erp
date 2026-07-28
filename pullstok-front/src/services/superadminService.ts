@@ -6,14 +6,20 @@ import { Plan } from "./onboardingService";
 
 export interface OrgUser {
   id: string;
-  email: string;
+  email?: string;
+  username?: string;
+  name?: string;
   role: string;
   isActive: boolean;
   createdAt: string;
 }
 
 export interface CreateOrgUserPayload {
-  email: string;
+  email?: string;
+  username?: string;
+  name?: string;
+  phone?: string;
+  address?: string;
   password: string;
   role?: string;
 }

@@ -5,6 +5,7 @@ export interface UserData {
   id: string;
   email?: string;
   username?: string;
+  name?: string;
   role: string;
   isActive: boolean;
   createdAt: string;
@@ -13,6 +14,9 @@ export interface UserData {
 export interface CreateUserPayload {
   email?: string;
   username?: string;
+  name?: string;
+  phone?: string;
+  address?: string;
   password: string;
   role?: string;
 }

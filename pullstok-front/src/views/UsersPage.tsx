@@ -58,6 +58,9 @@ export const UsersPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<string>("EMPLOYEE");
   const [creating, setCreating] = useState(false);
@@ -79,12 +82,18 @@ export const UsersPage = () => {
       await createUserApi({
         email: email.trim() || undefined,
         username: username.trim() || undefined,
+        name: name.trim() || undefined,
+        phone: phone.trim() || undefined,
+        address: address.trim() || undefined,
         password,
         role,
       });
       toast.success("Usuario creado");
       setEmail("");
       setUsername("");
+      setName("");
+      setPhone("");
+      setAddress("");
       setPassword("");
       setRole("EMPLOYEE");
       setDialogOpen(false);
@@ -192,6 +201,38 @@ export const UsersPage = () => {
                 </p>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="u-name">Nombre completo</Label>
+                <Input
+                  id="u-name"
+                  type="text"
+                  placeholder="Juan Pérez"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="u-phone">Teléfono</Label>
+                  <Input
+                    id="u-phone"
+                    type="text"
+                    placeholder="+54 11 1234-5678"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="u-address">Dirección</Label>
+                  <Input
+                    id="u-address"
+                    type="text"
+                    placeholder="Av. Siempreviva 742"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="u-password">Contraseña</Label>
                 <Input
                   id="u-password"
@@ -252,7 +293,7 @@ export const UsersPage = () => {
               {users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">
-                    {user.email || user.username}
+                    {user.name || user.email || user.username}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="capitalize">
