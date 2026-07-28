@@ -4,8 +4,10 @@ import {
   createUser as createUserApi,
   setUserActive as setUserActiveApi,
   deleteUser as deleteUserApi,
+  updateUser as updateUserApi,
   type UserData,
   type CreateUserPayload,
+  type UpdateUserPayload,
 } from "@/services/userService";
 
 /** Fetches the list of users in the current organization. */
@@ -87,6 +89,28 @@ export const useDeleteUser = () => {
 
   return {
     deleteUser: mutation.mutate,
+    loading: mutation.isPending,
+    error: mutation.isError ? mutation.error : null,
+    success: mutation.isSuccess,
+  };
+};
+
+/** Updates a user and invalidates the users query on success. */
+export const useUpdateUser = () => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation<UserData, Error, { id: string; data: UpdateUserPayload }>({
+    mutationFn: ({ id, data }) => updateUserApi(id, data),
+    onError: (error) => {
+      console.error("Error updating user:", error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
+  return {
+    updateUser: mutation.mutate,
     loading: mutation.isPending,
     error: mutation.isError ? mutation.error : null,
     success: mutation.isSuccess,

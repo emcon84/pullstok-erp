@@ -85,3 +85,59 @@ export const deleteUser = async (req: AuthedRequest, res: Response) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+/** ADMIN o MANAGEMENT: edita un usuario de SU organización. */
+export const updateUser = async (req: AuthedRequest, res: Response) => {
+  const { name, email, username, phone, address, role } = req.body;
+  try {
+    const organizationId = requireOrganizationId();
+
+    // Verificar que el usuario existe y pertenece a la org
+    const existing = await basePrisma.user.findFirst({
+      where: { id: req.params.id, organizationId },
+    });
+    if (!existing) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    // Si se cambia email o username, verificar unicidad
+    if (email && email !== existing.email) {
+      const dup = await basePrisma.user.findFirst({
+        where: { email, id: { not: req.params.id } },
+      });
+      if (dup) return res.status(400).json({ message: "Ya existe un usuario con ese email" });
+    }
+    if (username && username !== existing.username) {
+      const dup = await basePrisma.user.findFirst({
+        where: { username, id: { not: req.params.id } },
+      });
+      if (dup) return res.status(400).json({ message: "Ya existe un usuario con ese nombre de usuario" });
+    }
+
+    const updated = await basePrisma.user.update({
+      where: { id: req.params.id },
+      data: {
+        name: name !== undefined ? (name || null) : undefined,
+        email: email !== undefined ? (email || null) : undefined,
+        username: username !== undefined ? (username || null) : undefined,
+        phone: phone !== undefined ? (phone || null) : undefined,
+        address: address !== undefined ? (address || null) : undefined,
+        role: role !== undefined ? (role || existing.role) : undefined,
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        phone: true,
+        address: true,
+        role: true,
+        isActive: true,
+        organizationId: true,
+      },
+    });
+    res.status(200).json(updated);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};

@@ -8,6 +8,7 @@ import {
   listUsers,
   setUserActive,
   deleteUser,
+  updateUser,
 } from "../controllers/userController";
 
 const router = Router();
@@ -19,5 +20,6 @@ router.post("/", validate(createUserSchema), checkUserLimit, createUser);
 router.get("/", listUsers);
 router.patch("/:id/active", setUserActive);
 router.delete("/:id", deleteUser);
+router.put("/:id", updateUser);
 
 export default router;

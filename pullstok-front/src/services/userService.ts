@@ -11,6 +11,15 @@ export interface UserData {
   createdAt: string;
 }
 
+export interface UpdateUserPayload {
+  name?: string;
+  email?: string;
+  username?: string;
+  phone?: string;
+  address?: string;
+  role?: string;
+}
+
 export interface CreateUserPayload {
   email?: string;
   username?: string;
@@ -95,6 +104,28 @@ export const deleteUser = async (id: string): Promise<void> => {
     if (axios.isAxiosError(error)) {
       throw new Error(
         error.response?.data?.message || "Error deleting user",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+/** Updates a user's profile fields in the current organization. */
+export const updateUser = async (
+  id: string,
+  data: UpdateUserPayload,
+): Promise<UserData> => {
+  try {
+    const response = await axios.put<UserData>(
+      `${API_URL}/users/${id}`,
+      data,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error updating user",
       );
     }
     throw new Error("An unknown error occurred");

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Users, Trash2 } from "lucide-react";
+import { Plus, Users, Trash2, Pencil } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -30,7 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader } from "@/components/atoms/loader";
-import { useUsers, useDeleteUser } from "@/components/hooks/useUsers";
+import { useUsers, useDeleteUser, useUpdateUser } from "@/components/hooks/useUsers";
 import { useConfirm } from "@/components/hooks/useConfirm";
 import {
   createUser as createUserApi,
@@ -52,8 +52,10 @@ function formatDate(dateStr: string): string {
 export const UsersPage = () => {
   const { users: initialUsers, loading, refetch } = useUsers();
   const { deleteUser: deleteUserMut } = useDeleteUser();
+  const { updateUser: updateUserMut } = useUpdateUser();
   const confirm = useConfirm();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editUser, setEditUser] = useState<UserData | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -65,6 +67,14 @@ export const UsersPage = () => {
   const [role, setRole] = useState<string>("EMPLOYEE");
   const [creating, setCreating] = useState(false);
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
+  // Edit form state
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editUsername, setEditUsername] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editRole, setEditRole] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!loading) {
@@ -141,6 +151,48 @@ export const UsersPage = () => {
     } catch {
       setDeletingId(null);
     }
+  };
+
+  const openEdit = (user: UserData) => {
+    setEditUser(user);
+    setEditName(user.name || "");
+    setEditEmail(user.email || "");
+    setEditUsername(user.username || "");
+    setEditPhone((user as any).phone || "");
+    setEditAddress((user as any).address || "");
+    setEditRole(user.role);
+  };
+
+  const handleUpdate = async () => {
+    if (!editUser) return;
+    setSaving(true);
+    const data: any = {};
+    const orig = editUser as any;
+    if (editName !== (orig.name || "")) data.name = editName || null;
+    if (editEmail !== (orig.email || "")) data.email = editEmail || null;
+    if (editUsername !== (orig.username || "")) data.username = editUsername || null;
+    if (editPhone !== (orig.phone || "")) data.phone = editPhone || null;
+    if (editAddress !== (orig.address || "")) data.address = editAddress || null;
+    if (editRole !== orig.role) data.role = editRole;
+
+    if (Object.keys(data).length === 0) {
+      setEditUser(null);
+      setSaving(false);
+      return;
+    }
+
+    updateUserMut(
+      { id: editUser.id, data },
+      {
+        onSuccess: () => {
+          toast.success("Usuario actualizado");
+          refetch();
+          setEditUser(null);
+        },
+        onError: (e: any) => toast.error(e.message || "Error al actualizar"),
+        onSettled: () => setSaving(false),
+      },
+    );
   };
 
   if (loading) {
@@ -327,6 +379,14 @@ export const UsersPage = () => {
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={() => openEdit(user)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                         onClick={() => handleDelete(user.id)}
                         disabled={deletingId === user.id}
@@ -341,6 +401,54 @@ export const UsersPage = () => {
           </Table>
         </Card>
       )}
+      {/* Edit dialog */}
+      <Dialog open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar usuario</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Nombre completo</Label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Usuario</Label>
+              <Input value={editUsername} onChange={(e) => setEditUsername(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Teléfono</Label>
+                <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Dirección</Label>
+                <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Rol</Label>
+              <Select value={editRole} onValueChange={setEditRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ORG_ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>{ROLE_DISPLAY[r]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={handleUpdate} disabled={saving}>
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
