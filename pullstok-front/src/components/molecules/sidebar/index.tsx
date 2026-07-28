@@ -78,10 +78,10 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
         {user && (
           <div className="mb-2 flex items-center gap-3 rounded-lg px-3 py-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold uppercase text-accent-foreground">
-              {user.email?.[0] ?? "U"}
+              {(user.name?.[0] || user.email?.[0] || user.username?.[0] || "U").toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{user.email}</p>
+              <p className="truncate text-sm font-medium">{user.name || user.email || user.username}</p>
               <p className="text-xs capitalize text-muted-foreground">
                 {String(user.role ?? "").toLowerCase()}
               </p>
