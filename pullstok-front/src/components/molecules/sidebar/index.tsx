@@ -81,7 +81,7 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
               {(user.name?.[0] || user.email?.[0] || user.username?.[0] || "U").toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{user.name || user.email || user.username}</p>
+              <p className="truncate text-sm font-medium">{user.name || user.username || user.email}</p>
               <p className="text-xs capitalize text-muted-foreground">
                 {String(user.role ?? "").toLowerCase()}
               </p>
