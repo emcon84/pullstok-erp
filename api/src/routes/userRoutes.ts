@@ -7,6 +7,7 @@ import {
   createUser,
   listUsers,
   setUserActive,
+  deleteUser,
 } from "../controllers/userController";
 
 const router = Router();
@@ -17,5 +18,6 @@ router.use(authenticate, requireRole("ADMIN", "MANAGEMENT"));
 router.post("/", validate(createUserSchema), checkUserLimit, createUser);
 router.get("/", listUsers);
 router.patch("/:id/active", setUserActive);
+router.delete("/:id", deleteUser);
 
 export default router;

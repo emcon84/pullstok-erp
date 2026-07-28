@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Users } from "lucide-react";
+import { Plus, Users, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -30,7 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader } from "@/components/atoms/loader";
-import { useUsers } from "@/components/hooks/useUsers";
+import { useUsers, useDeleteUser } from "@/components/hooks/useUsers";
 import {
   createUser as createUserApi,
   setUserActive as setUserActiveApi,
@@ -50,6 +50,8 @@ function formatDate(dateStr: string): string {
 
 export const UsersPage = () => {
   const { users: initialUsers, loading, refetch } = useUsers();
+  const { deleteUser: deleteUserMut } = useDeleteUser();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -102,6 +104,25 @@ export const UsersPage = () => {
       toast.error(e.message || "Error al actualizar estado");
     } finally {
       setToggleLoading(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("¿Eliminar este usuario? Esta acción no se puede deshacer.")) return;
+    setDeletingId(id);
+    try {
+      deleteUserMut(id, {
+        onSuccess: () => {
+          toast.success("Usuario eliminado");
+          refetch();
+        },
+        onError: (e: any) => {
+          toast.error(e.message || "Error al eliminar usuario");
+        },
+        onSettled: () => setDeletingId(null),
+      });
+    } catch {
+      setDeletingId(null);
     }
   };
 
@@ -254,6 +275,15 @@ export const UsersPage = () => {
                         }
                         disabled={toggleLoading === user.id}
                       />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(user.id)}
+                        disabled={deletingId === user.id}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

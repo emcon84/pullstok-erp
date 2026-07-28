@@ -80,3 +80,19 @@ export const setUserActive = async (
     throw new Error("An unknown error occurred");
   }
 };
+
+/** Deletes a user from the current organization. */
+export const deleteUser = async (id: string): Promise<void> => {
+  try {
+    await axios.delete(`${API_URL}/users/${id}`, {
+      headers: authHeaders(),
+    });
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error deleting user",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};

@@ -243,3 +243,23 @@ export const setOrgUserActive = async (
     throw new Error("An unknown error occurred");
   }
 };
+
+/** SUPERADMIN: deletes a user from an organization. */
+export const deleteOrgUser = async (
+  orgId: string,
+  userId: string,
+): Promise<void> => {
+  try {
+    await axios.delete(
+      `${API_URL}/superadmin/organizations/${orgId}/users/${userId}`,
+      { headers: authHeaders() },
+    );
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error deleting org user",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};

@@ -256,3 +256,19 @@ export const toggleOrgUserActive = async (
     res.status(400).json({ message: error.message });
   }
 };
+
+/** SUPERADMIN: elimina un usuario de una organización específica. */
+export const deleteOrgUser = async (req: AuthedRequest, res: Response) => {
+  const { orgId, userId } = req.params;
+  try {
+    const result = await basePrisma.user.deleteMany({
+      where: { id: userId, organizationId: orgId },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+    res.status(200).json({ message: "Usuario eliminado" });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};

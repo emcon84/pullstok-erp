@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Plus, Users, ArrowLeft } from "lucide-react";
+import { Plus, Users, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -35,6 +35,7 @@ import {
   getOrgUsers,
   createOrgUser,
   setOrgUserActive,
+  deleteOrgUser,
   type OrgUser,
 } from "@/services/superadminService";
 import { ROLE_DISPLAY, type Role } from "@/constants/rolePermissions";
@@ -59,6 +60,7 @@ export const SuperadminUsersPage = () => {
   const [role, setRole] = useState<string>("EMPLOYEE");
   const [creating, setCreating] = useState(false);
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = async () => {
     if (!orgId) return;
@@ -109,6 +111,21 @@ export const SuperadminUsersPage = () => {
       toast.error(e.message || "Error al actualizar estado");
     } finally {
       setToggleLoading(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!orgId) return;
+    if (!confirm("¿Eliminar este usuario? Esta acción no se puede deshacer.")) return;
+    setDeletingId(id);
+    try {
+      await deleteOrgUser(orgId, id);
+      toast.success("Usuario eliminado");
+      await load();
+    } catch (e: any) {
+      toast.error(e.message || "Error al eliminar usuario");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -252,6 +269,15 @@ export const SuperadminUsersPage = () => {
                         }
                         disabled={toggleLoading === user.id}
                       />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(user.id)}
+                        disabled={deletingId === user.id}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

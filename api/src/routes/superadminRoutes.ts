@@ -17,6 +17,7 @@ import {
   listOrgUsers,
   createOrgUser,
   toggleOrgUserActive,
+  deleteOrgUser,
 } from "../controllers/superadminController";
 
 const router = Router();
@@ -56,6 +57,10 @@ router.post(
 router.patch(
   "/organizations/:orgId/users/:userId/active",
   toggleOrgUserActive,
+);
+router.delete(
+  "/organizations/:orgId/users/:userId",
+  deleteOrgUser,
 );
 
 export default router;

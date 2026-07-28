@@ -3,6 +3,7 @@ import {
   getUsers,
   createUser as createUserApi,
   setUserActive as setUserActiveApi,
+  deleteUser as deleteUserApi,
   type UserData,
   type CreateUserPayload,
 } from "@/services/userService";
@@ -64,6 +65,28 @@ export const useSetUserActive = () => {
 
   return {
     setUserActive: mutation.mutate,
+    loading: mutation.isPending,
+    error: mutation.isError ? mutation.error : null,
+    success: mutation.isSuccess,
+  };
+};
+
+/** Deletes a user and invalidates the users query on success. */
+export const useDeleteUser = () => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation<void, Error, string>({
+    mutationFn: deleteUserApi,
+    onError: (error) => {
+      console.error("Error deleting user:", error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
+  return {
+    deleteUser: mutation.mutate,
     loading: mutation.isPending,
     error: mutation.isError ? mutation.error : null,
     success: mutation.isSuccess,

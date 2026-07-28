@@ -65,3 +65,19 @@ export const setUserActive = async (req: AuthedRequest, res: Response) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+/** ADMIN o MANAGEMENT: elimina un usuario de SU organización. */
+export const deleteUser = async (req: AuthedRequest, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const result = await basePrisma.user.deleteMany({
+      where: { id: req.params.id, organizationId },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+    res.status(200).json({ message: "Usuario eliminado" });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
