@@ -377,7 +377,7 @@ class AuthService {
       data: {
         email,
         password: hashed,
-        role: role === Role.ADMIN ? Role.ADMIN : Role.EMPLOYEE,
+        role: role ?? Role.EMPLOYEE,
         organizationId,
         mustChangePassword: true,
       },

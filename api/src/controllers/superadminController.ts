@@ -140,3 +140,98 @@ export const registerOrganizationBilling = async (
     res.status(400).json({ message: error.message });
   }
 };
+
+// ── SUPERADMIN: User CRUD per organization ──────────────────
+
+/** SUPERADMIN: lista los usuarios de una organización específica. */
+export const listOrgUsers = async (req: AuthedRequest, res: Response) => {
+  const { orgId } = req.params;
+  try {
+    // Verify org exists first
+    const org = await basePrisma.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true },
+    });
+    if (!org) {
+      return res.status(404).json({ message: "Organización no encontrada" });
+    }
+
+    const users = await basePrisma.user.findMany({
+      where: { organizationId: orgId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+    res.status(200).json(users);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/** SUPERADMIN: crea un usuario en una organización específica. */
+export const createOrgUser = async (req: AuthedRequest, res: Response) => {
+  const { orgId } = req.params;
+  const { email, password, role } = req.body;
+  if (!email || !password) {
+    return res
+      .status(400)
+      .json({ message: "Email y contraseña son requeridos" });
+  }
+  try {
+    // Verify org exists
+    const org = await basePrisma.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true },
+    });
+    if (!org) {
+      return res.status(404).json({ message: "Organización no encontrada" });
+    }
+
+    const existing = await basePrisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(400).json({ message: "Ya existe un usuario con ese email" });
+    }
+
+    const bcrypt = await import("bcryptjs");
+    const hashed = await bcrypt.default.hash(password, 10);
+
+    const user = await basePrisma.user.create({
+      data: {
+        email,
+        password: hashed,
+        role: role ?? "EMPLOYEE",
+        organizationId: orgId,
+        mustChangePassword: true,
+      },
+      select: { id: true, email: true, role: true, organizationId: true },
+    });
+    res.status(201).json(user);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+/** SUPERADMIN: activa/desactiva un usuario en una organización específica. */
+export const toggleOrgUserActive = async (
+  req: AuthedRequest,
+  res: Response,
+) => {
+  const { orgId, userId } = req.params;
+  const { isActive } = req.body;
+  try {
+    const result = await basePrisma.user.updateMany({
+      where: { id: userId, organizationId: orgId },
+      data: { isActive: Boolean(isActive) },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+    res.status(200).json({ message: "Usuario actualizado" });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};

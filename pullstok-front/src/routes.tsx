@@ -74,6 +74,14 @@ const Messages = lazy(() =>
 const BotConfig = lazy(() =>
   import("./views/BotConfig").then((m) => ({ default: m.BotConfig })),
 );
+const UsersPage = lazy(() =>
+  import("./views/UsersPage").then((m) => ({ default: m.UsersPage })),
+);
+const SuperadminUsersPage = lazy(() =>
+  import("./views/superadmin/SuperadminUsersPage").then((m) => ({
+    default: m.SuperadminUsersPage,
+  })),
+);
 
 const AppRoutes = () => (
   <Router>
@@ -198,6 +206,7 @@ const AppRoutes = () => (
         <Route path="/facturacion/nueva" element={<InvoiceForm />} />
         <Route path="/facturacion/:id" element={<InvoiceDetail />} />
         <Route path="/facturacion/:id/editar" element={<InvoiceForm />} />
+        <Route path="/usuarios" element={<UsersPage />} />
       </Route>
 
       {/* Panel superadmin (sdd/planes-y-billing): rutas de plataforma, fuera
@@ -205,6 +214,7 @@ const AppRoutes = () => (
           SUPERADMIN -> /dashboard). */}
       <Route element={<SuperadminLayout />}>
         <Route path="/superadmin/organizaciones" element={<OrganizationsList />} />
+        <Route path="/superadmin/organizaciones/:orgId/usuarios" element={<SuperadminUsersPage />} />
       </Route>
     </Routes>
   </Router>

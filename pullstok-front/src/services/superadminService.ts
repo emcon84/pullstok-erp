@@ -2,6 +2,24 @@ import axios from "axios";
 import { API_URL } from "../constants";
 import { Plan } from "./onboardingService";
 
+// ── Types shared with userService ───────────────────────────
+
+export interface OrgUser {
+  id: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CreateOrgUserPayload {
+  email: string;
+  password: string;
+  role?: string;
+}
+
+// ── Organization types ──────────────────────────────────────
+
 /**
  * Servicio del panel superadmin (sdd/planes-y-billing, Fase 6). Consume los
  * endpoints `/superadmin/organizations/*` implementados en Fase 3 — todos
@@ -155,6 +173,71 @@ export const setOrganizationActive = async ({
       throw new Error(
         error.response?.data?.message ||
           "Error updating organization active state",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+// ── SUPERADMIN: Org User CRUD ────────────────────────────────
+
+/** Lists all users in a specific organization. */
+export const getOrgUsers = async (orgId: string): Promise<OrgUser[]> => {
+  try {
+    const response = await axios.get<OrgUser[]>(
+      `${API_URL}/superadmin/organizations/${orgId}/users`,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error fetching org users",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+/** Creates a user in a specific organization. */
+export const createOrgUser = async (
+  orgId: string,
+  data: CreateOrgUserPayload,
+): Promise<OrgUser> => {
+  try {
+    const response = await axios.post<OrgUser>(
+      `${API_URL}/superadmin/organizations/${orgId}/users`,
+      data,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error creating org user",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+/** Toggles a user's isActive status in a specific organization. */
+export const setOrgUserActive = async (
+  orgId: string,
+  userId: string,
+  isActive: boolean,
+): Promise<{ message: string }> => {
+  try {
+    const response = await axios.patch<{ message: string }>(
+      `${API_URL}/superadmin/organizations/${orgId}/users/${userId}/active`,
+      { isActive },
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error updating org user status",
       );
     }
     throw new Error("An unknown error occurred");

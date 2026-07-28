@@ -17,6 +17,7 @@ jest.mock('../../src/config/db', () => ({
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
+      create: jest.fn(),
     },
   },
 }));
@@ -48,7 +49,7 @@ jest.mock('../../src/services/rateLimiter', () => ({
 }));
 
 const mockedPrisma = basePrisma as unknown as {
-  user: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
+  user: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
 };
 const mockedBcrypt = bcrypt as unknown as { compare: jest.Mock; hash: jest.Mock };
 const mockedGenAccess = generateAccessToken as jest.Mock;
@@ -380,6 +381,151 @@ describe('AuthService', () => {
       await expect(
         AuthService.resetPassword('fake-token', 'newPass123'),
       ).rejects.toThrow('El enlace expiró o no es válido');
+    });
+  });
+
+  describe('createUser — role passthrough (no binary collapse)', () => {
+    const mockCreateResult = {
+      id: 'new-user-id',
+      email: 'newuser@example.com',
+      role: 'VENDEDOR',
+      organizationId: 'org-1',
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockedPrisma.user.findUnique.mockResolvedValue(null); // email not taken
+      mockedBcrypt.hash.mockResolvedValue('new-hashed-password');
+    });
+
+    it('creates user with role VENDEDOR (RED: current code collapses to EMPLOYEE)', async () => {
+      mockedPrisma.user.create.mockResolvedValue({
+        ...mockCreateResult,
+        role: 'VENDEDOR',
+      });
+
+      const result = await AuthService.createUser({
+        organizationId: 'org-1',
+        email: 'vendor@example.com',
+        password: 'password123',
+        role: 'VENDEDOR' as any,
+      });
+
+      // The key assertion: role must be passed through, not collapsed to EMPLOYEE
+      expect(mockedPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: 'VENDEDOR',
+          }),
+        }),
+      );
+      expect(result.role).toBe('VENDEDOR');
+    });
+
+    it('creates user with role CASHIER (RED: current code collapses to EMPLOYEE)', async () => {
+      mockedPrisma.user.create.mockResolvedValue({
+        ...mockCreateResult,
+        role: 'CASHIER',
+      });
+
+      const result = await AuthService.createUser({
+        organizationId: 'org-1',
+        email: 'cashier@example.com',
+        password: 'password123',
+        role: 'CASHIER' as any,
+      });
+
+      expect(mockedPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: 'CASHIER',
+          }),
+        }),
+      );
+      expect(result.role).toBe('CASHIER');
+    });
+
+    it('creates user with role MANAGEMENT (RED: current code collapses to EMPLOYEE)', async () => {
+      mockedPrisma.user.create.mockResolvedValue({
+        ...mockCreateResult,
+        role: 'MANAGEMENT',
+      });
+
+      const result = await AuthService.createUser({
+        organizationId: 'org-1',
+        email: 'management@example.com',
+        password: 'password123',
+        role: 'MANAGEMENT' as any,
+      });
+
+      expect(mockedPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: 'MANAGEMENT',
+          }),
+        }),
+      );
+      expect(result.role).toBe('MANAGEMENT');
+    });
+
+    it('creates ADMIN as ADMIN (regression: existing behavior preserved)', async () => {
+      mockedPrisma.user.create.mockResolvedValue({
+        ...mockCreateResult,
+        role: 'ADMIN',
+      });
+
+      const result = await AuthService.createUser({
+        organizationId: 'org-1',
+        email: 'admin2@example.com',
+        password: 'password123',
+        role: 'ADMIN' as any,
+      });
+
+      expect(mockedPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: 'ADMIN',
+          }),
+        }),
+      );
+      expect(result.role).toBe('ADMIN');
+    });
+
+    it('creates EMPLOYEE as EMPLOYEE (regression: existing behavior preserved)', async () => {
+      mockedPrisma.user.create.mockResolvedValue({
+        ...mockCreateResult,
+        role: 'EMPLOYEE',
+      });
+
+      const result = await AuthService.createUser({
+        organizationId: 'org-1',
+        email: 'employee2@example.com',
+        password: 'password123',
+        role: 'EMPLOYEE' as any,
+      });
+
+      expect(mockedPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: 'EMPLOYEE',
+          }),
+        }),
+      );
+      expect(result.role).toBe('EMPLOYEE');
+    });
+
+    it('rejects duplicate email', async () => {
+      mockedPrisma.user.findUnique.mockResolvedValue({ id: 'existing-id' });
+
+      await expect(
+        AuthService.createUser({
+          organizationId: 'org-1',
+          email: 'taken@example.com',
+          password: 'password123',
+          role: 'EMPLOYEE' as any,
+        }),
+      ).rejects.toThrow('Ya existe un usuario con ese email');
+      expect(mockedPrisma.user.create).not.toHaveBeenCalled();
     });
   });
 });

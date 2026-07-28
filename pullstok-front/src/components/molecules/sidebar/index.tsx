@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { logout } from "../../../controllers/authController";
 import { navItems, filterNavItemsByPlan } from "./navItems";
+import { filterNavItemsByRole } from "@/constants/rolePermissions";
 import { usePendingOrdersCount } from "../../hooks/useOrder";
 import { useUnreadMessagesCount } from "../../hooks/useChat";
 
@@ -36,7 +37,7 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
 
       {/* Navegación */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {filterNavItemsByPlan(navItems, user?.plan).map(({ to, label, icon: Icon }) => (
+        {filterNavItemsByRole(filterNavItemsByPlan(navItems, user?.plan), user?.role).map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

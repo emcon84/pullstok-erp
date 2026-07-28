@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Plus, CreditCard, Ban, CheckCircle2, MessageSquareX } from "lucide-react";
+import { Plus, CreditCard, Ban, CheckCircle2, MessageSquareX, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +54,7 @@ const PLAN_OPTIONS: { value: Plan; label: string }[] = [
  */
 export const OrganizationsList = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const navigate = useNavigate();
 
   const { organizations, loadingOrganizations, errorOrganizations } =
     useOrganizations();
@@ -237,6 +239,16 @@ export const OrganizationsList = () => {
                   <TableCell>{org._count.products}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Ver usuarios"
+                        onClick={() =>
+                          navigate(`/superadmin/organizaciones/${org.id}/usuarios`)
+                        }
+                      >
+                        <Users className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon-sm"

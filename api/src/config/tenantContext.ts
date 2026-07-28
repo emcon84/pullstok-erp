@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "async_hooks";
 
-export type UserRole = "SUPERADMIN" | "ADMIN" | "EMPLOYEE";
+export type UserRole = "SUPERADMIN" | "ADMIN" | "MANAGEMENT" | "VENDEDOR" | "CASHIER" | "EMPLOYEE";
 
 export interface TenantContext {
   userId: string;

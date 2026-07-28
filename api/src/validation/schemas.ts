@@ -69,7 +69,14 @@ export const registerBillingPaymentSchema = z.object({
 export const createUserSchema = z.object({
   email: z.email(),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
-  role: z.enum(["ADMIN", "EMPLOYEE"]).optional(),
+  role: z.enum(["ADMIN", "EMPLOYEE", "VENDEDOR", "CASHIER", "MANAGEMENT"]).optional(),
+});
+
+// SUPERADMIN create user: same as createUserSchema but role is explicit (no SUPERADMIN)
+export const superadminCreateUserSchema = z.object({
+  email: z.email(),
+  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+  role: z.enum(["ADMIN", "EMPLOYEE", "VENDEDOR", "CASHIER", "MANAGEMENT"]).optional(),
 });
 
 // ---------- Productos ----------

@@ -10,8 +10,10 @@ import {
   Tags,
   MessageSquare,
   Bot,
+  UserPlus,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
+import type { Role } from "@/constants/rolePermissions";
 
 export interface NavItem {
   to: string;
@@ -34,20 +36,23 @@ export interface NavItem {
   // primero la inconsistencia entre planLimits.ts y el comportamiento
   // actual (decisión de producto, no técnica).
   moduleKey?: string | null;
+  // Roles que pueden ver este item. `undefined` = visible para todos.
+  visibleRoles?: Role[];
 }
 
 export const navItems: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, moduleKey: null },
-  { to: "/categorias", label: "Categorías", icon: Tags, moduleKey: null },
-  { to: "/presupuestos", label: "Presupuestos", icon: FileText, moduleKey: null },
-  { to: "/pedidos", label: "Pedidos", icon: ClipboardList, moduleKey: null },
-  { to: "/Ventas", label: "Ventas", icon: ShoppingCart, moduleKey: null },
-  { to: "/facturas", label: "Remitos", icon: Truck, moduleKey: null },
-  { to: "/Clientes", label: "Clientes", icon: Users, moduleKey: null },
-  { to: "/tienda", label: "Tienda", icon: Store, moduleKey: null },
-  { to: "/mensajes", label: "Mensajes", icon: MessageSquare, moduleKey: null },
-  { to: "/facturacion", label: "Facturación", icon: Receipt, moduleKey: "facturacion" },
-  { to: "/asistente-ia", label: "Asistente IA", icon: Bot, moduleKey: "bot" },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, moduleKey: null, visibleRoles: ["SUPERADMIN", "ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER", "EMPLOYEE"] },
+  { to: "/categorias", label: "Categorías", icon: Tags, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT"] },
+  { to: "/presupuestos", label: "Presupuestos", icon: FileText, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
+  { to: "/pedidos", label: "Pedidos", icon: ClipboardList, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
+  { to: "/Ventas", label: "Ventas", icon: ShoppingCart, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"] },
+  { to: "/facturas", label: "Remitos", icon: Truck, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT", "CASHIER"] },
+  { to: "/Clientes", label: "Clientes", icon: Users, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
+  { to: "/tienda", label: "Tienda", icon: Store, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT"] },
+  { to: "/mensajes", label: "Mensajes", icon: MessageSquare, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT"] },
+  { to: "/facturacion", label: "Facturación", icon: Receipt, moduleKey: "facturacion", visibleRoles: ["ADMIN", "MANAGEMENT"] },
+  { to: "/asistente-ia", label: "Asistente IA", icon: Bot, moduleKey: "bot", visibleRoles: ["ADMIN", "MANAGEMENT"] },
+  { to: "/usuarios", label: "Usuarios", icon: UserPlus, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT"] },
 ];
 
 /**

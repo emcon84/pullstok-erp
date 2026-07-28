@@ -11,8 +11,8 @@ import {
 
 const router = Router();
 
-// La gestión de usuarios del negocio es solo para el ADMIN de la organización.
-router.use(authenticate, requireRole("ADMIN"));
+// La gestión de usuarios del negocio es para ADMIN y MANAGEMENT de la organización.
+router.use(authenticate, requireRole("ADMIN", "MANAGEMENT"));
 
 router.post("/", validate(createUserSchema), checkUserLimit, createUser);
 router.get("/", listUsers);

@@ -5,6 +5,7 @@ import {
   createOrganizationSchema,
   updateOrganizationPlanSchema,
   registerBillingPaymentSchema,
+  superadminCreateUserSchema,
 } from "../validation/schemas";
 import {
   createOrganization,
@@ -13,6 +14,9 @@ import {
   updateOrganizationPlan,
   registerOrganizationBilling,
   clearOrganizationConversations,
+  listOrgUsers,
+  createOrgUser,
+  toggleOrgUserActive,
 } from "../controllers/superadminController";
 
 const router = Router();
@@ -40,6 +44,18 @@ router.patch(
 router.delete(
   "/organizations/:id/conversations",
   clearOrganizationConversations,
+);
+
+// ── SUPERADMIN: User CRUD per organization ──────────────────
+router.get("/organizations/:orgId/users", listOrgUsers);
+router.post(
+  "/organizations/:orgId/users",
+  validate(superadminCreateUserSchema),
+  createOrgUser,
+);
+router.patch(
+  "/organizations/:orgId/users/:userId/active",
+  toggleOrgUserActive,
 );
 
 export default router;

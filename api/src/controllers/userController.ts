@@ -4,7 +4,7 @@ import { basePrisma } from "../config/db";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 import { requireOrganizationId } from "../config/tenantContext";
 
-/** ADMIN: crea un usuario (empleado/admin) dentro de SU organización. */
+/** ADMIN o MANAGEMENT: crea un usuario dentro de SU organización. */
 export const createUser = async (req: AuthedRequest, res: Response) => {
   const { email, password, role } = req.body;
   if (!email || !password) {
@@ -26,7 +26,7 @@ export const createUser = async (req: AuthedRequest, res: Response) => {
   }
 };
 
-/** ADMIN: lista los usuarios de SU organización. */
+/** ADMIN o MANAGEMENT: lista los usuarios de SU organización. */
 export const listUsers = async (_req: AuthedRequest, res: Response) => {
   try {
     const organizationId = requireOrganizationId();
@@ -46,7 +46,7 @@ export const listUsers = async (_req: AuthedRequest, res: Response) => {
   }
 };
 
-/** ADMIN: activa/desactiva un empleado de SU organización. */
+/** ADMIN o MANAGEMENT: activa/desactiva un usuario de SU organización. */
 export const setUserActive = async (req: AuthedRequest, res: Response) => {
   const { isActive } = req.body;
   try {
