@@ -9,6 +9,16 @@ import { Loader } from "./components/atoms/loader";
 const LoginPage = lazy(() =>
   import("./views/LoginPage").then((m) => ({ default: m.LoginPage })),
 );
+const ForgotPasswordPage = lazy(() =>
+  import("./views/ForgotPasswordPage").then((m) => ({
+    default: m.ForgotPasswordPage,
+  })),
+);
+const ResetPasswordPage = lazy(() =>
+  import("./views/ResetPasswordPage").then((m) => ({
+    default: m.ResetPasswordPage,
+  })),
+);
 const ChangePassword = lazy(() =>
   import("./views/ChangePassword").then((m) => ({ default: m.ChangePassword })),
 );
@@ -81,6 +91,40 @@ const AppRoutes = () => (
               }
             >
               <LoginPage />
+            </Suspense>
+          </AuthLayout>
+        }
+      />
+
+      {/* Recuperación de contraseña (público, sin auth) */}
+      <Route
+        path="/forgot-password"
+        element={
+          <AuthLayout>
+            <Suspense
+              fallback={
+                <div className="flex min-h-[60vh] items-center justify-center">
+                  <Loader />
+                </div>
+              }
+            >
+              <ForgotPasswordPage />
+            </Suspense>
+          </AuthLayout>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <AuthLayout>
+            <Suspense
+              fallback={
+                <div className="flex min-h-[60vh] items-center justify-center">
+                  <Loader />
+                </div>
+              }
+            >
+              <ResetPasswordPage />
             </Suspense>
           </AuthLayout>
         }

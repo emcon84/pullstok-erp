@@ -17,6 +17,18 @@ export const refreshSchema = z.object({
   refreshToken: z.string().min(1, "refreshToken requerido"),
 });
 
+// ---------- Password Recovery ----------
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Email inválido"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Token requerido"),
+  newPassword: z
+    .string()
+    .min(8, "La contraseña debe tener al menos 8 caracteres"),
+});
+
 // ---------- Organización ----------
 export const updateOrganizationSchema = z.object({
   name: z.string().min(1).optional(),

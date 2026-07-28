@@ -49,3 +49,26 @@ export const changePassword = async (req: AuthedRequest, res: Response) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const result = await AuthService.forgotPassword(req.body.email);
+    res.status(200).json(result);
+  } catch (error: any) {
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({ message: error.message });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const result = await AuthService.resetPassword(
+      req.body.token,
+      req.body.newPassword,
+    );
+    res.status(200).json(result);
+  } catch (error: any) {
+    const statusCode = error.statusCode || 400;
+    res.status(statusCode).json({ message: error.message });
+  }
+};

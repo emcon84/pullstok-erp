@@ -179,4 +179,40 @@ export function saleConfirmedEmail({
   };
 }
 
-export default { orderReceivedEmail, saleConfirmedEmail };
+// "Recuperá tu contraseña" — se manda cuando el usuario pide un reset de
+// contraseña desde el login. El link expira en 15 minutos.
+export function resetPasswordEmail({
+  org,
+  resetLink,
+}: {
+  org: MailOrg;
+  resetLink: string;
+}): RenderedMail {
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:20px;color:#111;">Recuperá tu contraseña</h1>
+    <p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.5;">
+      Recibimos una solicitud para restablecer la contraseña de tu cuenta en
+      <strong>${escapeHtml(org.name)}</strong>.
+    </p>
+    <p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.5;">
+      Hacé clic en el botón de abajo para crear una nueva contraseña.
+      <strong>Este enlace vence en 15 minutos.</strong>
+    </p>
+    <div style="text-align:center;margin:24px 0;">
+      <a href="${escapeHtml(resetLink)}"
+         style="display:inline-block;padding:12px 28px;background-color:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;">
+         Restablecer contraseña
+      </a>
+    </div>
+    <p style="margin:20px 0 0;color:#888;font-size:13px;line-height:1.5;">
+      Si no pediste este cambio, ignorá este mensaje. Tu contraseña actual
+      sigue siendo válida y nadie más puede acceder a tu cuenta.
+    </p>`;
+
+  return {
+    subject: `Recuperá tu contraseña — ${org.name}`,
+    html: renderLayout(org, DEFAULT_PRIMARY_COLOR, null, body),
+  };
+}
+
+export default { orderReceivedEmail, saleConfirmedEmail, resetPasswordEmail };

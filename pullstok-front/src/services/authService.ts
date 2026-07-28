@@ -36,3 +36,43 @@ export const changePassword = async (
     }
   }
 };
+
+export const forgotPassword = async (email: string): Promise<string> => {
+  try {
+    const response = await axios.post(`${API_URL}/auth/forgot-password`, { email });
+    return response.data.message;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 429) {
+        throw new Error(error.response?.data?.message || 'Demasiados intentos. Esperá 15 minutos.');
+      }
+      if (error.response?.status === 403) {
+        throw new Error(error.response?.data?.message || 'Contactá a tu administrador.');
+      }
+      throw new Error(error.response?.data?.message || 'Error al solicitar recuperación');
+    } else {
+      throw new Error('Error desconocido');
+    }
+  }
+};
+
+export const resetPassword = async (
+  token: string,
+  newPassword: string,
+): Promise<string> => {
+  try {
+    const response = await axios.post(`${API_URL}/auth/reset-password`, {
+      token,
+      newPassword,
+    });
+    return response.data.message;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || 'Error al restablecer la contraseña',
+      );
+    } else {
+      throw new Error('Error desconocido');
+    }
+  }
+};

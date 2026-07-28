@@ -4,6 +4,8 @@ import {
   refresh,
   me,
   changePassword,
+  forgotPassword,
+  resetPassword,
 } from '../../src/controllers/authController';
 import AuthService from '../../src/services/authServices';
 import { AuthedRequest } from '../../src/middlewares/authMiddleware';
@@ -183,6 +185,92 @@ describe('AuthController', () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({
         message: 'La contraseña actual es incorrecta',
+      });
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('devuelve 200 con mensaje genérico al solicitar reset exitoso', async () => {
+      mockedAuthService.forgotPassword.mockResolvedValue({
+        message: 'Si el email está registrado, recibirás un enlace de recuperación.',
+      } as any);
+
+      const req = mockRequest({ email: 'admin@demo.com' });
+      const res = mockResponse();
+
+      await forgotPassword(req, res);
+
+      expect(AuthService.forgotPassword).toHaveBeenCalledWith('admin@demo.com');
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Si el email está registrado, recibirás un enlace de recuperación.',
+      });
+    });
+
+    it('devuelve 403 cuando el service rechaza por rol EMPLOYEE', async () => {
+      const err: any = new Error('Contactá a tu administrador para restablecer tu contraseña');
+      err.statusCode = 403;
+      mockedAuthService.forgotPassword.mockRejectedValue(err);
+
+      const req = mockRequest({ email: 'empleado@demo.com' });
+      const res = mockResponse();
+
+      await forgotPassword(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Contactá a tu administrador para restablecer tu contraseña',
+      });
+    });
+
+    it('devuelve 429 cuando se excede el rate limit', async () => {
+      const err: any = new Error('Demasiados intentos. Esperá 15 minutos.');
+      err.statusCode = 429;
+      mockedAuthService.forgotPassword.mockRejectedValue(err);
+
+      const req = mockRequest({ email: 'admin@demo.com' });
+      const res = mockResponse();
+
+      await forgotPassword(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(429);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Demasiados intentos. Esperá 15 minutos.',
+      });
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('devuelve 200 con contraseña actualizada exitosamente', async () => {
+      mockedAuthService.resetPassword.mockResolvedValue({
+        message: 'Contraseña actualizada. Ya podés iniciar sesión.',
+      } as any);
+
+      const req = mockRequest({ token: 'valid-token', newPassword: 'newPass123' });
+      const res = mockResponse();
+
+      await resetPassword(req, res);
+
+      expect(AuthService.resetPassword).toHaveBeenCalledWith('valid-token', 'newPass123');
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Contraseña actualizada. Ya podés iniciar sesión.',
+      });
+    });
+
+    it('devuelve 400 cuando el token expiró o es inválido', async () => {
+      mockedAuthService.resetPassword.mockRejectedValue(
+        new Error('El enlace expiró o no es válido. Pedí uno nuevo.'),
+      );
+
+      const req = mockRequest({ token: 'expired', newPassword: 'newPass123' });
+      const res = mockResponse();
+
+      await resetPassword(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'El enlace expiró o no es válido. Pedí uno nuevo.',
       });
     });
   });

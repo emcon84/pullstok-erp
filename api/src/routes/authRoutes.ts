@@ -1,11 +1,13 @@
 import { Router } from "express";
-import { login, refresh, changePassword, me } from "../controllers/authController";
+import { login, refresh, changePassword, me, forgotPassword, resetPassword } from "../controllers/authController";
 import { authenticate } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validate";
 import {
   loginSchema,
   refreshSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -18,6 +20,17 @@ router.post(
   authenticate,
   validate(changePasswordSchema),
   changePassword,
+);
+// Password recovery — public endpoints (no auth middleware)
+router.post(
+  "/forgot-password",
+  validate(forgotPasswordSchema),
+  forgotPassword,
+);
+router.post(
+  "/reset-password",
+  validate(resetPasswordSchema),
+  resetPassword,
 );
 
 export default router;

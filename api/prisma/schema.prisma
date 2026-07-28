@@ -74,6 +74,9 @@ model User {
   // null SOLO para el SUPERADMIN (la plataforma). Todo otro usuario pertenece a una org.
   organizationId     String?
   organization       Organization? @relation(fields: [organizationId], references: [id])
+  // Password recovery: hashed reset token + expiry (nullable, null by default).
+  resetToken         String?
+  resetTokenExpiry   DateTime?
 
   @@index([organizationId])
   @@map("users")

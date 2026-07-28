@@ -1,11 +1,15 @@
 import { basePrisma } from "../config/db";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { Role, Plan } from "@prisma/client";
 import {
   generateAccessToken,
   generateRefreshToken,
   verifyToken,
 } from "../utils/jwtUtils";
+import { sendMail } from "./mailService";
+import { resetPasswordEmail } from "./mailTemplates";
+import { RateLimiter } from "./rateLimiter";
 
 class AuthService {
   static async login(email: string, password: string) {
@@ -153,6 +157,167 @@ class AuthService {
       mustChangePassword: user.mustChangePassword,
       organization: user.organization,
     };
+  }
+
+  // Rate limiter singleton para forgot-password (in-memory, una instancia por proceso).
+  // Expuesto como `_rateLimiter` solo para inyección en tests.
+  static _rateLimiter: RateLimiter | null = null;
+
+  private static getRateLimiter(): RateLimiter {
+    if (!AuthService._rateLimiter) {
+      AuthService._rateLimiter = new RateLimiter();
+    }
+    return AuthService._rateLimiter;
+  }
+
+  /**
+   * Recuperación de contraseña — paso 1: solicitar reset.
+   *
+   * - Bloquea roles EMPLOYEE (403: "Contactá a tu administrador")
+   * - Rate limit: 3 intentos por email cada 15 min (429)
+   * - Email inexistente → mismo 200 genérico (anti-enumeración)
+   * - SMTP falla → se loguea, pero el flujo NO se rompe (200 igual)
+   */
+  static async forgotPassword(email: string) {
+    // 1) Rate limit check
+    const limiter = AuthService.getRateLimiter();
+    if (limiter.isRateLimited(email, 3, 15 * 60 * 1000)) {
+      const err: any = new Error(
+        "Demasiados intentos. Esperá 15 minutos.",
+      );
+      err.statusCode = 429;
+      throw err;
+    }
+
+    // 2) Lookup user
+    const user = await basePrisma.user.findUnique({
+      where: { email },
+    });
+
+    // 3) No user → generic response (no enumeration)
+    if (!user) {
+      return {
+        message:
+          "Si el email está registrado, recibirás un enlace de recuperación.",
+      };
+    }
+
+    // 4) EMPLOYEE gate
+    if (user.role === Role.EMPLOYEE) {
+      const err: any = new Error(
+        "Contactá a tu administrador para restablecer tu contraseña.",
+      );
+      err.statusCode = 403;
+      throw err;
+    }
+
+    // 5) Generate token
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+    const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+
+    // 6) Store hashed token
+    await basePrisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetToken: hashedToken,
+        resetTokenExpiry: expiry,
+      },
+    });
+
+    // 7) Send email (non-blocking — sigue el contrato de mailService)
+    const frontendUrl =
+      process.env.FRONTEND_URL || "http://localhost:5173";
+    const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
+
+    // Nombre de la org o "Pullstok" como fallback para el template
+    const orgName =
+      (user as any).organization?.name ?? "Pullstok";
+
+    const mail = resetPasswordEmail({
+      org: { name: orgName },
+      resetLink,
+    });
+
+    try {
+      await sendMail({
+        to: user.email,
+        subject: mail.subject,
+        html: mail.html,
+      });
+    } catch (mailError) {
+      console.error(
+        "[AuthService.forgotPassword] Error enviando email de recuperación:",
+        mailError,
+      );
+      // No propagar: el mail NO debe romper el flujo de negocio
+    }
+
+    return {
+      message:
+        "Si el email está registrado, recibirás un enlace de recuperación.",
+    };
+  }
+
+  /**
+   * Recuperación de contraseña — paso 2: reset con token.
+   *
+   * - Busca el hash del token en la DB con expiración > now
+   * - Usa timingSafeEqual para evitar timing attacks
+   * - bcrypt-hashea la nueva contraseña y limpia los campos de reset
+   * - No emite JWT ni sesión (el usuario debe loguearse manualmente)
+   */
+  static async resetPassword(token: string, newPassword: string) {
+    // Hash del token recibido
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    // Buscar usuario con token válido (no expirado)
+    const user = await basePrisma.user.findFirst({
+      where: {
+        resetToken: hashedToken,
+        resetTokenExpiry: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new Error("El enlace expiró o no es válido. Pedí uno nuevo.");
+    }
+
+    // Timing-safe comparison (belt-and-suspenders sobre el hash match de Prisma)
+    if (
+      !crypto.timingSafeEqual(
+        Buffer.from(hashedToken),
+        Buffer.from(user.resetToken!),
+      )
+    ) {
+      throw new Error("El enlace expiró o no es válido. Pedí uno nuevo.");
+    }
+
+    // Validate new password length (belt-and-suspenders; Zod ya validó en ruta)
+    if (!newPassword || newPassword.length < 8) {
+      throw new Error("La nueva contraseña debe tener al menos 8 caracteres");
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user: new password + clear reset fields
+    await basePrisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
+    });
+
+    return { message: "Contraseña actualizada. Ya podés iniciar sesión." };
   }
 
   /** SUPERADMIN: crea una organización nueva junto a su usuario ADMIN. */

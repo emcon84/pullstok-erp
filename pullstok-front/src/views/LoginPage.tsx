@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { login } from "../controllers/authController";
 import { Button } from "@/components/ui/button";
@@ -96,6 +96,15 @@ export const LoginPage = () => {
                   required
                   autoComplete="current-password"
                 />
+              </div>
+
+              <div className="text-right">
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-muted-foreground hover:text-primary underline underline-offset-4"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
               </div>
 
               {error && (

@@ -1,16 +1,21 @@
 import AuthService from '../../src/services/authServices';
 import { basePrisma } from '../../src/config/db';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import {
   generateAccessToken,
   generateRefreshToken,
   verifyToken,
 } from '../../src/utils/jwtUtils';
+import { sendMail } from '../../src/services/mailService';
+import { resetPasswordEmail } from '../../src/services/mailTemplates';
+import { RateLimiter } from '../../src/services/rateLimiter';
 
 jest.mock('../../src/config/db', () => ({
   basePrisma: {
     user: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
     },
   },
@@ -27,13 +32,30 @@ jest.mock('../../src/utils/jwtUtils', () => ({
   verifyToken: jest.fn(),
 }));
 
+jest.mock('../../src/services/mailService', () => ({
+  sendMail: jest.fn(),
+}));
+
+jest.mock('../../src/services/mailTemplates', () => ({
+  resetPasswordEmail: jest.fn(),
+}));
+
+jest.mock('../../src/services/rateLimiter', () => ({
+  RateLimiter: jest.fn().mockImplementation(() => ({
+    isRateLimited: jest.fn(),
+    stopCleanup: jest.fn(),
+  })),
+}));
+
 const mockedPrisma = basePrisma as unknown as {
-  user: { findUnique: jest.Mock; update: jest.Mock };
+  user: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
 };
 const mockedBcrypt = bcrypt as unknown as { compare: jest.Mock; hash: jest.Mock };
 const mockedGenAccess = generateAccessToken as jest.Mock;
 const mockedGenRefresh = generateRefreshToken as jest.Mock;
 const mockedVerify = verifyToken as jest.Mock;
+const mockedSendMail = sendMail as jest.Mock;
+const mockedResetPasswordEmail = resetPasswordEmail as jest.Mock;
 
 const baseUser = {
   id: 'u1',
@@ -181,6 +203,183 @@ describe('AuthService', () => {
         AuthService.changePassword('u1', 'vieja1234', 'corta'),
       ).rejects.toThrow('La nueva contraseña debe tener al menos 8 caracteres');
       expect(mockedPrisma.user.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('forgotPassword', () => {
+    const authService = AuthService as any;
+
+    beforeEach(() => {
+      // Reset the rate limiter instance for fresh state each test
+      authService._rateLimiter = null;
+      jest.clearAllMocks();
+    });
+
+    it('(a) ADMIN válido → genera token, lo guarda hasheado, envía email, retorna 200 genérico', async () => {
+      const adminUser = {
+        ...baseUser,
+        role: 'ADMIN',
+        email: 'admin@demo.com',
+      };
+      mockedPrisma.user.findUnique.mockResolvedValue(adminUser);
+      mockedPrisma.user.update.mockResolvedValue({ ...adminUser, resetToken: 'hashed-token', resetTokenExpiry: new Date() });
+      mockedResetPasswordEmail.mockReturnValue({ subject: 'Reset', html: '<p>reset</p>' });
+      mockedSendMail.mockResolvedValue(undefined);
+
+      const result = await AuthService.forgotPassword('admin@demo.com');
+
+      expect(mockedPrisma.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'admin@demo.com' },
+      });
+      // Debe actualizar el user con resetToken y resetTokenExpiry
+      expect(mockedPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: {
+          resetToken: expect.any(String),
+          resetTokenExpiry: expect.any(Date),
+        },
+      });
+      // Debe enviar el email
+      expect(mockedSendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'admin@demo.com',
+          subject: expect.any(String),
+          html: expect.any(String),
+        }),
+      );
+      // Respuesta genérica (no revela si el email existe)
+      expect(result).toEqual({
+        message: 'Si el email está registrado, recibirás un enlace de recuperación.',
+      });
+    });
+
+    it('(b) email desconocido → retorna el MISMO mensaje genérico, sin efectos colaterales', async () => {
+      mockedPrisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await AuthService.forgotPassword('unknown@demo.com');
+
+      expect(result).toEqual({
+        message: 'Si el email está registrado, recibirás un enlace de recuperación.',
+      });
+      expect(mockedPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockedSendMail).not.toHaveBeenCalled();
+    });
+
+    it('(c) EMPLOYEE → lanza error con statusCode 403', async () => {
+      mockedPrisma.user.findUnique.mockResolvedValue({
+        ...baseUser,
+        role: 'EMPLOYEE',
+      });
+
+      let caught: any;
+      try {
+        await AuthService.forgotPassword('empleado@demo.com');
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeDefined();
+      expect(caught.message).toContain('administrador');
+      expect(caught.statusCode).toBe(403);
+      expect(mockedPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockedSendMail).not.toHaveBeenCalled();
+    });
+
+    it('(d) rate-limited → lanza error con statusCode 429', async () => {
+      mockedPrisma.user.findUnique.mockResolvedValue(baseUser);
+
+      // Inyectar un rate limiter mockeado que ya bloquea
+      (AuthService as any)._rateLimiter = {
+        isRateLimited: jest.fn().mockReturnValue(true),
+        stopCleanup: jest.fn(),
+      };
+
+      let caught: any;
+      try {
+        await AuthService.forgotPassword('admin@demo.com');
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeDefined();
+      expect(caught.message).toContain('Demasiados intentos');
+      expect(caught.statusCode).toBe(429);
+      expect(mockedPrisma.user.findUnique).not.toHaveBeenCalled();
+      // Reset internal instance
+      (AuthService as any)._rateLimiter = null;
+    });
+
+    it('(e) fallo SMTP → igual retorna 200, no propaga el error', async () => {
+      mockedPrisma.user.findUnique.mockResolvedValue(baseUser);
+      mockedPrisma.user.update.mockResolvedValue({ ...baseUser, resetToken: 'x', resetTokenExpiry: new Date() });
+      mockedResetPasswordEmail.mockReturnValue({ subject: 'S', html: 'H' });
+      mockedSendMail.mockRejectedValue(new Error('SMTP down'));
+
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await AuthService.forgotPassword('admin@demo.com');
+
+      expect(result).toEqual({
+        message: 'Si el email está registrado, recibirás un enlace de recuperación.',
+      });
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('resetPassword', () => {
+    // Pre-compute the SHA-256 hash for the test token so Buffer.from works
+    const testToken = 'raw-token-abc123';
+    const hashedTestToken = require('crypto')
+      .createHash('sha256')
+      .update(testToken)
+      .digest('hex');
+
+    it('token válido → actualiza password con bcrypt, limpia campos reset, retorna éxito', async () => {
+      const userWithToken = {
+        ...baseUser,
+        resetToken: hashedTestToken,
+        resetTokenExpiry: new Date(Date.now() + 600_000), // 10 min en el futuro
+      };
+      mockedPrisma.user.findFirst.mockResolvedValue(userWithToken);
+      mockedBcrypt.hash.mockResolvedValue('new-hash');
+      mockedPrisma.user.update.mockResolvedValue({ ...baseUser, password: 'new-hash' });
+
+      const result = await AuthService.resetPassword(testToken, 'newPass123');
+
+      expect(mockedPrisma.user.findFirst).toHaveBeenCalledWith({
+        where: {
+          resetToken: hashedTestToken,
+          resetTokenExpiry: { gt: expect.any(Date) },
+        },
+      });
+      expect(mockedBcrypt.hash).toHaveBeenCalledWith('newPass123', 10);
+      expect(mockedPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: {
+          password: 'new-hash',
+          resetToken: null,
+          resetTokenExpiry: null,
+        },
+      });
+      expect(result).toEqual({ message: 'Contraseña actualizada. Ya podés iniciar sesión.' });
+    });
+
+    it('token expirado → lanza error con mensaje de expiración', async () => {
+      mockedPrisma.user.findFirst.mockResolvedValue(null); // No encuentra token no expirado
+
+      await expect(
+        AuthService.resetPassword('expired-token', 'newPass123'),
+      ).rejects.toThrow('El enlace expiró o no es válido');
+      expect(mockedPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('token inválido → lanza error', async () => {
+      mockedPrisma.user.findFirst.mockResolvedValue(null);
+
+      await expect(
+        AuthService.resetPassword('fake-token', 'newPass123'),
+      ).rejects.toThrow('El enlace expiró o no es válido');
     });
   });
 });
