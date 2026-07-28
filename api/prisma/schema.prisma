@@ -68,7 +68,8 @@ model Organization {
 
 model User {
   id                 String        @id @default(uuid())
-  email              String        @unique
+  email              String?       @unique
+  username           String?       @unique
   password           String
   role               Role          @default(EMPLOYEE)
   mustChangePassword Boolean       @default(true)

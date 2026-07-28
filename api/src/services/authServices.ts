@@ -12,9 +12,11 @@ import { resetPasswordEmail } from "./mailTemplates";
 import { RateLimiter } from "./rateLimiter";
 
 class AuthService {
-  static async login(email: string, password: string) {
-    const user = await basePrisma.user.findUnique({
-      where: { email },
+  static async login(login: string, password: string) {
+    // Determinar si es email (tiene @) o username
+    const isEmail = login.includes("@");
+    const user = await basePrisma.user.findFirst({
+      where: isEmail ? { email: login } : { username: login },
       include: { organization: true },
     });
     if (!user || !user.isActive) {
@@ -52,6 +54,7 @@ class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        username: user.username,
         role: user.role,
         organizationId: user.organizationId,
         mustChangePassword: user.mustChangePassword,
@@ -152,6 +155,7 @@ class AuthService {
     return {
       id: user.id,
       email: user.email,
+      username: user.username,
       role: user.role,
       organizationId: user.organizationId,
       mustChangePassword: user.mustChangePassword,
@@ -228,7 +232,14 @@ class AuthService {
       },
     });
 
-    // 7) Send email (non-blocking — sigue el contrato de mailService)
+    // 7) Send email — solo si el usuario tiene email (usuarios con solo username no usan recupero)
+    if (!user.email) {
+      return {
+        message:
+          "Si el email está registrado, recibirás un enlace de recuperación.",
+      };
+    }
+
     const frontendUrl =
       process.env.FRONTEND_URL || "http://localhost:5173";
     const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
@@ -361,27 +372,50 @@ class AuthService {
   /** ADMIN: crea un usuario (empleado o admin) dentro de SU organización. */
   static async createUser(params: {
     organizationId: string;
-    email: string;
+    email?: string;
+    username?: string;
     password: string;
     role?: Role;
   }) {
-    const { organizationId, email, password, role } = params;
+    const { organizationId, email, username, password, role } = params;
 
-    const existing = await basePrisma.user.findUnique({ where: { email } });
-    if (existing) {
-      throw new Error("Ya existe un usuario con ese email");
+    if (email) {
+      const existing = await basePrisma.user.findFirst({
+        where: { OR: [{ email }, ...(username ? [{ username }] : [])] },
+      });
+      if (existing) {
+        throw new Error(
+          existing.email === email
+            ? "Ya existe un usuario con ese email"
+            : "Ya existe un usuario con ese nombre de usuario",
+        );
+      }
+    } else if (username) {
+      const existing = await basePrisma.user.findUnique({
+        where: { username },
+      });
+      if (existing) {
+        throw new Error("Ya existe un usuario con ese nombre de usuario");
+      }
     }
 
     const hashed = await bcrypt.hash(password, 10);
     return basePrisma.user.create({
       data: {
-        email,
+        email: email ?? null,
+        username: username ?? null,
         password: hashed,
         role: role ?? Role.EMPLOYEE,
         organizationId,
         mustChangePassword: true,
       },
-      select: { id: true, email: true, role: true, organizationId: true },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        role: true,
+        organizationId: true,
+      },
     });
   }
 }

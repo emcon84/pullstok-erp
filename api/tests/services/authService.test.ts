@@ -61,6 +61,7 @@ const mockedResetPasswordEmail = resetPasswordEmail as jest.Mock;
 const baseUser = {
   id: 'u1',
   email: 'test@example.com',
+  username: null,
   password: 'hashed-password',
   role: 'ADMIN',
   organizationId: 'org-1',
@@ -76,14 +77,14 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('devuelve tokens + datos del usuario en credenciales válidas', async () => {
-      mockedPrisma.user.findUnique.mockResolvedValue({ ...baseUser });
+      mockedPrisma.user.findFirst.mockResolvedValue({ ...baseUser });
       mockedBcrypt.compare.mockResolvedValue(true);
       mockedGenAccess.mockReturnValue('access-token');
       mockedGenRefresh.mockReturnValue('refresh-token');
 
       const result = await AuthService.login('test@example.com', 'password123');
 
-      expect(mockedPrisma.user.findUnique).toHaveBeenCalledWith({
+      expect(mockedPrisma.user.findFirst).toHaveBeenCalledWith({
         where: { email: 'test@example.com' },
         include: { organization: true },
       });
@@ -94,6 +95,7 @@ describe('AuthService', () => {
         user: {
           id: 'u1',
           email: 'test@example.com',
+          username: null,
           role: 'ADMIN',
           organizationId: 'org-1',
           mustChangePassword: false,
@@ -103,7 +105,7 @@ describe('AuthService', () => {
     });
 
     it('lanza "Credenciales inválidas" si el usuario no existe', async () => {
-      mockedPrisma.user.findUnique.mockResolvedValue(null);
+      mockedPrisma.user.findFirst.mockResolvedValue(null);
 
       await expect(AuthService.login('nadie@example.com', 'x')).rejects.toThrow(
         'Credenciales inválidas',
@@ -112,7 +114,7 @@ describe('AuthService', () => {
     });
 
     it('lanza "Credenciales inválidas" si el usuario está inactivo', async () => {
-      mockedPrisma.user.findUnique.mockResolvedValue({ ...baseUser, isActive: false });
+      mockedPrisma.user.findFirst.mockResolvedValue({ ...baseUser, isActive: false });
 
       await expect(AuthService.login('test@example.com', 'x')).rejects.toThrow(
         'Credenciales inválidas',
@@ -120,7 +122,7 @@ describe('AuthService', () => {
     });
 
     it('kill switch: rechaza si la organización está suspendida', async () => {
-      mockedPrisma.user.findUnique.mockResolvedValue({
+      mockedPrisma.user.findFirst.mockResolvedValue({
         ...baseUser,
         organization: { isActive: false },
       });
@@ -132,13 +134,28 @@ describe('AuthService', () => {
     });
 
     it('lanza "Credenciales inválidas" si la contraseña no coincide', async () => {
-      mockedPrisma.user.findUnique.mockResolvedValue({ ...baseUser });
+      mockedPrisma.user.findFirst.mockResolvedValue({ ...baseUser });
       mockedBcrypt.compare.mockResolvedValue(false);
 
       await expect(AuthService.login('test@example.com', 'mal')).rejects.toThrow(
         'Credenciales inválidas',
       );
       expect(mockedGenAccess).not.toHaveBeenCalled();
+    });
+
+    it('login funciona con username', async () => {
+      mockedPrisma.user.findFirst.mockResolvedValue({ ...baseUser, username: 'testuser', email: null });
+      mockedBcrypt.compare.mockResolvedValue(true);
+      mockedGenAccess.mockReturnValue('access-token');
+      mockedGenRefresh.mockReturnValue('refresh-token');
+
+      const result = await AuthService.login('testuser', 'password123');
+
+      expect(mockedPrisma.user.findFirst).toHaveBeenCalledWith({
+        where: { username: 'testuser' },
+        include: { organization: true },
+      });
+      expect(result.user.username).toBe('testuser');
     });
   });
 
@@ -515,7 +532,7 @@ describe('AuthService', () => {
     });
 
     it('rejects duplicate email', async () => {
-      mockedPrisma.user.findUnique.mockResolvedValue({ id: 'existing-id' });
+      mockedPrisma.user.findFirst.mockResolvedValue({ id: 'existing-id', email: 'taken@example.com' });
 
       await expect(
         AuthService.createUser({

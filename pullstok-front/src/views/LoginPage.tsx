@@ -74,15 +74,15 @@ export const LoginPage = () => {
             )}
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Correo electrónico</Label>
+                <Label htmlFor="email">Correo electrónico o usuario</Label>
                 <Input
                   id="email"
-                  type="email"
-                  placeholder="vos@negocio.com"
+                  type="text"
+                  placeholder="vos@negocio.com o nombre.usuario"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  autoComplete="email"
+                  autoComplete="username"
                 />
               </div>
               <div className="space-y-2">

@@ -53,6 +53,7 @@ export const UsersPage = () => {
   const [users, setUsers] = useState<UserData[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<string>("EMPLOYEE");
   const [creating, setCreating] = useState(false);
@@ -65,15 +66,21 @@ export const UsersPage = () => {
   }, [initialUsers, loading]);
 
   const handleCreate = async () => {
-    if (!email.trim() || !password || password.length < 8) {
-      toast.error("Email y contraseña (mínimo 8 caracteres) son requeridos");
+    if ((!email.trim() && !username.trim()) || !password || password.length < 8) {
+      toast.error("Email o usuario y contraseña (mínimo 8 caracteres) son requeridos");
       return;
     }
     setCreating(true);
     try {
-      await createUserApi({ email: email.trim(), password, role });
+      await createUserApi({
+        email: email.trim() || undefined,
+        username: username.trim() || undefined,
+        password,
+        role,
+      });
       toast.success("Usuario creado");
       setEmail("");
+      setUsername("");
       setPassword("");
       setRole("EMPLOYEE");
       setDialogOpen(false);
@@ -138,6 +145,22 @@ export const UsersPage = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Para roles Admin y Vendedor se recomienda usar email.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="u-username">Usuario</Label>
+                <Input
+                  id="u-username"
+                  type="text"
+                  placeholder="nombre.usuario"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Para Caja, Administración y Empleado. Solo minúsculas, números y puntos.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="u-password">Contraseña</Label>
@@ -167,7 +190,7 @@ export const UsersPage = () => {
               <Button
                 className="w-full"
                 onClick={handleCreate}
-                disabled={creating || !email.trim() || password.length < 8}
+                disabled={creating || (!email.trim() && !username.trim()) || password.length < 8}
               >
                 {creating ? "Creando..." : "Crear usuario"}
               </Button>
@@ -189,7 +212,7 @@ export const UsersPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Email</TableHead>
+                <TableHead>Email / Usuario</TableHead>
                 <TableHead>Rol</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="hidden sm:table-cell">Creado</TableHead>
@@ -199,7 +222,9 @@ export const UsersPage = () => {
             <TableBody>
               {users.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.email}</TableCell>
+                  <TableCell className="font-medium">
+                    {user.email || user.username}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="capitalize">
                       {ROLE_DISPLAY[user.role as Role] ?? user.role}

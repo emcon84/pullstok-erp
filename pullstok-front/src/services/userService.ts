@@ -3,14 +3,16 @@ import { API_URL } from "../constants";
 
 export interface UserData {
   id: string;
-  email: string;
+  email?: string;
+  username?: string;
   role: string;
   isActive: boolean;
   createdAt: string;
 }
 
 export interface CreateUserPayload {
-  email: string;
+  email?: string;
+  username?: string;
   password: string;
   role?: string;
 }

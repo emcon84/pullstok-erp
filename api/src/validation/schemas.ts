@@ -66,18 +66,41 @@ export const registerBillingPaymentSchema = z.object({
   action: z.literal("pay"),
 });
 
-export const createUserSchema = z.object({
-  email: z.email(),
-  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
-  role: z.enum(["ADMIN", "EMPLOYEE", "VENDEDOR", "CASHIER", "MANAGEMENT"]).optional(),
-});
+const orgRoles = ["ADMIN", "EMPLOYEE", "VENDEDOR", "CASHIER", "MANAGEMENT"] as const;
+
+export const createUserSchema = z
+  .object({
+    email: z.string().email().optional(),
+    username: z
+      .string()
+      .min(3, "El usuario debe tener al menos 3 caracteres")
+      .regex(
+        /^[a-z0-9._-]+$/,
+        "Usuario: solo minúsculas, números, puntos, guiones y guiones bajos",
+      )
+      .optional(),
+    password: z
+      .string()
+      .min(8, "La contraseña debe tener al menos 8 caracteres"),
+    role: z.enum(orgRoles).optional(),
+  })
+  .refine((data) => data.email || data.username, {
+    message: "Se requiere email o nombre de usuario",
+    path: ["email"],
+  })
+  .refine(
+    (data) => {
+      // Si se proporciona email, validar que sea un email real
+      if (data.email && !data.email.includes("@")) {
+        return false;
+      }
+      return true;
+    },
+    { message: "Email inválido", path: ["email"] },
+  );
 
 // SUPERADMIN create user: same as createUserSchema but role is explicit (no SUPERADMIN)
-export const superadminCreateUserSchema = z.object({
-  email: z.email(),
-  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
-  role: z.enum(["ADMIN", "EMPLOYEE", "VENDEDOR", "CASHIER", "MANAGEMENT"]).optional(),
-});
+export const superadminCreateUserSchema = createUserSchema;
 
 // ---------- Productos ----------
 // Alta manual single (form de la UI): exige categoryId real, elegido de un

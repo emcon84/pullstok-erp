@@ -161,6 +161,7 @@ export const listOrgUsers = async (req: AuthedRequest, res: Response) => {
       select: {
         id: true,
         email: true,
+        username: true,
         role: true,
         isActive: true,
         createdAt: true,
@@ -175,11 +176,11 @@ export const listOrgUsers = async (req: AuthedRequest, res: Response) => {
 /** SUPERADMIN: crea un usuario en una organización específica. */
 export const createOrgUser = async (req: AuthedRequest, res: Response) => {
   const { orgId } = req.params;
-  const { email, password, role } = req.body;
-  if (!email || !password) {
+  const { email, username, password, role } = req.body;
+  if ((!email && !username) || !password) {
     return res
       .status(400)
-      .json({ message: "Email y contraseña son requeridos" });
+      .json({ message: "Email o usuario y contraseña son requeridos" });
   }
   try {
     // Verify org exists
@@ -191,9 +192,28 @@ export const createOrgUser = async (req: AuthedRequest, res: Response) => {
       return res.status(404).json({ message: "Organización no encontrada" });
     }
 
-    const existing = await basePrisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return res.status(400).json({ message: "Ya existe un usuario con ese email" });
+    // Check uniqueness
+    if (email) {
+      const existing = await basePrisma.user.findFirst({
+        where: { OR: [{ email }, ...(username ? [{ username }] : [])] },
+      });
+      if (existing) {
+        return res.status(400).json({
+          message:
+            existing.email === email
+              ? "Ya existe un usuario con ese email"
+              : "Ya existe un usuario con ese nombre de usuario",
+        });
+      }
+    } else if (username) {
+      const existing = await basePrisma.user.findUnique({
+        where: { username },
+      });
+      if (existing) {
+        return res
+          .status(400)
+          .json({ message: "Ya existe un usuario con ese nombre de usuario" });
+      }
     }
 
     const bcrypt = await import("bcryptjs");
@@ -201,7 +221,8 @@ export const createOrgUser = async (req: AuthedRequest, res: Response) => {
 
     const user = await basePrisma.user.create({
       data: {
-        email,
+        email: email ?? null,
+        username: username ?? null,
         password: hashed,
         role: role ?? "EMPLOYEE",
         organizationId: orgId,
