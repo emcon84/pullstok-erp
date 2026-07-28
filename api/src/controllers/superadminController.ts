@@ -226,7 +226,7 @@ export const createOrgUser = async (req: AuthedRequest, res: Response) => {
         password: hashed,
         role: role ?? "EMPLOYEE",
         organizationId: orgId,
-        mustChangePassword: true,
+        mustChangePassword: false,
       },
       select: { id: true, email: true, role: true, organizationId: true },
     });

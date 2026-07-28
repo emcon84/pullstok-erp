@@ -407,7 +407,7 @@ class AuthService {
         password: hashed,
         role: role ?? Role.EMPLOYEE,
         organizationId,
-        mustChangePassword: true,
+        mustChangePassword: false,
       },
       select: {
         id: true,
