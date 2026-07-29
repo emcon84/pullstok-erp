@@ -38,7 +38,7 @@ router.post(
   upload.single("file"),
   uploadProductsCsv,
 );
-router.get("/template-csv", authenticateJWT, downloadTemplateCsv);
+router.get("/template-csv", downloadTemplateCsv);
 router.get("/", authenticateJWT, productController.getProducts);
 router.get("/:id", authenticateJWT, productController.getProductById);
 router.put(

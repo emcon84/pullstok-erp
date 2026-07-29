@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { prisma } from "../config/db";
+import { prisma, basePrisma } from "../config/db";
 import { bulkAddProducts, resolveCategoryId } from "../services/productsService";
 import { requireOrganizationId } from "../config/tenantContext";
 
@@ -159,9 +159,10 @@ export const uploadProductsCsv = async (req: Request, res: Response) => {
 
 /**
  * GET /products/template-csv?category=Collares
- * Devuelve un CSV de plantilla con las columnas base + columnas de variantes
- * según la categoría indicada. Si no se pasa categoría, devuelve solo las
- * columnas base.
+ * Público — devuelve un CSV de plantilla con las columnas base + columnas de
+ * variantes según la categoría indicada. Busca la categoría globalmente (sin
+ * scope de org) porque la plantilla es solo nombres de columnas, no datos
+ * sensibles.
  */
 export const downloadTemplateCsv = async (req: Request, res: Response) => {
   try {
@@ -170,9 +171,10 @@ export const downloadTemplateCsv = async (req: Request, res: Response) => {
     let columns = [...BASE_COLUMNS];
 
     if (categoryName) {
-      const organizationId = requireOrganizationId();
-      const category = await prisma.category.findFirst({
-        where: { organizationId, name: categoryName },
+      // Buscar categoría globalmente — la estructura de variantes es la misma
+      // para cualquier org que tenga esa categoría.
+      const category = await basePrisma.category.findFirst({
+        where: { name: categoryName },
         include: {
           variantDefs: { orderBy: { name: "asc" } },
         },
