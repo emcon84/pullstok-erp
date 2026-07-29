@@ -1,6 +1,11 @@
 -- AlterTable: add self-referential parentId to categories
 ALTER TABLE "categories" ADD COLUMN "parentId" TEXT;
 
+-- Replace old unique index (organizationId, name) with new (organizationId, parentId, name)
+-- to allow same category name under different parents.
+DROP INDEX IF EXISTS "categories_organizationId_name_key";
+CREATE UNIQUE INDEX "categories_organizationId_parentId_name_key" ON "categories"("organizationId", "parentId", "name");
+
 -- CreateTable: category_variant_definitions
 CREATE TABLE "category_variant_definitions" (
     "id" TEXT NOT NULL,
