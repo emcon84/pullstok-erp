@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ListTree,
   Settings2,
+  Download,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
@@ -222,15 +223,32 @@ const TreeNodeRow = ({
               <Plus className="h-3.5 w-3.5" />
             </Button>
             {isLeaf && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => onManageVariants(node)}
-                title="Gestionar variantes"
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onManageVariants(node)}
+                  title="Gestionar variantes"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  asChild
+                  title="Descargar plantilla CSV"
+                >
+                  <a
+                    href={`${import.meta.env.VITE_API_URL || "https://app.pullstok.com"}/api/products/template-csv?category=${encodeURIComponent(node.name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </a>
+                </Button>
+              </>
             )}
             <Button
               variant="ghost"
