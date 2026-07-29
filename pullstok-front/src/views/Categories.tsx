@@ -241,7 +241,7 @@ const TreeNodeRow = ({
                   title="Descargar plantilla CSV"
                 >
                   <a
-                    href={`${import.meta.env.VITE_API_URL || "https://app.pullstok.com"}/api/products/template-csv?category=${encodeURIComponent(node.name)}`}
+                    href={`/api/products/template-csv?category=${encodeURIComponent(node.name)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
