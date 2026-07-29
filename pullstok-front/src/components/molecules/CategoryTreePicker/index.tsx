@@ -86,7 +86,6 @@ const TreePickerRow = ({
 export const CategoryTreePicker = ({ value, onChange }: CategoryTreePickerProps) => {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
 
   useEffect(() => {
     getCategories()
@@ -108,10 +107,6 @@ export const CategoryTreePicker = ({ value, onChange }: CategoryTreePickerProps)
   };
   const selectedName = value ? findName(tree, value) : null;
 
-  const filtered = search
-    ? tree.filter((n) => n.name.toLowerCase().includes(search.toLowerCase()))
-    : tree;
-
   return (
     <div className="space-y-1">
       {selectedName && (
@@ -120,7 +115,7 @@ export const CategoryTreePicker = ({ value, onChange }: CategoryTreePickerProps)
         </div>
       )}
       <div className="max-h-[200px] overflow-y-auto rounded-md border">
-        {filtered.map((root) => (
+        {tree.map((root) => (
           <TreePickerRow
             key={root.id}
             node={root}

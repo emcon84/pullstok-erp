@@ -16,15 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { CategoryTreePicker } from "@/components/molecules/CategoryTreePicker";
 import { useCreateProduct } from "@/components/hooks/useProducts";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   VariantDefinition,
   getCategoryVariants,
-  updateProduct,
 } from "@/services/onboardingService";
+import { updateProduct } from "@/services/productService";
 import { API_URL } from "@/constants";
 import type { DataItem } from "@/types";
 
