@@ -12,9 +12,9 @@ import { GenericModal } from "../components/molecules/GenericModal";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { StatCard } from "../components/molecules/StatCard";
 import { ProductsTable } from "../components/molecules/ProductsTable";
+import { ProductDrawer } from "../components/molecules/ProductDrawer";
 import { Statistics } from "./Statistics";
 import { useProducts } from "../components/hooks/useProducts";
-import { ModalContent } from "../components/molecules/GenericModal/ModalContent";
 import { DataItem } from "../types";
 import { useGetSales, useCreateSale } from "../components/hooks/useSales";
 import { Loader } from "../components/atoms/loader";
@@ -27,10 +27,10 @@ import { toast } from "react-toastify";
 type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
 
 export const Dashboard = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerProduct, setDrawerProduct] = useState<DataItem | null>(null);
   const [isModalSalesOpen, setIsModalSalesOpen] = useState(false);
   const [isModalUploadOpen, setIsModalUploadOpen] = useState(false);
-  const [selectedData, setSelectedData] = useState<DataItem | null>(null);
   const [filter, setFilter] = useState("");
   const [selectedStat, setSelectedStat] = useState<StatType>(null);
 
@@ -44,17 +44,17 @@ export const Dashboard = () => {
   const { orders, loading: loadingOrders } = useOrders();
   const { createSale } = useCreateSale();
 
-  const addProduct = () => setIsModalOpen(true);
+  const addProduct = () => { setDrawerProduct(null); setDrawerOpen(true); };
   const addSales = () => setIsModalSalesOpen(true);
   const addUpload = () => setIsModalUploadOpen(true);
 
-  const openModal = (data: DataItem) => {
-    setSelectedData(data);
-    setIsModalOpen(true);
+  const openEditDrawer = (data: DataItem) => {
+    setDrawerProduct(data);
+    setDrawerOpen(true);
   };
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setSelectedData(null);
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setDrawerProduct(null);
   };
   const closeModalSales = () => setIsModalSalesOpen(false);
   const closeModalUpload = () => setIsModalUploadOpen(false);
@@ -175,16 +175,10 @@ export const Dashboard = () => {
       </div>
 
       {/* Tabla de productos / stock */}
-      <ProductsTable products={filteredProducts} onEdit={openModal} />
+      <ProductsTable products={filteredProducts} onEdit={openEditDrawer} />
 
-      {/* Modales (lógica intacta) */}
-      <GenericModal isOpen={isModalOpen} onClose={closeModal}>
-        <ModalContent
-          selectedData={selectedData}
-          setSelectedData={setSelectedData}
-          closeModalEdit={closeModal}
-        />
-      </GenericModal>
+      {/* Product Drawer (create/edit) */}
+      <ProductDrawer open={drawerOpen} onClose={closeDrawer} product={drawerProduct} />
 
       <SalesDrawer
         isOpen={isModalSalesOpen}
