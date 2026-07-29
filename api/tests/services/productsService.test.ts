@@ -83,6 +83,35 @@ describe('productsService', () => {
         where: { organizationId, name: 'Electricidad' },
       });
     });
+
+    it('resuelve rutas con > (ej: "Perros > Alimento Seco") paso a paso', async () => {
+      mockedPrisma.category.findFirst
+        .mockResolvedValueOnce({ id: 'perros-id', name: 'Perros', organizationId, parentId: null })
+        .mockResolvedValueOnce({ id: 'seco-id', name: 'Alimento Seco (Balanceado)', organizationId, parentId: 'perros-id' });
+
+      const result = await resolveCategoryId('Perros > Alimento Seco (Balanceado)', organizationId);
+
+      expect(result).toBe('seco-id');
+      expect(mockedPrisma.category.findFirst).toHaveBeenCalledTimes(2);
+      expect(mockedPrisma.category.findFirst).toHaveBeenNthCalledWith(1, {
+        where: { organizationId, name: 'Perros', parentId: null },
+      });
+      expect(mockedPrisma.category.findFirst).toHaveBeenNthCalledWith(2, {
+        where: { organizationId, name: 'Alimento Seco (Balanceado)', parentId: 'perros-id' },
+      });
+    });
+
+    it('crea niveles faltantes en rutas', async () => {
+      mockedPrisma.category.findFirst.mockResolvedValue(null);
+      mockedPrisma.category.create
+        .mockResolvedValueOnce({ id: 'new-perros', name: 'Perros', organizationId, parentId: null })
+        .mockResolvedValueOnce({ id: 'new-seco', name: 'Alimento Seco', organizationId, parentId: 'new-perros' });
+
+      const result = await resolveCategoryId('Perros > Alimento Seco', organizationId);
+
+      expect(result).toBe('new-seco');
+      expect(mockedPrisma.category.create).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('bulkAddProducts', () => {

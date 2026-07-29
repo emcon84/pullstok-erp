@@ -28,6 +28,27 @@ export const resolveCategoryId = async (
   const name = categoryName?.trim();
   if (!name) return null;
 
+  // Path-based lookup: "Perros > Alimento Seco (Balanceado)"
+  if (name.includes(">")) {
+    const parts = name.split(">").map(s => s.trim()).filter(Boolean);
+    let parentId: string | null = null;
+
+    for (const part of parts) {
+      let cat: { id: string; name: string; organizationId: string } | null = await basePrisma.category.findFirst({
+        where: { organizationId, name: part, parentId },
+      });
+      if (!cat) {
+        cat = await basePrisma.category.create({
+          data: { name: part, organizationId, parentId: parentId as any },
+        });
+      }
+      parentId = cat.id;
+    }
+
+    return parentId;
+  }
+
+  // Simple name lookup (backward compat)
   const existing = await basePrisma.category.findFirst({
     where: { organizationId, name },
   });
