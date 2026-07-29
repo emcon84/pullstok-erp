@@ -1,149 +1,149 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { BrowserMultiFormatReader } from "@zxing/library";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader } from "@/components/atoms/loader";
-import { Camera, CameraOff, Plus, Minus, RefreshCw, Search } from "lucide-react";
+import { Camera, CameraOff, Plus, Minus, Search } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 interface ScannedProduct {
-  id: string;
-  name: string;
-  code: string;
-  price: number;
-  quantity: number;
-  description: string | null;
+  id: string; name: string; code: string; price: number;
+  quantity: number; description: string | null;
   category: { name: string } | null;
-  variantAssignments: {
-    option: { value: string; variant: { name: string } };
-  }[];
+  variantAssignments: { option: { value: string; variant: { name: string } } }[];
 }
 
 export const StockScannerPage = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const detectorRef = useRef<any>(null);
+  const intervalRef = useRef<any>(null);
 
   const [scanning, setScanning] = useState(false);
-  const [lastCode, setLastCode] = useState("");
   const [manualCode, setManualCode] = useState("");
   const [product, setProduct] = useState<ScannedProduct | null>(null);
   const [loading, setLoading] = useState(false);
   const [adjustQty, setAdjustQty] = useState("");
 
-  const headers = useCallback(() => ({
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-    "Content-Type": "application/json",
-  }), []);
+  const token = localStorage.getItem("token") || "";
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  const lookupProduct = useCallback(async (code: string) => {
-    if (!code.trim() || code === lastCode) return;
-    setLastCode(code);
+  const lookupProduct = async (code: string) => {
+    const c = code.trim();
+    if (!c) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/products/by-code/${encodeURIComponent(code)}`, { headers: headers() });
+      const res = await fetch(`${API_URL}/products/by-code/${encodeURIComponent(c)}`, { headers });
       if (!res.ok) {
         setProduct(null);
-        toast.error("Producto no encontrado");
+        toast.error("Producto no encontrado: " + c);
       } else {
         const data = await res.json();
         setProduct(data);
         toast.success(data.name);
+        // Stop scanning after found
+        stopScanner();
       }
-    } catch {
-      toast.error("Error al buscar producto");
-    }
+    } catch { toast.error("Error al buscar"); }
     setLoading(false);
-  }, [headers, lastCode]);
+  };
 
   const startScanner = async () => {
+    setProduct(null);
     try {
-      const reader = new BrowserMultiFormatReader();
-      readerRef.current = reader;
+      // Check for native BarcodeDetector API (Chrome 88+)
+      if ("BarcodeDetector" in window) {
+        const formats = await (window as any).BarcodeDetector.getSupportedFormats();
+        detectorRef.current = new (window as any).BarcodeDetector({ formats });
 
-      const devices = await reader.listVideoInputDevices();
-      const backCamera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
-      if (!backCamera) {
-        toast.error("No se encontró cámara");
-        return;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+        });
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+        setScanning(true);
+
+        // Poll frames
+        const scan = async () => {
+          if (!detectorRef.current || !videoRef.current || !scanning) return;
+          try {
+            const barcodes = await detectorRef.current.detect(videoRef.current);
+            if (barcodes.length > 0) {
+              lookupProduct(barcodes[0].rawValue);
+            }
+          } catch {}
+          if (scanning) intervalRef.current = setTimeout(scan, 200);
+        };
+        scan();
+      } else {
+        // Fallback: try ZXing
+        const { BrowserMultiFormatReader } = await import("@zxing/library");
+        const reader = new BrowserMultiFormatReader();
+        const devices = await reader.listVideoInputDevices();
+        const cam = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
+        if (!cam) { toast.error("No se encontró cámara"); return; }
+
+        await reader.decodeFromVideoDevice(cam.deviceId, videoRef.current!, (result, err) => {
+          if (result) lookupProduct(result.getText());
+        });
+        setScanning(true);
       }
-
-      await reader.decodeFromVideoDevice(backCamera.deviceId, videoRef.current!, (result, err) => {
-        if (result) {
-          const code = result.getText();
-          lookupProduct(code);
-        }
-        if (err && !(err as any)?.message?.includes("NotFound")) {
-          // Silenciar errores de frame sin barcode
-        }
-      });
-      setScanning(true);
     } catch (e: any) {
-      toast.error("Error al iniciar cámara: " + e.message);
+      toast.error("Cámara: " + (e.message || "Permiso denegado"));
+      setScanning(false);
     }
   };
 
   const stopScanner = () => {
-    readerRef.current?.reset();
-    readerRef.current = null;
     setScanning(false);
+    if (intervalRef.current) clearTimeout(intervalRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
   };
 
-  useEffect(() => {
-    return () => { readerRef.current?.reset(); };
-  }, []);
+  useEffect(() => { return () => stopScanner(); }, []);
 
   const updateStock = async (newQty: number) => {
     if (!product) return;
     try {
-      const res = await fetch(`${API_URL}/products/${product.id}`, {
-        method: "PUT",
-        headers: headers(),
+      await fetch(`${API_URL}/products/${product.id}`, {
+        method: "PUT", headers,
         body: JSON.stringify({ quantity: newQty }),
       });
-      if (res.ok) {
-        setProduct(prev => prev ? { ...prev, quantity: newQty } : prev);
-        toast.success(`Stock: ${newQty}`);
-      } else {
-        toast.error("Error al actualizar stock");
-      }
-    } catch {
-      toast.error("Error de conexión");
-    }
+      setProduct(prev => prev ? { ...prev, quantity: newQty } : prev);
+      toast.success(`Stock: ${newQty}`);
+    } catch { toast.error("Error al actualizar"); }
   };
 
-  const adj = (delta: number) => product && updateStock(product.quantity + delta);
+  const adj = (d: number) => product && updateStock(product.quantity + d);
 
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4">
       <h1 className="text-xl font-semibold">Escanear Producto</h1>
 
-      {/* Camera viewfinder */}
-      <Card className="relative overflow-hidden bg-black aspect-square">
-        <video ref={videoRef} className="h-full w-full object-cover" playsInline />
+      <Card className="relative aspect-square overflow-hidden bg-black">
+        <video ref={videoRef} className="h-full w-full object-cover" playsInline autoPlay muted />
         {!scanning && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white gap-3">
-            <Camera className="h-12 w-12" />
-            <span>Cámara apagada</span>
+            <Camera className="h-10 w-10" />
+            <span className="text-sm">Cámara apagada</span>
           </div>
         )}
-        {/* Crosshair overlay */}
         {scanning && (
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-[15%] border-2 border-green-400/60 rounded-lg">
-              <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-green-400 rounded-tl" />
-              <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-green-400 rounded-tr" />
-              <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-green-400 rounded-bl" />
-              <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-green-400 rounded-br" />
+            <div className="absolute inset-[20%] rounded-lg border-2 border-green-400/70" />
+            <div className="absolute bottom-4 left-0 right-0 text-center">
+              <span className="rounded-full bg-black/50 px-3 py-1 text-xs text-white">Escaneando...</span>
             </div>
           </div>
         )}
       </Card>
 
-      {/* Controls */}
       <div className="flex gap-2">
         {!scanning ? (
           <Button onClick={startScanner} className="flex-1"><Camera className="h-4 w-4 mr-2" />Iniciar cámara</Button>
@@ -152,72 +152,42 @@ export const StockScannerPage = () => {
         )}
       </div>
 
-      {/* Manual code input */}
       <div className="flex gap-2">
-        <Input
-          placeholder="O escribí el código..."
-          value={manualCode}
-          onChange={e => setManualCode(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && lookupProduct(manualCode)}
-        />
+        <Input placeholder="O escribí el código..." value={manualCode} onChange={e => setManualCode(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && lookupProduct(manualCode)} />
         <Button onClick={() => lookupProduct(manualCode)} size="icon"><Search className="h-4 w-4" /></Button>
       </div>
 
-      {/* Loading */}
-      {loading && (
-        <div className="flex justify-center py-8"><Loader /></div>
-      )}
+      {loading && <div className="text-center py-4 text-muted-foreground">Buscando...</div>}
 
-      {/* Product card */}
       {product && !loading && (
-        <Card className="p-4 space-y-3 animate-in fade-in slide-in-from-bottom-4">
+        <Card className="p-4 space-y-3">
           <div>
             <h2 className="text-lg font-semibold">{product.name}</h2>
-            {product.description && (
-              <p className="text-sm text-muted-foreground mt-1">{product.description}</p>
-            )}
+            {product.description && <p className="text-sm text-muted-foreground mt-1">{product.description}</p>}
           </div>
-
           <div className="flex flex-wrap gap-2">
             {product.code && <Badge variant="outline">{product.code}</Badge>}
             {product.category && <Badge variant="secondary">{product.category.name}</Badge>}
           </div>
-
-          {/* Variants */}
           {product.variantAssignments?.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {product.variantAssignments.map((va, i) => (
-                <Badge key={i} variant="outline" className="text-xs">
-                  {va.option.variant.name}: {va.option.value}
-                </Badge>
+                <Badge key={i} variant="outline" className="text-xs">{va.option.variant.name}: {va.option.value}</Badge>
               ))}
             </div>
           )}
-
-          {/* Stock adjustment */}
           <div className="flex items-center gap-3 pt-2 border-t">
-            <span className="text-sm font-medium text-muted-foreground">Stock:</span>
-            <span className={`text-2xl font-bold ${product.quantity <= 0 ? "text-destructive" : "text-foreground"}`}>
-              {product.quantity}
-            </span>
+            <span className="text-sm text-muted-foreground">Stock:</span>
+            <span className={`text-2xl font-bold ${product.quantity <= 0 ? "text-destructive" : ""}`}>{product.quantity}</span>
             <div className="flex gap-1 ml-auto">
               <Button size="icon" variant="outline" onClick={() => adj(-1)}><Minus className="h-4 w-4" /></Button>
               <Button size="icon" variant="outline" onClick={() => adj(1)}><Plus className="h-4 w-4" /></Button>
             </div>
           </div>
-
-          {/* Manual quantity set */}
           <div className="flex gap-2">
-            <Input
-              type="number"
-              placeholder="Cantidad..."
-              value={adjustQty}
-              onChange={e => setAdjustQty(e.target.value)}
-              className="h-9"
-            />
-            <Button size="sm" onClick={() => { const q = parseInt(adjustQty); if (!isNaN(q)) { updateStock(q); setAdjustQty(""); } }}>
-              <RefreshCw className="h-4 w-4 mr-1" />Actualizar
-            </Button>
+            <Input type="number" placeholder="Cantidad..." value={adjustQty} onChange={e => setAdjustQty(e.target.value)} className="h-9" />
+            <Button size="sm" onClick={() => { const q = parseInt(adjustQty); if (!isNaN(q)) { updateStock(q); setAdjustQty(""); } }}>Actualizar</Button>
           </div>
         </Card>
       )}
