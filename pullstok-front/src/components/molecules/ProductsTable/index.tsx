@@ -2,6 +2,9 @@ import { useState } from "react";
 import {
   Pencil,
   Trash2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   ImageIcon,
   ChevronsLeft,
   ChevronLeft,
@@ -42,12 +45,32 @@ interface ProductsTableProps {
 
 export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<"name" | "code" | "quantity" | "price">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const { deleteProduct, loading } = useDeleteProduct();
   const confirm = useConfirm();
 
-  const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
+  const sorted = [...products].sort((a, b) => {
+    const aVal = sortBy === "quantity" ? Number(a.quantity) : sortBy === "price" ? Number(a.price) : (a[sortBy] || "").toString().toLowerCase();
+    const bVal = sortBy === "quantity" ? Number(b.quantity) : sortBy === "price" ? Number(b.price) : (b[sortBy] || "").toString().toLowerCase();
+    if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const current = Math.min(page, totalPages);
-  const slice = products.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const slice = sorted.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+
+  const toggleSort = (col: typeof sortBy) => {
+    if (sortBy === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortBy(col); setSortDir("asc"); }
+  };
+
+  const SortIcon = ({ col }: { col: typeof sortBy }) => {
+    if (sortBy !== col) return <ArrowUpDown className="h-3 w-3 text-muted-foreground/40" />;
+    return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+  };
 
   const handleDelete = async (id?: string) => {
     if (!id) return;
@@ -66,11 +89,20 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead>Producto</TableHead>
+            <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
+              <div className="flex items-center gap-1">Producto <SortIcon col="name" /></div>
+            </TableHead>
+            <TableHead className="cursor-pointer select-none hidden sm:table-cell" onClick={() => toggleSort("code")}>
+              <div className="flex items-center gap-1">Código <SortIcon col="code" /></div>
+            </TableHead>
             <TableHead>Categoría</TableHead>
             <TableHead>Variantes</TableHead>
-            <TableHead className="text-center">Stock</TableHead>
-            <TableHead className="text-right">Precio</TableHead>
+            <TableHead className="text-center cursor-pointer select-none" onClick={() => toggleSort("quantity")}>
+              <div className="flex items-center justify-center gap-1">Stock <SortIcon col="quantity" /></div>
+            </TableHead>
+            <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("price")}>
+              <div className="flex items-center justify-end gap-1">Precio <SortIcon col="price" /></div>
+            </TableHead>
             <TableHead className="w-[100px] text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
@@ -78,7 +110,7 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
           {slice.length === 0 && (
             <TableRow>
               <TableCell
-                colSpan={6}
+                colSpan={7}
                 className="h-32 text-center text-muted-foreground"
               >
                 No hay productos todavía.
@@ -122,6 +154,11 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
                       )}
                     </div>
                   </div>
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {p.code || "—"}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <span className="text-sm text-muted-foreground">
