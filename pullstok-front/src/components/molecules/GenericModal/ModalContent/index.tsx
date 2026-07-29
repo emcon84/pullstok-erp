@@ -118,6 +118,7 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
         image: imageUrl,
         price: parseFloat(selectedData.price?.toString() || "0"),
         quantity: parseInt(selectedData.quantity?.toString() || "0"),
+        categoryId: selectedData.categoryId || null,
         variantOptionIds,
       };
 
