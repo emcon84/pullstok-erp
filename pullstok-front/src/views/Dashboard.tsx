@@ -89,10 +89,12 @@ export const Dashboard = () => {
     );
   }
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(filter.toLowerCase()) ||
-    (product.code && product.code.toLowerCase().includes(filter.toLowerCase())),
-  );
+  const filterWords = filter.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+  const filteredProducts = products.filter((product) => {
+    if (filterWords.length === 0) return true;
+    const haystack = `${product.name} ${product.code || ""}`.toLowerCase();
+    return filterWords.every(w => haystack.includes(w));
+  });
 
   if (selectedStat) {
     return (

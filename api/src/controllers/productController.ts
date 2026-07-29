@@ -219,11 +219,22 @@ const getProducts = async (req: Request, res: Response) => {
 
     if (name) {
       const searchTerm = name as string;
-      // Search by name OR code (for scanner lookup)
-      where.OR = [
-        { name: { contains: searchTerm, mode: "insensitive" } },
-        { code: { contains: searchTerm, mode: "insensitive" } },
-      ];
+      // Split into words and search each — "Cat chow carne" matches
+      // "CAT CHOW ADULTOS CARNE X 15 KG" even with words in between.
+      const words = searchTerm.split(/\s+/).filter(w => w.length > 0);
+      if (words.length > 1) {
+        where.AND = words.map(w => ({
+          OR: [
+            { name: { contains: w, mode: "insensitive" } },
+            { code: { contains: w, mode: "insensitive" } },
+          ],
+        }));
+      } else {
+        where.OR = [
+          { name: { contains: searchTerm, mode: "insensitive" } },
+          { code: { contains: searchTerm, mode: "insensitive" } },
+        ];
+      }
     }
     if (category) {
       where.category = { name: category as string };
