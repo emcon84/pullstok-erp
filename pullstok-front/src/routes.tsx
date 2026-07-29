@@ -215,7 +215,7 @@ const AppRoutes = () => (
         <Route path="/facturacion/:id/editar" element={<InvoiceForm />} />
         <Route path="/usuarios" element={<UsersPage />} />
         <Route path="/sucursales" element={<BranchesPage />} />
-        <Route path="/escaner" element={<StockScannerPage />} />
+        <Route path="/scanner" element={<StockScannerPage />} />
       </Route>
 
       {/* Panel superadmin (sdd/planes-y-billing): rutas de plataforma, fuera

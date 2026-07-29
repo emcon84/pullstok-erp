@@ -19,7 +19,7 @@ export default defineConfig({
         background_color: "#18181b",
         display: "standalone",
         orientation: "any",
-        start_url: "/escaner",
+        start_url: "/scanner",
         scope: "/",
         icons: [
           { src: "/icon-192.png", sizes: "192x192", type: "image/png" },

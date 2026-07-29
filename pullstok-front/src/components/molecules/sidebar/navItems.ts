@@ -56,7 +56,7 @@ export const navItems: NavItem[] = [
   { to: "/asistente-ia", label: "Asistente IA", icon: Bot, moduleKey: "bot", visibleRoles: ["ADMIN", "MANAGEMENT"] },
   { to: "/usuarios", label: "Usuarios", icon: UserPlus, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT"] },
   { to: "/sucursales", label: "Sucursales", icon: Building, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT"] },
-  { to: "/escaner", label: "Escaner", icon: ScanLine, moduleKey: null },
+  { to: "/scanner", label: "Scanner", icon: ScanLine, moduleKey: null },
 ];
 
 /**
