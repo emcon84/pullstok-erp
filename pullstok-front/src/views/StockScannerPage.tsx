@@ -100,8 +100,6 @@ export const StockScannerPage = () => {
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4">
       <h1 className="text-xl font-semibold">Scanner</h1>
-      {/* Debug: always visible */}
-      <p className="text-xs text-muted-foreground">API: {API_URL}</p>
 
       {/* Camera */}
       <Card className="relative aspect-square overflow-hidden bg-black rounded-xl">
