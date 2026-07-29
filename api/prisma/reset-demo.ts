@@ -281,17 +281,18 @@ async function main() {
     node: { name: string; children?: any[]; variants?: { name: string; options: string[] }[] },
     parentId: string | null,
   ) {
-    const cat = await prisma.category.upsert({
+    let cat = await prisma.category.findFirst({
       where: {
-        organizationId_parentId_name: {
-          organizationId: org.id,
-          parentId: parentId ?? null as any,
-          name: node.name,
-        },
+        organizationId: org.id,
+        name: node.name,
+        parentId: parentId ?? null as any,
       },
-      update: {},
-      create: { name: node.name, organizationId: org.id, parentId: parentId as any },
     });
+    if (!cat) {
+      cat = await prisma.category.create({
+        data: { name: node.name, organizationId: org.id, parentId: parentId as any },
+      });
+    }
     if (node.variants && node.variants.length > 0) {
       for (const v of node.variants) {
         const def = await prisma.categoryVariantDefinition.upsert({

@@ -209,17 +209,20 @@ async function main() {
     node: { name: string; children?: any[]; variants?: { name: string; options: string[] }[] },
     parentId: string | null,
   ) {
-    const cat = await prisma.category.upsert({
+    // Prisma 7: @@unique([orgId, parentId, name]) no acepta null en el where del upsert.
+    // Usamos findFirst + create en vez de upsert para soportar parentId nullable.
+    let cat = await prisma.category.findFirst({
       where: {
-        organizationId_parentId_name: {
-          organizationId: org.id,
-          parentId: parentId ?? null as any,
-          name: node.name,
-        },
+        organizationId: org.id,
+        name: node.name,
+        parentId: parentId ?? null as any,
       },
-      update: {},
-      create: { name: node.name, organizationId: org.id, parentId: parentId as any },
     });
+    if (!cat) {
+      cat = await prisma.category.create({
+        data: { name: node.name, organizationId: org.id, parentId: parentId as any },
+      });
+    }
 
     // Seed variants for leaf categories
     if (node.variants && node.variants.length > 0) {
