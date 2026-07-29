@@ -1,0 +1,1 @@
+import{j as a}from"./index.DEVET6Ep.js";import{D as r,a as i,c as l}from"./dialog.DFbLmf2z.js";const m=({isOpen:s,onClose:e,children:n})=>a.jsx(r,{open:s,onOpenChange:o=>{o||e()},children:a.jsxs(i,{className:"max-w-lg",children:[a.jsx(l,{className:"sr-only",children:"Ventana"}),n]})});export{m as G};

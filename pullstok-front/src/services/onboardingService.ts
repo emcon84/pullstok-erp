@@ -33,7 +33,7 @@ export interface Organization {
 export interface Me {
   id: string;
   email: string;
-  role: "SUPERADMIN" | "ADMIN" | "EMPLOYEE";
+  role: "SUPERADMIN" | "ADMIN" | "MANAGEMENT" | "VENDEDOR" | "CASHIER" | "EMPLOYEE";
   organizationId: string;
   mustChangePassword: boolean;
   organization: Organization;

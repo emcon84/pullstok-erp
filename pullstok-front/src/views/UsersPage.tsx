@@ -38,7 +38,6 @@ import {
   setUserActive as setUserActiveApi,
   type UserData,
 } from "@/services/userService";
-import { type BranchData } from "@/services/branchService";
 import { ROLE_DISPLAY, type Role } from "@/constants/rolePermissions";
 
 const ORG_ROLES: Role[] = ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER", "EMPLOYEE"];
