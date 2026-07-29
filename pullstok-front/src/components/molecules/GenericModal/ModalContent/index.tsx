@@ -120,12 +120,12 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
         quantity: parseInt(selectedData.quantity?.toString() || "0"),
         variantOptionIds,
       };
+
+      const productId = selectedData._id || selectedData.id;
       // On edit, convert empty categoryId to null so backend can clear it
       if (productId && !selectedData.categoryId) {
         productData.categoryId = null;
       }
-
-      const productId = selectedData._id || selectedData.id;
       if (productId) {
         await updateProduct(productData);
       } else {
