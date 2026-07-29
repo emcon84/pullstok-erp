@@ -210,14 +210,24 @@ export const StockScannerPage = () => {
               {searchResults.map(p => (
                 <button
                   key={p.id}
-                  className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                  className="w-full rounded-md px-3 py-2 text-left hover:bg-accent transition-colors"
                   onClick={() => assignCode(p.id, notFoundCode)}
                   disabled={assigning}
                 >
-                  <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 truncate">{p.name}</span>
-                  {p.code && <Badge variant="outline" className="text-xs shrink-0">{p.code}</Badge>}
-                  {p.category && <span className="text-xs text-muted-foreground shrink-0">{p.category.name}</span>}
+                  <div className="flex items-center gap-2">
+                    <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    {p.code && <Badge variant="secondary" className="text-xs shrink-0 font-mono">{p.code}</Badge>}
+                    <span className="flex-1 truncate text-sm font-medium">{p.name}</span>
+                  </div>
+                  {(p.variantAssignments?.length > 0 || p.category) && (
+                    <div className="flex flex-wrap gap-1 mt-1.5 ml-6">
+                      {p.variantAssignments?.map((va: any, i: number) => (
+                        <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 h-5">
+                          {va.option?.variant?.name}: {va.option?.value}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
