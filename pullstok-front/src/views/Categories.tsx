@@ -126,6 +126,19 @@ const TreeNodeRow = ({
   const isLeaf = (node._count?.children ?? 0) === 0;
   const childCount = node._count?.children ?? 0;
   const variantCount = node._count?.variantDefs ?? 0;
+  const canExpand = childCount > 0 || (isLeaf && variantCount > 0);
+
+  // Load variants on expand for leaf nodes
+  const [loadedVariants, setLoadedVariants] = useState<VariantDefinition[]>([]);
+  const [variantsLoaded, setVariantsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (node.expanded && isLeaf && variantCount > 0 && !variantsLoaded) {
+      getCategoryVariants(node.id)
+        .then(d => { setLoadedVariants(d); setVariantsLoaded(true); })
+        .catch(() => setVariantsLoaded(true));
+    }
+  }, [node.expanded, node.id, isLeaf, variantCount, variantsLoaded]);
 
   return (
     <>
@@ -134,7 +147,7 @@ const TreeNodeRow = ({
         style={{ paddingLeft: `${depth * 1.5 + 1}rem` }}
       >
         {/* Expand toggle */}
-        {childCount > 0 ? (
+        {canExpand ? (
           <button
             onClick={() => onToggle(node.id)}
             className="text-muted-foreground hover:text-foreground"
@@ -187,8 +200,9 @@ const TreeNodeRow = ({
               </div>
               <span className="truncate font-medium text-sm">{node.name}</span>
               {isLeaf && variantCount > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {variantCount} var
+                <Badge variant="secondary" className="text-xs cursor-pointer" title="Click para ver variantes">
+                  {variantCount} variante{variantCount !== 1 ? 's' : ''}
+                  {node.expanded ? ' ▲' : ' ▼'}
                 </Badge>
               )}
               {!isLeaf && childCount > 0 && (
@@ -237,6 +251,27 @@ const TreeNodeRow = ({
           </>
         )}
       </div>
+
+      {/* Variant details — show inline when leaf expanded */}
+      {node.expanded && isLeaf && variantsLoaded && loadedVariants.length > 0 && (
+        loadedVariants.map(def => (
+          <div
+            key={def.id}
+            className="flex items-center gap-2 border-b bg-muted/20 py-2"
+            style={{ paddingLeft: `${(depth + 1) * 1.5 + 1}rem`, paddingRight: '1rem' }}
+          >
+            <Tags className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground min-w-[60px]">{def.name}:</span>
+            <div className="flex flex-wrap gap-1">
+              {def.options?.map(opt => (
+                <Badge key={opt.id} variant="outline" className="text-[10px] px-1.5 py-0 h-5">
+                  {opt.value}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
 
       {/* Inline add-child row */}
       {addingUnder === node.id && (
