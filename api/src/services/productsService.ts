@@ -82,20 +82,27 @@ export const bulkAddProducts = async (
     fs.createReadStream(filePath)
       .pipe(csvParser())
       .on("data", (row: any) => {
+        // Strip BOM from column names (Excel UTF-8 CSVs)
+        const cleanRow: Record<string, string> = {};
+        for (const key of Object.keys(row)) {
+          const cleanKey = key.replace(/^\uFEFF/, "").trim();
+          cleanRow[cleanKey] = row[key];
+        }
+
         // Separate known columns from variant columns
         const variantColumns: Record<string, string> = {};
-        for (const key of Object.keys(row)) {
-          if (!KNOWN_COLUMNS.has(key) && row[key]?.trim()) {
-            variantColumns[key] = row[key].trim();
+        for (const key of Object.keys(cleanRow)) {
+          if (!KNOWN_COLUMNS.has(key) && cleanRow[key]?.trim()) {
+            variantColumns[key] = cleanRow[key].trim();
           }
         }
         rows.push({
-          name: row.name,
-          price: parseFloat(row.price),
-          description: row.description,
-          category: row.category,
-          image: row.image,
-          quantity: parseInt(row.quantity, 10),
+          name: cleanRow.name,
+          price: parseFloat(cleanRow.price),
+          description: cleanRow.description,
+          category: cleanRow.category,
+          image: cleanRow.image,
+          quantity: parseInt(cleanRow.quantity, 10),
           _variantColumns: Object.keys(variantColumns).length > 0 ? variantColumns : undefined,
         });
       })
