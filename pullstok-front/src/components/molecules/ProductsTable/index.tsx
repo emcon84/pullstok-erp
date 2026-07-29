@@ -125,7 +125,7 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
                 </TableCell>
                 <TableCell>
                   <span className="text-sm text-muted-foreground">
-                    {p.category?.name || p.category || "—"}
+                    {(p.category as any)?.name || p.category || "—"}
                   </span>
                 </TableCell>
                 <TableCell>

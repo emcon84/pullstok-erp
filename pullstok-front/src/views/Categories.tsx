@@ -15,13 +15,6 @@ import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -39,7 +32,7 @@ import {
   deleteCategory,
   getCategoryVariants,
   createVariant,
-  updateVariant,
+
   deleteVariant,
   createVariantOption,
   updateVariantOption,
@@ -110,8 +103,8 @@ interface TreeNodeRowProps {
 const TreeNodeRow = ({
   node,
   depth,
-  parents,
-  allCategories,
+
+
   onToggle,
   onEdit,
   onDelete,
