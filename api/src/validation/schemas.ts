@@ -41,9 +41,35 @@ export const updateOrganizationSchema = z.object({
 // ---------- Categorías ----------
 export const createCategoriesSchema = z.object({
   names: z.array(z.string().min(1)).min(1, "Debe enviar al menos una categoría"),
+  parentId: z.string().uuid().optional(),
+});
+export const createCategorySchema = z.object({
+  name: z.string().min(1, "El nombre es requerido"),
+  parentId: z.string().uuid().optional(),
 });
 export const updateCategorySchema = z.object({
+  name: z.string().min(1, "El nombre es requerido").optional(),
+  parentId: z.string().uuid().nullable().optional(),
+});
+
+// ---------- Variant Definitions ----------
+export const createVariantSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
+  sortOrder: z.number().int().optional(),
+});
+export const updateVariantSchema = z.object({
+  name: z.string().min(1, "El nombre es requerido").optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+// ---------- Variant Options ----------
+export const createVariantOptionSchema = z.object({
+  value: z.string().min(1, "El valor es requerido"),
+  sortOrder: z.number().int().optional(),
+});
+export const updateVariantOptionSchema = z.object({
+  value: z.string().min(1, "El valor es requerido").optional(),
+  sortOrder: z.number().int().optional(),
 });
 
 // ---------- Plataforma / usuarios ----------
@@ -121,6 +147,9 @@ export const createProductSchema = z.object({
   // Visibilidad en la tienda online (WS4). Opcional en alta/edición general;
   // el toggle dedicado de la UI usa publishProductSchema (PATCH /publish).
   publishedToStore: z.boolean().optional(),
+  // Variant option IDs (categories-variants-redesign). Array de UUIDs de
+  // CategoryVariantOption. El controller valida pertenencia a la categoría.
+  variantOptionIds: z.array(z.string().uuid()).optional(),
 });
 // En edición, categoryId puede venir null: un producto sin categoría es válido
 // (la FK es nullable en la DB). createProductSchema lo exige string min(1), así
@@ -131,6 +160,7 @@ export const updateProductSchema = createProductSchema.partial().extend({
     .min(1, "La categoría es requerida")
     .nullable()
     .optional(),
+  variantOptionIds: z.array(z.string().uuid()).optional(),
 });
 
 // Toggle dedicado "Publicar en tienda" (WS4 — UI de Tienda/listado de
@@ -149,6 +179,7 @@ const bulkProductSchema = z.object({
   category: z.string().min(1, "La categoría es requerida"),
   image: z.string().optional(),
   quantity: z.coerce.number().int().nonnegative("La cantidad no puede ser negativa"),
+  variantOptionIds: z.array(z.string().uuid()).optional(),
 });
 export const bulkProductsSchema = z.array(bulkProductSchema).min(1);
 

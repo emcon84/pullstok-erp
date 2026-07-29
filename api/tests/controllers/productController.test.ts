@@ -9,6 +9,13 @@ jest.mock('../../src/config/db', () => ({
     },
     product: {
       create: jest.fn(),
+      findFirst: jest.fn(),
+    },
+    categoryVariantOption: {
+      findMany: jest.fn(),
+    },
+    productVariant: {
+      createMany: jest.fn(),
     },
   },
 }));
@@ -19,7 +26,9 @@ jest.mock('../../src/config/tenantContext', () => ({
 
 const mockedPrisma = prisma as unknown as {
   category: { findFirst: jest.Mock };
-  product: { create: jest.Mock };
+  product: { create: jest.Mock; findFirst: jest.Mock };
+  categoryVariantOption: { findMany: jest.Mock };
+  productVariant: { createMany: jest.Mock };
 };
 
 const mockRequest = (body: any) => ({ body } as Request);
@@ -40,6 +49,7 @@ describe('productController.createProduct', () => {
     mockedPrisma.category.findFirst.mockResolvedValue({ id: categoryId, name: 'Herramientas' });
     const createdProduct = { id: 'prod-1', name: 'Martillo', categoryId };
     mockedPrisma.product.create.mockResolvedValue(createdProduct);
+    mockedPrisma.product.findFirst.mockResolvedValue(createdProduct);
 
     const req = mockRequest({ name: 'Martillo', price: 100, quantity: 5, categoryId });
     const res = mockResponse();
@@ -68,22 +78,19 @@ describe('productController.createProduct', () => {
   });
 
   it('rechaza con 400 si el categoryId pertenece a otra organización (findFirst no la encuentra por scope automático)', async () => {
-    // La extensión multi-tenant de db.ts inyecta organizationId en el `where`
-    // de findFirst automáticamente — si la categoría es de otra org, el mock
-    // de prisma (que simula ESE comportamiento ya filtrado) devuelve null,
-    // exactamente igual que con un id inexistente.
     mockedPrisma.category.findFirst.mockResolvedValue(null);
 
     const req = mockRequest({
       name: 'Martillo',
       price: 100,
       quantity: 5,
-      categoryId: 'cat-de-otra-organizacion',
+      categoryId: 'cat-cross-tenant',
     });
     const res = mockResponse();
 
     await productController.createProduct(req, res);
 
+    expect(mockedPrisma.product.create).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ message: 'La categoría indicada no existe' });
   });

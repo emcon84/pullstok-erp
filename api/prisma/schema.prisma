@@ -52,6 +52,9 @@ model Organization {
   users                 User[]
   products              Product[]
   categories            Category[]
+  variantDefs           CategoryVariantDefinition[]
+  variantOptions        CategoryVariantOption[]
+  productVariants       ProductVariant[]
   customers             Customer[]
   orders                Order[]
   quotations            Quotation[]
@@ -138,33 +141,79 @@ model Customer {
 }
 
 model Category {
-  id             String       @id @default(uuid())
+  id             String                       @id @default(uuid())
   name           String
+  parentId       String?
+  parent         Category?                    @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children       Category[]                   @relation("CategoryHierarchy")
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization                 @relation(fields: [organizationId], references: [id])
   products       Product[]
+  variantDefs    CategoryVariantDefinition[]
 
-  @@unique([organizationId, name])
+  @@unique([organizationId, parentId, name])
   @@map("categories")
 }
 
+model CategoryVariantDefinition {
+  id             String                   @id @default(uuid())
+  categoryId     String
+  category       Category                 @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name           String
+  sortOrder      Int                      @default(0)
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id])
+  options        CategoryVariantOption[]
+
+  @@unique([categoryId, name])
+  @@map("category_variant_definitions")
+}
+
+model CategoryVariantOption {
+  id              String                        @id @default(uuid())
+  variantId       String
+  variant         CategoryVariantDefinition     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  value           String
+  sortOrder       Int                           @default(0)
+  organizationId  String
+  organization    Organization                  @relation(fields: [organizationId], references: [id])
+  productVariants ProductVariant[]
+
+  @@unique([variantId, value])
+  @@map("category_variant_options")
+}
+
+model ProductVariant {
+  id             String                @id @default(uuid())
+  productId      String
+  product        Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  optionId       String
+  option         CategoryVariantOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+
+  @@unique([productId, optionId])
+  @@map("product_variants")
+}
+
 model Product {
-  id               String          @id @default(uuid())
-  name             String
-  price            Float
-  description      String?
-  categoryId       String?
-  category         Category?       @relation(fields: [categoryId], references: [id])
-  image            String?
-  quantity         Int
+  id                 String            @id @default(uuid())
+  name               String
+  price              Float
+  description        String?
+  categoryId         String?
+  category           Category?         @relation(fields: [categoryId], references: [id])
+  image              String?
+  quantity           Int
   // Visibilidad en la tienda online pública (negocio.pullstok.com). Default
   // false: un producto nunca aparece publicado sin que el dueño lo decida.
-  publishedToStore Boolean         @default(false)
-  organizationId   String
-  organization     Organization    @relation(fields: [organizationId], references: [id])
-  orderItems       OrderItem[]
-  quotationItems   QuotationItem[]
-  saleItems        SaleItem[]
+  publishedToStore   Boolean           @default(false)
+  organizationId     String
+  organization       Organization      @relation(fields: [organizationId], references: [id])
+  orderItems         OrderItem[]
+  quotationItems     QuotationItem[]
+  saleItems          SaleItem[]
+  variantAssignments ProductVariant[]
 
   @@index([organizationId])
   @@index([categoryId])

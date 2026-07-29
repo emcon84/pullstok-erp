@@ -24,8 +24,10 @@ import { ProductCsvUploadForm } from "../../components/molecules/ProductCsvUploa
 import { createProduct } from "../../services/productService";
 import {
   Category,
+  VariantDefinition,
   completeOnboarding,
   getCategories,
+  getCategoryVariants,
   getMe,
 } from "../../services/onboardingService";
 
@@ -35,6 +37,10 @@ interface StepProductsProps {
 
 export const StepProducts = ({ onBack }: StepProductsProps) => {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [variants, setVariants] = useState<VariantDefinition[]>([]);
+  const [variantSelections, setVariantSelections] = useState<
+    Record<string, string>
+  >({});
   const [productCount, setProductCount] = useState(0);
 
   const [name, setName] = useState("");
@@ -55,6 +61,19 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
       .then(setCategories)
       .catch(() => setCategories([]));
   }, []);
+
+  // Fetch variant definitions when category changes
+  useEffect(() => {
+    if (categoryId) {
+      getCategoryVariants(categoryId)
+        .then(setVariants)
+        .catch(() => setVariants([]));
+      setVariantSelections({});
+    } else {
+      setVariants([]);
+      setVariantSelections({});
+    }
+  }, [categoryId]);
 
   // Hay un producto "a medio cargar" si el usuario tocó cualquiera de los campos.
   const hasPendingProduct =
@@ -90,17 +109,21 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
     setAddingProduct(true);
     setAddError(null);
     try {
+      const variantOptionIds = Object.values(variantSelections).filter(Boolean);
       await createProduct({
         name,
         price: parseFloat(price || "0"),
         quantity: parseInt(quantity || "0", 10),
         categoryId,
+        variantOptionIds,
       });
       setProductCount((prev) => prev + 1);
       setName("");
       setPrice("");
       setQuantity("");
       setCategoryId("");
+      setVariantSelections({});
+      setVariants([]);
       toast.success("Producto agregado");
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Ocurrió un error");
@@ -125,17 +148,21 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
     setFinishing(true);
     try {
       if (hasPendingProduct) {
+        const variantOptionIds = Object.values(variantSelections).filter(Boolean);
         await createProduct({
           name,
           price: parseFloat(price || "0"),
           quantity: parseInt(quantity || "0", 10),
           categoryId,
+          variantOptionIds,
         });
         setProductCount((prev) => prev + 1);
         setName("");
         setPrice("");
         setQuantity("");
         setCategoryId("");
+        setVariantSelections({});
+        setVariants([]);
       }
       await completeOnboarding();
       // Esta ruta vive fuera de ProtectedLayout (único observer de ['me']),
@@ -221,6 +248,42 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {variants.length > 0 && (
+                <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Variantes de esta categoría
+                  </p>
+                  {variants.map((def) => (
+                    <div key={def.id} className="space-y-1.5">
+                      <Label className="text-xs">{def.name}</Label>
+                      <Select
+                        value={variantSelections[def.id] || ""}
+                        onValueChange={(value) =>
+                          setVariantSelections((prev) => ({
+                            ...prev,
+                            [def.id]: value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-full h-9 text-sm">
+                          <SelectValue
+                            placeholder={`Elegí ${def.name.toLowerCase()}`}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">(Sin selección)</SelectItem>
+                          {def.options.map((opt) => (
+                            <SelectItem key={opt.id} value={opt.id}>
+                              {opt.value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {addError && (
                 <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">

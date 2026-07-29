@@ -68,6 +68,7 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
           <TableRow className="hover:bg-transparent">
             <TableHead>Producto</TableHead>
             <TableHead>Categoría</TableHead>
+            <TableHead>Variantes</TableHead>
             <TableHead className="text-center">Stock</TableHead>
             <TableHead className="text-right">Precio</TableHead>
             <TableHead className="w-[100px] text-right">Acciones</TableHead>
@@ -77,7 +78,7 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
           {slice.length === 0 && (
             <TableRow>
               <TableCell
-                colSpan={5}
+                colSpan={6}
                 className="h-32 text-center text-muted-foreground"
               >
                 No hay productos todavía.
@@ -88,6 +89,15 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
             const id = p._id || p.id;
             const qty = Number(p.quantity);
             const src = imgSrc(p.image);
+
+            // Build variant labels from API response
+            const variantLabels = p.variantAssignments
+              ?.map(
+                (pv: any) =>
+                  `${pv.option?.variant?.name ?? ""}: ${pv.option?.value ?? ""}`,
+              )
+              .join(", ");
+
             return (
               <TableRow key={id}>
                 <TableCell>
@@ -115,7 +125,12 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
                 </TableCell>
                 <TableCell>
                   <span className="text-sm text-muted-foreground">
-                    {p.category}
+                    {p.category?.name || p.category || "—"}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-muted-foreground">
+                    {variantLabels || "—"}
                   </span>
                 </TableCell>
                 <TableCell className="text-center">

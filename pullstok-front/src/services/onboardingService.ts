@@ -43,6 +43,28 @@ export interface Category {
   id: string;
   name: string;
   organizationId: string;
+  parentId?: string | null;
+  _count?: {
+    children: number;
+    variantDefs: number;
+  };
+}
+
+export interface VariantDefinition {
+  id: string;
+  categoryId: string;
+  name: string;
+  sortOrder: number;
+  organizationId: string;
+  options: VariantOption[];
+}
+
+export interface VariantOption {
+  id: string;
+  variantId: string;
+  value: string;
+  sortOrder: number;
+  organizationId: string;
 }
 
 const authHeaders = () => ({
@@ -124,11 +146,12 @@ export const getSuggestedCategories = async (
 
 export const createCategories = async (
   names: string[],
+  parentId?: string,
 ): Promise<Category[]> => {
   try {
     const response = await axios.post<Category[]>(
       `${API_URL}/categories`,
-      { names },
+      { names, parentId },
       { headers: authHeaders() },
     );
     return response.data;
@@ -188,6 +211,143 @@ export const deleteCategory = async (id: string): Promise<void> => {
     if (axios.isAxiosError(error)) {
       throw new Error(
         error.response?.data?.message || "Error deleting category",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+// ---------- Variant Definitions ----------
+
+export const getCategoryVariants = async (
+  categoryId: string,
+): Promise<VariantDefinition[]> => {
+  try {
+    const response = await axios.get<VariantDefinition[]>(
+      `${API_URL}/categories/${categoryId}/variants`,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error fetching variants",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+export const createVariant = async (
+  categoryId: string,
+  data: { name: string; sortOrder?: number },
+): Promise<VariantDefinition> => {
+  try {
+    const response = await axios.post<VariantDefinition>(
+      `${API_URL}/categories/${categoryId}/variants`,
+      data,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error creating variant",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+export const updateVariant = async (
+  id: string,
+  data: { name?: string; sortOrder?: number },
+): Promise<VariantDefinition> => {
+  try {
+    const response = await axios.put<VariantDefinition>(
+      `${API_URL}/categories/variants/${id}`,
+      data,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error updating variant",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+export const deleteVariant = async (id: string): Promise<void> => {
+  try {
+    await axios.delete(`${API_URL}/categories/variants/${id}`, {
+      headers: authHeaders(),
+    });
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error deleting variant",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+// ---------- Variant Options ----------
+
+export const createVariantOption = async (
+  variantId: string,
+  data: { value: string; sortOrder?: number },
+): Promise<VariantOption> => {
+  try {
+    const response = await axios.post<VariantOption>(
+      `${API_URL}/categories/variants/${variantId}/options`,
+      data,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error creating option",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+export const updateVariantOption = async (
+  id: string,
+  data: { value?: string; sortOrder?: number },
+): Promise<VariantOption> => {
+  try {
+    const response = await axios.put<VariantOption>(
+      `${API_URL}/categories/options/${id}`,
+      data,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error updating option",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+export const deleteVariantOption = async (id: string): Promise<void> => {
+  try {
+    await axios.delete(`${API_URL}/categories/options/${id}`, {
+      headers: authHeaders(),
+    });
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error deleting option",
       );
     }
     throw new Error("An unknown error occurred");

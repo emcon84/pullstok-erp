@@ -47,7 +47,78 @@ async function main() {
   });
   console.log(`✅ ADMIN (org demo): ${adminEmail} / ${adminPassword}`);
 
-  // 3) Productos demo (scopeados a la org)
+  // 3) Root categories (8 pet-shop roots seeded once)
+  const ROOT_CATEGORIES = [
+    "ALIMENTACIÓN Y NUTRICIÓN",
+    "FARMACIA SALUD Y CUIDADOS",
+    "DESCANSO Y HOGAR",
+    "ACCESORIOS Y PASEO",
+    "ESTÉTICA E HIGIENE",
+    "JUGUETES",
+    "INDUMENTARIA Y SEGURIDAD",
+    "IMPORTADOS",
+  ];
+  for (const name of ROOT_CATEGORIES) {
+    await prisma.category.upsert({
+      where: { organizationId_name: { organizationId: org.id, name } },
+      update: {},
+      create: { name, organizationId: org.id },
+    });
+  }
+  console.log(`✅ ${ROOT_CATEGORIES.length} categorías raíz creadas`);
+
+  // 4) Child category "Collares" under "ACCESORIOS Y PASEO"
+  const accesorios = await prisma.category.findFirst({
+    where: { organizationId: org.id, name: "ACCESORIOS Y PASEO" },
+  });
+  if (accesorios) {
+    const collares = await prisma.category.upsert({
+      where: { organizationId_name: { organizationId: org.id, name: "Collares" } },
+      update: { parentId: accesorios.id },
+      create: { name: "Collares", organizationId: org.id, parentId: accesorios.id },
+    });
+    console.log(`✅ Categoría hija "Collares" creada bajo "ACCESORIOS Y PASEO"`);
+
+    // Variant definitions for Collares
+    const talleDef = await prisma.categoryVariantDefinition.upsert({
+      where: { categoryId_name: { categoryId: collares.id, name: "Talle" } },
+      update: {},
+      create: { categoryId: collares.id, name: "Talle", organizationId: org.id },
+    });
+    const talleOptions = [
+      { variantId: talleDef.id, value: "S", organizationId: org.id },
+      { variantId: talleDef.id, value: "M", organizationId: org.id },
+      { variantId: talleDef.id, value: "L", organizationId: org.id },
+    ];
+    for (const opt of talleOptions) {
+      await prisma.categoryVariantOption.upsert({
+        where: { variantId_value: { variantId: talleDef.id, value: opt.value } },
+        update: {},
+        create: opt,
+      });
+    }
+
+    const colorDef = await prisma.categoryVariantDefinition.upsert({
+      where: { categoryId_name: { categoryId: collares.id, name: "Color" } },
+      update: {},
+      create: { categoryId: collares.id, name: "Color", organizationId: org.id },
+    });
+    const colorOptions = [
+      { variantId: colorDef.id, value: "Negro", organizationId: org.id },
+      { variantId: colorDef.id, value: "Marrón", organizationId: org.id },
+      { variantId: colorDef.id, value: "Rojo", organizationId: org.id },
+    ];
+    for (const opt of colorOptions) {
+      await prisma.categoryVariantOption.upsert({
+        where: { variantId_value: { variantId: colorDef.id, value: opt.value } },
+        update: {},
+        create: opt,
+      });
+    }
+    console.log(`✅ Variantes "Talle" (S/M/L) y "Color" (Negro/Marrón/Rojo) creadas para Collares`);
+  }
+
+  // 5) Productos demo (scopeados a la org)
   await prisma.product.deleteMany({ where: { organizationId: org.id } });
   const baseProducts = [
     { name: "Laptop HP Pavilion 15", price: 45999.99, description: "Intel i5, 8GB RAM, 512GB SSD", quantity: 15, image: "https://images.pullstok.com/demo_laptop.webp" },
@@ -70,7 +141,7 @@ async function main() {
   });
   console.log(`✅ ${products.count} productos demo creados`);
 
-  // 4) Clientes demo (scopeados a la org)
+  // 6) Clientes demo (scopeados a la org)
   await prisma.customer.deleteMany({ where: { organizationId: org.id } });
   const customers = await prisma.customer.createMany({
     data: [

@@ -15,7 +15,12 @@ import { ProductsProps } from "../../../../models/productsModel";
 import { useCreateProduct } from "../../../hooks/useProducts";
 import { DataItem } from "../../../../types";
 import { updateProduct } from "../../../../services/productService";
-import { Category, getCategories } from "../../../../services/onboardingService";
+import {
+  Category,
+  VariantDefinition,
+  getCategories,
+  getCategoryVariants,
+} from "../../../../services/onboardingService";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface ModalEditContentProps {
@@ -31,6 +36,10 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
 }) => {
   const [image, setImage] = useState<File | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [variants, setVariants] = useState<VariantDefinition[]>([]);
+  const [variantSelections, setVariantSelections] = useState<
+    Record<string, string>
+  >({});
   const { createProduct, loading } = useCreateProduct();
   const queryClient = useQueryClient();
 
@@ -41,6 +50,34 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
       .then(setCategories)
       .catch(() => setCategories([]));
   }, []);
+
+  // Fetch variant definitions when category changes
+  useEffect(() => {
+    const catId = selectedData?.categoryId;
+    if (catId) {
+      getCategoryVariants(catId)
+        .then((defs) => {
+          setVariants(defs);
+          // Pre-select existing variant assignments on edit
+          if (isEdit && selectedData?.variantAssignments) {
+            const preSelect: Record<string, string> = {};
+            for (const pv of selectedData.variantAssignments) {
+              const opt = pv.option;
+              if (opt?.variantId) {
+                preSelect[opt.variantId] = opt.id;
+              }
+            }
+            setVariantSelections(preSelect);
+          } else {
+            setVariantSelections({});
+          }
+        })
+        .catch(() => setVariants([]));
+    } else {
+      setVariants([]);
+      setVariantSelections({});
+    }
+  }, [selectedData?.categoryId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -73,11 +110,15 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
         imageUrl = data.url;
       }
 
+      // Build variantOptionIds from selections
+      const variantOptionIds = Object.values(variantSelections).filter(Boolean);
+
       const productData = {
         ...selectedData,
         image: imageUrl,
         price: parseFloat(selectedData.price?.toString() || "0"),
         quantity: parseInt(selectedData.quantity?.toString() || "0"),
+        variantOptionIds,
       };
 
       const productId = selectedData._id || selectedData.id;
@@ -168,6 +209,7 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
             <SelectContent>
               {categories.map((cat) => (
                 <SelectItem key={cat.id} value={cat.id}>
+                  {cat.parentId ? "— " : ""}
                   {cat.name}
                 </SelectItem>
               ))}
@@ -187,6 +229,43 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
           />
         </div>
       </div>
+
+      {/* Dynamic variant selectors */}
+      {variants.length > 0 && (
+        <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+          <p className="text-sm font-medium text-muted-foreground">
+            Variantes de esta categoría
+          </p>
+          {variants.map((def) => (
+            <div key={def.id} className="space-y-1.5">
+              <Label className="text-xs">{def.name}</Label>
+              <Select
+                value={variantSelections[def.id] || ""}
+                onValueChange={(value) =>
+                  setVariantSelections((prev) => ({
+                    ...prev,
+                    [def.id]: value,
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full h-9 text-sm">
+                  <SelectValue
+                    placeholder={`Elegí ${def.name.toLowerCase()}`}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">(Sin selección)</SelectItem>
+                  {def.options.map((opt) => (
+                    <SelectItem key={opt.id} value={opt.id}>
+                      {opt.value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">

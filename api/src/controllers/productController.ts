@@ -11,7 +11,7 @@ import { requireOrganizationId } from "../config/tenantContext";
 // de otra organización.
 const createProduct = async (req: Request, res: Response) => {
   try {
-    const { categoryId, ...data } = req.body;
+    const { categoryId, variantOptionIds, ...data } = req.body;
     const category = await prisma.category.findFirst({
       where: { id: categoryId },
     });
@@ -20,10 +20,53 @@ const createProduct = async (req: Request, res: Response) => {
         .status(400)
         .json({ message: "La categoría indicada no existe" });
     }
+
+    // Validate variantOptionIds belong to the category's variant definitions
+    if (variantOptionIds && variantOptionIds.length > 0) {
+      const validOptions = await prisma.categoryVariantOption.findMany({
+        where: {
+          id: { in: variantOptionIds },
+          variant: { categoryId },
+        },
+      });
+      if (validOptions.length !== variantOptionIds.length) {
+        return res
+          .status(400)
+          .json({ message: "Algunas opciones de variante no pertenecen a esta categoría" });
+      }
+    }
+
     const product = await prisma.product.create({
       data: { ...data, categoryId },
     });
-    res.status(201).json(product);
+
+    // Create ProductVariant rows
+    if (variantOptionIds && variantOptionIds.length > 0) {
+      const orgId = requireOrganizationId();
+      await prisma.productVariant.createMany({
+        data: variantOptionIds.map((optionId: string) => ({
+          productId: product.id,
+          optionId,
+          organizationId: orgId,
+        })),
+      });
+    }
+
+    // Return product with variant assignments
+    const created = await prisma.product.findFirst({
+      where: { id: product.id },
+      include: {
+        variantAssignments: {
+          include: {
+            option: {
+              include: { variant: true },
+            },
+          },
+        },
+      },
+    });
+
+    res.status(201).json(created);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
   }
@@ -40,18 +83,56 @@ const bulkUploadProducts = async (req: Request, res: Response) => {
     }
 
     const organizationId = requireOrganizationId();
-    // Secuencial (no Promise.all): si dos filas comparten nombre de categoría,
-    // la segunda debe reusar la Category creada por la primera, no competir.
-    const data = [];
-    for (const { category, ...rest } of products) {
+    const results = [];
+
+    for (const { category, variantOptionIds, ...rest } of products) {
       const categoryId = await resolveCategoryId(category, organizationId);
-      data.push({ ...rest, categoryId });
+
+      // If the product has variantOptionIds, create individually to
+      // get the product ID back (createMany doesn't return IDs in PostgreSQL).
+      if (variantOptionIds && variantOptionIds.length > 0) {
+        // Validate options belong to the category
+        if (categoryId) {
+          const validOptions = await prisma.categoryVariantOption.findMany({
+            where: {
+              id: { in: variantOptionIds },
+              variant: { categoryId },
+            },
+          });
+          if (validOptions.length !== variantOptionIds.length) {
+            console.warn(
+              `[bulkUploadProducts] Skipping variant assignments for "${rest.name}": some options don't belong to category "${category}"`,
+            );
+          }
+        }
+
+        const product = await prisma.product.create({
+          data: { ...rest, categoryId: categoryId ?? null },
+        });
+
+        if (variantOptionIds.length > 0 && categoryId) {
+          await prisma.productVariant.createMany({
+            data: variantOptionIds.map((optionId: string) => ({
+              productId: product.id,
+              optionId,
+              organizationId,
+            })),
+          });
+        }
+
+        results.push(product);
+      } else {
+        // No variants — use create directly
+        const product = await prisma.product.create({
+          data: { ...rest, categoryId: categoryId ?? null },
+        });
+        results.push(product);
+      }
     }
 
-    const result = await prisma.product.createMany({ data });
     res
       .status(201)
-      .json({ message: "Products added successfully", data: result });
+      .json({ message: "Products added successfully", data: results });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
   }
@@ -97,7 +178,19 @@ const getProducts = async (req: Request, res: Response) => {
       };
     }
 
-    const products = await prisma.product.findMany({ where });
+    const products = await prisma.product.findMany({
+      where,
+      include: {
+        category: { select: { id: true, name: true } },
+        variantAssignments: {
+          include: {
+            option: {
+              include: { variant: { select: { id: true, name: true } } },
+            },
+          },
+        },
+      },
+    });
     res.status(200).json(products);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -109,6 +202,16 @@ const getProductById = async (req: Request, res: Response) => {
   try {
     const product = await prisma.product.findFirst({
       where: { id: req.params.id },
+      include: {
+        category: { select: { id: true, name: true } },
+        variantAssignments: {
+          include: {
+            option: {
+              include: { variant: { select: { id: true, name: true } } },
+            },
+          },
+        },
+      },
     });
     if (product) {
       res.status(200).json(product);
@@ -123,15 +226,61 @@ const getProductById = async (req: Request, res: Response) => {
 // Update a product by ID
 const updateProduct = async (req: Request, res: Response) => {
   try {
+    const { variantOptionIds, ...data } = req.body;
+
+    // If categoryId is changing, clear old variant assignments
+    if (data.categoryId !== undefined) {
+      const existing = await prisma.product.findFirst({
+        where: { id: req.params.id },
+        select: { categoryId: true },
+      });
+      if (existing && existing.categoryId !== data.categoryId) {
+        await prisma.productVariant.deleteMany({
+          where: { productId: req.params.id },
+        });
+      }
+    }
+
     const result = await prisma.product.updateMany({
       where: { id: req.params.id },
-      data: req.body,
+      data,
     });
     if (result.count === 0) {
       return res.status(404).json({ message: "Product not found" });
     }
+
+    // Handle variantOptionIds if provided
+    if (variantOptionIds !== undefined) {
+      // Clear existing
+      await prisma.productVariant.deleteMany({
+        where: { productId: req.params.id },
+      });
+
+      // Insert new ones
+      if (variantOptionIds.length > 0) {
+        const orgId = requireOrganizationId();
+        await prisma.productVariant.createMany({
+          data: variantOptionIds.map((optionId: string) => ({
+            productId: req.params.id,
+            optionId,
+            organizationId: orgId,
+          })),
+        });
+      }
+    }
+
     const product = await prisma.product.findFirst({
       where: { id: req.params.id },
+      include: {
+        category: { select: { id: true, name: true } },
+        variantAssignments: {
+          include: {
+            option: {
+              include: { variant: { select: { id: true, name: true } } },
+            },
+          },
+        },
+      },
     });
     res.status(200).json(product);
   } catch (error: any) {

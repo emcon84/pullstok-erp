@@ -121,8 +121,64 @@ async function main() {
     `✅ Datos transaccionales limpiados: ${deletedInvoices.count} facturas, ${deletedOrders.count} órdenes, ${deletedQuotations.count} cotizaciones, ${deletedSales.count} ventas, ${deletedReceipts.count} comprobantes, ${resetCounters.count} contadores reseteados a 0`
   );
 
-  // 4) Productos y clientes demo: borrar y recrear exactamente como en seed.ts.
-  //    Ahora que no quedan Order/Quotation/Sale items colgando, se puede borrar Product sin violar FK.
+  // 4) Root categories + sample hierarchy (mirrors seed.ts)
+  const ROOT_CATEGORIES = [
+    "ALIMENTACIÓN Y NUTRICIÓN",
+    "FARMACIA SALUD Y CUIDADOS",
+    "DESCANSO Y HOGAR",
+    "ACCESORIOS Y PASEO",
+    "ESTÉTICA E HIGIENE",
+    "JUGUETES",
+    "INDUMENTARIA Y SEGURIDAD",
+    "IMPORTADOS",
+  ];
+  for (const name of ROOT_CATEGORIES) {
+    await prisma.category.upsert({
+      where: { organizationId_name: { organizationId: org.id, name } },
+      update: {},
+      create: { name, organizationId: org.id },
+    });
+  }
+
+  const accesorios = await prisma.category.findFirst({
+    where: { organizationId: org.id, name: "ACCESORIOS Y PASEO" },
+  });
+  if (accesorios) {
+    const collares = await prisma.category.upsert({
+      where: { organizationId_name: { organizationId: org.id, name: "Collares" } },
+      update: { parentId: accesorios.id },
+      create: { name: "Collares", organizationId: org.id, parentId: accesorios.id },
+    });
+
+    const talleDef = await prisma.categoryVariantDefinition.upsert({
+      where: { categoryId_name: { categoryId: collares.id, name: "Talle" } },
+      update: {},
+      create: { categoryId: collares.id, name: "Talle", organizationId: org.id },
+    });
+    for (const value of ["S", "M", "L"]) {
+      await prisma.categoryVariantOption.upsert({
+        where: { variantId_value: { variantId: talleDef.id, value } },
+        update: {},
+        create: { variantId: talleDef.id, value, organizationId: org.id },
+      });
+    }
+
+    const colorDef = await prisma.categoryVariantDefinition.upsert({
+      where: { categoryId_name: { categoryId: collares.id, name: "Color" } },
+      update: {},
+      create: { categoryId: collares.id, name: "Color", organizationId: org.id },
+    });
+    for (const value of ["Negro", "Marrón", "Rojo"]) {
+      await prisma.categoryVariantOption.upsert({
+        where: { variantId_value: { variantId: colorDef.id, value } },
+        update: {},
+        create: { variantId: colorDef.id, value, organizationId: org.id },
+      });
+    }
+  }
+  console.log("✅ Categorías raíz + jerarquía + variantes de Collares restauradas");
+
+  // 5) Productos y clientes demo: borrar y recrear exactamente como en seed.ts.
   await prisma.product.deleteMany({ where: { organizationId: org.id } });
   const products = await prisma.product.createMany({
     data: DEMO_PRODUCTS.map((p) => ({

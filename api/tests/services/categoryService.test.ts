@@ -9,6 +9,8 @@ jest.mock('../../src/config/db', () => ({
       findFirst: jest.fn(),
       create: jest.fn(),
       findMany: jest.fn(),
+      updateMany: jest.fn(),
+      deleteMany: jest.fn(),
     },
   },
 }));
@@ -22,6 +24,8 @@ const mockedPrisma = prisma as unknown as {
     findFirst: jest.Mock;
     create: jest.Mock;
     findMany: jest.Mock;
+    updateMany: jest.Mock;
+    deleteMany: jest.Mock;
   };
 };
 const mockedRequireOrgId = requireOrganizationId as jest.Mock;
@@ -45,10 +49,10 @@ describe('CategoryService', () => {
 
       expect(mockedPrisma.category.create).toHaveBeenCalledTimes(2);
       expect(mockedPrisma.category.create).toHaveBeenCalledWith({
-        data: { name: 'Tornillos', organizationId },
+        data: { name: 'Tornillos', organizationId, parentId: null },
       });
       expect(mockedPrisma.category.create).toHaveBeenCalledWith({
-        data: { name: 'Pinturas', organizationId },
+        data: { name: 'Pinturas', organizationId, parentId: null },
       });
       expect(result).toHaveLength(2);
     });
@@ -83,20 +87,28 @@ describe('CategoryService', () => {
 
       expect(mockedPrisma.category.create).toHaveBeenCalledTimes(1);
       expect(mockedPrisma.category.create).toHaveBeenCalledWith({
-        data: { name: 'Real', organizationId },
+        data: { name: 'Real', organizationId, parentId: null },
       });
     });
   });
 
   describe('list', () => {
-    it('devuelve las categorías de la organización ordenadas por nombre', async () => {
+    it('devuelve las categorías de la organización (incluye conteo de hijos y variantes)', async () => {
       const categories = [{ id: '1', name: 'A' }, { id: '2', name: 'B' }];
       mockedPrisma.category.findMany.mockResolvedValue(categories);
 
       const result = await CategoryService.list();
 
       expect(mockedPrisma.category.findMany).toHaveBeenCalledWith({
-        orderBy: { name: 'asc' },
+        orderBy: [{ name: 'asc' }],
+        include: {
+          _count: {
+            select: {
+              children: true,
+              variantDefs: true,
+            },
+          },
+        },
       });
       expect(result).toEqual(categories);
     });
