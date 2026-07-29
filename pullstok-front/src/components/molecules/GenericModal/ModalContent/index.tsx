@@ -181,6 +181,17 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
       </div>
 
       <div className="space-y-2">
+        <Label htmlFor="code">Código / SKU</Label>
+        <Input
+          id="code"
+          name="code"
+          placeholder="Código de barras o SKU (opcional)"
+          value={selectedData?.code || ""}
+          onChange={handleChange}
+        />
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="description">Descripción</Label>
         <Input
           id="description"

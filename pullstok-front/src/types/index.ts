@@ -8,6 +8,7 @@ export interface DataItem {
   id?: string;
   _id?: string;
   name: string;
+  code?: string;
   image?: string;
   description?: string;
   // Alta manual envía categoryId (FK real, ver decisión sdd/onboarding-wizard
