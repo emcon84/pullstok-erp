@@ -22,6 +22,7 @@ export const StockScannerPage = () => {
   const scanTimerRef = useRef<any>(null);
 
   const [scanning, setScanning] = useState(false);
+  const scanningRef = useRef(false); // Avoid stale closure in scan loop
   const [manualCode, setManualCode] = useState("");
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,9 +60,10 @@ export const StockScannerPage = () => {
         detectorRef.current = new (window as any).BarcodeDetector({ formats });
       }
       setScanning(true);
+      scanningRef.current = true;
 
       const scanLoop = async () => {
-        if (!scanning || !videoRef.current) return;
+        if (!scanningRef.current || !videoRef.current) return;
         try {
           if (detectorRef.current) {
             const barcodes = await detectorRef.current.detect(videoRef.current);
@@ -78,6 +80,7 @@ export const StockScannerPage = () => {
 
   const stopScanner = () => {
     setScanning(false);
+    scanningRef.current = false;
     clearTimeout(scanTimerRef.current);
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
     if (videoRef.current) videoRef.current.srcObject = null;
