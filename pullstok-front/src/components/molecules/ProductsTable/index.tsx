@@ -65,6 +65,7 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
   const toggleSort = (col: typeof sortBy) => {
     if (sortBy === col) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortBy(col); setSortDir("asc"); }
+    setPage(1);
   };
 
   const SortIcon = ({ col }: { col: typeof sortBy }) => {
