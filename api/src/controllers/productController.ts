@@ -403,6 +403,28 @@ const deleteProduct = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * GET /products/by-code/:code
+ * Búsqueda rápida por código de barras / SKU.
+ */
+export const getProductByCode = async (req: Request, res: Response) => {
+  try {
+    const { code } = req.params;
+    const organizationId = requireOrganizationId();
+    const product = await prisma.product.findFirst({
+      where: { organizationId, code },
+      include: {
+        category: { select: { id: true, name: true } },
+        variantAssignments: { include: { option: { include: { variant: true } } } },
+      },
+    });
+    if (!product) return res.status(404).json({ message: "Producto no encontrado" });
+    res.status(200).json(product);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export default {
   createProduct,
   bulkUploadProducts,

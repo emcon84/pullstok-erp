@@ -5,6 +5,7 @@ import { basePrisma, prisma } from "../config/db";
 interface ProductInput {
   name: string;
   price: number;
+  code?: string;
   description: string;
   category: string;
   image: string;
@@ -74,7 +75,7 @@ export const bulkAddProducts = async (
     throw new Error(`El archivo no existe en la ruta especificada: ${filePath}`);
   }
 
-  const KNOWN_COLUMNS = new Set(["name", "price", "description", "category", "image", "quantity"]);
+  const KNOWN_COLUMNS = new Set(["name", "price", "code", "description", "category", "image", "quantity"]);
 
   return new Promise((resolve, reject) => {
     const rows: ProductInput[] = [];
@@ -99,6 +100,7 @@ export const bulkAddProducts = async (
         rows.push({
           name: cleanRow.name,
           price: parseFloat(cleanRow.price),
+          code: cleanRow.code || undefined,
           description: cleanRow.description,
           category: cleanRow.category,
           image: cleanRow.image,
@@ -124,6 +126,7 @@ export const bulkAddProducts = async (
                   data: {
                     name: row.name,
                     price: row.price,
+                    code: row.code,
                     description: row.description,
                     categoryId: categoryId ?? null,
                     image: row.image,
@@ -171,6 +174,7 @@ export const bulkAddProducts = async (
                 data: {
                   name: row.name,
                   price: row.price,
+                  code: row.code,
                   description: row.description,
                   categoryId,
                   image: row.image,
