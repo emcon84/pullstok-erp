@@ -27,20 +27,22 @@ export const StockScannerPage = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [adjustQty, setAdjustQty] = useState("");
+  const lastScannedRef = useRef("");
 
   const token = localStorage.getItem("token") || "";
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
   const lookupProduct = async (code: string) => {
     const c = code.trim();
-    if (!c) return;
+    if (!c || c === lastScannedRef.current) return;
+    lastScannedRef.current = c;
     setManualCode(c);
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/products/by-code/${encodeURIComponent(c)}`, { headers });
       const data = await res.json();
-      if (!res.ok) { setProduct(null); toast.error(data.message || "Producto no encontrado"); }
-      else { setProduct(data); toast.success(data.name); stopScanner(); }
+      if (!res.ok) { setProduct(null); toast.error(data.message || "Producto no encontrado: " + c); }
+      else { setProduct(data); toast.success(data.name); }
     } catch { toast.error("Error al buscar"); }
     setLoading(false);
   };
