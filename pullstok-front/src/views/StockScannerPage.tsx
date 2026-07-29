@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Camera, CameraOff, Plus, Minus, Search } from "lucide-react";
+import { Camera, CameraOff, Plus, Minus, Search, Link2 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -22,12 +22,19 @@ export const StockScannerPage = () => {
   const scanTimerRef = useRef<any>(null);
 
   const [scanning, setScanning] = useState(false);
-  const scanningRef = useRef(false); // Avoid stale closure in scan loop
+  const scanningRef = useRef(false);
   const [manualCode, setManualCode] = useState("");
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [adjustQty, setAdjustQty] = useState("");
   const lastScannedRef = useRef("");
+
+  // "Not found" flow
+  const [notFoundCode, setNotFoundCode] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   const token = localStorage.getItem("token") || "";
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -38,17 +45,58 @@ export const StockScannerPage = () => {
     lastScannedRef.current = c;
     setManualCode(c);
     setLoading(true);
+    setNotFoundCode("");
+    setSearchResults([]);
+    setSearchQuery("");
     try {
       const res = await fetch(`${API_URL}/products/by-code/${encodeURIComponent(c)}`, { headers });
       const data = await res.json();
-      if (!res.ok) { setProduct(null); toast.error(data.message || "Producto no encontrado: " + c); }
-      else { setProduct(data); toast.success(data.name); }
+      if (!res.ok) {
+        setProduct(null);
+        setNotFoundCode(c);
+      } else {
+        setProduct(data);
+        toast.success(data.name);
+      }
     } catch { toast.error("Error al buscar"); }
     setLoading(false);
   };
 
+  const searchProducts = useCallback(async (q: string) => {
+    if (q.length < 2) { setSearchResults([]); return; }
+    setSearching(true);
+    try {
+      const res = await fetch(`${API_URL}/products?name=${encodeURIComponent(q)}`, { headers });
+      const data = await res.json();
+      setSearchResults(Array.isArray(data) ? data.slice(0, 8) : []);
+    } catch { setSearchResults([]); }
+    setSearching(false);
+  }, []);
+
+  const assignCode = async (productId: string, code: string) => {
+    setAssigning(true);
+    try {
+      const res = await fetch(`${API_URL}/products/${productId}`, {
+        method: "PUT", headers,
+        body: JSON.stringify({ code }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setProduct(updated);
+        setNotFoundCode("");
+        setSearchResults([]);
+        toast.success("¡Código asignado!");
+      } else {
+        toast.error("Error al asignar código");
+      }
+    } catch { toast.error("Error de conexión"); }
+    setAssigning(false);
+  };
+
   const startScanner = async () => {
     setProduct(null);
+    setNotFoundCode("");
+    setSearchResults([]);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
@@ -56,7 +104,6 @@ export const StockScannerPage = () => {
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
 
-      // Try native BarcodeDetector (Chrome 88+)
       if ("BarcodeDetector" in window) {
         const formats = await (window as any).BarcodeDetector.getSupportedFormats();
         detectorRef.current = new (window as any).BarcodeDetector({ formats });
@@ -90,6 +137,11 @@ export const StockScannerPage = () => {
 
   useEffect(() => { return () => stopScanner(); }, []);
 
+  useEffect(() => {
+    const t = setTimeout(() => searchProducts(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery, searchProducts]);
+
   const updateStock = async (qty: number) => {
     if (!product) return;
     try {
@@ -120,7 +172,6 @@ export const StockScannerPage = () => {
         )}
       </Card>
 
-      {/* Camera controls */}
       <div className="flex gap-2">
         {!scanning ? (
           <Button onClick={startScanner} className="flex-1"><Camera className="h-4 w-4 mr-2" />Iniciar cámara</Button>
@@ -129,13 +180,50 @@ export const StockScannerPage = () => {
         )}
       </div>
 
-      {/* Manual input */}
       <div className="flex gap-2">
         <Input placeholder="O escribí el código..." value={manualCode} onChange={e => setManualCode(e.target.value)} onKeyDown={e => e.key === "Enter" && lookupProduct(manualCode)} />
         <Button size="icon" onClick={() => lookupProduct(manualCode)}><Search className="h-4 w-4" /></Button>
       </div>
 
       {loading && <p className="text-center text-sm text-muted-foreground py-2">Buscando...</p>}
+
+      {/* Not found — assign code to existing product */}
+      {notFoundCode && !product && !loading && (
+        <Card className="p-4 space-y-3 border-amber-400 bg-amber-400/5">
+          <div>
+            <Badge variant="outline" className="mb-1 text-amber-600 border-amber-400">Código nuevo</Badge>
+            <p className="text-lg font-mono font-bold">{notFoundCode}</p>
+            <p className="text-sm text-muted-foreground mt-1">No está asociado a ningún producto.</p>
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium">Buscá el producto por nombre para vincularlo:</p>
+            <Input
+              placeholder="Ej: Cat Chow Adultos..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              autoFocus
+            />
+          </div>
+          {searching && <p className="text-xs text-muted-foreground">Buscando...</p>}
+          {searchResults.length > 0 && (
+            <div className="space-y-1 max-h-[200px] overflow-y-auto">
+              {searchResults.map(p => (
+                <button
+                  key={p.id}
+                  className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                  onClick={() => assignCode(p.id, notFoundCode)}
+                  disabled={assigning}
+                >
+                  <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="flex-1 truncate">{p.name}</span>
+                  {p.code && <Badge variant="outline" className="text-xs shrink-0">{p.code}</Badge>}
+                  {p.category && <span className="text-xs text-muted-foreground shrink-0">{p.category.name}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Product card */}
       {product && !loading && (
@@ -165,7 +253,7 @@ export const StockScannerPage = () => {
             <Button size="sm" onClick={() => { const q = parseInt(adjustQty); if (!isNaN(q)) { updateStock(q); setAdjustQty(""); } }}>Actualizar</Button>
           </div>
 
-          <Button variant="outline" className="w-full" onClick={() => { setProduct(null); startScanner(); }}>
+          <Button variant="outline" className="w-full" onClick={() => { setProduct(null); setNotFoundCode(""); startScanner(); }}>
             <Camera className="h-4 w-4 mr-2" />Escanear otro
           </Button>
         </Card>
