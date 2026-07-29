@@ -428,7 +428,10 @@ export const getProductByCode = async (req: Request, res: Response) => {
     const { code } = req.params;
     const organizationId = requireOrganizationId();
     const product = await prisma.product.findFirst({
-      where: { organizationId, code },
+      where: {
+        organizationId,
+        OR: [{ code }, { barcode: code }],
+      },
       include: {
         category: { select: { id: true, name: true } },
         variantAssignments: { include: { option: { include: { variant: true } } } },

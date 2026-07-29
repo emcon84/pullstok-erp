@@ -98,7 +98,7 @@ export const StockScannerPage = () => {
     try {
       const res = await fetch(`${API_URL}/products/${productId}`, {
         method: "PUT", headers,
-        body: JSON.stringify({ code: notFoundCode }),
+        body: JSON.stringify({ barcode: notFoundCode }),
       });
       if (res.ok) {
         const updated = await res.json();

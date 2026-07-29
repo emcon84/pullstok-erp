@@ -201,6 +201,7 @@ model Product {
   name               String
   price              Float
   code               String?           // Código de barras / SKU del proveedor
+  barcode             String?           // EAN-13 / UPC escaneado
   description        String?
   categoryId         String?
   category           Category?         @relation(fields: [categoryId], references: [id])
@@ -219,6 +220,7 @@ model Product {
   @@index([organizationId])
   @@index([categoryId])
   @@index([organizationId, code])
+  @@index([organizationId, barcode])
   @@map("products")
 }
 
