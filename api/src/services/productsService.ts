@@ -1,6 +1,6 @@
 import csvParser from "csv-parser";
 import fs from "fs";
-import { basePrisma } from "../config/db";
+import { basePrisma, prisma } from "../config/db";
 
 interface ProductInput {
   name: string;
@@ -9,6 +9,8 @@ interface ProductInput {
   category: string;
   image: string;
   quantity: number;
+  /** Extra columns (variant values keyed by variant definition name) */
+  _variantColumns?: Record<string, string>;
 }
 
 /**
@@ -46,10 +48,12 @@ export const resolveCategoryId = async (
 export const bulkAddProducts = async (
   filePath: string,
   organizationId: string,
-): Promise<void> => {
+): Promise<{ count: number; errors: string[] }> => {
   if (!fs.existsSync(filePath)) {
     throw new Error(`El archivo no existe en la ruta especificada: ${filePath}`);
   }
+
+  const KNOWN_COLUMNS = new Set(["name", "price", "description", "category", "image", "quantity"]);
 
   return new Promise((resolve, reject) => {
     const rows: ProductInput[] = [];
@@ -57,6 +61,13 @@ export const bulkAddProducts = async (
     fs.createReadStream(filePath)
       .pipe(csvParser())
       .on("data", (row: any) => {
+        // Separate known columns from variant columns
+        const variantColumns: Record<string, string> = {};
+        for (const key of Object.keys(row)) {
+          if (!KNOWN_COLUMNS.has(key) && row[key]?.trim()) {
+            variantColumns[key] = row[key].trim();
+          }
+        }
         rows.push({
           name: row.name,
           price: parseFloat(row.price),
@@ -64,28 +75,99 @@ export const bulkAddProducts = async (
           category: row.category,
           image: row.image,
           quantity: parseInt(row.quantity, 10),
+          _variantColumns: Object.keys(variantColumns).length > 0 ? variantColumns : undefined,
         });
       })
       .on("end", async () => {
         try {
-          // Categorías resueltas secuencialmente (no Promise.all) para que
-          // nombres repetidos en el mismo CSV reusen la misma Category en vez
-          // de crear duplicados por una carrera entre creates concurrentes.
-          const products = [];
-          for (const row of rows) {
-            const categoryId = await resolveCategoryId(row.category, organizationId);
-            products.push({
-              name: row.name,
-              price: row.price,
-              description: row.description,
-              categoryId,
-              image: row.image,
-              quantity: row.quantity,
-              organizationId,
-            });
+          const errors: string[] = [];
+          let productsCreated = 0;
+
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const lineNum = i + 2; // +2 for header row + 1-based
+
+            try {
+              const categoryId = await resolveCategoryId(row.category, organizationId);
+
+              // If no variants, use create directly
+              if (!row._variantColumns || Object.keys(row._variantColumns).length === 0 || !categoryId) {
+                await basePrisma.product.create({
+                  data: {
+                    name: row.name,
+                    price: row.price,
+                    description: row.description,
+                    categoryId: categoryId ?? null,
+                    image: row.image,
+                    quantity: row.quantity,
+                    organizationId,
+                  },
+                });
+                productsCreated++;
+                continue;
+              }
+
+              // Resolve variant columns to option IDs
+              const variantDefs = await basePrisma.categoryVariantDefinition.findMany({
+                where: { categoryId },
+                include: { options: true },
+              });
+
+              const defMap = new Map(variantDefs.map(d => [d.name, d]));
+              const optionIds: string[] = [];
+              const unmatched: string[] = [];
+
+              for (const [colName, colValue] of Object.entries(row._variantColumns)) {
+                const def = defMap.get(colName);
+                if (!def) {
+                  unmatched.push(`"${colName}" (la categoría "${row.category}" no tiene esa variante)`);
+                  continue;
+                }
+                const option = def.options.find(
+                  o => o.value.toLowerCase() === colValue.toLowerCase(),
+                );
+                if (!option) {
+                  const available = def.options.map(o => o.value).join(", ");
+                  unmatched.push(`"${colName}=${colValue}" (valores disponibles: ${available})`);
+                  continue;
+                }
+                optionIds.push(option.id);
+              }
+
+              if (unmatched.length > 0) {
+                errors.push(`Fila ${lineNum} (${row.name}): ${unmatched.join("; ")}`);
+              }
+
+              // Create product with variants
+              const product = await basePrisma.product.create({
+                data: {
+                  name: row.name,
+                  price: row.price,
+                  description: row.description,
+                  categoryId,
+                  image: row.image,
+                  quantity: row.quantity,
+                  organizationId,
+                },
+              });
+
+              if (optionIds.length > 0) {
+                await basePrisma.productVariant.createMany({
+                  data: optionIds.map(optionId => ({
+                    productId: product.id,
+                    optionId,
+                    organizationId,
+                  })),
+                });
+              }
+
+              productsCreated++;
+            } catch (rowError: any) {
+              errors.push(`Fila ${lineNum} (${row.name || "sin nombre"}): ${rowError.message}`);
+            }
           }
-          await basePrisma.product.createMany({ data: products });
-          resolve();
+
+          resolve({ count: productsCreated, errors });
         } catch (error) {
           reject(error);
         }

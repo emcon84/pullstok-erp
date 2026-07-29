@@ -9,7 +9,14 @@ jest.mock('../../src/config/db', () => ({
       findFirst: jest.fn(),
       create: jest.fn(),
     },
+    categoryVariantDefinition: {
+      findMany: jest.fn(),
+    },
     product: {
+      create: jest.fn(),
+      createMany: jest.fn(),
+    },
+    productVariant: {
       createMany: jest.fn(),
     },
   },
@@ -17,7 +24,9 @@ jest.mock('../../src/config/db', () => ({
 
 const mockedPrisma = basePrisma as unknown as {
   category: { findFirst: jest.Mock; create: jest.Mock };
-  product: { createMany: jest.Mock };
+  categoryVariantDefinition: { findMany: jest.Mock };
+  product: { create: jest.Mock; createMany: jest.Mock };
+  productVariant: { createMany: jest.Mock };
 };
 
 describe('productsService', () => {
@@ -109,31 +118,17 @@ describe('productsService', () => {
         name: 'Herramientas',
         organizationId,
       });
-      // Tras la primera creación, la segunda fila debe encontrarla (find-or-create
-      // secuencial real) — simulamos el efecto recreando el comportamiento del
-      // servicio: la segunda llamada a findFirst debería encontrar lo creado.
       mockedPrisma.category.findFirst
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ id: 'cat-herramientas', name: 'Herramientas', organizationId });
-      mockedPrisma.product.createMany.mockResolvedValue({ count: 2 });
+      mockedPrisma.product.create.mockResolvedValue({ id: 'p-1' });
+      mockedPrisma.categoryVariantDefinition.findMany.mockResolvedValue([]);
 
-      await bulkAddProducts(filePath, organizationId);
+      const result = await bulkAddProducts(filePath, organizationId);
 
       expect(mockedPrisma.category.create).toHaveBeenCalledTimes(1);
-      expect(mockedPrisma.product.createMany).toHaveBeenCalledWith({
-        data: [
-          expect.objectContaining({
-            name: 'Martillo',
-            categoryId: 'cat-herramientas',
-            organizationId,
-          }),
-          expect.objectContaining({
-            name: 'Pinza',
-            categoryId: 'cat-herramientas',
-            organizationId,
-          }),
-        ],
-      });
+      expect(mockedPrisma.product.create).toHaveBeenCalledTimes(2);
+      expect(result.count).toBe(2);
     });
 
     it('asigna el organizationId correcto a cada producto creado', async () => {
@@ -142,14 +137,59 @@ describe('productsService', () => {
         name: 'Herramientas',
         organizationId,
       });
-      mockedPrisma.product.createMany.mockResolvedValue({ count: 2 });
+      mockedPrisma.product.create.mockResolvedValue({ id: 'p-1' });
+      mockedPrisma.categoryVariantDefinition.findMany.mockResolvedValue([]);
 
-      await bulkAddProducts(filePath, organizationId);
+      const result = await bulkAddProducts(filePath, organizationId);
 
-      const callArg = mockedPrisma.product.createMany.mock.calls[0][0];
-      for (const product of callArg.data) {
-        expect(product.organizationId).toBe(organizationId);
+      expect(result.count).toBe(2);
+      const calls = mockedPrisma.product.create.mock.calls;
+      for (const call of calls) {
+        expect(call[0].data.organizationId).toBe(organizationId);
       }
+    });
+
+    it('resuelve columnas de variantes y crea product_variants', async () => {
+      const csvWithVariants =
+        'name,price,category,Tipo,Medida / N°\n' +
+        'Collar Cuero Chico,2500,Collares,Cuero,Chico\n';
+
+      jest.spyOn(fs, 'createReadStream').mockReturnValue(
+        Readable.from([csvWithVariants]) as unknown as fs.ReadStream,
+      );
+
+      mockedPrisma.category.findFirst.mockResolvedValue({
+        id: 'cat-collares', name: 'Collares', organizationId,
+      });
+      mockedPrisma.categoryVariantDefinition.findMany.mockResolvedValue([
+        {
+          id: 'def-tipo', categoryId: 'cat-collares', name: 'Tipo',
+          options: [
+            { id: 'opt-cuero', value: 'Cuero' },
+            { id: 'opt-ahorque', value: 'Ahorque' },
+          ],
+        },
+        {
+          id: 'def-medida', categoryId: 'cat-collares', name: 'Medida / N°',
+          options: [
+            { id: 'opt-chico', value: 'Chico' },
+            { id: 'opt-grande', value: 'Grande' },
+          ],
+        },
+      ]);
+      mockedPrisma.product.create.mockResolvedValue({ id: 'p-collar' });
+      mockedPrisma.productVariant.createMany.mockResolvedValue({ count: 2 });
+
+      const result = await bulkAddProducts(filePath, organizationId);
+
+      expect(result.count).toBe(1);
+      expect(result.errors).toHaveLength(0);
+      expect(mockedPrisma.productVariant.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({ productId: 'p-collar', optionId: 'opt-cuero' }),
+          expect.objectContaining({ productId: 'p-collar', optionId: 'opt-chico' }),
+        ],
+      });
     });
   });
 });

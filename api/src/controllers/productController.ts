@@ -145,11 +145,66 @@ export const uploadProductsCsv = async (req: Request, res: Response) => {
 
   try {
     const organizationId = requireOrganizationId();
-    await bulkAddProducts(req.file.path, organizationId);
-    res.status(201).json({ message: "Products added successfully" });
+    const result = await bulkAddProducts(req.file.path, organizationId);
+    res.status(201).json({
+      message: `${result.count} productos importados`,
+      count: result.count,
+      errors: result.errors.length > 0 ? result.errors : undefined,
+    });
   } catch (error) {
     console.error("Error processing file:", error);
     res.status(500).json({ message: "Error processing file", error });
+  }
+};
+
+/**
+ * GET /products/template-csv?category=Collares
+ * Devuelve un CSV de plantilla con las columnas base + columnas de variantes
+ * según la categoría indicada. Si no se pasa categoría, devuelve solo las
+ * columnas base.
+ */
+export const downloadTemplateCsv = async (req: Request, res: Response) => {
+  try {
+    const categoryName = req.query.category as string | undefined;
+    const BASE_COLUMNS = ["name", "price", "description", "category", "image", "quantity"];
+    let columns = [...BASE_COLUMNS];
+
+    if (categoryName) {
+      const organizationId = requireOrganizationId();
+      const category = await prisma.category.findFirst({
+        where: { organizationId, name: categoryName },
+        include: {
+          variantDefs: { orderBy: { name: "asc" } },
+        },
+      });
+
+      if (category && category.variantDefs.length > 0) {
+        for (const def of category.variantDefs) {
+          columns.push(def.name);
+        }
+      }
+    }
+
+    // Add example row
+    const exampleRow = ["Ejemplo Producto", "1500", "Descripción opcional", categoryName || "Collares", "", "10"];
+    // Add example variant values for each variant column
+    if (categoryName) {
+      const exampleDefs = columns.length - BASE_COLUMNS.length;
+      for (let i = 0; i < exampleDefs; i++) {
+        exampleRow.push("valor de ejemplo");
+      }
+    }
+
+    const csv = [columns.join(","), exampleRow.join(",")].join("\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="plantilla-productos${categoryName ? "-" + categoryName.replace(/\s+/g, "-").toLowerCase() : ""}.csv"`,
+    );
+    res.status(200).send("\uFEFF" + csv); // BOM for Excel UTF-8
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
   }
 };
 
