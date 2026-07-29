@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Camera, CameraOff, Plus, Minus, Search, Link2 } from "lucide-react";
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle,
+} from "@/components/ui/sheet";
+import { Camera, CameraOff, Plus, Minus, Search, Link2, X } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -20,6 +23,7 @@ export const StockScannerPage = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<any>(null);
   const scanTimerRef = useRef<any>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [scanning, setScanning] = useState(false);
   const scanningRef = useRef(false);
@@ -29,31 +33,9 @@ export const StockScannerPage = () => {
   const [adjustQty, setAdjustQty] = useState("");
   const lastScannedRef = useRef("");
 
-  // Beep sound
-  const playBeep = () => {
-    try {
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      osc.type = "sine";
-      gain.gain.value = 0.15;
-      osc.start(); osc.stop(ctx.currentTime + 0.12);
-    } catch {}
-  };
-
-  const resetAndScan = () => {
-    setProduct(null);
-    setNotFoundCode("");
-    setSearchResults([]);
-    setSearchQuery("");
-    lastScannedRef.current = "";
-    startScanner();
-  };
-
-  // "Not found" flow
+  // Assignment panel
   const [notFoundCode, setNotFoundCode] = useState("");
+  const [assignOpen, setAssignOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
@@ -62,26 +44,39 @@ export const StockScannerPage = () => {
   const token = localStorage.getItem("token") || "";
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
+  const playBeep = () => {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 880; osc.type = "sine";
+      gain.gain.value = 0.15;
+      osc.start(); osc.stop(ctx.currentTime + 0.12);
+    } catch {}
+  };
+
   const lookupProduct = async (code: string) => {
     const c = code.trim();
     if (!c || c === lastScannedRef.current) return;
     lastScannedRef.current = c;
     setManualCode(c);
     setLoading(true);
-    setNotFoundCode("");
-    setSearchResults([]);
-    setSearchQuery("");
     try {
       const res = await fetch(`${API_URL}/products/by-code/${encodeURIComponent(c)}`, { headers });
       const data = await res.json();
+      playBeep();
       if (!res.ok) {
         setProduct(null);
         setNotFoundCode(c);
-        playBeep();
+        setSearchQuery("");
+        setSearchResults([]);
+        setAssignOpen(true);
+        setTimeout(() => searchInputRef.current?.focus(), 300);
       } else {
         setProduct(data);
+        setAssignOpen(false);
         toast.success(data.name);
-        playBeep();
       }
     } catch { toast.error("Error al buscar"); }
     setLoading(false);
@@ -93,23 +88,22 @@ export const StockScannerPage = () => {
     try {
       const res = await fetch(`${API_URL}/products?name=${encodeURIComponent(q)}`, { headers });
       const data = await res.json();
-      setSearchResults(Array.isArray(data) ? data.slice(0, 8) : []);
+      setSearchResults(Array.isArray(data) ? data.slice(0, 12) : []);
     } catch { setSearchResults([]); }
     setSearching(false);
   }, []);
 
-  const assignCode = async (productId: string, code: string) => {
+  const assignCode = async (productId: string) => {
     setAssigning(true);
     try {
       const res = await fetch(`${API_URL}/products/${productId}`, {
         method: "PUT", headers,
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code: notFoundCode }),
       });
       if (res.ok) {
         const updated = await res.json();
         setProduct(updated);
-        setNotFoundCode("");
-        setSearchResults([]);
+        setAssignOpen(false);
         toast.success("¡Código asignado!");
         playBeep();
       } else {
@@ -121,6 +115,7 @@ export const StockScannerPage = () => {
 
   const startScanner = async () => {
     setProduct(null);
+    setAssignOpen(false);
     setNotFoundCode("");
     setSearchResults([]);
     try {
@@ -164,7 +159,7 @@ export const StockScannerPage = () => {
   useEffect(() => { return () => stopScanner(); }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => searchProducts(searchQuery), 300);
+    const t = setTimeout(() => searchProducts(searchQuery), 250);
     return () => clearTimeout(t);
   }, [searchQuery, searchProducts]);
 
@@ -175,6 +170,16 @@ export const StockScannerPage = () => {
       setProduct(p => p ? { ...p, quantity: qty } : p);
       toast.success(`Stock: ${qty}`);
     } catch { toast.error("Error"); }
+  };
+
+  const resetAndScan = () => {
+    setProduct(null);
+    setAssignOpen(false);
+    setNotFoundCode("");
+    setSearchResults([]);
+    setSearchQuery("");
+    lastScannedRef.current = "";
+    startScanner();
   };
 
   return (
@@ -213,57 +218,6 @@ export const StockScannerPage = () => {
 
       {loading && <p className="text-center text-sm text-muted-foreground py-2">Buscando...</p>}
 
-      {/* Not found — assign code to existing product */}
-      {notFoundCode && !product && !loading && (
-        <Card className="p-4 space-y-3 border-amber-400 bg-amber-400/5">
-          <div>
-            <Badge variant="outline" className="mb-1 text-amber-600 border-amber-400">Código nuevo</Badge>
-            <p className="text-lg font-mono font-bold">{notFoundCode}</p>
-            <p className="text-sm text-muted-foreground mt-1">No está asociado a ningún producto.</p>
-          </div>
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium">Buscá el producto por nombre para vincularlo:</p>
-            <Input
-              placeholder="Ej: Cat Chow Adultos..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              autoFocus
-            />
-          </div>
-          {searching && <p className="text-xs text-muted-foreground">Buscando...</p>}
-          {searchResults.length > 0 && (
-            <div className="space-y-1 max-h-[200px] overflow-y-auto">
-              {searchResults.map(p => (
-                <button
-                  key={p.id}
-                  className="w-full rounded-md px-3 py-2 text-left hover:bg-accent transition-colors"
-                  onClick={() => assignCode(p.id, notFoundCode)}
-                  disabled={assigning}
-                >
-                  <div className="flex items-center gap-2">
-                    <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    {p.code && <Badge variant="secondary" className="text-xs shrink-0 font-mono">{p.code}</Badge>}
-                    <span className="flex-1 truncate text-sm font-medium">{p.name}</span>
-                  </div>
-                  {(p.variantAssignments?.length > 0) && (
-                    <div className="flex flex-wrap gap-1 mt-1.5 ml-6">
-                      {p.variantAssignments.map((va: any, i: number) => (
-                        <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 h-5">
-                          {va.option?.variant?.name}: {va.option?.value}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-          <Button variant="ghost" size="sm" className="w-full" onClick={resetAndScan}>
-            <Camera className="h-3.5 w-3.5 mr-1" />Escanear otro
-          </Button>
-        </Card>
-      )}
-
       {/* Product card */}
       {product && !loading && (
         <Card className="p-4 space-y-3">
@@ -297,6 +251,74 @@ export const StockScannerPage = () => {
           </Button>
         </Card>
       )}
+
+      {/* Assign code panel — fullscreen Sheet */}
+      <Sheet open={assignOpen} onOpenChange={(v) => { if (!v) { setAssignOpen(false); lastScannedRef.current = ""; } }}>
+        <SheetContent side="bottom" className="h-[92vh] rounded-t-2xl p-0">
+          <SheetHeader className="px-4 pt-4 pb-2 flex-row items-center justify-between">
+            <SheetTitle>Vincular código</SheetTitle>
+            <Button variant="ghost" size="icon" onClick={() => { setAssignOpen(false); lastScannedRef.current = ""; }}>
+              <X className="h-5 w-5" />
+            </Button>
+          </SheetHeader>
+
+          <div className="flex flex-col h-full px-4 pb-4 space-y-3">
+            {/* Scanned code display */}
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-center">
+              <p className="text-xs text-amber-600 font-medium">Código escaneado</p>
+              <p className="text-xl font-mono font-bold text-amber-800 mt-0.5">{notFoundCode}</p>
+              <p className="text-xs text-amber-600 mt-1">No está asociado a ningún producto</p>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                ref={searchInputRef}
+                className="pl-9 h-11 text-base"
+                placeholder="Buscá el producto por nombre..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* Results */}
+            <div className="flex-1 overflow-y-auto -mx-1 px-1">
+              {searching && <p className="text-center text-sm text-muted-foreground py-4">Buscando...</p>}
+
+              {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
+                <p className="text-center text-sm text-muted-foreground py-8">Sin resultados. Probá con menos palabras.</p>
+              )}
+
+              {searchResults.map(p => (
+                <button
+                  key={p.id}
+                  className="w-full flex items-start gap-3 rounded-xl px-3 py-3 mb-1.5 text-left active:bg-accent transition-colors border border-transparent hover:border-primary/30 hover:bg-primary/5"
+                  onClick={() => assignCode(p.id)}
+                  disabled={assigning}
+                >
+                  <div className="mt-0.5"><Link2 className="h-4 w-4 text-primary" /></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm leading-snug">{p.name}</p>
+                    {p.variantAssignments?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {p.variantAssignments.map((va, i) => (
+                          <Badge key={i} variant="secondary" className="text-[11px] px-1.5 py-0.5">
+                            {va.option.variant.name}: {va.option.value}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {p.category && !p.variantAssignments?.length && (
+                      <p className="text-xs text-muted-foreground mt-1">{p.category.name}</p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
