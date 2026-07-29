@@ -85,7 +85,7 @@ export const StockScannerPage = () => {
         const cam = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
         if (!cam) { toast.error("No se encontró cámara"); return; }
 
-        await reader.decodeFromVideoDevice(cam.deviceId, videoRef.current!, (result, err) => {
+        await reader.decodeFromVideoDevice(cam.deviceId, videoRef.current!, (result, _err) => {
           if (result) lookupProduct(result.getText());
         });
         setScanning(true);
