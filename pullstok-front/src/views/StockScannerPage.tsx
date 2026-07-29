@@ -105,7 +105,6 @@ export const StockScannerPage = () => {
         body: JSON.stringify({ quantity: newQty }),
       });
       if (res.ok) {
-        const updated = await res.json();
         setProduct(prev => prev ? { ...prev, quantity: newQty } : prev);
         toast.success(`Stock: ${newQty}`);
       } else {
