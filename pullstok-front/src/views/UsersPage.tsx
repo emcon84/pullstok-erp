@@ -31,12 +31,14 @@ import {
 } from "@/components/ui/table";
 import { Loader } from "@/components/atoms/loader";
 import { useUsers, useDeleteUser, useUpdateUser } from "@/components/hooks/useUsers";
+import { useBranches } from "@/components/hooks/useBranches";
 import { useConfirm } from "@/components/hooks/useConfirm";
 import {
   createUser as createUserApi,
   setUserActive as setUserActiveApi,
   type UserData,
 } from "@/services/userService";
+import { type BranchData } from "@/services/branchService";
 import { ROLE_DISPLAY, type Role } from "@/constants/rolePermissions";
 
 const ORG_ROLES: Role[] = ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER", "EMPLOYEE"];
@@ -51,6 +53,7 @@ function formatDate(dateStr: string): string {
 
 export const UsersPage = () => {
   const { users: initialUsers, loading, refetch } = useUsers();
+  const { branches } = useBranches();
   const { deleteUser: deleteUserMut } = useDeleteUser();
   const { updateUser: updateUserMut } = useUpdateUser();
   const confirm = useConfirm();
@@ -65,6 +68,7 @@ export const UsersPage = () => {
   const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<string>("EMPLOYEE");
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
   // Edit form state
@@ -74,6 +78,7 @@ export const UsersPage = () => {
   const [editPhone, setEditPhone] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editRole, setEditRole] = useState("");
+  const [editBranchIds, setEditBranchIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -97,6 +102,7 @@ export const UsersPage = () => {
         address: address.trim() || undefined,
         password,
         role,
+        branchIds: selectedBranchIds.length > 0 ? selectedBranchIds : undefined,
       });
       toast.success("Usuario creado");
       setEmail("");
@@ -106,6 +112,7 @@ export const UsersPage = () => {
       setAddress("");
       setPassword("");
       setRole("EMPLOYEE");
+      setSelectedBranchIds([]);
       setDialogOpen(false);
       refetch();
     } catch (e: any) {
@@ -161,6 +168,7 @@ export const UsersPage = () => {
     setEditPhone((user as any).phone || "");
     setEditAddress((user as any).address || "");
     setEditRole(user.role);
+    setEditBranchIds(user.branchIds || []);
   };
 
   const handleUpdate = async () => {
@@ -174,6 +182,14 @@ export const UsersPage = () => {
     if (editPhone !== (orig.phone || "")) data.phone = editPhone || null;
     if (editAddress !== (orig.address || "")) data.address = editAddress || null;
     if (editRole !== orig.role) data.role = editRole;
+
+    // Always include branchIds in update (replace semantics)
+    const currentIds = orig.branchIds || [];
+    const newIds = editBranchIds.sort();
+    const currentSorted = [...currentIds].sort();
+    if (JSON.stringify(newIds) !== JSON.stringify(currentSorted)) {
+      data.branchIds = editBranchIds;
+    }
 
     if (Object.keys(data).length === 0) {
       setEditUser(null);
@@ -309,6 +325,35 @@ export const UsersPage = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {branches.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Sucursales</Label>
+                  <div className="max-h-32 overflow-y-auto space-y-1 border rounded-md p-2">
+                    {branches.map((b) => (
+                      <label
+                        key={b.id}
+                        className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent rounded px-1 py-0.5"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={selectedBranchIds.includes(b.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBranchIds([...selectedBranchIds, b.id]);
+                            } else {
+                              setSelectedBranchIds(
+                                selectedBranchIds.filter((id) => id !== b.id),
+                              );
+                            }
+                          }}
+                        />
+                        {b.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               <Button
                 className="w-full"
                 onClick={handleCreate}
@@ -336,6 +381,7 @@ export const UsersPage = () => {
               <TableRow>
                 <TableHead>Email / Usuario</TableHead>
                 <TableHead>Rol</TableHead>
+                <TableHead className="hidden sm:table-cell">Sucursales</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="hidden sm:table-cell">Creado</TableHead>
                 <TableHead className="w-[80px]">Activo</TableHead>
@@ -351,6 +397,22 @@ export const UsersPage = () => {
                     <Badge variant="secondary" className="capitalize">
                       {ROLE_DISPLAY[user.role as Role] ?? user.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <div className="flex flex-wrap gap-1">
+                      {(user.branchIds || []).length === 0 ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        (user.branchIds || []).map((bid) => {
+                          const branchName = branches.find((b) => b.id === bid)?.name || bid;
+                          return (
+                            <Badge key={bid} variant="outline" className="text-xs">
+                              {branchName}
+                            </Badge>
+                          );
+                        })
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -443,6 +505,35 @@ export const UsersPage = () => {
                 </SelectContent>
               </Select>
             </div>
+            {branches.length > 0 && (
+              <div className="space-y-2">
+                <Label>Sucursales</Label>
+                <div className="max-h-32 overflow-y-auto space-y-1 border rounded-md p-2">
+                  {branches.map((b) => (
+                    <label
+                      key={b.id}
+                      className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent rounded px-1 py-0.5"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={editBranchIds.includes(b.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setEditBranchIds([...editBranchIds, b.id]);
+                          } else {
+                            setEditBranchIds(
+                              editBranchIds.filter((id) => id !== b.id),
+                            );
+                          }
+                        }}
+                      />
+                      {b.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <Button className="w-full" onClick={handleUpdate} disabled={saving}>
               {saving ? "Guardando..." : "Guardar cambios"}
             </Button>

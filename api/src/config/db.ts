@@ -15,6 +15,7 @@ const basePrisma = new PrismaClient({ adapter });
 // Counter queda FUERA a propósito: lo maneja secuenceService con su clave
 // compuesta (organizationId + name) de forma explícita.
 const TENANT_MODELS = new Set([
+  "Branch",
   "Product",
   "Category",
   "Customer",

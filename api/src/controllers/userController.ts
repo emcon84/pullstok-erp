@@ -6,7 +6,7 @@ import { requireOrganizationId } from "../config/tenantContext";
 
 /** ADMIN o MANAGEMENT: crea un usuario dentro de SU organización. */
 export const createUser = async (req: AuthedRequest, res: Response) => {
-  const { email, username, name, phone, address, password, role } = req.body;
+  const { email, username, name, phone, address, password, role, branchIds } = req.body;
   if ((!email && !username) || !password) {
     return res
       .status(400)
@@ -24,7 +24,27 @@ export const createUser = async (req: AuthedRequest, res: Response) => {
       password,
       role,
     });
-    res.status(201).json(user);
+
+    // Assign branches if provided
+    if (branchIds && branchIds.length > 0) {
+      await basePrisma.branchAssignment.createMany({
+        data: branchIds.map((branchId: string) => ({
+          userId: user.id,
+          branchId,
+        })),
+      });
+    }
+
+    const branchIdsResult = branchIds?.length
+      ? (
+          await basePrisma.branchAssignment.findMany({
+            where: { userId: user.id },
+            select: { branchId: true },
+          })
+        ).map((a) => a.branchId)
+      : [];
+
+    res.status(201).json({ ...user, branchIds: branchIdsResult });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
   }
@@ -44,9 +64,24 @@ export const listUsers = async (_req: AuthedRequest, res: Response) => {
         role: true,
         isActive: true,
         createdAt: true,
+        branchAssignments: {
+          select: { branchId: true },
+        },
       },
     });
-    res.status(200).json(users);
+
+    const mapped = users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      username: u.username,
+      name: u.name,
+      role: u.role,
+      isActive: u.isActive,
+      createdAt: u.createdAt,
+      branchIds: u.branchAssignments.map((a) => a.branchId),
+    }));
+
+    res.status(200).json(mapped);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -88,7 +123,7 @@ export const deleteUser = async (req: AuthedRequest, res: Response) => {
 
 /** ADMIN o MANAGEMENT: edita un usuario de SU organización. */
 export const updateUser = async (req: AuthedRequest, res: Response) => {
-  const { name, email, username, phone, address, role } = req.body;
+  const { name, email, username, phone, address, role, branchIds } = req.body;
   try {
     const organizationId = requireOrganizationId();
 
@@ -136,7 +171,32 @@ export const updateUser = async (req: AuthedRequest, res: Response) => {
         organizationId: true,
       },
     });
-    res.status(200).json(updated);
+
+    // Replace branch assignments if branchIds provided
+    if (branchIds !== undefined) {
+      await basePrisma.branchAssignment.deleteMany({
+        where: { userId: req.params.id },
+      });
+      if (branchIds.length > 0) {
+        await basePrisma.branchAssignment.createMany({
+          data: branchIds.map((branchId: string) => ({
+            userId: req.params.id,
+            branchId,
+          })),
+        });
+      }
+    }
+
+    const finalBranchIds = branchIds !== undefined
+      ? branchIds
+      : (
+          await basePrisma.branchAssignment.findMany({
+            where: { userId: req.params.id },
+            select: { branchId: true },
+          })
+        ).map((a) => a.branchId);
+
+    res.status(200).json({ ...updated, branchIds: finalBranchIds });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
   }

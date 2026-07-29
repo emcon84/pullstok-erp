@@ -166,9 +166,24 @@ export const listOrgUsers = async (req: AuthedRequest, res: Response) => {
         role: true,
         isActive: true,
         createdAt: true,
+        branchAssignments: {
+          select: { branchId: true },
+        },
       },
     });
-    res.status(200).json(users);
+
+    const mapped = users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      username: u.username,
+      name: u.name,
+      role: u.role,
+      isActive: u.isActive,
+      createdAt: u.createdAt,
+      branchIds: u.branchAssignments.map((a) => a.branchId),
+    }));
+
+    res.status(200).json(mapped);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -177,7 +192,7 @@ export const listOrgUsers = async (req: AuthedRequest, res: Response) => {
 /** SUPERADMIN: crea un usuario en una organización específica. */
 export const createOrgUser = async (req: AuthedRequest, res: Response) => {
   const { orgId } = req.params;
-  const { email, username, name, phone, address, password, role } = req.body;
+  const { email, username, name, phone, address, password, role, branchIds } = req.body;
   if ((!email && !username) || !password) {
     return res
       .status(400)
@@ -234,6 +249,17 @@ export const createOrgUser = async (req: AuthedRequest, res: Response) => {
       },
       select: { id: true, email: true, role: true, organizationId: true },
     });
+
+    // Assign branches if provided
+    if (branchIds && branchIds.length > 0) {
+      await basePrisma.branchAssignment.createMany({
+        data: branchIds.map((branchId: string) => ({
+          userId: user.id,
+          branchId,
+        })),
+      });
+    }
+
     res.status(201).json(user);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -274,5 +300,26 @@ export const deleteOrgUser = async (req: AuthedRequest, res: Response) => {
     res.status(200).json({ message: "Usuario eliminado" });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
+  }
+};
+
+/** SUPERADMIN: lista las sucursales de una organización específica. */
+export const listOrgBranches = async (req: AuthedRequest, res: Response) => {
+  const { orgId } = req.params;
+  try {
+    const org = await basePrisma.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true },
+    });
+    if (!org) {
+      return res.status(404).json({ message: "Organización no encontrada" });
+    }
+
+    const branches = await basePrisma.branch.findMany({
+      where: { organizationId: orgId },
+    });
+    res.status(200).json(branches);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
   }
 };

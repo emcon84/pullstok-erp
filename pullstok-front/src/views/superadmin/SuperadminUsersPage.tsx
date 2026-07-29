@@ -36,8 +36,10 @@ import {
   createOrgUser,
   setOrgUserActive,
   deleteOrgUser,
+  getOrgBranches,
   type OrgUser,
 } from "@/services/superadminService";
+import { type BranchData } from "@/services/branchService";
 import { ROLE_DISPLAY, type Role } from "@/constants/rolePermissions";
 import { useConfirm } from "@/components/hooks/useConfirm";
 
@@ -67,12 +69,18 @@ export const SuperadminUsersPage = () => {
   const [creating, setCreating] = useState(false);
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [branches, setBranches] = useState<BranchData[]>([]);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
 
   const load = async () => {
     if (!orgId) return;
     try {
-      const data = await getOrgUsers(orgId);
+      const [data, branchData] = await Promise.all([
+        getOrgUsers(orgId),
+        getOrgBranches(orgId),
+      ]);
       setUsers(data);
+      setBranches(branchData);
     } catch (e: any) {
       toast.error(e.message || "Error al cargar usuarios");
     } finally {
@@ -100,6 +108,7 @@ export const SuperadminUsersPage = () => {
         address: address.trim() || undefined,
         password,
         role,
+        branchIds: selectedBranchIds.length > 0 ? selectedBranchIds : undefined,
       });
       toast.success("Usuario creado");
       setEmail("");
@@ -109,6 +118,7 @@ export const SuperadminUsersPage = () => {
       setAddress("");
       setPassword("");
       setRole("EMPLOYEE");
+      setSelectedBranchIds([]);
       setDialogOpen(false);
       await load();
     } catch (e: any) {
@@ -260,6 +270,35 @@ export const SuperadminUsersPage = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {branches.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Sucursales</Label>
+                  <div className="max-h-32 overflow-y-auto space-y-1 border rounded-md p-2">
+                    {branches.map((b) => (
+                      <label
+                        key={b.id}
+                        className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent rounded px-1 py-0.5"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={selectedBranchIds.includes(b.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBranchIds([...selectedBranchIds, b.id]);
+                            } else {
+                              setSelectedBranchIds(
+                                selectedBranchIds.filter((id) => id !== b.id),
+                              );
+                            }
+                          }}
+                        />
+                        {b.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               <Button
                 className="w-full"
                 onClick={handleCreate}
@@ -287,6 +326,7 @@ export const SuperadminUsersPage = () => {
               <TableRow>
                 <TableHead>Email</TableHead>
                 <TableHead>Rol</TableHead>
+                <TableHead className="hidden sm:table-cell">Sucursales</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="hidden sm:table-cell">Creado</TableHead>
                 <TableHead className="w-[80px]">Activo</TableHead>
@@ -302,6 +342,22 @@ export const SuperadminUsersPage = () => {
                     <Badge variant="secondary" className="capitalize">
                       {ROLE_DISPLAY[user.role as Role] ?? user.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <div className="flex flex-wrap gap-1">
+                      {(user.branchIds || []).length === 0 ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        (user.branchIds || []).map((bid) => {
+                          const branchName = branches.find((b) => b.id === bid)?.name || bid;
+                          return (
+                            <Badge key={bid} variant="outline" className="text-xs">
+                              {branchName}
+                            </Badge>
+                          );
+                        })
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge

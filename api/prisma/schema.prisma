@@ -62,6 +62,7 @@ model Organization {
   invoices              Invoice[]
   conversations         Conversation[]
   botConfig             BotConfig?
+  branches              Branch[]
 
   @@map("organizations")
 }
@@ -84,9 +85,35 @@ model User {
   // Password recovery: hashed reset token + expiry (nullable, null by default).
   resetToken         String?
   resetTokenExpiry   DateTime?
+  branchAssignments  BranchAssignment[]
 
   @@index([organizationId])
   @@map("users")
+}
+
+model Branch {
+  id             String             @id @default(uuid())
+  name           String
+  address        String?
+  phone          String?
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  assignments    BranchAssignment[]
+
+  @@unique([organizationId, name])
+  @@map("branches")
+}
+
+model BranchAssignment {
+  userId   String
+  branchId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([userId, branchId])
+  @@map("branch_assignments")
 }
 
 model Customer {

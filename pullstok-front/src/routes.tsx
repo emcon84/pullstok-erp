@@ -82,6 +82,9 @@ const SuperadminUsersPage = lazy(() =>
     default: m.SuperadminUsersPage,
   })),
 );
+const BranchesPage = lazy(() =>
+  import("./views/BranchesPage").then((m) => ({ default: m.BranchesPage })),
+);
 
 const AppRoutes = () => (
   <Router>
@@ -207,6 +210,7 @@ const AppRoutes = () => (
         <Route path="/facturacion/:id" element={<InvoiceDetail />} />
         <Route path="/facturacion/:id/editar" element={<InvoiceForm />} />
         <Route path="/usuarios" element={<UsersPage />} />
+        <Route path="/sucursales" element={<BranchesPage />} />
       </Route>
 
       {/* Panel superadmin (sdd/planes-y-billing): rutas de plataforma, fuera

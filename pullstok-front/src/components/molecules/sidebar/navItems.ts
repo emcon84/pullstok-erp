@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Bot,
   UserPlus,
+  Building,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 import type { Role } from "@/constants/rolePermissions";
@@ -53,6 +54,7 @@ export const navItems: NavItem[] = [
   { to: "/facturacion", label: "Facturación", icon: Receipt, moduleKey: "facturacion", visibleRoles: ["ADMIN", "MANAGEMENT"] },
   { to: "/asistente-ia", label: "Asistente IA", icon: Bot, moduleKey: "bot", visibleRoles: ["ADMIN", "MANAGEMENT"] },
   { to: "/usuarios", label: "Usuarios", icon: UserPlus, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT"] },
+  { to: "/sucursales", label: "Sucursales", icon: Building, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT"] },
 ];
 
 /**

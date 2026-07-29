@@ -86,6 +86,7 @@ export const createUserSchema = z
       .string()
       .min(8, "La contraseña debe tener al menos 8 caracteres"),
     role: z.enum(orgRoles).optional(),
+    branchIds: z.array(z.string()).optional(),
   })
   .refine((data) => data.email || data.username, {
     message: "Se requiere email o nombre de usuario",
@@ -328,3 +329,12 @@ export const botConfigSchema = z.object({
     .max(5000, "El límite diario no puede superar 5000")
     .optional(),
 });
+
+// ---------- Sucursales ----------
+export const createBranchSchema = z.object({
+  name: z.string().min(1, "El nombre es requerido"),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+});
+
+export const updateBranchSchema = createBranchSchema.partial();

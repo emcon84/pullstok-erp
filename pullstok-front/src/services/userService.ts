@@ -9,6 +9,7 @@ export interface UserData {
   role: string;
   isActive: boolean;
   createdAt: string;
+  branchIds?: string[];
 }
 
 export interface UpdateUserPayload {
@@ -18,6 +19,7 @@ export interface UpdateUserPayload {
   phone?: string;
   address?: string;
   role?: string;
+  branchIds?: string[];
 }
 
 export interface CreateUserPayload {
@@ -28,6 +30,7 @@ export interface CreateUserPayload {
   address?: string;
   password: string;
   role?: string;
+  branchIds?: string[];
 }
 
 const authHeaders = () => ({

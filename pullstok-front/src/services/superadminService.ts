@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_URL } from "../constants";
 import { Plan } from "./onboardingService";
+import type { BranchData } from "./branchService";
 
 // ── Types shared with userService ───────────────────────────
 
@@ -12,6 +13,7 @@ export interface OrgUser {
   role: string;
   isActive: boolean;
   createdAt: string;
+  branchIds?: string[];
 }
 
 export interface CreateOrgUserPayload {
@@ -22,6 +24,7 @@ export interface CreateOrgUserPayload {
   address?: string;
   password: string;
   role?: string;
+  branchIds?: string[];
 }
 
 // ── Organization types ──────────────────────────────────────
@@ -264,6 +267,24 @@ export const deleteOrgUser = async (
     if (axios.isAxiosError(error)) {
       throw new Error(
         error.response?.data?.message || "Error deleting org user",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+/** Fetches branches for a specific organization (superadmin). */
+export const getOrgBranches = async (orgId: string): Promise<BranchData[]> => {
+  try {
+    const response = await axios.get<BranchData[]>(
+      `${API_URL}/superadmin/organizations/${orgId}/branches`,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error fetching org branches",
       );
     }
     throw new Error("An unknown error occurred");

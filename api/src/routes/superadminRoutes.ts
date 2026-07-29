@@ -18,6 +18,7 @@ import {
   createOrgUser,
   toggleOrgUserActive,
   deleteOrgUser,
+  listOrgBranches,
 } from "../controllers/superadminController";
 
 const router = Router();
@@ -62,5 +63,8 @@ router.delete(
   "/organizations/:orgId/users/:userId",
   deleteOrgUser,
 );
+
+// ── SUPERADMIN: Branches per organization ────────────────────
+router.get("/organizations/:orgId/branches", listOrgBranches);
 
 export default router;
