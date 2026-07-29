@@ -29,6 +29,29 @@ export const StockScannerPage = () => {
   const [adjustQty, setAdjustQty] = useState("");
   const lastScannedRef = useRef("");
 
+  // Beep sound
+  const playBeep = () => {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = "sine";
+      gain.gain.value = 0.15;
+      osc.start(); osc.stop(ctx.currentTime + 0.12);
+    } catch {}
+  };
+
+  const resetAndScan = () => {
+    setProduct(null);
+    setNotFoundCode("");
+    setSearchResults([]);
+    setSearchQuery("");
+    lastScannedRef.current = "";
+    startScanner();
+  };
+
   // "Not found" flow
   const [notFoundCode, setNotFoundCode] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,9 +77,11 @@ export const StockScannerPage = () => {
       if (!res.ok) {
         setProduct(null);
         setNotFoundCode(c);
+        playBeep();
       } else {
         setProduct(data);
         toast.success(data.name);
+        playBeep();
       }
     } catch { toast.error("Error al buscar"); }
     setLoading(false);
@@ -86,6 +111,7 @@ export const StockScannerPage = () => {
         setNotFoundCode("");
         setSearchResults([]);
         toast.success("¡Código asignado!");
+        playBeep();
       } else {
         toast.error("Error al asignar código");
       }
@@ -219,9 +245,9 @@ export const StockScannerPage = () => {
                     {p.code && <Badge variant="secondary" className="text-xs shrink-0 font-mono">{p.code}</Badge>}
                     <span className="flex-1 truncate text-sm font-medium">{p.name}</span>
                   </div>
-                  {(p.variantAssignments?.length > 0 || p.category) && (
+                  {(p.variantAssignments?.length > 0) && (
                     <div className="flex flex-wrap gap-1 mt-1.5 ml-6">
-                      {p.variantAssignments?.map((va: any, i: number) => (
+                      {p.variantAssignments.map((va: any, i: number) => (
                         <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 h-5">
                           {va.option?.variant?.name}: {va.option?.value}
                         </Badge>
@@ -232,6 +258,9 @@ export const StockScannerPage = () => {
               ))}
             </div>
           )}
+          <Button variant="ghost" size="sm" className="w-full" onClick={resetAndScan}>
+            <Camera className="h-3.5 w-3.5 mr-1" />Escanear otro
+          </Button>
         </Card>
       )}
 
@@ -263,7 +292,7 @@ export const StockScannerPage = () => {
             <Button size="sm" onClick={() => { const q = parseInt(adjustQty); if (!isNaN(q)) { updateStock(q); setAdjustQty(""); } }}>Actualizar</Button>
           </div>
 
-          <Button variant="outline" className="w-full" onClick={() => { setProduct(null); setNotFoundCode(""); startScanner(); }}>
+          <Button variant="outline" className="w-full" onClick={resetAndScan}>
             <Camera className="h-4 w-4 mr-2" />Escanear otro
           </Button>
         </Card>
