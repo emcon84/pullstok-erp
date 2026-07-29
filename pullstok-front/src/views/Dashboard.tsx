@@ -90,7 +90,8 @@ export const Dashboard = () => {
   }
 
   const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(filter.toLowerCase()),
+    product.name.toLowerCase().includes(filter.toLowerCase()) ||
+    (product.code && product.code.toLowerCase().includes(filter.toLowerCase())),
   );
 
   if (selectedStat) {
@@ -168,7 +169,7 @@ export const Dashboard = () => {
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="pl-9"
-          placeholder="Buscar producto por nombre..."
+          placeholder="Buscar por nombre o código..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
