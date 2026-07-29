@@ -113,14 +113,17 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
       // Build variantOptionIds from selections
       const variantOptionIds = Object.values(variantSelections).filter(Boolean);
 
-      const productData = {
+      const productData: any = {
         ...selectedData,
         image: imageUrl,
         price: parseFloat(selectedData.price?.toString() || "0"),
         quantity: parseInt(selectedData.quantity?.toString() || "0"),
-        categoryId: selectedData.categoryId || null,
         variantOptionIds,
       };
+      // On edit, convert empty categoryId to null so backend can clear it
+      if (productId && !selectedData.categoryId) {
+        productData.categoryId = null;
+      }
 
       const productId = selectedData._id || selectedData.id;
       if (productId) {
