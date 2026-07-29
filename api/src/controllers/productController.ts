@@ -218,7 +218,12 @@ const getProducts = async (req: Request, res: Response) => {
     const where: any = {};
 
     if (name) {
-      where.name = { contains: name as string, mode: "insensitive" };
+      const searchTerm = name as string;
+      // Search by name OR code (for scanner lookup)
+      where.OR = [
+        { name: { contains: searchTerm, mode: "insensitive" } },
+        { code: { contains: searchTerm, mode: "insensitive" } },
+      ];
     }
     if (category) {
       where.category = { name: category as string };
