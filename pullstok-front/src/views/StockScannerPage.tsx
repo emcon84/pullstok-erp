@@ -8,6 +8,8 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { Camera, CameraOff, Plus, Minus, Search, Link2, X, Barcode, Copy } from "lucide-react";
+import { ProductDrawer } from "@/components/molecules/ProductDrawer";
+import type { DataItem } from "@/types";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -43,6 +45,11 @@ export const StockScannerPage = () => {
   const [correctingBarcode, setCorrectingBarcode] = useState(false);
   const correctingRef = useRef(false);
   const [reassignFromId, setReassignFromId] = useState<string | null>(null);
+
+  // Duplicate product drawer
+  const [dupProduct, setDupProduct] = useState<DataItem | null>(null);
+  const [dupDrawerOpen, setDupDrawerOpen] = useState(false);
+  const [dupBarcode, setDupBarcode] = useState("");
 
   const token = localStorage.getItem("token") || "";
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -152,38 +159,34 @@ export const StockScannerPage = () => {
     setAssigning(false);
   };
 
-  const [duplicating, setDuplicating] = useState(false);
+  const openDuplicateDrawer = (p: Product) => {
+    setDupBarcode(notFoundCode);
+    setDupProduct({
+      name: p.name,
+      code: "",
+      price: p.price,
+      quantity: p.quantity,
+      categoryId: p.categoryId || null,
+      description: p.description || "",
+      image: undefined,
+      variantAssignments: (p.variantAssignments || []).map(va => ({
+        option: { id: va.option.id, value: va.option.value, variantId: va.option.variantId, variant: va.option.variant },
+      })),
+    } as any);
+    setDupDrawerOpen(true);
+  };
 
-  const duplicateAndAssign = async (p: Product) => {
-    setDuplicating(true);
+  const handleDuplicateCreated = async (newProduct: DataItem) => {
+    setDupDrawerOpen(false);
+    setDupProduct(null);
+    if (!dupBarcode || !newProduct.id) return;
     try {
-      const variantOptionIds = (p.variantAssignments || [])
-        .map(va => va.option.id)
-        .filter(Boolean);
-      const createRes = await fetch(`${API_URL}/products`, {
-        method: "POST", headers,
-        body: JSON.stringify({
-          name: p.name,
-          code: "",
-          price: p.price,
-          quantity: p.quantity,
-          categoryId: p.categoryId || null,
-          description: p.description || "",
-          variantOptionIds,
-        }),
-      });
-      const newProduct = await createRes.json();
-      if (!createRes.ok || !newProduct.id) {
-        toast.error(newProduct.message || "Error al duplicar");
-        return;
-      }
-      // Assign barcode to the new product
-      const assignRes = await fetch(`${API_URL}/products/${newProduct.id}`, {
+      const res = await fetch(`${API_URL}/products/${newProduct.id}`, {
         method: "PUT", headers,
-        body: JSON.stringify({ barcode: notFoundCode }),
+        body: JSON.stringify({ barcode: dupBarcode }),
       });
-      const assigned = await assignRes.json();
-      if (assignRes.ok && assigned.id) {
+      const assigned = await res.json();
+      if (res.ok && assigned.id) {
         setProduct(assigned);
         setAssignOpen(false);
         lastScannedRef.current = "";
@@ -194,8 +197,8 @@ export const StockScannerPage = () => {
         setAssignOpen(false);
         setProduct(null);
       }
-    } catch { toast.error("Error de conexión"); }
-    setDuplicating(false);
+    } catch { toast.error("Error al asignar código"); }
+    setDupBarcode("");
   };
 
   const startScanner = async () => {
@@ -468,9 +471,9 @@ export const StockScannerPage = () => {
                   </div>
                   <button
                     className="mt-0.5 shrink-0 p-1 rounded-md hover:bg-primary/10 active:scale-90 transition-transform disabled:opacity-50"
-                    onClick={(e) => { e.stopPropagation(); duplicateAndAssign(p); }}
-                    disabled={assigning || duplicating}
-                    title="Duplicar producto y asignar código"
+                    onClick={(e) => { e.stopPropagation(); openDuplicateDrawer(p); }}
+                    disabled={assigning}
+                    title="Duplicar producto y editar antes de asignar"
                   >
                     <Copy className="h-4 w-4 text-muted-foreground" />
                   </button>
@@ -480,6 +483,14 @@ export const StockScannerPage = () => {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Product drawer for duplicating */}
+      <ProductDrawer
+        open={dupDrawerOpen}
+        onClose={() => { setDupDrawerOpen(false); setDupProduct(null); }}
+        product={dupProduct}
+        onCreated={handleDuplicateCreated}
+      />
     </div>
   );
 };

@@ -31,9 +31,10 @@ interface ProductDrawerProps {
   open: boolean;
   onClose: () => void;
   product?: DataItem | null; // null/undefined = create mode
+  onCreated?: (product: DataItem) => void;
 }
 
-export const ProductDrawer = ({ open, onClose, product }: ProductDrawerProps) => {
+export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDrawerProps) => {
   const isEdit = !!(product?._id || product?.id);
   const queryClient = useQueryClient();
   const { createProduct, loading } = useCreateProduct();
@@ -138,8 +139,9 @@ export const ProductDrawer = ({ open, onClose, product }: ProductDrawerProps) =>
         toast.success("Producto actualizado");
       } else {
         payload.categoryId = categoryId || undefined;
-        await createProduct(payload);
+        const newProduct = await createProduct(payload);
         toast.success("Producto creado");
+        onCreated?.(newProduct);
       }
 
       queryClient.invalidateQueries({ queryKey: ["products"] });
