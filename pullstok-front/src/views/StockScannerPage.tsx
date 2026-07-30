@@ -41,6 +41,7 @@ export const StockScannerPage = () => {
   const [searching, setSearching] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [correctingBarcode, setCorrectingBarcode] = useState(false);
+  const correctingRef = useRef(false);
 
   const token = localStorage.getItem("token") || "";
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -60,12 +61,12 @@ export const StockScannerPage = () => {
   const lookupProduct = async (code: string) => {
     const c = code.trim();
     if (!c) return;
-    if (c === lastScannedRef.current && !correctingBarcode) return;
+    if (c === lastScannedRef.current && !correctingRef.current) return;
     lastScannedRef.current = c;
     setManualCode(c);
 
     // Correction mode: update barcode of current product
-    if (correctingBarcode && product) {
+    if (correctingRef.current && product) {
       setLoading(true);
       try {
         const res = await fetch(`${API_URL}/products/${product.id}`, {
@@ -76,6 +77,7 @@ export const StockScannerPage = () => {
         if (res.ok && data.id) {
           setProduct(data);
           setCorrectingBarcode(false);
+          correctingRef.current = false;
           lastScannedRef.current = "";
           toast.success("Código corregido");
           playBeep();
@@ -142,7 +144,7 @@ export const StockScannerPage = () => {
   };
 
   const startScanner = async () => {
-    setProduct(null);
+    if (!correctingRef.current) setProduct(null);
     setAssignOpen(false);
     setNotFoundCode("");
     setSearchResults([]);
@@ -207,6 +209,7 @@ export const StockScannerPage = () => {
     setSearchResults([]);
     setSearchQuery("");
     setCorrectingBarcode(false);
+    correctingRef.current = false;
     lastScannedRef.current = "";
     startScanner();
   };
@@ -241,7 +244,7 @@ export const StockScannerPage = () => {
           <Button onClick={stopScanner} variant="secondary" className="flex-1"><CameraOff className="h-4 w-4 mr-2" />Detener</Button>
         )}
         {correctingBarcode && (
-          <Button variant="outline" size="sm" onClick={() => setCorrectingBarcode(false)}>
+          <Button variant="outline" size="sm" onClick={() => { setCorrectingBarcode(false); correctingRef.current = false; }}>
             <X className="h-4 w-4 mr-1" />Cancelar
           </Button>
         )}
@@ -276,6 +279,7 @@ export const StockScannerPage = () => {
                   title="Corregir código"
                   onClick={() => {
                     setCorrectingBarcode(true);
+                    correctingRef.current = true;
                     lastScannedRef.current = "";
                     if (!scanning) startScanner();
                   }}
@@ -291,6 +295,7 @@ export const StockScannerPage = () => {
                 className="h-7 text-xs"
                 onClick={() => {
                   setCorrectingBarcode(true);
+                  correctingRef.current = true;
                   lastScannedRef.current = "";
                   if (!scanning) startScanner();
                 }}
