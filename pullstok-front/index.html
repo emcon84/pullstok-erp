@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -20,6 +20,9 @@
       rel="stylesheet"
     />
     <title>Pullstok</title>
+    <script>
+      (function(){var t=localStorage.getItem("theme")||"light";if(t==="dark"||(t==="system"&&window.matchMedia("(prefers-color-scheme:dark)").matches)){document.documentElement.classList.add("dark")}})()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { LogOut, ChevronDown } from "lucide-react";
+import { LogOut, ChevronDown, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { navGroups, filterNavItemsByPlan } from "./navItems";
 import { filterNavItemsByRole } from "@/constants/rolePermissions";
 import { usePendingOrdersCount } from "../../hooks/useOrder";
 import { useUnreadMessagesCount } from "../../hooks/useChat";
+import { useTheme } from "@/hooks/useTheme";
 
 interface SidebarContentProps {
   onNavigate?: () => void;
@@ -18,6 +19,7 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
   const location = useLocation();
   const { count: pendingOrders } = usePendingOrdersCount();
   const { count: unreadMessages } = useUnreadMessagesCount();
+  const { theme, toggleTheme } = useTheme();
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
@@ -66,7 +68,20 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
           P
         </div>
-        <span className="text-lg font-semibold tracking-tight">Pullstok</span>
+        <span className="flex-1 text-lg font-semibold tracking-tight">Pullstok</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+        >
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
+        </Button>
       </div>
 
       {/* Navegación por grupos */}
