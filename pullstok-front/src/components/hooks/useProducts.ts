@@ -49,7 +49,7 @@ export const useProducts = () => {
 export const useCreateProduct = () => {
   const queryClient = useQueryClient();
 
-  const mutation = useMutation<void, Error, DataItem>({
+  const mutation = useMutation<DataItem, Error, DataItem>({
     mutationFn: createNewProduct,
     onError: (error) => {
       console.error('Error creating product:', error.message);
@@ -60,7 +60,7 @@ export const useCreateProduct = () => {
   });
 
   return {
-    createProduct: mutation.mutate,
+    createProduct: mutation.mutateAsync,
     loading: mutation.isPending,
     error: mutation.isError ? mutation.error : null,
     success: mutation.isSuccess,
