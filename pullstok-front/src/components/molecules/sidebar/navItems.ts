@@ -85,3 +85,14 @@ export const navGroups: NavGroup[] = [
 
 // Keep navItems flat for backward compatibility with filters
 export const navItems: NavItem[] = navGroups.flatMap((g) => g.items);
+
+export function filterNavItemsByPlan(
+  items: NavItem[],
+  plan: Plan | null | undefined,
+): NavItem[] {
+  return items.filter((item) => {
+    if (!item.moduleKey) return true;
+    const modules = plan ? PLAN_LIMITS[plan]?.modules : undefined;
+    return !!modules?.includes(item.moduleKey);
+  });
+}
