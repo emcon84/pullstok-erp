@@ -12,7 +12,7 @@ import { Camera, CameraOff, Plus, Minus, Search, Link2, X, Barcode } from "lucid
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 interface Product {
-  id: string; name: string; code: string; price: number;
+  id: string; name: string; code: string; barcode: string; price: number;
   quantity: number; description: string | null;
   category: { name: string } | null;
   variantAssignments: { option: { value: string; variant: { name: string } } }[];
@@ -258,8 +258,13 @@ export const StockScannerPage = () => {
 
           <div className="flex flex-wrap gap-2">
             {product.code && (
+              <Badge variant="outline">SKU: {product.code}</Badge>
+            )}
+            {product.barcode && (
               <span className="inline-flex items-center gap-1">
-                <Badge variant="outline">{product.code}</Badge>
+                <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                  {product.barcode}
+                </Badge>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -274,6 +279,20 @@ export const StockScannerPage = () => {
                   <Barcode className="h-3.5 w-3.5" />
                 </Button>
               </span>
+            )}
+            {!product.barcode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => {
+                  setCorrectingBarcode(true);
+                  lastScannedRef.current = "";
+                  if (!scanning) startScanner();
+                }}
+              >
+                <Barcode className="h-3.5 w-3.5 mr-1" />Sin código de barras
+              </Button>
             )}
             {product.category && <Badge variant="secondary">{product.category.name}</Badge>}
             {product.variantAssignments?.map((va, i) => (
