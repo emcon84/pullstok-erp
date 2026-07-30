@@ -150,12 +150,12 @@ export const ProductDrawer = ({ open, onClose, product }: ProductDrawerProps) =>
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="w-full sm:w-[440px] sm:max-w-[440px] overflow-y-auto p-0">
-        <SheetHeader className="px-6 pt-6 pb-2">
+      <SheetContent side="right" className="w-full sm:w-[440px] sm:max-w-[440px] max-w-[100vw] overflow-hidden p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-2 shrink-0">
           <SheetTitle>{isEdit ? "Editar producto" : "Agregar producto"}</SheetTitle>
         </SheetHeader>
 
-        <div className="flex flex-col gap-4 px-6 pb-8">
+        <div className="flex flex-col gap-4 px-6 pb-8 overflow-y-auto flex-1 min-h-0">
           {/* Nombre + Código */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
