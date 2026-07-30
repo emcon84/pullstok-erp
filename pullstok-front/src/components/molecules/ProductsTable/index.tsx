@@ -123,7 +123,7 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
             const src = imgSrc(p.image);
 
             return (
-              <TableRow key={id}>
+              <TableRow key={id} className="cursor-pointer hover:bg-muted/50" onClick={() => onEdit(p)}>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
@@ -190,7 +190,7 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
                       size="icon"
                       className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       disabled={loading}
-                      onClick={() => handleDelete(id)}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(id); }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
