@@ -150,14 +150,14 @@ export const ProductDrawer = ({ open, onClose, product }: ProductDrawerProps) =>
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="w-[440px] sm:max-w-[440px] overflow-y-auto p-0">
+      <SheetContent side="right" className="w-full sm:w-[440px] sm:max-w-[440px] overflow-y-auto p-0">
         <SheetHeader className="px-6 pt-6 pb-2">
           <SheetTitle>{isEdit ? "Editar producto" : "Agregar producto"}</SheetTitle>
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-6 pb-8">
           {/* Nombre + Código */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="p-name">Nombre *</Label>
               <Input id="p-name" value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Collar de Cuero" />
@@ -175,7 +175,7 @@ export const ProductDrawer = ({ open, onClose, product }: ProductDrawerProps) =>
           </div>
 
           {/* Precio + Cantidad */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="p-price">Precio</Label>
               <Input id="p-price" type="number" inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" />
