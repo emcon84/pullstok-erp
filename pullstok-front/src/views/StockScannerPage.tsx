@@ -59,7 +59,8 @@ export const StockScannerPage = () => {
 
   const lookupProduct = async (code: string) => {
     const c = code.trim();
-    if (!c || c === lastScannedRef.current) return;
+    if (!c) return;
+    if (c === lastScannedRef.current && !correctingBarcode) return;
     lastScannedRef.current = c;
     setManualCode(c);
 
@@ -71,14 +72,15 @@ export const StockScannerPage = () => {
           method: "PUT", headers,
           body: JSON.stringify({ barcode: c }),
         });
-        if (res.ok) {
-          const updated = await res.json();
-          setProduct(updated);
+        const data = await res.json();
+        if (res.ok && data.id) {
+          setProduct(data);
           setCorrectingBarcode(false);
+          lastScannedRef.current = "";
           toast.success("Código corregido");
           playBeep();
         } else {
-          toast.error("Error al actualizar código");
+          toast.error(data.message || "Error al actualizar código");
         }
       } catch { toast.error("Error de conexión"); }
       setLoading(false);
@@ -100,6 +102,7 @@ export const StockScannerPage = () => {
       } else {
         setProduct(data);
         setAssignOpen(false);
+        lastScannedRef.current = "";
         toast.success(data.name);
       }
     } catch { toast.error("Error al buscar"); }
@@ -124,14 +127,15 @@ export const StockScannerPage = () => {
         method: "PUT", headers,
         body: JSON.stringify({ barcode: notFoundCode }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setProduct(updated);
+      const data = await res.json();
+      if (res.ok && data.id) {
+        setProduct(data);
         setAssignOpen(false);
+        lastScannedRef.current = "";
         toast.success("¡Código asignado!");
         playBeep();
       } else {
-        toast.error("Error al asignar código");
+        toast.error(data.message || "Error al asignar código");
       }
     } catch { toast.error("Error de conexión"); }
     setAssigning(false);
