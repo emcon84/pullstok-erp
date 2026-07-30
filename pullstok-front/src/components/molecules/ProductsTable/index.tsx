@@ -93,9 +93,6 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
             <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
               <div className="flex items-center gap-1">Producto <SortIcon col="name" /></div>
             </TableHead>
-            <TableHead className="cursor-pointer select-none hidden sm:table-cell" onClick={() => toggleSort("code")}>
-              <div className="flex items-center gap-1">SKU <SortIcon col="code" /></div>
-            </TableHead>
             <TableHead>Categoría</TableHead>
             <TableHead className="text-center cursor-pointer select-none" onClick={() => toggleSort("quantity")}>
               <div className="flex items-center justify-center gap-1">Stock <SortIcon col="quantity" /></div>
@@ -110,7 +107,7 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
           {slice.length === 0 && (
             <TableRow>
               <TableCell
-                colSpan={6}
+                colSpan={5}
                 className="h-32 text-center text-muted-foreground"
               >
                 No hay productos todavía.
@@ -139,18 +136,11 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium leading-tight">{p.name}</p>
-                      {p.description && (
-                        <p className="max-w-[260px] truncate text-xs text-muted-foreground">
-                          {p.description}
-                        </p>
-                      )}
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {p.code || "—"}
+                      </p>
                     </div>
                   </div>
-                </TableCell>
-                <TableCell className="hidden sm:table-cell">
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {p.code || "—"}
-                  </span>
                 </TableCell>
                 <TableCell>
                   <span className="text-sm text-muted-foreground">
