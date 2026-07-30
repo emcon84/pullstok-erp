@@ -32,7 +32,7 @@ interface PreviewData {
   newTotal: number;
 }
 
-const BulkPriceUpdate = () => {
+export const BulkPriceUpdate = () => {
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -264,5 +264,3 @@ const BulkPriceUpdate = () => {
     </div>
   );
 };
-
-export default BulkPriceUpdate;
