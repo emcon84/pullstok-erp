@@ -94,7 +94,7 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
               <div className="flex items-center gap-1">Producto <SortIcon col="name" /></div>
             </TableHead>
             <TableHead className="cursor-pointer select-none hidden sm:table-cell" onClick={() => toggleSort("code")}>
-              <div className="flex items-center gap-1">Código <SortIcon col="code" /></div>
+              <div className="flex items-center gap-1">SKU <SortIcon col="code" /></div>
             </TableHead>
             <TableHead>Categoría</TableHead>
             <TableHead className="text-center cursor-pointer select-none" onClick={() => toggleSort("quantity")}>
