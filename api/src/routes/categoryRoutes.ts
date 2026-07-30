@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { authenticate, requireRole } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validate";
-import prisma from "../db";
+import { prisma } from "../config/db";
 import {
   createCategoriesSchema,
   createCategorySchema,
