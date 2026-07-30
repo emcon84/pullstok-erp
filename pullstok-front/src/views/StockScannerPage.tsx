@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
-import { Camera, CameraOff, Plus, Minus, Search, Link2, X } from "lucide-react";
+import { Camera, CameraOff, Plus, Minus, Search, Link2, X, Barcode } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -40,6 +40,7 @@ export const StockScannerPage = () => {
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [correctingBarcode, setCorrectingBarcode] = useState(false);
 
   const token = localStorage.getItem("token") || "";
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -61,6 +62,29 @@ export const StockScannerPage = () => {
     if (!c || c === lastScannedRef.current) return;
     lastScannedRef.current = c;
     setManualCode(c);
+
+    // Correction mode: update barcode of current product
+    if (correctingBarcode && product) {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/products/${product.id}`, {
+          method: "PUT", headers,
+          body: JSON.stringify({ barcode: c }),
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          setProduct(updated);
+          setCorrectingBarcode(false);
+          toast.success("Código corregido");
+          playBeep();
+        } else {
+          toast.error("Error al actualizar código");
+        }
+      } catch { toast.error("Error de conexión"); }
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/products/by-code/${encodeURIComponent(c)}`, { headers });
@@ -178,6 +202,7 @@ export const StockScannerPage = () => {
     setNotFoundCode("");
     setSearchResults([]);
     setSearchQuery("");
+    setCorrectingBarcode(false);
     lastScannedRef.current = "";
     startScanner();
   };
@@ -197,8 +222,10 @@ export const StockScannerPage = () => {
         )}
         {scanning && (
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-[18%] rounded-2xl border-2 border-green-400/70" />
-            <p className="absolute bottom-3 w-full text-center text-xs text-white/80">Escaneando...</p>
+            <div className={`absolute inset-[18%] rounded-2xl border-2 ${correctingBarcode ? "border-amber-400/70" : "border-green-400/70"}`} />
+            <p className="absolute bottom-3 w-full text-center text-xs text-white/80">
+              {correctingBarcode ? "Corrigiendo código..." : "Escaneando..."}
+            </p>
           </div>
         )}
       </Card>
@@ -208,6 +235,11 @@ export const StockScannerPage = () => {
           <Button onClick={startScanner} className="flex-1"><Camera className="h-4 w-4 mr-2" />Iniciar cámara</Button>
         ) : (
           <Button onClick={stopScanner} variant="secondary" className="flex-1"><CameraOff className="h-4 w-4 mr-2" />Detener</Button>
+        )}
+        {correctingBarcode && (
+          <Button variant="outline" size="sm" onClick={() => setCorrectingBarcode(false)}>
+            <X className="h-4 w-4 mr-1" />Cancelar
+          </Button>
         )}
       </div>
 
@@ -225,7 +257,24 @@ export const StockScannerPage = () => {
           {product.description && <p className="text-sm text-muted-foreground">{product.description}</p>}
 
           <div className="flex flex-wrap gap-2">
-            {product.code && <Badge variant="outline">{product.code}</Badge>}
+            {product.code && (
+              <span className="inline-flex items-center gap-1">
+                <Badge variant="outline">{product.code}</Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title="Corregir código"
+                  onClick={() => {
+                    setCorrectingBarcode(true);
+                    lastScannedRef.current = "";
+                    if (!scanning) startScanner();
+                  }}
+                >
+                  <Barcode className="h-3.5 w-3.5" />
+                </Button>
+              </span>
+            )}
             {product.category && <Badge variant="secondary">{product.category.name}</Badge>}
             {product.variantAssignments?.map((va, i) => (
               <Badge key={i} variant="outline" className="text-xs">{va.option.variant.name}: {va.option.value}</Badge>
