@@ -8,6 +8,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { SidebarContent } from "../components/molecules/sidebar";
+import { BottomBar } from "../components/molecules/BottomBar";
 
 const MainLayout = ({ children }: { children: ReactNode }) => {
   const [open, setOpen] = useState(false);
@@ -41,9 +42,12 @@ const MainLayout = ({ children }: { children: ReactNode }) => {
       </header>
 
       {/* Contenido */}
-      <main className="lg:pl-64">
+      <main className="lg:pl-64 pb-20 lg:pb-0">
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
+
+      {/* Bottom bar mobile */}
+      <BottomBar />
     </div>
   );
 };
