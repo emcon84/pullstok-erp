@@ -92,7 +92,10 @@ export const Dashboard = () => {
   const filterWords = filter.toLowerCase().split(/\s+/).filter(w => w.length > 0);
   const filteredProducts = products.filter((product) => {
     if (filterWords.length === 0) return true;
-    const haystack = `${product.name} ${product.code || ""}`.toLowerCase();
+    const variantValues = (product as any).variantAssignments
+      ?.map((pv: any) => pv.option?.value ?? "")
+      .join(" ");
+    const haystack = `${product.name} ${product.code || ""} ${variantValues || ""}`.toLowerCase();
     return filterWords.every(w => haystack.includes(w));
   });
 
@@ -171,7 +174,7 @@ export const Dashboard = () => {
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="pl-9"
-          placeholder="Buscar por nombre o código..."
+          placeholder="Buscar por nombre, código o variante..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />

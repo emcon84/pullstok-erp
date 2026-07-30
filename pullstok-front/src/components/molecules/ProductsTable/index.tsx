@@ -97,7 +97,6 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
               <div className="flex items-center gap-1">Código <SortIcon col="code" /></div>
             </TableHead>
             <TableHead>Categoría</TableHead>
-            <TableHead>Variantes</TableHead>
             <TableHead className="text-center cursor-pointer select-none" onClick={() => toggleSort("quantity")}>
               <div className="flex items-center justify-center gap-1">Stock <SortIcon col="quantity" /></div>
             </TableHead>
@@ -111,7 +110,7 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
           {slice.length === 0 && (
             <TableRow>
               <TableCell
-                colSpan={7}
+                colSpan={6}
                 className="h-32 text-center text-muted-foreground"
               >
                 No hay productos todavía.
@@ -122,14 +121,6 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
             const id = p._id || p.id;
             const qty = Number(p.quantity);
             const src = imgSrc(p.image);
-
-            // Build variant labels from API response
-            const variantLabels = p.variantAssignments
-              ?.map(
-                (pv: any) =>
-                  `${pv.option?.variant?.name ?? ""}: ${pv.option?.value ?? ""}`,
-              )
-              .join(", ");
 
             return (
               <TableRow key={id}>
@@ -164,11 +155,6 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
                 <TableCell>
                   <span className="text-sm text-muted-foreground">
                     {(p.category as any)?.name || p.category || "—"}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <span className="text-sm text-muted-foreground">
-                    {variantLabels || "—"}
                   </span>
                 </TableCell>
                 <TableCell className="text-center">
