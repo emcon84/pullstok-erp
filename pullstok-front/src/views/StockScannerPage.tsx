@@ -42,6 +42,7 @@ export const StockScannerPage = () => {
   const [assigning, setAssigning] = useState(false);
   const [correctingBarcode, setCorrectingBarcode] = useState(false);
   const correctingRef = useRef(false);
+  const [reassignFromId, setReassignFromId] = useState<string | null>(null);
 
   const token = localStorage.getItem("token") || "";
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -125,6 +126,14 @@ export const StockScannerPage = () => {
   const assignCode = async (productId: string) => {
     setAssigning(true);
     try {
+      // If reassigning, first clear barcode from old product
+      if (reassignFromId && reassignFromId !== productId) {
+        await fetch(`${API_URL}/products/${reassignFromId}`, {
+          method: "PUT", headers,
+          body: JSON.stringify({ barcode: null }),
+        });
+        setReassignFromId(null);
+      }
       const res = await fetch(`${API_URL}/products/${productId}`, {
         method: "PUT", headers,
         body: JSON.stringify({ barcode: notFoundCode }),
@@ -285,6 +294,22 @@ export const StockScannerPage = () => {
                   }}
                 >
                   <Barcode className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground"
+                  title="Reasignar a otro producto"
+                  onClick={() => {
+                    setReassignFromId(product.id);
+                    setNotFoundCode(product.barcode);
+                    setSearchQuery("");
+                    setSearchResults([]);
+                    setAssignOpen(true);
+                    setTimeout(() => searchInputRef.current?.focus(), 300);
+                  }}
+                >
+                  <Link2 className="h-3.5 w-3.5" />
                 </Button>
               </span>
             )}
