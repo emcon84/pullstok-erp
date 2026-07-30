@@ -141,6 +141,7 @@ export const createProductSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   price: z.coerce.number().nonnegative("El precio no puede ser negativo"),
   code: z.string().optional(), // Código de barras / SKU
+  barcode: z.string().optional(), // EAN-13 / UPC escaneado
   description: z.string().optional(),
   categoryId: z.string().min(1, "La categoría es requerida"),
   image: z.string().optional(),
