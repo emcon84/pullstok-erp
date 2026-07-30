@@ -444,6 +444,92 @@ export const getProductByCode = async (req: Request, res: Response) => {
   }
 };
 
+export const bulkPriceUpdate = async (req: Request, res: Response) => {
+  try {
+    const { brandValues, percentage, roundUp, categoryId } = req.body as {
+      brandValues: string[];
+      percentage: number;
+      roundUp: boolean;
+      categoryId?: string;
+    };
+    const dryRun = req.query.dryRun === "true";
+
+    // Build where clause: products that have at least one of the selected brand options
+    const where: any = {
+      variantAssignments: {
+        some: {
+          option: {
+            value: { in: brandValues },
+            variant: { name: "Marca" },
+          },
+        },
+      },
+    };
+
+    if (categoryId) {
+      where.categoryId = categoryId;
+    }
+
+    // Find all matching products
+    const products = await prisma.product.findMany({
+      where,
+      select: { id: true, price: true, name: true },
+    });
+
+    if (products.length === 0) {
+      return res.status(200).json({
+        message: "No se encontraron productos con esas marcas",
+        affected: 0,
+        previousTotal: 0,
+        newTotal: 0,
+      });
+    }
+
+    const multiplier = 1 + (percentage / 100);
+    const updates: { id: string; newPrice: number }[] = [];
+
+    for (const p of products) {
+      let newPrice = Number(p.price) * multiplier;
+      if (roundUp) {
+        const intPart = Math.floor(newPrice);
+        const decPart = newPrice - intPart;
+        if (decPart > 0.50) {
+          newPrice = intPart + 1;
+        } else {
+          newPrice = intPart;
+        }
+      }
+      updates.push({ id: p.id, newPrice: Math.round(newPrice * 100) / 100 });
+    }
+
+    const previousTotal = products.reduce((sum, p) => sum + Number(p.price), 0);
+    const newTotal = updates.reduce((sum, u) => sum + u.newPrice, 0);
+
+    if (!dryRun) {
+      // Update all products in a transaction
+      await prisma.$transaction(
+        updates.map((u) =>
+          prisma.product.updateMany({
+            where: { id: u.id },
+            data: { price: u.newPrice },
+          })
+        )
+      );
+    }
+
+    res.status(200).json({
+      message: dryRun
+        ? `Preview: ${updates.length} productos serían actualizados`
+        : `${updates.length} productos actualizados`,
+      affected: updates.length,
+      previousTotal: Math.round(previousTotal * 100) / 100,
+      newTotal: Math.round(newTotal * 100) / 100,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export default {
   createProduct,
   bulkUploadProducts,
@@ -452,4 +538,5 @@ export default {
   updateProduct,
   publishProduct,
   deleteProduct,
+  bulkPriceUpdate,
 };

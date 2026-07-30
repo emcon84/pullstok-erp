@@ -371,3 +371,11 @@ export const createBranchSchema = z.object({
 });
 
 export const updateBranchSchema = createBranchSchema.partial();
+
+// ---------- Bulk Price Update ----------
+export const bulkPriceUpdateSchema = z.object({
+  brandValues: z.array(z.string().min(1)).min(1, "Seleccioná al menos una marca"),
+  percentage: z.coerce.number().min(0, "El porcentaje debe ser >= 0").max(500, "Máximo 500%"),
+  roundUp: z.boolean().default(false),
+  categoryId: z.string().uuid().optional(),
+});

@@ -1,6 +1,7 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { authenticate, requireRole } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validate";
+import prisma from "../db";
 import {
   createCategoriesSchema,
   createCategorySchema,
@@ -27,6 +28,22 @@ import {
   deleteVariantOption,
 } from "../controllers/categoryController";
 
+// GET /variant-options?def=Marca — return unique option values for a variant definition
+const getVariantOptionsByDef = async (req: Request, res: Response) => {
+  try {
+    const defName = req.query.def as string;
+    if (!defName) return res.status(400).json({ message: "Falta el parámetro 'def'" });
+    const options = await prisma.categoryVariantOption.findMany({
+      where: { variant: { name: defName } },
+      select: { id: true, value: true },
+      orderBy: { value: "asc" },
+    });
+    res.json(options);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 const router = Router();
 
 // =========================================================================
@@ -50,6 +67,7 @@ router.post(
 router.get("/", authenticate, getCategories);
 // /tree MUST come before /:id/children to avoid matching "tree" as an :id param
 router.get("/tree", authenticate, getTree);
+router.get("/variant-options", authenticate, getVariantOptionsByDef);
 router.get("/:id/children", authenticate, getCategoryChildren);
 router.put(
   "/:id",

@@ -13,6 +13,7 @@ import {
   UserPlus,
   Building,
   ScanLine,
+  DollarSign,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 import type { Role } from "@/constants/rolePermissions";
@@ -56,6 +57,7 @@ export const navItems: NavItem[] = [
   { to: "/asistente-ia", label: "Asistente IA", icon: Bot, moduleKey: "bot", visibleRoles: ["ADMIN", "MANAGEMENT"] },
   { to: "/usuarios", label: "Usuarios", icon: UserPlus, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT"] },
   { to: "/sucursales", label: "Sucursales", icon: Building, moduleKey: null, visibleRoles: ["ADMIN", "MANAGEMENT"] },
+  { to: "/actualizar-precios", label: "Actualizar precios", icon: DollarSign, moduleKey: null, visibleRoles: ["ADMIN", "SUPERADMIN"] },
   { to: "/scanner", label: "Scanner", icon: ScanLine, moduleKey: null },
 ];
 

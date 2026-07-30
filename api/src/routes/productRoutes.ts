@@ -4,7 +4,7 @@ import productController, {
   downloadTemplateCsv,
   getProductByCode,
 } from "../controllers/productController";
-import { authenticateJWT } from "../middlewares/authMiddleware";
+import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
 import { upload } from "../middlewares/uploadMiddleware";
 import { validate } from "../middlewares/validate";
 import {
@@ -16,6 +16,7 @@ import {
   updateProductSchema,
   bulkProductsSchema,
   publishProductSchema,
+  bulkPriceUpdateSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -57,5 +58,14 @@ router.patch(
   productController.publishProduct,
 );
 router.delete("/:id", authenticateJWT, productController.deleteProduct);
+
+// Bulk price update — ADMIN only
+router.post(
+  "/bulk-price-update",
+  authenticateJWT,
+  requireRole("ADMIN"),
+  validate(bulkPriceUpdateSchema),
+  productController.bulkPriceUpdate,
+);
 
 export default router;
