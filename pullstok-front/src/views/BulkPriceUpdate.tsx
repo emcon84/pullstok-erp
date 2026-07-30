@@ -121,10 +121,6 @@ const BulkPriceUpdate = () => {
           categoryId: categoryId || undefined,
         }),
       });
-          roundUp,
-          categoryId: categoryId || undefined,
-        }),
-      });
       const data = await res.json();
       if (res.ok) {
         toast.success(`${data.affected} productos actualizados`);
