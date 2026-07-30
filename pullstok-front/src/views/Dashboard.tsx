@@ -52,6 +52,15 @@ export const Dashboard = () => {
     setDrawerProduct(data);
     setDrawerOpen(true);
   };
+  const openDuplicateDrawer = (data: DataItem) => {
+    setDrawerProduct({
+      ...data,
+      _id: undefined,
+      id: undefined,
+      code: "",
+    });
+    setDrawerOpen(true);
+  };
   const closeDrawer = () => {
     setDrawerOpen(false);
     setDrawerProduct(null);
@@ -181,7 +190,7 @@ export const Dashboard = () => {
       </div>
 
       {/* Tabla de productos / stock */}
-      <ProductsTable products={filteredProducts} onEdit={openEditDrawer} />
+      <ProductsTable products={filteredProducts} onEdit={openEditDrawer} onDuplicate={openDuplicateDrawer} />
 
       {/* Product Drawer (create/edit) */}
       <ProductDrawer open={drawerOpen} onClose={closeDrawer} product={drawerProduct} />

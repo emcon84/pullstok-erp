@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Pencil,
   Trash2,
+  Copy,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -41,9 +42,10 @@ const imgSrc = (image?: string) => {
 interface ProductsTableProps {
   products: DataItem[];
   onEdit: (product: DataItem) => void;
+  onDuplicate: (product: DataItem) => void;
 }
 
-export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
+export const ProductsTable = ({ products, onEdit, onDuplicate }: ProductsTableProps) => {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<"name" | "code" | "quantity" | "price">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -167,6 +169,15 @@ export const ProductsTable = ({ products, onEdit }: ProductsTableProps) => {
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      title="Duplicar producto"
+                      onClick={(e) => { e.stopPropagation(); onDuplicate(p); }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

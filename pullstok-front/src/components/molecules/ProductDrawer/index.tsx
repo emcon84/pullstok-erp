@@ -53,7 +53,8 @@ export const ProductDrawer = ({ open, onClose, product }: ProductDrawerProps) =>
   // Reset form on open/product change
   useEffect(() => {
     if (open) {
-      if (product && isEdit) {
+      if (product) {
+        // Pre-fill for both edit and duplicate mode
         setName(product.name || "");
         setCode(product.code || "");
         setDescription(product.description || "");
@@ -62,7 +63,7 @@ export const ProductDrawer = ({ open, onClose, product }: ProductDrawerProps) =>
         setQuantity(product.quantity?.toString() || "");
         setImageUrl(product.image || "");
         setImageFile(null);
-        // Pre-select variants
+        // Pre-select variants if available
         if (product.variantAssignments) {
           const pre: Record<string, string> = {};
           for (const pv of product.variantAssignments) {
@@ -93,7 +94,8 @@ export const ProductDrawer = ({ open, onClose, product }: ProductDrawerProps) =>
       getCategoryVariants(categoryId)
         .then((defs) => {
           setVariants(defs);
-          if (!isEdit) setVariantSelections({});
+          // Only clear selections for fresh create (no product data at all)
+          if (!isEdit && !product?.variantAssignments) setVariantSelections({});
         })
         .catch(() => setVariants([]));
     } else {

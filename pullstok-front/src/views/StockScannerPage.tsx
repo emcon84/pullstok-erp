@@ -7,15 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
-import { Camera, CameraOff, Plus, Minus, Search, Link2, X, Barcode } from "lucide-react";
+import { Camera, CameraOff, Plus, Minus, Search, Link2, X, Barcode, Copy } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 interface Product {
   id: string; name: string; code: string; barcode: string; price: number;
   quantity: number; description: string | null;
-  category: { name: string } | null;
-  variantAssignments: { option: { value: string; variant: { name: string } } }[];
+  category: { name: string } | null; categoryId?: string;
+  variantAssignments?: { option: { id: string; value: string; variantId?: string; variant: { name: string } } }[];
 }
 
 export const StockScannerPage = () => {
@@ -150,6 +150,52 @@ export const StockScannerPage = () => {
       }
     } catch { toast.error("Error de conexión"); }
     setAssigning(false);
+  };
+
+  const [duplicating, setDuplicating] = useState(false);
+
+  const duplicateAndAssign = async (p: Product) => {
+    setDuplicating(true);
+    try {
+      const variantOptionIds = (p.variantAssignments || [])
+        .map(va => va.option.id)
+        .filter(Boolean);
+      const createRes = await fetch(`${API_URL}/products`, {
+        method: "POST", headers,
+        body: JSON.stringify({
+          name: p.name,
+          code: "",
+          price: p.price,
+          quantity: p.quantity,
+          categoryId: p.categoryId || null,
+          description: p.description || "",
+          variantOptionIds,
+        }),
+      });
+      const newProduct = await createRes.json();
+      if (!createRes.ok || !newProduct.id) {
+        toast.error(newProduct.message || "Error al duplicar");
+        return;
+      }
+      // Assign barcode to the new product
+      const assignRes = await fetch(`${API_URL}/products/${newProduct.id}`, {
+        method: "PUT", headers,
+        body: JSON.stringify({ barcode: notFoundCode }),
+      });
+      const assigned = await assignRes.json();
+      if (assignRes.ok && assigned.id) {
+        setProduct(assigned);
+        setAssignOpen(false);
+        lastScannedRef.current = "";
+        toast.success("¡Producto duplicado y código asignado!");
+        playBeep();
+      } else {
+        toast.success("Producto duplicado. Asigná el código manualmente.");
+        setAssignOpen(false);
+        setProduct(null);
+      }
+    } catch { toast.error("Error de conexión"); }
+    setDuplicating(false);
   };
 
   const startScanner = async () => {
@@ -393,16 +439,21 @@ export const StockScannerPage = () => {
               )}
 
               {searchResults.map(p => (
-                <button
+                <div
                   key={p.id}
-                  className="w-full flex items-start gap-3 rounded-xl px-3 py-3 mb-1.5 text-left active:bg-accent transition-colors border border-transparent hover:border-primary/30 hover:bg-primary/5"
-                  onClick={() => assignCode(p.id)}
-                  disabled={assigning}
+                  className="w-full flex items-start gap-3 rounded-xl px-3 py-3 mb-1.5 text-left border border-transparent hover:border-primary/30 hover:bg-primary/5"
                 >
-                  <div className="mt-0.5"><Link2 className="h-4 w-4 text-primary" /></div>
-                  <div className="flex-1 min-w-0">
+                  <button
+                    className="mt-0.5 shrink-0 active:scale-90 transition-transform disabled:opacity-50"
+                    onClick={() => assignCode(p.id)}
+                    disabled={assigning}
+                    title="Asignar código a este producto"
+                  >
+                    <Link2 className="h-4 w-4 text-primary" />
+                  </button>
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => assignCode(p.id)}>
                     <p className="font-medium text-sm leading-snug">{p.name}</p>
-                    {p.variantAssignments?.length > 0 && (
+                    {p.variantAssignments && p.variantAssignments.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {p.variantAssignments.map((va, i) => (
                           <Badge key={i} variant="secondary" className="text-[11px] px-1.5 py-0.5">
@@ -415,7 +466,15 @@ export const StockScannerPage = () => {
                       <p className="text-xs text-muted-foreground mt-1">{p.category.name}</p>
                     )}
                   </div>
-                </button>
+                  <button
+                    className="mt-0.5 shrink-0 p-1 rounded-md hover:bg-primary/10 active:scale-90 transition-transform disabled:opacity-50"
+                    onClick={(e) => { e.stopPropagation(); duplicateAndAssign(p); }}
+                    disabled={assigning || duplicating}
+                    title="Duplicar producto y asignar código"
+                  >
+                    <Copy className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
