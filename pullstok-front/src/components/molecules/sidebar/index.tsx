@@ -1,10 +1,11 @@
-import { NavLink } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import { LogOut, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { logout } from "../../../controllers/authController";
-import { navItems, filterNavItemsByPlan } from "./navItems";
+import { navGroups, filterNavItemsByPlan } from "./navItems";
 import { filterNavItemsByRole } from "@/constants/rolePermissions";
 import { usePendingOrdersCount } from "../../hooks/useOrder";
 import { useUnreadMessagesCount } from "../../hooks/useChat";
@@ -14,8 +15,11 @@ interface SidebarContentProps {
 }
 
 export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
+  const location = useLocation();
   const { count: pendingOrders } = usePendingOrdersCount();
   const { count: unreadMessages } = useUnreadMessagesCount();
+
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
   const user = (() => {
     try {
@@ -24,6 +28,36 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
       return null;
     }
   })();
+
+  // Auto-open group containing the current route
+  useEffect(() => {
+    const currentPath = location.pathname;
+    for (const group of navGroups) {
+      const visibleItems = filterNavItemsByRole(
+        filterNavItemsByPlan(group.items, user?.plan),
+        user?.role,
+      );
+      if (visibleItems.some((item) => currentPath === item.to || currentPath.startsWith(item.to + "/"))) {
+        setOpenGroups((prev) => new Set(prev).add(group.label));
+        break;
+      }
+    }
+  }, [location.pathname]);
+
+  const toggleGroup = (label: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  };
+
+  const badgeCount = (to: string) => {
+    if (to === "/pedidos" && pendingOrders > 0) return pendingOrders;
+    if (to === "/mensajes" && unreadMessages > 0) return unreadMessages;
+    return 0;
+  };
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -35,42 +69,73 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
         <span className="text-lg font-semibold tracking-tight">Pullstok</span>
       </div>
 
-      {/* Navegación */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {filterNavItemsByRole(filterNavItemsByPlan(navItems, user?.plan), user?.role).map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )
-            }
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            {label}
-            {to === "/pedidos" && pendingOrders > 0 && (
-              <Badge
-                variant="destructive"
-                className="ml-auto h-5 min-w-5 px-1.5 text-xs"
+      {/* Navegación por grupos */}
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+        {navGroups.map((group) => {
+          const visibleItems = filterNavItemsByRole(
+            filterNavItemsByPlan(group.items, user?.plan),
+            user?.role,
+          );
+          if (visibleItems.length === 0) return null;
+
+          const isOpen = openGroups.has(group.label);
+          const GroupIcon = group.icon;
+
+          return (
+            <div key={group.label}>
+              <button
+                onClick={() => toggleGroup(group.label)}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
               >
-                {pendingOrders}
-              </Badge>
-            )}
-            {to === "/mensajes" && unreadMessages > 0 && (
-              <Badge
-                variant="destructive"
-                className="ml-auto h-5 min-w-5 px-1.5 text-xs"
+                <GroupIcon className="h-4 w-4 shrink-0" />
+                <span className="flex-1 text-left">{group.label}</span>
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0 transition-transform",
+                    isOpen && "rotate-180",
+                  )}
+                />
+              </button>
+
+              <div
+                className={cn(
+                  "space-y-1 overflow-hidden transition-all",
+                  isOpen ? "mt-1 max-h-96 opacity-100" : "max-h-0 opacity-0",
+                )}
               >
-                {unreadMessages}
-              </Badge>
-            )}
-          </NavLink>
-        ))}
+                {visibleItems.map(({ to, label, icon: Icon }) => {
+                  const count = badgeCount(to);
+                  return (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={onNavigate}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-2 pl-9 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        )
+                      }
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {label}
+                      {count > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="ml-auto h-5 min-w-5 px-1.5 text-xs"
+                        >
+                          {count}
+                        </Badge>
+                      )}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </nav>
 
       {/* Usuario + salir */}
