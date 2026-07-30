@@ -295,22 +295,6 @@ export const StockScannerPage = () => {
                 >
                   <Barcode className="h-3.5 w-3.5" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground"
-                  title="Reasignar a otro producto"
-                  onClick={() => {
-                    setReassignFromId(product.id);
-                    setNotFoundCode(product.barcode);
-                    setSearchQuery("");
-                    setSearchResults([]);
-                    setAssignOpen(true);
-                    setTimeout(() => searchInputRef.current?.focus(), 300);
-                  }}
-                >
-                  <Link2 className="h-3.5 w-3.5" />
-                </Button>
               </span>
             )}
             {!product.barcode && (
@@ -348,6 +332,22 @@ export const StockScannerPage = () => {
             <Button size="sm" onClick={() => { const q = parseInt(adjustQty); if (!isNaN(q)) { updateStock(q); setAdjustQty(""); } }}>Actualizar</Button>
           </div>
 
+          {product.barcode && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setReassignFromId(product.id);
+                setNotFoundCode(product.barcode);
+                setSearchQuery("");
+                setSearchResults([]);
+                setAssignOpen(true);
+                setTimeout(() => searchInputRef.current?.focus(), 300);
+              }}
+            >
+              <Link2 className="h-4 w-4 mr-2" />Reasignar código
+            </Button>
+          )}
           <Button variant="outline" className="w-full" onClick={resetAndScan}>
             <Camera className="h-4 w-4 mr-2" />Escanear otro
           </Button>
