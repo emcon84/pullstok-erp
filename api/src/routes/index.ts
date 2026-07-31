@@ -20,6 +20,7 @@ import chatRoutes from "./chatRoutes";
 import botRoutes from "./botRoutes";
 import branchRoutes from "./branchRoutes";
 import brandingRoutes from "./brandingRoutes";
+import backupRoutes from "./backupRoutes";
 
 const router = Router();
 
@@ -48,5 +49,6 @@ router.use("/chat", chatRoutes);
 router.use("/bot", botRoutes);
 router.use("/branches", branchRoutes);
 router.use("/app-branding", brandingRoutes);
+router.use("/backups", backupRoutes);
 
 export default router;

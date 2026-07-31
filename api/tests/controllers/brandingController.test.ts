@@ -57,7 +57,7 @@ describe("brandingController", () => {
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
-        primaryColor: "#111827",
+        primaryColor: null,
         logoUrl: null,
         faviconUrl: null,
         displayName: null,

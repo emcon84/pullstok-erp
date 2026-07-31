@@ -1,6 +1,7 @@
-// Cloudflare R2 storage (S3-compatible) for product images.
+// Cloudflare R2 storage (S3-compatible) for product images and backups.
 // Replaces the legacy local-disk multer storage.
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import sharp from "sharp";
 import { randomUUID } from "crypto";
 
@@ -76,4 +77,46 @@ export async function uploadImageToR2(
 
   const filename = `${prefix}_${uuid}.webp`;
   return uploadToR2(optimized, filename, "image/webp");
+}
+
+// ---------------------------------------------------------------------------
+// Backup storage — used by backupService.ts
+// ---------------------------------------------------------------------------
+
+/**
+ * Uploads a raw gzip-compressed backup buffer to R2.
+ * Does NOT return a public URL (backups are private, accessed via presigned URLs).
+ */
+export async function uploadBackupToR2(
+  key: string,
+  body: Buffer,
+  contentType: string,
+): Promise<void> {
+  await getClient().send(
+    new PutObjectCommand({
+      Bucket: BUCKET(),
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+}
+
+/**
+ * Generates a presigned URL for downloading a private R2 object.
+ * Default expiry: 3600 seconds (1 hour) per spec A2.
+ */
+export async function generatePresignedUrl(
+  key: string,
+  expiresIn = 3600,
+): Promise<string> {
+  const client = getClient();
+  const command = new GetObjectCommand({
+    Bucket: BUCKET(),
+    Key: key,
+  });
+  // getSignedUrl expects Client<any, ServiceInputTypes, MetadataBearer, any>,
+  // but S3Client's private `handlers` field type can diverge across pnpm-hoisted
+  // copies of @smithy/types. Runtime compatibility is guaranteed; the cast is safe.
+  return getSignedUrl(client as any, command, { expiresIn });
 }
