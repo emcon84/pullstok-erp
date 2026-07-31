@@ -164,3 +164,152 @@ describe("updateBranchSchema", () => {
     expect(result.data).toEqual({ address: "Nueva Dirección" });
   });
 });
+
+describe("updateAppBrandingSchema", () => {
+  const { updateAppBrandingSchema } = require("../../src/validation/schemas");
+
+  // --- primaryColor (hex regex) ---
+  it("accepts valid primaryColor hex (6 digits)", () => {
+    const result = updateAppBrandingSchema.safeParse({ primaryColor: "#dc2626" });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ primaryColor: "#dc2626" });
+  });
+
+  it("accepts valid primaryColor with uppercase hex", () => {
+    const result = updateAppBrandingSchema.safeParse({ primaryColor: "#A1B2C3" });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ primaryColor: "#A1B2C3" });
+  });
+
+  it("accepts valid primaryColor with mix case hex", () => {
+    const result = updateAppBrandingSchema.safeParse({ primaryColor: "#AbC123" });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ primaryColor: "#AbC123" });
+  });
+
+  it("rejects primaryColor that is not a hex color (named color)", () => {
+    const result = updateAppBrandingSchema.safeParse({ primaryColor: "red" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects primaryColor with missing hash prefix", () => {
+    const result = updateAppBrandingSchema.safeParse({ primaryColor: "dc2626" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects primaryColor with invalid characters (#XYZ)", () => {
+    const result = updateAppBrandingSchema.safeParse({ primaryColor: "#XYZ" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects primaryColor that is too short (#12345)", () => {
+    const result = updateAppBrandingSchema.safeParse({ primaryColor: "#12345" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects primaryColor that is too long (#1234567)", () => {
+    const result = updateAppBrandingSchema.safeParse({ primaryColor: "#1234567" });
+    expect(result.success).toBe(false);
+  });
+
+  // --- logoUrl / faviconUrl (URL + nullable) ---
+  it("accepts valid logoUrl", () => {
+    const result = updateAppBrandingSchema.safeParse({ logoUrl: "https://example.com/logo.png" });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ logoUrl: "https://example.com/logo.png" });
+  });
+
+  it("accepts null logoUrl (nullable)", () => {
+    const result = updateAppBrandingSchema.safeParse({ logoUrl: null });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ logoUrl: null });
+  });
+
+  it("accepts valid faviconUrl", () => {
+    const result = updateAppBrandingSchema.safeParse({ faviconUrl: "https://example.com/favicon.ico" });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ faviconUrl: "https://example.com/favicon.ico" });
+  });
+
+  it("accepts null faviconUrl (nullable)", () => {
+    const result = updateAppBrandingSchema.safeParse({ faviconUrl: null });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ faviconUrl: null });
+  });
+
+  it("rejects invalid URL for logoUrl", () => {
+    const result = updateAppBrandingSchema.safeParse({ logoUrl: "not-a-valid-url" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid URL for faviconUrl", () => {
+    const result = updateAppBrandingSchema.safeParse({ faviconUrl: "just-plain-text" });
+    expect(result.success).toBe(false);
+  });
+
+  // --- displayName max length ---
+  it("accepts displayName within 100 chars", () => {
+    const result = updateAppBrandingSchema.safeParse({ displayName: "Mi Negocio" });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ displayName: "Mi Negocio" });
+  });
+
+  it("accepts displayName exactly 100 chars", () => {
+    const name = "A".repeat(100);
+    const result = updateAppBrandingSchema.safeParse({ displayName: name });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ displayName: name });
+  });
+
+  it("rejects displayName over 100 chars", () => {
+    const name = "A".repeat(101);
+    const result = updateAppBrandingSchema.safeParse({ displayName: name });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects displayName over 100 chars with meaningful error", () => {
+    const name = "X".repeat(150);
+    const result = updateAppBrandingSchema.safeParse({ displayName: name });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const dnIssue = result.error.issues.find((i: any) =>
+        i.path?.includes("displayName"),
+      );
+      expect(dnIssue).toBeDefined();
+    }
+  });
+
+  // --- all fields optional ---
+  it("accepts empty object (all fields optional)", () => {
+    const result = updateAppBrandingSchema.safeParse({});
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({});
+  });
+
+  it("accepts full valid payload", () => {
+    const result = updateAppBrandingSchema.safeParse({
+      primaryColor: "#dc2626",
+      logoUrl: "https://example.com/logo.png",
+      faviconUrl: "https://example.com/favicon.ico",
+      displayName: "Mi Negocio",
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      primaryColor: "#dc2626",
+      logoUrl: "https://example.com/logo.png",
+      faviconUrl: "https://example.com/favicon.ico",
+      displayName: "Mi Negocio",
+    });
+  });
+
+  // --- unknown fields stripped ---
+  it("strips unknown fields", () => {
+    const result = updateAppBrandingSchema.safeParse({
+      primaryColor: "#111111",
+      extraField: "should be stripped",
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ primaryColor: "#111111" });
+    expect((result.data as any).extraField).toBeUndefined();
+  });
+});

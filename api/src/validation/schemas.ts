@@ -379,3 +379,16 @@ export const bulkPriceUpdateSchema = z.object({
   roundUp: z.boolean().default(false),
   categoryId: z.string().uuid().optional(),
 });
+
+// ---------- Branding de la app (ERP) ----------
+// Configuración de branding del ERP, 1:1 con Organization.
+// Mismo patrón que updateStoreSettingsSchema: hex regex, URL nullable, strip.
+export const updateAppBrandingSchema = z.object({
+  primaryColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Color inválido (formato #rrggbb)")
+    .optional(),
+  logoUrl: z.string().url("URL de logo inválida").nullable().optional(),
+  faviconUrl: z.string().url("URL de favicon inválida").nullable().optional(),
+  displayName: z.string().max(100, "Máximo 100 caracteres").optional(),
+}).strip();

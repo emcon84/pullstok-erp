@@ -35,6 +35,7 @@ export const PLAN_LIMITS: Record<
       "reportes",
       "tienda",
       "facturacion",
+      "branding",
     ],
   },
   PREMIUM: {
@@ -56,6 +57,7 @@ export const PLAN_LIMITS: Record<
       "reportes",
       "tienda",
       "facturacion",
+      "branding",
     ],
   },
 };
