@@ -143,9 +143,10 @@ export async function backupOrganization(
 
   try {
     // Step 3: pg_dump --schema-only for DDL
-    // Use DATABASE_URL as connection string so pg_dump picks up user/password/host
+    // Strip Prisma-only query params (?schema=xxx) — pg_dump rejects them
+    const pgUrl = dbUrl.replace(/\?.*$/, "");
     const ddl = execSync(
-      `pg_dump --schema-only --no-owner --no-privileges -d "${dbUrl}"`,
+      `pg_dump --schema-only --no-owner --no-privileges -d "${pgUrl}"`,
       { encoding: "utf-8" },
     );
 
