@@ -230,6 +230,24 @@ async function queryTableRows(
 
   // Models WITHOUT organizationId: scoped via parent relationship
   switch (modelName) {
+    case "Organization": {
+      // Organization IS the org — query by id, not organizationId
+      let skip = 0;
+      while (true) {
+        const rows = await basePrisma.$queryRawUnsafe<Record<string, unknown>[]>(
+          `SELECT * FROM "${tableName}"
+           WHERE "id" = $1
+           LIMIT $2 OFFSET $3`,
+          orgId,
+          BATCH_SIZE,
+          skip,
+        );
+        allRows.push(...rows);
+        if (rows.length < BATCH_SIZE) break;
+        skip += BATCH_SIZE;
+      }
+      return allRows;
+    }
     case "OrderItem": {
       // Scope via Order.organizationId
       let skip = 0;
