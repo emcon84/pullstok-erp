@@ -574,6 +574,7 @@ model AppBranding {
   logoUrl        String?
   faviconUrl     String?
   displayName    String?
+  showDisplayName Boolean      @default(true)
   updatedAt      DateTime     @updatedAt
 
   @@map("app_branding")

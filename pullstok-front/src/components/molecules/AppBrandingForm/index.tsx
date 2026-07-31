@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { API_URL } from "../../../constants";
 import type { AppBranding } from "../../../services/brandingService";
 
@@ -84,6 +85,22 @@ export const AppBrandingForm = ({
             onChange={(e) => handleField("displayName", e.target.value)}
             placeholder="Pullstok"
             maxLength={100}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+          <div className="space-y-1">
+            <Label htmlFor="showDisplayName">Mostrar nombre junto al logo</Label>
+            <p className="text-xs text-muted-foreground">
+              Si lo apagás, en la barra lateral se ve solo el logo.
+            </p>
+          </div>
+          <Switch
+            id="showDisplayName"
+            checked={form.showDisplayName ?? true}
+            onCheckedChange={(checked) =>
+              handleField("showDisplayName", checked)
+            }
           />
         </div>
 

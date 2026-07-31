@@ -6,6 +6,7 @@ export interface AppBranding {
   logoUrl: string | null;
   faviconUrl: string | null;
   primaryColor: string | null;
+  showDisplayName: boolean;
 }
 
 export type UpdateAppBrandingInput = {
@@ -13,6 +14,7 @@ export type UpdateAppBrandingInput = {
   logoUrl?: string | null;
   faviconUrl?: string | null;
   primaryColor?: string | null;
+  showDisplayName?: boolean;
 };
 
 const authHeaders = () => ({

@@ -7,6 +7,7 @@ export interface Branding {
   logoUrl: string | null;
   faviconUrl: string | null;
   primaryColor: string | null;
+  showDisplayName: boolean;
 }
 
 const DEFAULT_BRANDING: Branding = {
@@ -14,6 +15,7 @@ const DEFAULT_BRANDING: Branding = {
   logoUrl: null,
   faviconUrl: null,
   primaryColor: null,
+  showDisplayName: true,
 };
 
 interface BrandingContextValue {
@@ -37,6 +39,7 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
         logoUrl: branding.logoUrl,
         faviconUrl: branding.faviconUrl,
         primaryColor: branding.primaryColor,
+        showDisplayName: branding.showDisplayName,
       }
     : DEFAULT_BRANDING;
 

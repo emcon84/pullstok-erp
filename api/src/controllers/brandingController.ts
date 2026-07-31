@@ -22,6 +22,7 @@ export const getBranding = async (_req: AuthedRequest, res: Response) => {
       logoUrl: branding?.logoUrl ?? null,
       faviconUrl: branding?.faviconUrl ?? null,
       displayName: branding?.displayName ?? null,
+      showDisplayName: branding?.showDisplayName ?? true,
     });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -57,6 +58,7 @@ export const updateBranding = async (req: AuthedRequest, res: Response) => {
       logoUrl: branding.logoUrl,
       faviconUrl: branding.faviconUrl,
       displayName: branding.displayName,
+      showDisplayName: branding.showDisplayName,
     });
   } catch (error: any) {
     res.status(400).json({ message: error.message });

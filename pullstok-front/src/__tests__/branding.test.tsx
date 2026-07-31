@@ -65,9 +65,9 @@ describe("BrandLogo", () => {
     render(<BrandLogo logoUrl={null} displayName="Test" />);
 
     const monogram = screen.getByText("T");
-    expect(monogram.className).toContain("h-8");
-    expect(monogram.className).toContain("w-8");
-    expect(monogram.className).toContain("text-lg");
+    expect(monogram.className).toContain("h-10");
+    expect(monogram.className).toContain("w-10");
+    expect(monogram.className).toContain("text-xl");
   });
 
   it('applies the "mobile" size classes when size="mobile"', () => {
@@ -89,8 +89,8 @@ describe("BrandLogo", () => {
     );
 
     const img = screen.getByRole("img");
-    expect(img.className).toContain("h-8");
-    expect(img.className).toContain("w-8");
+    expect(img.className).toContain("h-10");
+    expect(img.className).toContain("w-10");
   });
 
   it("uses the first letter capitalised from displayName", () => {
@@ -150,6 +150,7 @@ describe("BrandingContext", () => {
         primaryColor: "#dc2626",
         logoUrl: "https://example.com/logo.png",
         faviconUrl: "https://example.com/favicon.ico",
+        showDisplayName: true,
       },
       loading: false,
       error: null,
@@ -190,6 +191,7 @@ describe("BrandingContext", () => {
         primaryColor: "#22c55e",
         logoUrl: null,
         faviconUrl: null,
+        showDisplayName: true,
       },
       loading: false,
       error: null,
@@ -243,6 +245,7 @@ describe("BrandingContext", () => {
         primaryColor: "#111827",
         logoUrl: null,
         faviconUrl: "https://example.com/custom.ico",
+        showDisplayName: true,
       },
       loading: false,
       error: null,
@@ -307,6 +310,7 @@ describe("AppBrandingForm", () => {
           primaryColor: "#f59e0b",
           logoUrl: "https://example.com/logo.png",
           faviconUrl: "https://example.com/fav.ico",
+          showDisplayName: true,
         }}
         onSave={vi.fn()}
         isSaving={false}
@@ -415,6 +419,7 @@ describe("BrandingSettings", () => {
         primaryColor: "#111827",
         logoUrl: null,
         faviconUrl: null,
+        showDisplayName: true,
       },
       loading: false,
       error: null,
@@ -461,6 +466,7 @@ describe("BrandingSettings", () => {
         primaryColor: "#a855f7",
         logoUrl: null,
         faviconUrl: null,
+        showDisplayName: true,
       },
       loading: false,
       error: null,

@@ -43,12 +43,14 @@ const MainLayout = ({ children }: { children: ReactNode }) => {
             displayName={branding.displayName}
             size="mobile"
           />
-          <span
-            className="truncate font-semibold"
-            title={branding.displayName || undefined}
-          >
-            {branding.displayName || "Pullstok"}
-          </span>
+          {branding.showDisplayName !== false && (
+            <span
+              className="truncate font-semibold"
+              title={branding.displayName || undefined}
+            >
+              {branding.displayName || "Pullstok"}
+            </span>
+          )}
         </div>
         <div className="ml-auto flex items-center gap-2">
           <RefreshDataButton />

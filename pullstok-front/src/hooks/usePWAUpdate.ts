@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 
 /**
@@ -16,6 +16,51 @@ export function usePWAUpdate() {
   });
 
   const [dismissed, setDismissed] = useState(false);
+  const [activeWaiting, setActiveWaiting] = useState(false);
+
+  // Verificación activa: si el SW nuevo ya quedó "waiting" antes de que este
+  // componente se monte (típico tras un deploy con la app abierta), el evento
+  // de useRegisterSW no se dispara. Chequeamos la registration directamente
+  // y escuchamos updatefound para los SW que lleguen después.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+
+    const checkWaiting = async () => {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        setActiveWaiting(!!registration?.waiting);
+      } catch {
+        setActiveWaiting(false);
+      }
+    };
+
+    const onUpdateFound = () => {
+      setActiveWaiting(true);
+      setDismissed(false);
+    };
+
+    checkWaiting();
+
+    // Escuchar cambios de registration: un updatefound significa que un SW
+    // nuevo está instalándose; al terminar quedará en waiting.
+    const watchRegistration = async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      registration?.addEventListener("updatefound", onUpdateFound);
+    };
+    watchRegistration();
+
+    const interval = setInterval(checkWaiting, 60000);
+
+    return () => {
+      clearInterval(interval);
+      navigator.serviceWorker
+        .getRegistration()
+        .then((registration) =>
+          registration?.removeEventListener("updatefound", onUpdateFound),
+        )
+        .catch(() => {});
+    };
+  }, []);
 
   const applyUpdate = async () => {
     setDismissed(false);
@@ -25,7 +70,7 @@ export function usePWAUpdate() {
   const dismiss = () => setDismissed(true);
 
   return {
-    needRefresh: needRefresh[0] && !dismissed,
+    needRefresh: (needRefresh[0] || activeWaiting) && !dismissed,
     offlineReady: offlineReady[0],
     applyUpdate,
     dismiss,

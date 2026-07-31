@@ -23,7 +23,7 @@ export const BrandLogo = ({
 
   const sizeClasses =
     size === "sidebar"
-      ? "h-8 w-8 text-lg"
+      ? "h-10 w-10 text-xl"
       : "h-7 w-7 text-base";
 
   const hasLogo = logoUrl && !imgError;

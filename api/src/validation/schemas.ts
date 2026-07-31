@@ -391,4 +391,5 @@ export const updateAppBrandingSchema = z.object({
   logoUrl: z.string().url("URL de logo inválida").nullable().optional(),
   faviconUrl: z.string().url("URL de favicon inválida").nullable().optional(),
   displayName: z.string().max(100, "Máximo 100 caracteres").optional(),
+  showDisplayName: z.boolean().optional(),
 }).strip();

@@ -70,32 +70,36 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Marca */}
-      <div className="flex h-16 items-center gap-2 border-b px-6">
+      <div className="flex h-16 items-center gap-2 border-b px-4">
         <BrandLogo
           logoUrl={branding.logoUrl}
           displayName={branding.displayName}
           size="sidebar"
         />
-        <span
-          className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight"
-          title={branding.displayName || undefined}
-        >
-          {branding.displayName || "Pullstok"}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={toggleTheme}
-          title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
-        >
-          {theme === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-        </Button>
-        <RefreshDataButton className="h-8 w-8" />
+        {branding.showDisplayName !== false && (
+          <span
+            className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight"
+            title={branding.displayName || undefined}
+          >
+            {branding.displayName || "Pullstok"}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+          >
+            {theme === "dark" ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
+          </Button>
+          <RefreshDataButton className="h-8 w-8" />
+        </div>
       </div>
 
       {/* Navegación por grupos */}
