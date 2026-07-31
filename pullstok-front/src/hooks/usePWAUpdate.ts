@@ -18,17 +18,28 @@ export function usePWAUpdate() {
   const [dismissed, setDismissed] = useState(false);
   const [activeWaiting, setActiveWaiting] = useState(false);
 
-  // Verificación activa: si el SW nuevo ya quedó "waiting" antes de que este
-  // componente se monte (típico tras un deploy con la app abierta), el evento
-  // de useRegisterSW no se dispara. Chequeamos la registration directamente
-  // y escuchamos updatefound para los SW que lleguen después.
+  // Verificación activa: el navegador NO avisa solo cuando hay un deploy —
+  // solo chequea el SW al cargar la página, con registration.update(), o
+  // cada ~24h. Para que la PWA abierta detecte versiones nuevas en tiempo
+  // real, forzamos registration.update() periódicamente: descarga el sw.js,
+  // lo compara, y si cambió dispara "updatefound" → banner.
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
+    let registrationRef: ServiceWorkerRegistration | null | undefined = null;
+    let disposed = false;
+
     const checkWaiting = async () => {
       try {
-        const registration = await navigator.serviceWorker.getRegistration();
-        setActiveWaiting(!!registration?.waiting);
+        const registration =
+          registrationRef ??
+          (await navigator.serviceWorker.getRegistration());
+        registrationRef = registration;
+        if (!registration) return;
+        setActiveWaiting(!!registration.waiting);
+        // Forzar la descarga/comparación del sw.js — el corazón de la
+        // detección reactiva. No falla si no hay cambios (update() es no-op).
+        await registration.update();
       } catch {
         setActiveWaiting(false);
       }
@@ -39,26 +50,29 @@ export function usePWAUpdate() {
       setDismissed(false);
     };
 
-    checkWaiting();
-
-    // Escuchar cambios de registration: un updatefound significa que un SW
-    // nuevo está instalándose; al terminar quedará en waiting.
     const watchRegistration = async () => {
       const registration = await navigator.serviceWorker.getRegistration();
+      registrationRef = registration;
       registration?.addEventListener("updatefound", onUpdateFound);
     };
     watchRegistration();
 
-    const interval = setInterval(checkWaiting, 60000);
+    // Primer chequeo inmediato + polling cada 60s.
+    checkWaiting();
+    const interval = setInterval(() => {
+      if (!disposed) checkWaiting();
+    }, 60000);
+
+    // Además del polling, escuchar el evento global "online": al volver la
+    // conexión, el SW puede haber quedado desactualizado mientras estuvimos
+    // offline.
+    window.addEventListener("online", checkWaiting);
 
     return () => {
+      disposed = true;
       clearInterval(interval);
-      navigator.serviceWorker
-        .getRegistration()
-        .then((registration) =>
-          registration?.removeEventListener("updatefound", onUpdateFound),
-        )
-        .catch(() => {});
+      window.removeEventListener("online", checkWaiting);
+      registrationRef?.removeEventListener("updatefound", onUpdateFound);
     };
   }, []);
 
