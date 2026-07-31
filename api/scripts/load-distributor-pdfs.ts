@@ -70,14 +70,21 @@ async function readPdfText(path: string): Promise<string> {
 }
 
 function parsePrice(raw: string): number {
-  // "34,148.18" -> 34148.18 ; "1.658,00" -> 1658.00 ; "7.238,20" -> 7238.20
+  // "34,148.18" (US: miles=comma, decimal=dot) -> 34148.18
+  // "1.658,00" (AR: miles=dot, decimal=comma)  -> 1658.00
   const s = raw.trim().replace(/\$/g, "").replace(/\s/g, "");
   if (!s) return 0;
   const lastComma = s.lastIndexOf(",");
   const lastDot = s.lastIndexOf(".");
   let normalized: string;
-  if (lastComma > -1 && lastDot > -1 && lastComma > lastDot) {
-    normalized = s.replace(/\./g, "").replace(",", ".");
+  if (lastComma > -1 && lastDot > -1) {
+    if (lastComma > lastDot) {
+      // AR: comma is the decimal separator -> strip dots, comma -> dot
+      normalized = s.replace(/\./g, "").replace(",", ".");
+    } else {
+      // US: dot is the decimal separator -> strip commas, keep dot
+      normalized = s.replace(/,/g, "");
+    }
   } else if (lastComma > -1 && lastDot === -1) {
     normalized = s.replace(",", ".");
   } else {
@@ -107,10 +114,13 @@ function parseVitalcan(text: string): RawProduct[] {
     let description = m[2].replace(/\s+/g, " ").trim();
     // Strip Vitalcan classification suffix: repeated brand + tokens like
     // NR ESPEC / ESPEC / WET MASIVO / MASIVO / VITAL at the end.
-    description = description.replace(
-      /\s+(?:BALANCED|NR|ESPEC|MASIVO|WET|SOBRE|EN\s+SOBRE|LATA|VITAL|ACTUAL)\s*$/i,
-      "",
-    );
+    const suffixRe = /\s+(?:BALANCED|NR|ESPEC|MASIVO|WET|SOBRE|EN\s+SOBRE|LATA|VITAL|ACTUAL)$/i;
+    let stripped = true;
+    while (stripped) {
+      const before = description;
+      description = description.replace(suffixRe, "");
+      stripped = description !== before;
+    }
     out.push({
       source: "vitalcan",
       code: m[1],
