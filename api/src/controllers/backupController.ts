@@ -2,18 +2,18 @@ import { Response } from "express";
 import { basePrisma } from "../config/db";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 import { requireOrganizationId } from "../config/tenantContext";
-import { generatePresignedUrl } from "../config/storage";
+import { downloadFromR2 } from "../config/storage";
 import { sanitizeSlug } from "../services/backupService";
 
 /**
  * GET /api/backups/latest
  *
- * Returns a presigned URL for the current organization's latest daily backup.
+ * Streams the current organization's latest daily backup directly from R2.
  *
  * Auth: JWT required, ADMIN role required, tenant-scoped.
  *
  * Responses:
- *   200 — { url, date, size }
+ *   200 — file download (Content-Disposition: attachment)
  *   401 — No token / invalid token
  *   403 — Not ADMIN
  *   404 — No backup found for today
@@ -26,7 +26,7 @@ export const getLatestBackup = async (req: AuthedRequest, res: Response) => {
     // Get org slug
     const org = await basePrisma.organization.findUnique({
       where: { id: organizationId },
-      select: { slug: true },
+      select: { slug: true, name: true },
     });
 
     if (!org) {
@@ -43,21 +43,21 @@ export const getLatestBackup = async (req: AuthedRequest, res: Response) => {
 
     const key = `backups/${safeSlug}/${dateStr}.sql.gz`;
 
-    // Generate a 1-hour presigned URL (spec A2)
-    const url = await generatePresignedUrl(key, 3600);
+    // Download from R2 and stream to client
+    const { body, contentType, contentLength } = await downloadFromR2(key);
 
-    return res.status(200).json({
-      url,
-      date: dateStr,
-      // Size is unknown without a head-object to R2. We return 0 as
-      // the frontend doesn't display size (spec A1 only mentions url).
-      size: 0,
-    });
+    const filename = `${safeSlug}-${dateStr}.sql.gz`;
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Length", contentLength);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.status(200).send(body);
   } catch (error: any) {
-    // Presigned URL generation failure — likely R2 unreachable (spec A6)
-    console.error(`[backupController] Error generating presigned URL: ${error.message}`);
+    if (error.name === "NoSuchKey" || error.Code === "NoSuchKey") {
+      return res.status(404).json({ message: "No backup available for today." });
+    }
+    console.error(`[backupController] Error downloading backup: ${error.message}`);
     return res.status(500).json({
-      message: "Could not generate backup download link. Please try again later.",
+      message: "Could not download backup. Please try again later.",
     });
   }
 };

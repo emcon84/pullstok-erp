@@ -120,3 +120,29 @@ export async function generatePresignedUrl(
   // copies of @smithy/types. Runtime compatibility is guaranteed; the cast is safe.
   return getSignedUrl(client as any, command, { expiresIn });
 }
+
+/**
+ * Downloads an object from R2 and returns its body as a Buffer.
+ */
+export async function downloadFromR2(key: string): Promise<{ body: Buffer; contentType: string; contentLength: number }> {
+  const client = getClient();
+  const command = new GetObjectCommand({
+    Bucket: BUCKET(),
+    Key: key,
+  });
+  const response = await client.send(command);
+  const body = await streamToBuffer(response.Body as any);
+  return {
+    body,
+    contentType: response.ContentType || "application/octet-stream",
+    contentLength: response.ContentLength || 0,
+  };
+}
+
+async function streamToBuffer(stream: any): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}

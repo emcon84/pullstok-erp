@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
+import axios from "axios";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getMe } from "../services/onboardingService";
-import { getLatestBackup } from "../services/backupService";
+import { API_URL } from "../constants";
 import { useBranding, useUpdateBranding } from "../components/hooks/useBranding";
 import { AppBrandingForm } from "../components/molecules/AppBrandingForm";
 import { Loader } from "../components/atoms/loader";
@@ -25,10 +26,26 @@ export const BrandingSettings = () => {
   const handleDownloadBackup = async () => {
     setDownloading(true);
     try {
-      const { url } = await getLatestBackup();
-      window.open(url, "_self");
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${API_URL}/backups/latest`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
+      // Trigger browser download from blob
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      const disposition = response.headers["content-disposition"];
+      const filenameMatch = disposition?.match(/filename="?([^"]+)"?/);
+      link.setAttribute("download", filenameMatch?.[1] || "backup.sql.gz");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Backup descargado");
     } catch (error: any) {
-      toast.error(error.message || "Error al obtener el backup");
+      const msg = error.response?.data?.message || error.message || "Error al descargar el backup";
+      toast.error(typeof msg === "string" ? msg : "Error al descargar el backup");
     } finally {
       setDownloading(false);
     }
@@ -75,7 +92,7 @@ export const BrandingSettings = () => {
               {downloading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generando enlace...
+                  Descargando...
                 </>
               ) : (
                 <>

@@ -166,7 +166,8 @@ describe("backupService", () => {
 
     const orgQuery = selectCalls.find((s) => s.includes("organizations"));
     expect(orgQuery).toBeDefined();
-    expect(orgQuery).toContain("organizationId");
+    // Organization table queries by "id" (not "organizationId") — it IS the org
+    expect(orgQuery).toContain("\"id\"");
     expect(selectCalls.length).toBeGreaterThanOrEqual(1);
   });
 
