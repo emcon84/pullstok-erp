@@ -36,6 +36,7 @@ export const PLAN_LIMITS: Record<
       "reportes",
       "tienda",
       "facturacion",
+      "branding",
     ],
   },
   PREMIUM: {
@@ -56,6 +57,7 @@ export const PLAN_LIMITS: Record<
       // BASICO. Feature premium (chat-bot-groq). Si se agrega al backend en
       // otro plan, replicar acá.
       "bot",
+      "branding",
     ],
   },
 };

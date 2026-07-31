@@ -6,6 +6,8 @@
 :root {
   --radius: 0.75rem;
 
+  --brand-primary: var(--primary);
+
   --background: #ffffff;
   --foreground: #0f172a;
 

@@ -9,9 +9,12 @@ import {
 } from "@/components/ui/sheet";
 import { SidebarContent } from "../components/molecules/sidebar";
 import { BottomBar } from "../components/molecules/BottomBar";
+import { useBrandingContext } from "@/contexts/BrandingContext";
+import { BrandLogo } from "@/components/atoms/BrandLogo";
 
 const MainLayout = ({ children }: { children: ReactNode }) => {
   const [open, setOpen] = useState(false);
+  const { branding } = useBrandingContext();
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -34,10 +37,14 @@ const MainLayout = ({ children }: { children: ReactNode }) => {
           </SheetContent>
         </Sheet>
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
-            P
-          </div>
-          <span className="font-semibold">Pullstok</span>
+          <BrandLogo
+            logoUrl={branding.logoUrl}
+            displayName={branding.displayName}
+            size="mobile"
+          />
+          <span className="font-semibold">
+            {branding.displayName || "Pullstok"}
+          </span>
         </div>
       </header>
 

@@ -93,6 +93,10 @@ const BulkPriceUpdate = lazy(() =>
   import("./views/BulkPriceUpdate").then((m) => ({ default: m.BulkPriceUpdate })),
 );
 
+const BrandingSettings = lazy(() =>
+  import("./views/BrandingSettings").then((m) => ({ default: m.BrandingSettings })),
+);
+
 const AppRoutes = () => (
   <Router>
     <Routes>
@@ -220,6 +224,7 @@ const AppRoutes = () => (
         <Route path="/sucursales" element={<BranchesPage />} />
         <Route path="/scanner" element={<StockScannerPage />} />
         <Route path="/actualizar-precios" element={<BulkPriceUpdate />} />
+        <Route path="/ajustes" element={<BrandingSettings />} />
       </Route>
 
       {/* Panel superadmin (sdd/planes-y-billing): rutas de plataforma, fuera

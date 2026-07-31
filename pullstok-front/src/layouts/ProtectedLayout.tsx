@@ -6,6 +6,7 @@ import { Loader } from "../components/atoms/loader";
 import { getMe } from "../services/onboardingService";
 import { useOrdersRealtime } from "../components/hooks/useOrdersRealtime";
 import { useChatConversationsRealtime } from "../components/hooks/useChatRealtime";
+import { BrandingProvider } from "@/contexts/BrandingContext";
 
 /**
  * Layout persistente para las rutas autenticadas. El MainLayout (sidebar) se
@@ -80,8 +81,9 @@ const ProtectedLayout = () => {
   }
 
   return (
-    <MainLayout>
-      <Suspense
+    <BrandingProvider>
+      <MainLayout>
+        <Suspense
         fallback={
           <div className="flex min-h-[60vh] items-center justify-center">
             <Loader />
@@ -91,6 +93,7 @@ const ProtectedLayout = () => {
         <Outlet />
       </Suspense>
     </MainLayout>
+    </BrandingProvider>
   );
 };
 

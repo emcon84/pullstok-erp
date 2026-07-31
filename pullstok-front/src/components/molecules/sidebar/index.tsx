@@ -10,6 +10,8 @@ import { filterNavItemsByRole } from "@/constants/rolePermissions";
 import { usePendingOrdersCount } from "../../hooks/useOrder";
 import { useUnreadMessagesCount } from "../../hooks/useChat";
 import { useTheme } from "@/hooks/useTheme";
+import { useBrandingContext } from "@/contexts/BrandingContext";
+import { BrandLogo } from "@/components/atoms/BrandLogo";
 
 interface SidebarContentProps {
   onNavigate?: () => void;
@@ -55,6 +57,8 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
     });
   };
 
+  const { branding } = useBrandingContext();
+
   const badgeCount = (to: string) => {
     if (to === "/pedidos" && pendingOrders > 0) return pendingOrders;
     if (to === "/mensajes" && unreadMessages > 0) return unreadMessages;
@@ -65,10 +69,14 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
     <div className="flex h-full flex-col bg-background">
       {/* Marca */}
       <div className="flex h-16 items-center gap-2 border-b px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-          P
-        </div>
-        <span className="flex-1 text-lg font-semibold tracking-tight">Pullstok</span>
+        <BrandLogo
+          logoUrl={branding.logoUrl}
+          displayName={branding.displayName}
+          size="sidebar"
+        />
+        <span className="flex-1 text-lg font-semibold tracking-tight">
+          {branding.displayName || "Pullstok"}
+        </span>
         <Button
           variant="ghost"
           size="icon"
