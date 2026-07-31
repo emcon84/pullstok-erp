@@ -18,17 +18,41 @@ export default defineConfig({
         theme_color: "#18181b",
         background_color: "#18181b",
         display: "standalone",
+        display_override: ["window-controls-overlay", "standalone"],
         orientation: "any",
         start_url: "/scanner",
         scope: "/",
         icons: [
           { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
           { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
           { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
+        shortcuts: [
+          {
+            name: "Escanear código",
+            short_name: "Scanner",
+            url: "/scanner",
+            icons: [{ src: "/icon-192.png", sizes: "192x192" }],
+          },
+          {
+            name: "Productos",
+            short_name: "Productos",
+            url: "/productos",
+            icons: [{ src: "/icon-192.png", sizes: "192x192" }],
+          },
+          {
+            name: "Nueva venta",
+            short_name: "Venta",
+            url: "/sales/new",
+            icons: [{ src: "/icon-192.png", sizes: "192x192" }],
+          },
         ],
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
+        navigateFallback: "/index.html",
+        includeAssets: ["/favicon.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"],
         skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [

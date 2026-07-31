@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — vitest lifts these above all static imports so the module
@@ -8,6 +10,10 @@ import { render, screen } from "@testing-library/react";
 vi.mock("../components/hooks/useBranding", () => ({
   useBranding: vi.fn(),
   useUpdateBranding: vi.fn(),
+}));
+
+vi.mock("../services/onboardingService", () => ({
+  getMe: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -387,9 +393,20 @@ describe("AppBrandingForm", () => {
 // STEP 4 – BrandingSettings page (FS1)
 // ============================================================================
 describe("BrandingSettings", () => {
+  let queryClient: QueryClient;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
   });
+
+  const renderWithProviders = (ui: React.ReactElement) => {
+    return render(
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+    );
+  };
 
   it('renders the page title "Ajustes" when data is loaded', () => {
     vi.mocked(useBranding).mockReturnValue({
@@ -409,7 +426,7 @@ describe("BrandingSettings", () => {
       success: false,
     });
 
-    render(<BrandingSettings />);
+    renderWithProviders(<BrandingSettings />);
 
     expect(
       screen.getByRole("heading", { name: /ajustes/i, level: 1 }),
@@ -429,7 +446,7 @@ describe("BrandingSettings", () => {
       success: false,
     });
 
-    render(<BrandingSettings />);
+    renderWithProviders(<BrandingSettings />);
 
     expect(screen.getByText(/cargando/i)).toBeInTheDocument();
     expect(
@@ -455,7 +472,7 @@ describe("BrandingSettings", () => {
       success: false,
     });
 
-    render(<BrandingSettings />);
+    renderWithProviders(<BrandingSettings />);
 
     const displayNameInput = screen.getByLabelText(
       /nombre para mostrar/i,

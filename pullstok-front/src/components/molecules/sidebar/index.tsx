@@ -12,6 +12,7 @@ import { useUnreadMessagesCount } from "../../hooks/useChat";
 import { useTheme } from "@/hooks/useTheme";
 import { useBrandingContext } from "@/contexts/BrandingContext";
 import { BrandLogo } from "@/components/atoms/BrandLogo";
+import { InstallButton } from "@/components/atoms/InstallButton";
 
 interface SidebarContentProps {
   onNavigate?: () => void;
@@ -184,6 +185,7 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
           <LogOut className="h-4 w-4" />
           Salir
         </Button>
+        <InstallButton />
       </div>
     </div>
   );
