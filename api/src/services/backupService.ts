@@ -134,15 +134,18 @@ export async function backupOrganization(
   slug: string,
   date: string,
 ): Promise<{ key: string; bytes: number }> {
-  // Step 1: Open READ ONLY transaction
+  // Step 1: Validate DATABASE_URL
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) throw new Error("DATABASE_URL environment variable is not set");
+
+  // Step 2: Open READ ONLY transaction
   await basePrisma.$queryRawUnsafe("BEGIN READ ONLY");
 
   try {
-    // Step 2: pg_dump --schema-only for DDL
-    const dbName = getDbName();
-    const safeDbName = `"${dbName.replace(/"/g, '""')}"`;
+    // Step 3: pg_dump --schema-only for DDL
+    // Use DATABASE_URL as connection string so pg_dump picks up user/password/host
     const ddl = execSync(
-      `pg_dump --schema-only --no-owner --no-privileges ${safeDbName}`,
+      `pg_dump --schema-only --no-owner --no-privileges -d "${dbUrl}"`,
       { encoding: "utf-8" },
     );
 
