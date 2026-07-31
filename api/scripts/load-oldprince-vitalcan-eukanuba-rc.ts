@@ -319,10 +319,10 @@ const CATEGORY_KEYS = ["seco-perros", "seco-gatos", "humedo-perros", "humedo-gat
 type CategoryKey = (typeof CATEGORY_KEYS)[number];
 
 const CATEGORY_PATHS: Record<CategoryKey, { parent: string; child: string }> = {
-  "seco-perros": { parent: "Alimento Seco (Balanceado)", child: "Perros" },
-  "seco-gatos": { parent: "Alimento Seco (Balanceado)", child: "Gatos" },
-  "humedo-perros": { parent: "Alimento Húmedo (Latas / Sobres)", child: "Perros" },
-  "humedo-gatos": { parent: "Alimento Húmedo (Pouch / Latas)", child: "Gatos" },
+  "seco-perros": { parent: "Perros", child: "Alimento Seco (Balanceado)" },
+  "seco-gatos": { parent: "Gatos", child: "Alimento Seco (Balanceado)" },
+  "humedo-perros": { parent: "Perros", child: "Alimento Húmedo (Latas / Sobres)" },
+  "humedo-gatos": { parent: "Gatos", child: "Alimento Húmedo (Pouch / Latas)" },
 };
 
 const SECO_VARIANT_NAMES = ["Marca", "Etapa", "Segmento", "Tamaño"];
@@ -358,7 +358,7 @@ async function main() {
 
     if (!parentCache[parent]) {
       const p = await basePrisma.category.findFirst({
-        where: { name: parent, organizationId: orgId, parentId: null },
+        where: { name: parent, organizationId: orgId },
       });
       if (!p) throw new Error(`Parent category not found: "${parent}"`);
       parentCache[parent] = p.id;
