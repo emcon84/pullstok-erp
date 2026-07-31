@@ -11,6 +11,7 @@ import { SidebarContent } from "../components/molecules/sidebar";
 import { BottomBar } from "../components/molecules/BottomBar";
 import { useBrandingContext } from "@/contexts/BrandingContext";
 import { BrandLogo } from "@/components/atoms/BrandLogo";
+import { RefreshDataButton } from "@/components/atoms/RefreshDataButton";
 
 const MainLayout = ({ children }: { children: ReactNode }) => {
   const [open, setOpen] = useState(false);
@@ -45,6 +46,9 @@ const MainLayout = ({ children }: { children: ReactNode }) => {
           <span className="font-semibold">
             {branding.displayName || "Pullstok"}
           </span>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <RefreshDataButton />
         </div>
       </header>
 

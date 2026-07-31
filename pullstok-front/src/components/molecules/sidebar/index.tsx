@@ -13,6 +13,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useBrandingContext } from "@/contexts/BrandingContext";
 import { BrandLogo } from "@/components/atoms/BrandLogo";
 import { InstallButton } from "@/components/atoms/InstallButton";
+import { RefreshDataButton } from "@/components/atoms/RefreshDataButton";
 
 interface SidebarContentProps {
   onNavigate?: () => void;
@@ -91,6 +92,7 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
             <Moon className="h-4 w-4" />
           )}
         </Button>
+        <RefreshDataButton className="h-8 w-8" />
       </div>
 
       {/* Navegación por grupos */}

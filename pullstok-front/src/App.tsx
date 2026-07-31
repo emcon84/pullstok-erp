@@ -4,6 +4,7 @@ import AppRoutes from "./routes";
 import { ToastContainer } from "react-toastify";
 import * as React from "react";
 import { ConfirmProvider } from "./components/hooks/useConfirm";
+import { UpdateBanner } from "./components/molecules/UpdateBanner";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <div>
           <AppRoutes />
           <ToastContainer />
+          <UpdateBanner />
         </div>
       </ConfirmProvider>
     </React.StrictMode>
