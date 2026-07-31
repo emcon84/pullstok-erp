@@ -12,7 +12,7 @@ export type UpdateAppBrandingInput = {
   displayName?: string | null;
   logoUrl?: string | null;
   faviconUrl?: string | null;
-  primaryColor?: string;
+  primaryColor?: string | null;
 };
 
 const authHeaders = () => ({
