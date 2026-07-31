@@ -5,7 +5,7 @@ export interface AppBranding {
   displayName: string | null;
   logoUrl: string | null;
   faviconUrl: string | null;
-  primaryColor: string;
+  primaryColor: string | null;
 }
 
 export type UpdateAppBrandingInput = {

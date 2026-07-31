@@ -18,7 +18,7 @@ export const getBranding = async (_req: AuthedRequest, res: Response) => {
     });
 
     res.status(200).json({
-      primaryColor: branding?.primaryColor ?? DEFAULT_PRIMARY_COLOR,
+      primaryColor: branding?.primaryColor ?? null,
       logoUrl: branding?.logoUrl ?? null,
       faviconUrl: branding?.faviconUrl ?? null,
       displayName: branding?.displayName ?? null,

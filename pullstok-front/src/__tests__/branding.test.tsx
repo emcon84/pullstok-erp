@@ -132,7 +132,8 @@ describe("BrandingContext", () => {
     );
 
     expect(screen.getByTestId("name")).toHaveTextContent("Pullstok");
-    expect(screen.getByTestId("color")).toHaveTextContent("#111827");
+    // default primaryColor is null — no inline CSS override, theme handles it
+    expect(screen.getByTestId("color")).toHaveTextContent("");
     expect(screen.getByTestId("loading")).toHaveTextContent("false");
   });
 
@@ -219,7 +220,8 @@ describe("BrandingContext", () => {
     render(<TestConsumer />);
 
     expect(screen.getByTestId("name")).toHaveTextContent("Pullstok");
-    expect(screen.getByTestId("color")).toHaveTextContent("#111827");
+    // default context: primaryColor is null — theme CSS handles it
+    expect(screen.getByTestId("color")).toHaveTextContent("");
     expect(screen.getByTestId("loading")).toHaveTextContent("false");
   });
 

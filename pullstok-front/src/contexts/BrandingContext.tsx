@@ -6,14 +6,14 @@ export interface Branding {
   displayName: string | null;
   logoUrl: string | null;
   faviconUrl: string | null;
-  primaryColor: string;
+  primaryColor: string | null;
 }
 
 const DEFAULT_BRANDING: Branding = {
   displayName: "Pullstok",
   logoUrl: null,
   faviconUrl: null,
-  primaryColor: "#111827",
+  primaryColor: null,
 };
 
 interface BrandingContextValue {
@@ -40,10 +40,13 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
       }
     : DEFAULT_BRANDING;
 
-  // Sync --primary CSS custom property on the document root so Tailwind's
-  // bg-primary / text-primary / ring references pick it up automatically.
+  // Only override --primary when a custom color was explicitly set.
+  // When primaryColor is null (no DB row), the CSS theme's own --primary
+  // (light: #6366f1 / dark: #818cf8) handles active-link contrast correctly.
   useEffect(() => {
-    document.documentElement.style.setProperty("--primary", resolved.primaryColor);
+    if (resolved.primaryColor) {
+      document.documentElement.style.setProperty("--primary", resolved.primaryColor);
+    }
   }, [resolved.primaryColor]);
 
   // Sync favicon dynamically when faviconUrl is set.
