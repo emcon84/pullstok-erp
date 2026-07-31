@@ -76,7 +76,10 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
           displayName={branding.displayName}
           size="sidebar"
         />
-        <span className="flex-1 text-lg font-semibold tracking-tight">
+        <span
+          className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight"
+          title={branding.displayName || undefined}
+        >
           {branding.displayName || "Pullstok"}
         </span>
         <Button

@@ -37,13 +37,16 @@ const MainLayout = ({ children }: { children: ReactNode }) => {
             <SidebarContent onNavigate={() => setOpen(false)} />
           </SheetContent>
         </Sheet>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <BrandLogo
             logoUrl={branding.logoUrl}
             displayName={branding.displayName}
             size="mobile"
           />
-          <span className="font-semibold">
+          <span
+            className="truncate font-semibold"
+            title={branding.displayName || undefined}
+          >
             {branding.displayName || "Pullstok"}
           </span>
         </div>
