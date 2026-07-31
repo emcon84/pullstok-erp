@@ -91,8 +91,19 @@ function parseVitalcan(text: string): RawProduct[] {
   // Anchored to line start; description ends at the trailing classification
   // tokens ("BALANCED NR ESPEC VITAL", "WET MASIVO VITAL", ...).
   const re = /^(\d{6,8})\s+(.+?)\s+([\d.,]+)\t\$\s+([\d.,]+)\t\$/gm;
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // A line starting with a code but lacking prices may be split: its price
+    // row is on the next line (e.g. "2421749 ... BALANCED NR ESPEC\nVITAL 26,267.83 $ 34,148.18 $").
+    if (!line.includes("\t$") && /^\d{6,8}\s/.test(line) && lines[i + 1]?.includes("\t$")) {
+      lines[i] = line + " " + lines[i + 1];
+      lines.splice(i + 1, 1);
+    }
+  }
+  const joined = lines.join("\n");
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
+  while ((m = re.exec(joined)) !== null) {
     let description = m[2].replace(/\s+/g, " ").trim();
     // Strip Vitalcan classification suffix: repeated brand + tokens like
     // NR ESPEC / ESPEC / WET MASIVO / MASIVO / VITAL at the end.
