@@ -52,7 +52,6 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
         navigateFallback: "/index.html",
-        includeAssets: ["/favicon.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"],
         skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [
