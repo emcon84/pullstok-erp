@@ -235,7 +235,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDraw
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="w-full sm:w-[440px] sm:max-w-[440px] max-w-[100vw] overflow-hidden p-0 flex flex-col">
+      <SheetContent side="right" className="w-full sm:w-[560px] sm:max-w-[560px] max-w-[100vw] overflow-hidden p-0 flex flex-col">
         <SheetHeader className="px-6 pt-6 pb-2 shrink-0">
           <SheetTitle>{isEdit ? "Editar producto" : "Agregar producto"}</SheetTitle>
         </SheetHeader>
