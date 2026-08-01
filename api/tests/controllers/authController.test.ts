@@ -106,8 +106,13 @@ describe('AuthController', () => {
   });
 
   describe('me', () => {
-    it('devuelve 200 con el usuario autenticado', async () => {
-      const usuario = { id: 'u1', email: 'test@example.com', role: 'ADMIN' };
+    it('devuelve 200 con el usuario autenticado (incluye branchIds)', async () => {
+      const usuario = {
+        id: 'u1',
+        email: 'test@example.com',
+        role: 'ADMIN',
+        branchIds: ['b-1', 'b-2'],
+      };
       mockedAuthService.me.mockResolvedValue(usuario as any);
 
       const req = mockRequest({}, { id: 'u1' });

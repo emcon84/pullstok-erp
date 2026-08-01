@@ -47,6 +47,7 @@ class AuthService {
       organizationId: user.organizationId,
     });
     const refreshToken = generateRefreshToken(user.id);
+    const branchIds = await AuthService.readUserBranchIds(user.id);
 
     return {
       accessToken,
@@ -59,6 +60,10 @@ class AuthService {
         role: user.role,
         organizationId: user.organizationId,
         mustChangePassword: user.mustChangePassword,
+        // BranchIds del usuario como hint UX para el front (design D3):
+        // el server re-lee BranchAssignment de la DB en cada PUT de stock,
+        // este valor es SOLO informativo (scanner/selector de sucursal).
+        branchIds,
         // Plan de la organización para gating client-side (ej. sidebar).
         // null para SUPERADMIN (organizationId null, sin organization).
         // NO se agrega al JWT firmado a propósito (ver checkInvoicingEnabled.ts):
@@ -67,6 +72,19 @@ class AuthService {
         plan: user.organization?.plan ?? null,
       },
     };
+  }
+
+  /**
+   * BranchIds del usuario leídos de la DB. BranchAssignment no es
+   * tenant-scoped (no tiene organizationId), así que el filtro por userId es
+   * seguro y global. Solo hint UX (design D3) — nunca se usa para autorizar.
+   */
+  private static async readUserBranchIds(userId: string): Promise<string[]> {
+    const assignments = await basePrisma.branchAssignment.findMany({
+      where: { userId },
+      select: { branchId: true },
+    });
+    return assignments.map((a) => a.branchId);
   }
 
   /** Emite un nuevo access token a partir de un refresh token válido. */
@@ -153,6 +171,8 @@ class AuthService {
       throw new Error("Usuario no encontrado");
     }
 
+    const branchIds = await AuthService.readUserBranchIds(userId);
+
     return {
       id: user.id,
       email: user.email,
@@ -161,6 +181,7 @@ class AuthService {
       role: user.role,
       organizationId: user.organizationId,
       mustChangePassword: user.mustChangePassword,
+      branchIds,
       organization: user.organization,
     };
   }

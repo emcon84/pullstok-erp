@@ -19,6 +19,9 @@ jest.mock('../../src/config/db', () => ({
       update: jest.fn(),
       create: jest.fn(),
     },
+    branchAssignment: {
+      findMany: jest.fn(),
+    },
   },
 }));
 
@@ -50,6 +53,7 @@ jest.mock('../../src/services/rateLimiter', () => ({
 
 const mockedPrisma = basePrisma as unknown as {
   user: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
+  branchAssignment: { findMany: jest.Mock };
 };
 const mockedBcrypt = bcrypt as unknown as { compare: jest.Mock; hash: jest.Mock };
 const mockedGenAccess = generateAccessToken as jest.Mock;
@@ -78,6 +82,10 @@ describe('AuthService', () => {
   describe('login', () => {
     it('devuelve tokens + datos del usuario en credenciales válidas', async () => {
       mockedPrisma.user.findFirst.mockResolvedValue({ ...baseUser });
+      mockedPrisma.branchAssignment.findMany.mockResolvedValue([
+        { branchId: 'b-1' },
+        { branchId: 'b-2' },
+      ]);
       mockedBcrypt.compare.mockResolvedValue(true);
       mockedGenAccess.mockReturnValue('access-token');
       mockedGenRefresh.mockReturnValue('refresh-token');
@@ -89,6 +97,10 @@ describe('AuthService', () => {
         include: { organization: true },
       });
       expect(mockedBcrypt.compare).toHaveBeenCalledWith('password123', 'hashed-password');
+      expect(mockedPrisma.branchAssignment.findMany).toHaveBeenCalledWith({
+        where: { userId: 'u1' },
+        select: { branchId: true },
+      });
       expect(result).toEqual({
         accessToken: 'access-token',
         refreshToken: 'refresh-token',
@@ -99,6 +111,7 @@ describe('AuthService', () => {
           role: 'ADMIN',
           organizationId: 'org-1',
           mustChangePassword: false,
+          branchIds: ['b-1', 'b-2'],
           plan: null,
         },
       });
@@ -145,6 +158,7 @@ describe('AuthService', () => {
 
     it('login funciona con username', async () => {
       mockedPrisma.user.findFirst.mockResolvedValue({ ...baseUser, username: 'testuser', email: null });
+      mockedPrisma.branchAssignment.findMany.mockResolvedValue([]);
       mockedBcrypt.compare.mockResolvedValue(true);
       mockedGenAccess.mockReturnValue('access-token');
       mockedGenRefresh.mockReturnValue('refresh-token');
@@ -156,6 +170,60 @@ describe('AuthService', () => {
         include: { organization: true },
       });
       expect(result.user.username).toBe('testuser');
+    });
+
+    it('devuelve branchIds vacío si el usuario no tiene BranchAssignments', async () => {
+      mockedPrisma.user.findFirst.mockResolvedValue({ ...baseUser });
+      mockedPrisma.branchAssignment.findMany.mockResolvedValue([]);
+      mockedBcrypt.compare.mockResolvedValue(true);
+      mockedGenAccess.mockReturnValue('access-token');
+      mockedGenRefresh.mockReturnValue('refresh-token');
+
+      const result = await AuthService.login('test@example.com', 'password123');
+
+      expect(mockedPrisma.branchAssignment.findMany).toHaveBeenCalledWith({
+        where: { userId: 'u1' },
+        select: { branchId: true },
+      });
+      expect(result.user.branchIds).toEqual([]);
+    });
+  });
+
+  describe('me', () => {
+    it('devuelve el usuario con sus branchIds (hint UX del design D3)', async () => {
+      mockedPrisma.user.findUnique.mockResolvedValue({
+        ...baseUser,
+        organization: { id: 'org-1', name: 'Org A' },
+      });
+      mockedPrisma.branchAssignment.findMany.mockResolvedValue([
+        { branchId: 'b-2' },
+        { branchId: 'b-9' },
+      ]);
+
+      const result = await AuthService.me('u1');
+
+      expect(mockedPrisma.branchAssignment.findMany).toHaveBeenCalledWith({
+        where: { userId: 'u1' },
+        select: { branchId: true },
+      });
+      expect(result.id).toBe('u1');
+      expect(result.branchIds).toEqual(['b-2', 'b-9']);
+    });
+
+    it('devuelve branchIds vacío cuando el usuario no tiene asignaciones', async () => {
+      mockedPrisma.user.findUnique.mockResolvedValue({ ...baseUser, organization: null });
+      mockedPrisma.branchAssignment.findMany.mockResolvedValue([]);
+
+      const result = await AuthService.me('u1');
+
+      expect(result.branchIds).toEqual([]);
+    });
+
+    it('lanza "Usuario no encontrado" si el user no existe', async () => {
+      mockedPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(AuthService.me('nadie')).rejects.toThrow('Usuario no encontrado');
+      expect(mockedPrisma.branchAssignment.findMany).not.toHaveBeenCalled();
     });
   });
 
