@@ -61,6 +61,7 @@ describe("brandingController", () => {
         logoUrl: null,
         faviconUrl: null,
         displayName: null,
+        showDisplayName: true,
       });
     });
 
@@ -87,6 +88,7 @@ describe("brandingController", () => {
         logoUrl: "https://example.com/logo.png",
         faviconUrl: null,
         displayName: "Mi Negocio",
+        showDisplayName: true,
       });
     });
 
