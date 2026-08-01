@@ -14,5 +14,5 @@
 Detalle completo en Engram (project `nexo-erp`).
 - **Backend** (`api/`): Express + Prisma 7 + PostgreSQL, multi-tenant (orgId + extension anti-fuga), auth 3 roles + JWT, Zod, pnpm.
 - **Front** (`pullstok-front/`): React + Vite + Tailwind v4 + shadcn/ui (design system migrado completo).
-- **Dev**: DB docker `nexo_db_dev:5434`; API :5000; front :5173. Demo: `admin@demo.com` / `admin123`.
+- **Dev**: NO hay Docker ni BD en local. Todo lo que exige Postgres (DB, e2e backend, deploy) corre en el VPS `root@72.61.25.48` (`/var/www/pullstok`, clave `C:\Users\Emiliano\.ssh\id_ed25519`). Los unit tests de backend corren local sin DB; los e2e (`api/tests/e2e/`) SOLO en el VPS. El frontend (vitest) corre local sin DB. Demo: `admin@demo.com` / `admin123`.
 - **PWA**: fuera de alcance por ahora (decisión del usuario).

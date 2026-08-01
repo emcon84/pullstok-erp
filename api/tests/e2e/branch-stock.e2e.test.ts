@@ -123,6 +123,17 @@ describe("E2E: branch stock — GET/PUT /products/:id/stock (A1/A2/D4)", () => {
     organizationId = orgA.id;
     adminToken = await loginAndUnblock(orgA.adminEmail, "temporal123");
 
+    // El beforeAll crea 4 usuarios en Org A (admin + vendedor asignado +
+    // vendedor sin asignación + employee). BASICO topa en maxUsers=2
+    // (checkUserLimit responde 403 PLAN_LIMIT), así que la org de prueba
+    // debe correr en PRO (maxUsers=10) — misma estrategia que
+    // store-branch-stock.e2e.test.ts.
+    const planRes = await request(app)
+      .patch(`/api/superadmin/organizations/${organizationId}/plan`)
+      .set("Authorization", `Bearer ${superadminToken}`)
+      .send({ plan: "PRO" });
+    expect(planRes.status).toBe(200);
+
     // Branches: HQ + Sucursal 2 (activas) + Sucursal 3 (inactiva)
     const hq = await basePrisma.branch.create({
       data: { name: "Casa Central", organizationId, isActive: true, isHeadquarters: true },
