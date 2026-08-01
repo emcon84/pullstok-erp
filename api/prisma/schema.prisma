@@ -110,6 +110,7 @@ model Branch {
   organization   Organization       @relation(fields: [organizationId], references: [id])
   assignments    BranchAssignment[]
   stocks         ProductStock[]
+  storeSettings  StoreSettings[]
 
   @@unique([organizationId, name])
   @@map("branches")
@@ -468,7 +469,14 @@ model StoreSettings {
   contactEmail   String?
   contactPhone   String?
   address        String?
-  updatedAt      DateTime     @updatedAt
+  // Sucursal que alimenta la tienda online (spec S1): catálogo/detalle/checkout
+  // leen ProductStock de esta sucursal en vez del stock global. null = sin
+  // configurar → fallback a la casa central (resolveEffectiveBranch). FK con
+  // onDelete SetNull: si borran la sucursal, la tienda cae sola al fallback HQ
+  // sin dejar estado inválido (decisión D6 del design).
+  storeBranchId  String?
+  storeBranch    Branch?        @relation(fields: [storeBranchId], references: [id], onDelete: SetNull)
+  updatedAt      DateTime       @updatedAt
 
   @@map("store_settings")
 }

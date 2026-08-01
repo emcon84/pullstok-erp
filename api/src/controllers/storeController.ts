@@ -2,6 +2,7 @@ import { Response } from "express";
 import { basePrisma, prisma } from "../config/db";
 import { PublicStoreRequest } from "../middlewares/tenantBySlug";
 import { requireOrganizationId } from "../config/tenantContext";
+import { resolveEffectiveBranch } from "../services/stockService";
 import getNextSequenceValue from "../services/secuenceService";
 import { sendMail } from "../services/mailService";
 import { orderReceivedEmail } from "../services/mailTemplates";
@@ -11,6 +12,43 @@ import { emitOrdersChanged } from "../realtime/socket";
 // (StoreSettings es 1:1 y NO está en TENANT_MODELS — se lee directo por
 // organizationId vía basePrisma, sin pasar por la extensión anti-fuga).
 const DEFAULT_PRIMARY_COLOR = "#6d28d9";
+
+/**
+ * Sucursal efectiva de la tienda online (spec S1): el storeBranchId configurado
+ * gana; si no, la casa central; null si no hay ninguna de las dos (en ese caso
+ * el catálogo muestra quantity 0 — no hay sucursal de la cual leer stock).
+ * StoreSettings no es tenant-model → basePrisma por organizationId; la HQ se
+ * resuelve con el scope automático de `prisma` (corre dentro de runWithTenant).
+ */
+const resolveStoreBranchId = async (orgId: string): Promise<string | null> => {
+  const [settings, hqBranch] = await Promise.all([
+    basePrisma.storeSettings.findFirst({ where: { organizationId: orgId } }),
+    prisma.branch.findFirst({
+      where: { isHeadquarters: true },
+      select: { id: true },
+    }),
+  ]);
+  return resolveEffectiveBranch(settings?.storeBranchId ?? null, hqBranch?.id ?? null);
+};
+
+/**
+ * Stock de la sucursal efectiva para un conjunto de productos: UN solo findMany
+ * de ProductStock → Map en memoria por productId (design D7, sin N+1). Un
+ * producto sin fila en esa sucursal queda con quantity implícito 0.
+ */
+const readBranchStockMap = async (
+  orgId: string,
+  productIds: string[],
+): Promise<Map<string, number>> => {
+  if (productIds.length === 0) return new Map();
+  const branchId = await resolveStoreBranchId(orgId);
+  if (!branchId) return new Map();
+  const stocks = await prisma.productStock.findMany({
+    where: { branchId, productId: { in: productIds } },
+    select: { productId: true, quantity: true },
+  });
+  return new Map(stocks.map((s) => [s.productId, s.quantity]));
+};
 
 // Catálogo público: SOLO productos publicados (publishedToStore=true) de la
 // organización resuelta por tenantBySlug. El scope por organización lo pone
@@ -25,9 +63,14 @@ const DEFAULT_PRIMARY_COLOR = "#6d28d9";
 // Shape de respuesta pensado para el storefront (Astro): id, name, price,
 // image, quantity (para mostrar "sin stock" sin ocultar el producto — ver
 // spec "Out-of-stock product still visible"), description.
+//
+// quantity ya NO es Product.quantity (stock global): es el ProductStock de la
+// sucursal efectiva (spec S1 — storeBranchId ?? casa central). La SHAPE no
+// cambia, solo la fuente (contrato del storefront intacto).
 const getProducts = async (req: PublicStoreRequest, res: Response) => {
   try {
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    const organizationId = requireOrganizationId();
 
     const products = await prisma.product.findMany({
       where: {
@@ -47,11 +90,25 @@ const getProducts = async (req: PublicStoreRequest, res: Response) => {
         price: true,
         description: true,
         image: true,
-        quantity: true,
       },
       orderBy: { name: "asc" },
     });
-    res.status(200).json(products);
+
+    const stockByProduct = await readBranchStockMap(
+      organizationId,
+      products.map((p) => p.id),
+    );
+
+    res.status(200).json(
+      products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        description: p.description,
+        image: p.image,
+        quantity: stockByProduct.get(p.id) ?? 0,
+      })),
+    );
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -63,6 +120,7 @@ const getProducts = async (req: PublicStoreRequest, res: Response) => {
 // está oculto").
 const getProductById = async (req: PublicStoreRequest, res: Response) => {
   try {
+    const organizationId = requireOrganizationId();
     const product = await prisma.product.findFirst({
       where: { id: req.params.id, publishedToStore: true },
       select: {
@@ -71,7 +129,6 @@ const getProductById = async (req: PublicStoreRequest, res: Response) => {
         price: true,
         description: true,
         image: true,
-        quantity: true,
       },
     });
 
@@ -79,7 +136,12 @@ const getProductById = async (req: PublicStoreRequest, res: Response) => {
       return res.status(404).json({ message: "Not found" });
     }
 
-    res.status(200).json(product);
+    const stockByProduct = await readBranchStockMap(organizationId, [product.id]);
+
+    res.status(200).json({
+      ...product,
+      quantity: stockByProduct.get(product.id) ?? 0,
+    });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -158,12 +220,39 @@ const checkout = async (req: PublicStoreRequest, res: Response) => {
           }
         }
 
+        // Stock disponible por línea: ProductStock de la sucursal efectiva
+        // (spec S1 — storeBranchId ?? casa central), resuelto DENTRO de la tx
+        // SERIALIZABLE para que la validación vea el estado consistente al
+        // crear la Order. 1 solo findMany → Map en memoria (design D7, sin
+        // N+1); producto sin fila en esa sucursal = disponible 0.
+        const [settings, hqBranch] = await Promise.all([
+          basePrisma.storeSettings.findFirst({ where: { organizationId } }),
+          tx.branch.findFirst({
+            where: { isHeadquarters: true },
+            select: { id: true },
+          }),
+        ]);
+        const effectiveBranchId = resolveEffectiveBranch(
+          settings?.storeBranchId ?? null,
+          hqBranch?.id ?? null,
+        );
+        const branchStocks = effectiveBranchId
+          ? await tx.productStock.findMany({
+              where: { branchId: effectiveBranchId, productId: { in: productIds } },
+              select: { productId: true, quantity: true },
+            })
+          : [];
+        const stockByProduct = new Map(
+          branchStocks.map((s) => [s.productId, s.quantity]),
+        );
+
         // Validar stock disponible por línea ANTES de crear nada — si una
         // sola línea no alcanza, se aborta todo (no fulfillment parcial).
         for (const item of items) {
           const product = productsById.get(item.productId)!;
-          if (item.quantity > product.quantity) {
-            throw new InsufficientStockError(product.name, product.quantity);
+          const available = stockByProduct.get(item.productId) ?? 0;
+          if (item.quantity > available) {
+            throw new InsufficientStockError(product.name, available);
           }
         }
 

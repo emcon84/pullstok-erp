@@ -30,6 +30,9 @@ export const getStoreSettings = async (req: AuthedRequest, res: Response) => {
       contactEmail: settings?.contactEmail ?? null,
       contactPhone: settings?.contactPhone ?? null,
       address: settings?.address ?? null,
+      // Sucursal que alimenta la tienda online (spec S1). null = sin
+      // configurar → la tienda usa la casa central (fallback).
+      storeBranchId: settings?.storeBranchId ?? null,
     });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -44,6 +47,21 @@ export const updateStoreSettings = async (req: AuthedRequest, res: Response) => 
   try {
     const organizationId = requireOrganizationId();
     const data = req.body;
+
+    // Spec S1: storeBranchId debe referenciar una Branch ACTIVA de la org. Si
+    // no existe → 400 (evita apuntar la tienda a una sucursal ajena, inactiva
+    // o inexistente). null (limpiar la config) no valida nada: la tienda cae
+    // al fallback de casa central.
+    if (data.storeBranchId != null) {
+      const branch = await basePrisma.branch.findFirst({
+        where: { id: data.storeBranchId, organizationId, isActive: true },
+      });
+      if (!branch) {
+        return res.status(400).json({
+          message: "La sucursal configurada no existe o no está activa",
+        });
+      }
+    }
 
     const settings = await basePrisma.storeSettings.upsert({
       where: { organizationId },
@@ -62,6 +80,7 @@ export const updateStoreSettings = async (req: AuthedRequest, res: Response) => 
       contactEmail: settings.contactEmail,
       contactPhone: settings.contactPhone,
       address: settings.address,
+      storeBranchId: settings.storeBranchId,
     });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
