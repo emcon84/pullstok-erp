@@ -189,11 +189,10 @@ export const Dashboard = () => {
         />
         <StatCard
           title="Productos"
-          value={stockSummary?.total ?? 0}
-          subtitle="Stock total (todas las sucursales)"
+          value={products.length}
+          subtitle="En inventario"
           icon={<FaReceipt />}
           color="info"
-          loading={stockSummaryLoading}
         />
       </div>
 
@@ -203,21 +202,21 @@ export const Dashboard = () => {
           Stock por sucursal
         </h2>
         {stockSummaryLoading ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-5">
+          <div className="flex flex-wrap gap-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Card key={i} className="min-w-[180px] flex-1 basis-40 p-5">
                 <Skeleton className="h-4 w-24" />
                 <Skeleton className="mt-2 h-8 w-16" />
               </Card>
             ))}
           </div>
         ) : stockSummary?.branches.length ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-wrap gap-4">
             {stockSummary.branches.map((branch) => (
               <Card
                 key={branch.branchId}
                 className={cn(
-                  "p-5",
+                  "min-w-[180px] flex-1 basis-40 p-5",
                   branch.isHeadquarters &&
                     "border-primary/50 ring-1 ring-primary/20",
                 )}
