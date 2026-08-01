@@ -17,6 +17,7 @@ import {
   bulkProductsSchema,
   publishProductSchema,
   bulkPriceUpdateSchema,
+  updateBranchStockSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -58,6 +59,16 @@ router.patch(
   productController.publishProduct,
 );
 router.delete("/:id", authenticateJWT, productController.deleteProduct);
+
+// Stock por sucursal (branch-stock, PR 2b): consulta autocontenida para
+// cualquier rol autenticado y edición con autorización server-side (A1/A2).
+router.get("/:id/stock", authenticateJWT, productController.getProductStock);
+router.put(
+  "/:id/stock/:branchId",
+  authenticateJWT,
+  validate(updateBranchStockSchema),
+  productController.updateBranchStock,
+);
 
 // Bulk price update — ADMIN only
 router.post(

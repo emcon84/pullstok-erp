@@ -1,8 +1,23 @@
 import { Request, Response } from "express";
 import { prisma, basePrisma } from "../config/db";
 import { bulkAddProducts, resolveCategoryId } from "../services/productsService";
-import { syncHqStock } from "../services/stockService";
+import { syncHqStock, canEditBranchStock } from "../services/stockService";
 import { requireOrganizationId } from "../config/tenantContext";
+import { AuthedRequest } from "../middlewares/authMiddleware";
+
+/**
+ * BranchIds del usuario leídos de la DB (design D3: la DB es la fuente de
+ * verdad, el token nunca lo es — las asignaciones pueden cambiar a mitad de
+ * sesión). BranchAssignment no es tenant-scoped (no tiene organizationId): el
+ * filtro por userId es seguro y global.
+ */
+const readUserBranchIds = async (userId: string): Promise<string[]> => {
+  const assignments = await basePrisma.branchAssignment.findMany({
+    where: { userId },
+    select: { branchId: true },
+  });
+  return assignments.map((a) => a.branchId);
+};
 
 // Create a new product (organizationId lo inyecta la extension de Prisma).
 // Alta manual: exige categoryId real (elegido de un <select>), no nombre.
@@ -551,6 +566,113 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * GET /products/:id/stock — stock del producto en todas las sucursales ACTIVAS
+ * de la org (spec A1). Respuesta autocontenida (design D5): no depende de
+ * GET /branches (que es ADMIN/MANAGEMENT-only), cualquier rol autenticado la
+ * puede leer. canEdit se calcula con el rol + BranchAssignment del usuario
+ * (leído de la DB, fuente de verdad — design D3).
+ */
+export const getProductStock = async (req: AuthedRequest, res: Response) => {
+  try {
+    const product = await prisma.product.findFirst({
+      where: { id: req.params.id },
+      select: { id: true },
+    });
+    if (!product) {
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
+
+    const [branches, stocks, branchIds] = await Promise.all([
+      prisma.branch.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, isHeadquarters: true },
+      }),
+      prisma.productStock.findMany({
+        where: { productId: product.id },
+        select: { branchId: true, quantity: true },
+      }),
+      readUserBranchIds(req.user!.id),
+    ]);
+
+    const stockByBranch = new Map(stocks.map((s) => [s.branchId, s.quantity]));
+
+    res.status(200).json({
+      productId: product.id,
+      branches: branches.map((b) => ({
+        branchId: b.id,
+        branchName: b.name,
+        quantity: stockByBranch.get(b.id) ?? 0,
+        isHeadquarters: b.isHeadquarters,
+        canEdit: canEditBranchStock(req.user!.role, branchIds, b.id),
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * PUT /products/:id/stock/:branchId — actualiza el stock de UNA sucursal
+ * (spec A2). Autorización server-side: ADMIN/MANAGEMENT editan cualquier
+ * sucursal; VENDEDOR/CASHIER solo las suyas; el resto 403. BranchAssignment se
+ * re-lee de la DB en CADA PUT (design D3 — el token no es fuente de verdad).
+ * Si la sucursal es la casa central, sincroniza la columna legacy
+ * Product.quantity (spec D4); las no-HQ NO la tocan.
+ */
+export const updateBranchStock = async (req: AuthedRequest, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const { quantity } = req.body as { quantity: number };
+    const { id, branchId } = req.params;
+
+    const product = await prisma.product.findFirst({
+      where: { id },
+      select: { id: true },
+    });
+    if (!product) {
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
+
+    const branch = await prisma.branch.findFirst({
+      where: { id: branchId, isActive: true },
+      select: { id: true, isHeadquarters: true },
+    });
+    if (!branch) {
+      return res.status(404).json({ message: "Sucursal no encontrada" });
+    }
+
+    // Autorización: rol + asignaciones FRESCAS de la DB (spec A2).
+    const branchIds = await readUserBranchIds(req.user!.id);
+    if (!canEditBranchStock(req.user!.role, branchIds, branchId)) {
+      return res
+        .status(403)
+        .json({ message: "No tenés permiso para editar el stock de esta sucursal." });
+    }
+
+    // Upsert manual (updateMany count 0 → create): la fila de stock nace
+    // on-first-write (sucursal sin fila previa queda en el valor indicado).
+    const updated = await prisma.productStock.updateMany({
+      where: { productId: id, branchId },
+      data: { quantity },
+    });
+    if (updated.count === 0) {
+      await prisma.productStock.create({
+        data: { productId: id, branchId, quantity, organizationId },
+      });
+    }
+
+    // D4: solo la casa central sincroniza la columna legacy Product.quantity.
+    if (branch.isHeadquarters) {
+      await syncHqStock(organizationId, id, quantity);
+    }
+
+    res.status(200).json({ message: "Stock actualizado", branchId, quantity });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 export default {
   createProduct,
   bulkUploadProducts,
@@ -560,4 +682,6 @@ export default {
   publishProduct,
   deleteProduct,
   bulkPriceUpdate,
+  getProductStock,
+  updateBranchStock,
 };
