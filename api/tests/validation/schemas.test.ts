@@ -165,6 +165,54 @@ describe("updateBranchSchema", () => {
   });
 });
 
+describe("updateBranchStockSchema", () => {
+  const { updateBranchStockSchema } = require("../../src/validation/schemas");
+
+  it("accepts a non-negative integer quantity", () => {
+    const result = updateBranchStockSchema.safeParse({ quantity: 10 });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ quantity: 10 });
+  });
+
+  it("coerces numeric strings to numbers", () => {
+    const result = updateBranchStockSchema.safeParse({ quantity: "7" });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ quantity: 7 });
+  });
+
+  it("rejects a negative quantity", () => {
+    const result = updateBranchStockSchema.safeParse({ quantity: -3 });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a non-integer quantity", () => {
+    const result = updateBranchStockSchema.safeParse({ quantity: 2.5 });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("updateStoreSettingsSchema — storeBranchId", () => {
+  const { updateStoreSettingsSchema } = require("../../src/validation/schemas");
+
+  it("accepts a storeBranchId string", () => {
+    const result = updateStoreSettingsSchema.safeParse({ storeBranchId: "b-2" });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ storeBranchId: "b-2" });
+  });
+
+  it("accepts null storeBranchId (clear the store branch)", () => {
+    const result = updateStoreSettingsSchema.safeParse({ storeBranchId: null });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ storeBranchId: null });
+  });
+
+  it("still accepts an empty object (all fields optional)", () => {
+    const result = updateStoreSettingsSchema.safeParse({});
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({});
+  });
+});
+
 describe("updateAppBrandingSchema", () => {
   const { updateAppBrandingSchema } = require("../../src/validation/schemas");
 

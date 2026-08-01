@@ -1,6 +1,7 @@
 import csvParser from "csv-parser";
 import fs from "fs";
 import { basePrisma, prisma } from "../config/db";
+import { syncHqStock } from "./stockService";
 
 interface ProductInput {
   name: string;
@@ -122,7 +123,7 @@ export const bulkAddProducts = async (
 
               // If no variants, use create directly
               if (!row._variantColumns || Object.keys(row._variantColumns).length === 0 || !categoryId) {
-                await basePrisma.product.create({
+                const product = await basePrisma.product.create({
                   data: {
                     name: row.name,
                     price: row.price,
@@ -134,6 +135,13 @@ export const bulkAddProducts = async (
                     organizationId,
                   },
                 });
+
+                // Mantener ProductStock(HQ) sincronizado (spec D4). basePrisma
+                // explícito: corre dentro del callback del stream, fuera del ALS.
+                if (row.quantity !== undefined) {
+                  await syncHqStock(organizationId, product.id, row.quantity, basePrisma);
+                }
+
                 productsCreated++;
                 continue;
               }
@@ -191,6 +199,12 @@ export const bulkAddProducts = async (
                     organizationId,
                   })),
                 });
+              }
+
+              // Mantener ProductStock(HQ) sincronizado (spec D4). basePrisma
+              // explícito: corre dentro del callback del stream, fuera del ALS.
+              if (row.quantity !== undefined) {
+                await syncHqStock(organizationId, product.id, row.quantity, basePrisma);
               }
 
               productsCreated++;

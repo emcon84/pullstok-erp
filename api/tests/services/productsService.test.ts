@@ -15,18 +15,30 @@ jest.mock('../../src/config/db', () => ({
     product: {
       create: jest.fn(),
       createMany: jest.fn(),
+      updateMany: jest.fn(),
     },
     productVariant: {
       createMany: jest.fn(),
     },
+    // syncHqStock corre con basePrisma (fuera de ALS) en el import CSV; sin HQ
+    // branch el sync no toca nada (early return), así los tests existentes no
+    // dependen de filas de stock.
+    $transaction: jest.fn((cb: any) =>
+      cb({
+        branch: { findFirst: jest.fn().mockResolvedValue(null) },
+        productStock: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn() },
+        product: { updateMany: jest.fn() },
+      }),
+    ),
   },
 }));
 
 const mockedPrisma = basePrisma as unknown as {
   category: { findFirst: jest.Mock; create: jest.Mock };
   categoryVariantDefinition: { findMany: jest.Mock };
-  product: { create: jest.Mock; createMany: jest.Mock };
+  product: { create: jest.Mock; createMany: jest.Mock; updateMany: jest.Mock };
   productVariant: { createMany: jest.Mock };
+  $transaction: jest.Mock;
 };
 
 describe('productsService', () => {
@@ -176,6 +188,8 @@ describe('productsService', () => {
       for (const call of calls) {
         expect(call[0].data.organizationId).toBe(organizationId);
       }
+      // Cada fila con quantity dispara syncHqStock (spec D4) — 2 filas = 2 sync.
+      expect(mockedPrisma.$transaction).toHaveBeenCalledTimes(2);
     });
 
     it('resuelve columnas de variantes y crea product_variants', async () => {

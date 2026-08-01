@@ -10,6 +10,7 @@ jest.mock('../../src/config/db', () => ({
     product: {
       create: jest.fn(),
       findFirst: jest.fn(),
+      updateMany: jest.fn(),
     },
     categoryVariantOption: {
       findMany: jest.fn(),
@@ -17,6 +18,15 @@ jest.mock('../../src/config/db', () => ({
     productVariant: {
       createMany: jest.fn(),
     },
+    branch: {
+      findFirst: jest.fn(),
+    },
+    productStock: {
+      findFirst: jest.fn(),
+      updateMany: jest.fn(),
+      create: jest.fn(),
+    },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -26,9 +36,12 @@ jest.mock('../../src/config/tenantContext', () => ({
 
 const mockedPrisma = prisma as unknown as {
   category: { findFirst: jest.Mock };
-  product: { create: jest.Mock; findFirst: jest.Mock };
+  product: { create: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
   categoryVariantOption: { findMany: jest.Mock };
   productVariant: { createMany: jest.Mock };
+  branch: { findFirst: jest.Mock };
+  productStock: { findFirst: jest.Mock; updateMany: jest.Mock; create: jest.Mock };
+  $transaction: jest.Mock;
 };
 
 const mockRequest = (body: any) => ({ body } as Request);
@@ -60,6 +73,9 @@ describe('productController.createProduct', () => {
     expect(mockedPrisma.product.create).toHaveBeenCalledWith({
       data: { name: 'Martillo', price: 100, quantity: 5, categoryId },
     });
+    // syncHqStock se dispara al crear con quantity en el body (spec D4):
+    // ProductStock(HQ) y Product.quantity quedan sincronizados.
+    expect(mockedPrisma.$transaction).toHaveBeenCalledTimes(1);
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith(createdProduct);
   });

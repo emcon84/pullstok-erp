@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { prisma, basePrisma } from "../config/db";
 import { bulkAddProducts, resolveCategoryId } from "../services/productsService";
+import { syncHqStock } from "../services/stockService";
 import { requireOrganizationId } from "../config/tenantContext";
 
 // Create a new product (organizationId lo inyecta la extension de Prisma).
@@ -39,6 +40,12 @@ const createProduct = async (req: Request, res: Response) => {
     const product = await prisma.product.create({
       data: { ...data, categoryId },
     });
+
+    // Mantener ProductStock(HQ) sincronizado con el quantity del body (spec
+    // D4): crear con quantity=10 deja ProductStock(HQ)=10 y Product.quantity=10.
+    if (data.quantity !== undefined) {
+      await syncHqStock(requireOrganizationId(), product.id, data.quantity);
+    }
 
     // Create ProductVariant rows
     if (variantOptionIds && variantOptionIds.length > 0) {
@@ -120,12 +127,21 @@ const bulkUploadProducts = async (req: Request, res: Response) => {
           });
         }
 
+        if (rest.quantity !== undefined) {
+          await syncHqStock(organizationId, product.id, rest.quantity);
+        }
+
         results.push(product);
       } else {
         // No variants — use create directly
         const product = await prisma.product.create({
           data: { ...rest, categoryId: categoryId ?? null },
         });
+
+        if (rest.quantity !== undefined) {
+          await syncHqStock(organizationId, product.id, rest.quantity);
+        }
+
         results.push(product);
       }
     }
@@ -320,6 +336,11 @@ const updateProduct = async (req: Request, res: Response) => {
     });
     if (result.count === 0) {
       return res.status(404).json({ message: "Product not found" });
+    }
+
+    // Sincronizar ProductStock(HQ) cuando la edición trae quantity (spec D4).
+    if (data.quantity !== undefined) {
+      await syncHqStock(requireOrganizationId(), req.params.id, data.quantity);
     }
 
     // Handle variantOptionIds if provided

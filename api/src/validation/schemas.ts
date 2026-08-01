@@ -329,6 +329,11 @@ export const updateStoreSettingsSchema = z.object({
   contactEmail: z.email("Email inválido").nullable().optional(),
   contactPhone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
+  // Sucursal que la tienda online usa para disponibilidad/checkout (spec S1).
+  // null = sin configurar → fallback casa central. La columna y el controller
+  // llegan en PR 4; el campo queda aceptado en el schema desde acá para no
+  // romper contratos del body (Zod lo descarta si viene de otro lado).
+  storeBranchId: z.string().nullable().optional(),
 });
 
 // ---------- Chat cliente↔operador (FASE A) ----------
@@ -371,6 +376,16 @@ export const createBranchSchema = z.object({
 });
 
 export const updateBranchSchema = createBranchSchema.partial();
+
+// ---------- Stock por sucursal ----------
+// Body del PUT /products/:id/stock/:branchId (spec A2). Coerción numérica +
+// entero ≥ 0: quantity -3 o 2.5 → 400 vía validate().
+export const updateBranchStockSchema = z.object({
+  quantity: z.coerce
+    .number()
+    .int("La cantidad debe ser un número entero")
+    .nonnegative("La cantidad no puede ser negativa"),
+});
 
 // ---------- Bulk Price Update ----------
 export const bulkPriceUpdateSchema = z.object({
