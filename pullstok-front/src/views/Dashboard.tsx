@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Upload, ShoppingCart, Search } from "lucide-react";
 import {
   FaShoppingCart,
@@ -15,6 +15,7 @@ import { ProductsTable } from "../components/molecules/ProductsTable";
 import { ProductDrawer } from "../components/molecules/ProductDrawer";
 import { Statistics } from "./Statistics";
 import { useProducts } from "../components/hooks/useProducts";
+import { useStockSummary } from "../components/hooks/useStockSummary";
 import { DataItem } from "../types";
 import { useGetSales, useCreateSale } from "../components/hooks/useSales";
 import { Loader } from "../components/atoms/loader";
@@ -23,6 +24,9 @@ import { useGetBudgets } from "../components/hooks/useBudget";
 import { useOrders } from "../components/hooks/useOrder";
 import { CartItem } from "../models/salesModel";
 import { toast } from "react-toastify";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
 
@@ -43,6 +47,20 @@ export const Dashboard = () => {
   const { budgets, loading: loadingBudgets } = useGetBudgets();
   const { orders, loading: loadingOrders } = useOrders();
   const { createSale } = useCreateSale();
+  const {
+    summary: stockSummary,
+    loading: stockSummaryLoading,
+    error: stockSummaryError,
+  } = useStockSummary();
+
+  useEffect(() => {
+    if (stockSummaryError) {
+      console.error(
+        "Error al cargar el resumen de stock:",
+        stockSummaryError.message,
+      );
+    }
+  }, [stockSummaryError]);
 
   const addProduct = () => { setDrawerProduct(null); setDrawerOpen(true); };
   const addSales = () => setIsModalSalesOpen(true);
@@ -171,11 +189,62 @@ export const Dashboard = () => {
         />
         <StatCard
           title="Productos"
-          value={products.length}
-          subtitle="En inventario"
+          value={stockSummary?.total ?? 0}
+          subtitle="Stock total (todas las sucursales)"
           icon={<FaReceipt />}
           color="info"
+          loading={stockSummaryLoading}
         />
+      </div>
+
+      {/* Stock por sucursal */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Stock por sucursal
+        </h2>
+        {stockSummaryLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="p-5">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="mt-2 h-8 w-16" />
+              </Card>
+            ))}
+          </div>
+        ) : stockSummary?.branches.length ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {stockSummary.branches.map((branch) => (
+              <Card
+                key={branch.branchId}
+                className={cn(
+                  "p-5",
+                  branch.isHeadquarters &&
+                    "border-primary/50 ring-1 ring-primary/20",
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {branch.branchName}
+                    </p>
+                    <p className="mt-1 text-3xl font-bold tracking-tight">
+                      {branch.quantity}
+                    </p>
+                  </div>
+                  {branch.isHeadquarters && (
+                    <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      Casa Central
+                    </span>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Sin sucursales activas para mostrar stock.
+          </p>
+        )}
       </div>
 
       {/* Búsqueda */}

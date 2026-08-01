@@ -77,6 +77,46 @@ export const updateBranchStock = async (
   }
 };
 
+/** Stock agregado de una sucursal ACTIVA dentro del resumen de la org. */
+export interface BranchStockSummary {
+  branchId: string;
+  branchName: string;
+  quantity: number;
+  isHeadquarters: boolean;
+}
+
+/** Resumen de stock de toda la org (dashboard): total + detalle por sucursal. */
+export interface StockSummary {
+  total: number;
+  branches: BranchStockSummary[];
+}
+
+/**
+ * Fetches the org-wide stock summary: `total` (all ProductStock rows of the
+ * org, active or not) plus the per-branch breakdown of ACTIVE branches.
+ */
+export const getStockSummary = async (): Promise<StockSummary> => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const response = await axios.get<StockSummary>(
+      `${API_URL}/products/stock-summary`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "get stock summary failed");
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+
 export const products = async () => {
   try {
     const token = localStorage.getItem("token");

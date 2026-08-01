@@ -2,11 +2,19 @@ import {
   canEditBranchStock,
   resolveEffectiveBranch,
   syncHqStock,
+  getStockSummary,
 } from "../../src/services/stockService";
 import { prisma } from "../../src/config/db";
 
 jest.mock("../../src/config/db", () => ({
   prisma: {
+    branch: { findMany: jest.fn() },
+    productStock: {
+      groupBy: jest.fn(),
+      findFirst: jest.fn(),
+      updateMany: jest.fn(),
+      create: jest.fn(),
+    },
     $transaction: jest.fn(),
   },
 }));
@@ -14,6 +22,17 @@ jest.mock("../../src/config/db", () => ({
 const mockedTransaction = (
   prisma as unknown as { $transaction: jest.Mock }
 ).$transaction;
+
+const mockedPrisma = prisma as unknown as {
+  branch: { findMany: jest.Mock };
+  productStock: {
+    groupBy: jest.Mock;
+    findFirst: jest.Mock;
+    updateMany: jest.Mock;
+    create: jest.Mock;
+  };
+  $transaction: jest.Mock;
+};
 
 const makeTx = () => ({
   branch: { findFirst: jest.fn() },
@@ -132,5 +151,85 @@ describe("syncHqStock", () => {
     expect(tx.productStock.create).not.toHaveBeenCalled();
     expect(tx.productStock.updateMany).not.toHaveBeenCalled();
     expect(tx.product.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("getStockSummary", () => {
+  const orgId = "org-1";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("arma el resumen con sucursales activas y sumas por branch", async () => {
+    mockedPrisma.branch.findMany.mockResolvedValue([
+      { id: "hq", name: "Casa Central", isHeadquarters: true },
+      { id: "b-2", name: "Sucursal 2", isHeadquarters: false },
+    ]);
+    mockedPrisma.productStock.groupBy.mockResolvedValue([
+      { branchId: "hq", _sum: { quantity: 15 } },
+      { branchId: "b-2", _sum: { quantity: 7 } },
+    ]);
+
+    const result = await getStockSummary(orgId);
+
+    expect(mockedPrisma.productStock.groupBy).toHaveBeenCalledWith({
+      by: ["branchId"],
+      where: { organizationId: orgId },
+      _sum: { quantity: true },
+    });
+    expect(mockedPrisma.branch.findMany).toHaveBeenCalledWith({
+      where: { organizationId: orgId, isActive: true },
+      select: { id: true, name: true, isHeadquarters: true },
+    });
+    expect(result.total).toBe(22);
+    expect(result.branches).toEqual([
+      { branchId: "hq", branchName: "Casa Central", quantity: 15, isHeadquarters: true },
+      { branchId: "b-2", branchName: "Sucursal 2", quantity: 7, isHeadquarters: false },
+    ]);
+  });
+
+  it("branch inactiva: excluida de branches pero su stock cuenta en el total", async () => {
+    mockedPrisma.branch.findMany.mockResolvedValue([
+      { id: "hq", name: "Casa Central", isHeadquarters: true },
+    ]);
+    mockedPrisma.productStock.groupBy.mockResolvedValue([
+      { branchId: "hq", _sum: { quantity: 10 } },
+      { branchId: "inactive-1", _sum: { quantity: 5 } },
+    ]);
+
+    const result = await getStockSummary(orgId);
+
+    expect(result.branches).toHaveLength(1);
+    expect(result.branches[0].branchId).toBe("hq");
+    expect(result.total).toBe(15);
+  });
+
+  it("branch sin filas de stock → quantity 0 (mismo criterio que getProductStock)", async () => {
+    mockedPrisma.branch.findMany.mockResolvedValue([
+      { id: "hq", name: "Casa Central", isHeadquarters: true },
+      { id: "b-2", name: "Sucursal 2", isHeadquarters: false },
+    ]);
+    mockedPrisma.productStock.groupBy.mockResolvedValue([
+      { branchId: "hq", _sum: { quantity: 4 } },
+    ]);
+
+    const result = await getStockSummary(orgId);
+
+    expect(result.total).toBe(4);
+    expect(result.branches).toEqual([
+      { branchId: "hq", branchName: "Casa Central", quantity: 4, isHeadquarters: true },
+      { branchId: "b-2", branchName: "Sucursal 2", quantity: 0, isHeadquarters: false },
+    ]);
+  });
+
+  it("org vacía → total 0 y branches []", async () => {
+    mockedPrisma.branch.findMany.mockResolvedValue([]);
+    mockedPrisma.productStock.groupBy.mockResolvedValue([]);
+
+    const result = await getStockSummary(orgId);
+
+    expect(result.total).toBe(0);
+    expect(result.branches).toEqual([]);
   });
 });

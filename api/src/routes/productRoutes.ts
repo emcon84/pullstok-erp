@@ -44,6 +44,16 @@ router.post(
 router.get("/template-csv", downloadTemplateCsv);
 router.get("/by-code/:code", authenticateJWT, getProductByCode);
 router.get("/", authenticateJWT, productController.getProducts);
+
+// Resumen de stock de toda la org (dashboard). Debe registrarse ANTES de
+// "/:id" (un id literal "stock-summary" la matchearía) y antes de la sección
+// de rutas paramétricas de stock de abajo.
+router.get(
+  "/stock-summary",
+  authenticateJWT,
+  productController.getStockSummary,
+);
+
 router.get("/:id", authenticateJWT, productController.getProductById);
 router.put(
   "/:id",

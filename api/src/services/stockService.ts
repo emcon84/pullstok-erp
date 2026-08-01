@@ -1,6 +1,20 @@
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "../config/db";
 
+/** Stock agregado de una sucursal ACTIVA dentro del resumen de la org. */
+export interface StockSummaryBranch {
+  branchId: string;
+  branchName: string;
+  quantity: number;
+  isHeadquarters: boolean;
+}
+
+/** Resumen de stock de TODA la org (dashboard): total + detalle por sucursal. */
+export interface StockSummary {
+  total: number;
+  branches: StockSummaryBranch[];
+}
+
 /**
  * Whether a user with the given role may edit the stock of a specific branch.
  * Pure helper (no DB): the caller reads the user's BranchAssignment and passes
@@ -79,4 +93,43 @@ export const syncHqStock = async (
       data: { quantity },
     });
   });
+};
+
+/**
+ * Stock summary de la org (dashboard): `total` = suma de TODOS los
+ * ProductStock de la org (incluye sucursales inactivas — el total es el
+ * inventario real), y `branches` = SOLO sucursales activas con la suma de su
+ * stock (0 si no tienen filas). Agrupa con groupBy (soportado por la
+ * extension de db.ts: inyecta organizationId en el where) y siempre scopa por
+ * organizationId explícito (patrón tenant del repo).
+ */
+export const getStockSummary = async (orgId: string): Promise<StockSummary> => {
+  const [stockGroups, branches] = await Promise.all([
+    prisma.productStock.groupBy({
+      by: ["branchId"],
+      where: { organizationId: orgId },
+      _sum: { quantity: true },
+    }),
+    prisma.branch.findMany({
+      where: { organizationId: orgId, isActive: true },
+      select: { id: true, name: true, isHeadquarters: true },
+    }),
+  ]);
+
+  const stockByBranch = new Map(
+    stockGroups.map((g) => [g.branchId, g._sum.quantity ?? 0]),
+  );
+
+  return {
+    total: stockGroups.reduce(
+      (sum, g) => sum + (g._sum.quantity ?? 0),
+      0,
+    ),
+    branches: branches.map((b) => ({
+      branchId: b.id,
+      branchName: b.name,
+      quantity: stockByBranch.get(b.id) ?? 0,
+      isHeadquarters: b.isHeadquarters,
+    })),
+  };
 };

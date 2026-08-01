@@ -1,7 +1,11 @@
 import { Request, Response } from "express";
 import { prisma, basePrisma } from "../config/db";
 import { bulkAddProducts, resolveCategoryId } from "../services/productsService";
-import { syncHqStock, canEditBranchStock } from "../services/stockService";
+import {
+  syncHqStock,
+  canEditBranchStock,
+  getStockSummary as getStockSummaryService,
+} from "../services/stockService";
 import { requireOrganizationId } from "../config/tenantContext";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
@@ -673,6 +677,23 @@ export const updateBranchStock = async (req: AuthedRequest, res: Response) => {
   }
 };
 
+/**
+ * GET /products/stock-summary — resumen de stock de TODA la org: `total`
+ * (suma de todos los ProductStock, incluye sucursales inactivas) + detalle por
+ * sucursal ACTIVA (quantity por branch, 0 si no tiene filas). Cualquier rol
+ * autenticado puede leerlo (mismo criterio que getProductStock). Usa prisma
+ * (scope de tenant del request vía requireOrganizationId).
+ */
+export const getStockSummary = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const summary = await getStockSummaryService(organizationId);
+    res.status(200).json(summary);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export default {
   createProduct,
   bulkUploadProducts,
@@ -684,4 +705,5 @@ export default {
   bulkPriceUpdate,
   getProductStock,
   updateBranchStock,
+  getStockSummary,
 };
