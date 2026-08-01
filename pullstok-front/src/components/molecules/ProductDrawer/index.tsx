@@ -10,6 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Card,
+  CardContent,
+} from "@/components/ui/card";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -18,12 +22,16 @@ import {
 } from "@/components/ui/select";
 import { CategoryTreePicker } from "@/components/molecules/CategoryTreePicker";
 import { useCreateProduct } from "@/components/hooks/useProducts";
+import { useProductStock } from "@/components/hooks/useProductStock";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   VariantDefinition,
   getCategoryVariants,
 } from "@/services/onboardingService";
 import { updateProduct } from "@/services/productService";
+import type { BranchStockInfo } from "@/services/productService";
+import { canEditBranchStock } from "@/constants/rolePermissions";
+import type { Role } from "@/constants/rolePermissions";
 import { API_URL } from "@/constants";
 import type { DataItem } from "@/types";
 
@@ -32,6 +40,19 @@ interface ProductDrawerProps {
   onClose: () => void;
   product?: DataItem | null; // null/undefined = create mode
   onCreated?: (product: DataItem) => void;
+}
+
+/** Body sent to create/update product. quantity is only present in create
+ * mode (server syncs HQ stock); edit mode edits stock per branch. */
+interface ProductPayload {
+  name: string;
+  code?: string;
+  description?: string;
+  price: number;
+  image?: string;
+  variantOptionIds: string[];
+  quantity?: number;
+  categoryId?: string | null;
 }
 
 export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDrawerProps) => {
@@ -50,6 +71,60 @@ export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDraw
   const [variants, setVariants] = useState<VariantDefinition[]>([]);
   const [variantSelections, setVariantSelections] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  // Draft per-branch quantities + which branch is saving right now (edit mode).
+  const [branchDrafts, setBranchDrafts] = useState<Record<string, string>>({});
+  const [savingBranch, setSavingBranch] = useState<string | null>(null);
+
+  // Stock por sucursal (edit mode): self-contained response, no GET /branches.
+  const productId = isEdit ? (product?._id || product?.id) : undefined;
+  const { stock, loading: stockLoading, updateBranchStock: saveBranchStock } =
+    useProductStock(productId);
+
+  // Client-side stock-edit policy (mirrors the backend): the response's
+  // `canEdit` is authoritative; the helper is the UI expression of the same rule.
+  const currentUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  })();
+  const userRole = currentUser?.role as Role | undefined;
+  const userBranchIds = currentUser?.branchIds as string[] | undefined;
+
+  const canEditBranch = (branch: BranchStockInfo): boolean =>
+    branch.canEdit &&
+    canEditBranchStock(userRole, userBranchIds, branch.branchId);
+
+  // Keep per-branch drafts in sync with the latest server response.
+  useEffect(() => {
+    if (stock) {
+      const drafts: Record<string, string> = {};
+      for (const branch of stock.branches) {
+        drafts[branch.branchId] = String(branch.quantity);
+      }
+      setBranchDrafts(drafts);
+    }
+  }, [stock]);
+
+  const handleSaveBranchStock = async (branchId: string) => {
+    const quantity = parseInt(branchDrafts[branchId] ?? "0", 10);
+    if (Number.isNaN(quantity) || quantity < 0) {
+      toast.error("La cantidad debe ser un número mayor o igual a 0");
+      return;
+    }
+    setSavingBranch(branchId);
+    try {
+      await saveBranchStock({ branchId, quantity });
+      toast.success("Stock actualizado");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Error al actualizar el stock";
+      toast.error(message);
+    } finally {
+      setSavingBranch(null);
+    }
+  };
 
   // Reset form on open/product change
   useEffect(() => {
@@ -103,7 +178,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDraw
       setVariants([]);
       setVariantSelections({});
     }
-  }, [categoryId, isEdit]);
+  }, [categoryId, isEdit, product?.variantAssignments]);
 
   const handleSubmit = async () => {
     if (!name.trim()) { toast.error("El nombre es requerido"); return; }
@@ -123,31 +198,37 @@ export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDraw
       }
 
       const variantOptionIds = Object.values(variantSelections).filter(Boolean);
-      const payload: any = {
+      const payload: ProductPayload = {
         name,
         code: code || undefined,
         description: description || undefined,
         price: parseFloat(price) || 0,
-        quantity: parseInt(quantity) || 0,
         image: imgUrl,
         variantOptionIds,
       };
+      // Only create mode sends the global quantity: the server syncs it to the
+      // HQ ProductStock row (syncHqStock). In edit mode stock is edited per
+      // branch via the stock endpoints, so Product.quantity must not change.
+      if (!isEdit) {
+        payload.quantity = parseInt(quantity) || 0;
+      }
 
       if (isEdit && product) {
         payload.categoryId = categoryId || null;
-        await updateProduct({ _id: product._id || product.id, ...payload });
+        await updateProduct({ _id: product._id || product.id, ...payload } as DataItem);
         toast.success("Producto actualizado");
       } else {
         payload.categoryId = categoryId || undefined;
-        const newProduct = await createProduct(payload);
+        const newProduct = await createProduct(payload as DataItem);
         toast.success("Producto creado");
         onCreated?.(newProduct);
       }
 
       queryClient.invalidateQueries({ queryKey: ["products"] });
       onClose();
-    } catch (e: any) {
-      toast.error(e?.message || "Error al guardar");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al guardar";
+      toast.error(message);
     }
     setSaving(false);
   };
@@ -178,17 +259,67 @@ export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDraw
             <CategoryTreePicker value={categoryId} onChange={setCategoryId} />
           </div>
 
-          {/* Precio + Cantidad */}
+          {/* Precio + Cantidad (Cantidad solo en alta; en edición el stock es por sucursal) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
+            <div className={`space-y-1.5 ${isEdit ? "sm:col-span-2" : ""}`}>
               <Label htmlFor="p-price">Precio</Label>
               <Input id="p-price" type="number" inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="p-qty">Cantidad</Label>
-              <Input id="p-qty" type="number" inputMode="numeric" value={quantity} onChange={e => setQuantity(e.target.value)} placeholder="0" />
-            </div>
+            {!isEdit && (
+              <div className="space-y-1.5">
+                <Label htmlFor="p-qty">Cantidad</Label>
+                <Input id="p-qty" type="number" inputMode="numeric" value={quantity} onChange={e => setQuantity(e.target.value)} placeholder="0" />
+              </div>
+            )}
           </div>
+
+          {/* Stock por sucursal — edit mode (spec F1): una card por sucursal activa,
+              con edición inline SOLO donde el usuario puede editar (canEdit). */}
+          {isEdit && (
+            <div className="space-y-2">
+              <Label>Stock por sucursal</Label>
+              {stockLoading && (
+                <p className="text-sm text-muted-foreground">Cargando stock...</p>
+              )}
+              {!stockLoading && !stock && (
+                <p className="text-sm text-muted-foreground">No se pudo cargar el stock de las sucursales</p>
+              )}
+              {stock?.branches.map((branch) => (
+                <Card key={branch.branchId} className="py-3">
+                  <CardContent className="flex items-center justify-between gap-3 px-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{branch.branchName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {branch.quantity} en stock{branch.isHeadquarters ? " · Casa central" : ""}
+                      </p>
+                    </div>
+                    {canEditBranch(branch) ? (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          aria-label={`Cantidad de ${branch.branchName}`}
+                          className="w-20"
+                          value={branchDrafts[branch.branchId] ?? String(branch.quantity)}
+                          onChange={e => setBranchDrafts(prev => ({ ...prev, [branch.branchId]: e.target.value }))}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSaveBranchStock(branch.branchId)}
+                          disabled={savingBranch === branch.branchId}
+                        >
+                          {savingBranch === branch.branchId ? "Guardando..." : "Guardar"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="shrink-0 text-sm text-muted-foreground">Solo lectura</span>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           {/* Descripción */}
           <div className="space-y-1.5">

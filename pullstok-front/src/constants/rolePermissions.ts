@@ -70,3 +70,28 @@ export function filterNavItemsByRole(
     return item.visibleRoles.includes(role as Role);
   });
 }
+
+/**
+ * Roles that may edit the stock of ANY branch (spec A2).
+ */
+export const STOCK_EDIT_ROLES: Role[] = ["ADMIN", "MANAGEMENT"];
+
+/**
+ * Client-side stock-edit policy for the UI, mirroring the backend
+ * stockService.canEditBranchStock (spec A2 / design D5): ADMIN/MANAGEMENT may
+ * edit any branch; VENDEDOR/CASHIER only their assigned branches (null/empty =
+ * read-only); everyone else never edits. The GET /products/:id/stock response
+ * carries the authoritative per-branch `canEdit` computed from the DB; this
+ * helper is the UI-level expression of the same rule.
+ */
+export function canEditBranchStock(
+  role: string | null | undefined,
+  branchIds: string[] | null | undefined,
+  targetBranchId: string,
+): boolean {
+  if (role === "ADMIN" || role === "MANAGEMENT") return true;
+  if (role === "VENDEDOR" || role === "CASHIER") {
+    return Array.isArray(branchIds) && branchIds.includes(targetBranchId);
+  }
+  return false;
+}
