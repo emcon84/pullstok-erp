@@ -172,6 +172,10 @@ describe("Branch Controller", () => {
 
   describe("toggleBranchActive", () => {
     it("toggles active status and returns 200", async () => {
+      mockedPrisma.branch.findFirst.mockResolvedValue({
+        id: "b1",
+        isHeadquarters: false,
+      });
       mockedPrisma.branch.updateMany.mockResolvedValue({ count: 1 });
 
       const req = mockRequest({ id: "b1" }, { isActive: false });
@@ -179,6 +183,7 @@ describe("Branch Controller", () => {
 
       await toggleBranchActive(req, res);
 
+      expect(mockedPrisma.branch.findFirst).toHaveBeenCalledWith({ where: { id: "b1" } });
       expect(mockedPrisma.branch.updateMany).toHaveBeenCalledWith({
         where: { id: "b1" },
         data: { isActive: false },
@@ -187,20 +192,62 @@ describe("Branch Controller", () => {
       expect(res.json).toHaveBeenCalledWith({ message: "Sucursal actualizada" });
     });
 
+    it("returns 400 when trying to deactivate the headquarters branch", async () => {
+      mockedPrisma.branch.findFirst.mockResolvedValue({
+        id: "b-hq",
+        isHeadquarters: true,
+      });
+
+      const req = mockRequest({ id: "b-hq" }, { isActive: false });
+      const res = mockResponse();
+
+      await toggleBranchActive(req, res);
+
+      expect(mockedPrisma.branch.updateMany).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        message: "No se puede desactivar/eliminar la casa central",
+      });
+    });
+
+    it("allows re-activating the headquarters branch", async () => {
+      mockedPrisma.branch.findFirst.mockResolvedValue({
+        id: "b-hq",
+        isHeadquarters: true,
+      });
+      mockedPrisma.branch.updateMany.mockResolvedValue({ count: 1 });
+
+      const req = mockRequest({ id: "b-hq" }, { isActive: true });
+      const res = mockResponse();
+
+      await toggleBranchActive(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(mockedPrisma.branch.updateMany).toHaveBeenCalledWith({
+        where: { id: "b-hq" },
+        data: { isActive: true },
+      });
+    });
+
     it("returns 404 when branch not found", async () => {
-      mockedPrisma.branch.updateMany.mockResolvedValue({ count: 0 });
+      mockedPrisma.branch.findFirst.mockResolvedValue(null);
 
       const req = mockRequest({ id: "nonexistent" }, { isActive: false });
       const res = mockResponse();
 
       await toggleBranchActive(req, res);
 
+      expect(mockedPrisma.branch.updateMany).not.toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(404);
     });
   });
 
   describe("deleteBranch", () => {
     it("deletes a branch and returns 200", async () => {
+      mockedPrisma.branch.findFirst.mockResolvedValue({
+        id: "b1",
+        isHeadquarters: false,
+      });
       mockedPrisma.branch.deleteMany.mockResolvedValue({ count: 1 });
 
       const req = mockRequest({ id: "b1" });
@@ -208,19 +255,39 @@ describe("Branch Controller", () => {
 
       await deleteBranch(req, res);
 
+      expect(mockedPrisma.branch.findFirst).toHaveBeenCalledWith({ where: { id: "b1" } });
       expect(mockedPrisma.branch.deleteMany).toHaveBeenCalledWith({ where: { id: "b1" } });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ message: "Sucursal eliminada" });
     });
 
+    it("returns 400 when trying to delete the headquarters branch", async () => {
+      mockedPrisma.branch.findFirst.mockResolvedValue({
+        id: "b-hq",
+        isHeadquarters: true,
+      });
+
+      const req = mockRequest({ id: "b-hq" });
+      const res = mockResponse();
+
+      await deleteBranch(req, res);
+
+      expect(mockedPrisma.branch.deleteMany).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        message: "No se puede desactivar/eliminar la casa central",
+      });
+    });
+
     it("returns 404 when branch not found", async () => {
-      mockedPrisma.branch.deleteMany.mockResolvedValue({ count: 0 });
+      mockedPrisma.branch.findFirst.mockResolvedValue(null);
 
       const req = mockRequest({ id: "nonexistent" });
       const res = mockResponse();
 
       await deleteBranch(req, res);
 
+      expect(mockedPrisma.branch.deleteMany).not.toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(404);
     });
   });

@@ -67,6 +67,7 @@ model Organization {
   botConfig             BotConfig?
   appBranding           AppBranding?
   branches              Branch[]
+  productStocks         ProductStock[]
 
   @@map("organizations")
 }
@@ -101,10 +102,14 @@ model Branch {
   address        String?
   phone          String?
   isActive       Boolean            @default(true)
+  // Casa central: la DB garantiza EXACTAMENTE 1 por organización vía el
+  // índice único parcial "branch_single_headquarters" (ver migración).
+  isHeadquarters Boolean            @default(false)
   createdAt      DateTime           @default(now())
   organizationId String
   organization   Organization       @relation(fields: [organizationId], references: [id])
   assignments    BranchAssignment[]
+  stocks         ProductStock[]
 
   @@unique([organizationId, name])
   @@map("branches")
@@ -217,12 +222,33 @@ model Product {
   quotationItems     QuotationItem[]
   saleItems          SaleItem[]
   variantAssignments ProductVariant[]
+  stocks             ProductStock[]
 
   @@index([organizationId])
   @@index([categoryId])
   @@index([organizationId, code])
   @@index([organizationId, barcode])
   @@map("products")
+}
+
+// Stock por sucursal (branch-stock). Una fila por par (producto, sucursal).
+// Tenant-scoped: está en TENANT_MODELS (db.ts) → scope org automático en los
+// endpoints. En el cliente extendido NO se permite findUnique/upsert (patrón
+// del codebase) → findFirst / updateMany / create. Product.quantity queda como
+// columna legacy sincronizada con el stock de la casa central (spec D4).
+model ProductStock {
+  id             String       @id @default(uuid())
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  quantity       Int          @default(0)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([productId, branchId])
+  @@index([branchId])
+  @@map("product_stocks")
 }
 
 model Order {

@@ -49,14 +49,22 @@ export const updateBranch = async (req: AuthedRequest, res: Response) => {
 /** ADMIN/MANAGEMENT: activa/desactiva una sucursal. */
 export const toggleBranchActive = async (req: AuthedRequest, res: Response) => {
   try {
+    const branch = await prisma.branch.findFirst({ where: { id: req.params.id } });
+
+    if (!branch) {
+      return res.status(404).json({ message: "Sucursal no encontrada" });
+    }
+
+    // La casa central no se puede desactivar: rompería la sincronización de
+    // Product.quantity (D4) y el fallback de la tienda online (S1).
+    if (branch.isHeadquarters && req.body.isActive === false) {
+      return res.status(400).json({ message: "No se puede desactivar/eliminar la casa central" });
+    }
+
     const result = await prisma.branch.updateMany({
       where: { id: req.params.id },
       data: { isActive: Boolean(req.body.isActive) },
     });
-
-    if (result.count === 0) {
-      return res.status(404).json({ message: "Sucursal no encontrada" });
-    }
 
     res.status(200).json({ message: "Sucursal actualizada" });
   } catch (error: any) {
@@ -64,9 +72,20 @@ export const toggleBranchActive = async (req: AuthedRequest, res: Response) => {
   }
 };
 
-/** ADMIN: elimina una sucursal (cascade borra assignments). */
+/** ADMIN: elimina una sucursal (cascade borra assignments y product_stocks). */
 export const deleteBranch = async (req: AuthedRequest, res: Response) => {
   try {
+    const branch = await prisma.branch.findFirst({ where: { id: req.params.id } });
+
+    if (!branch) {
+      return res.status(404).json({ message: "Sucursal no encontrada" });
+    }
+
+    // La casa central no se puede borrar: es la referencia del stock global.
+    if (branch.isHeadquarters) {
+      return res.status(400).json({ message: "No se puede desactivar/eliminar la casa central" });
+    }
+
     const result = await prisma.branch.deleteMany({
       where: { id: req.params.id },
     });
