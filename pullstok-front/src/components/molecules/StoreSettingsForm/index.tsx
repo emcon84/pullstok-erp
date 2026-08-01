@@ -6,6 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { API_URL } from "../../../constants";
 import {
   StoreSettings,
@@ -15,6 +22,7 @@ import {
   useStoreSettings,
   useUpdateStoreSettings,
 } from "../../hooks/useStoreSettings";
+import { useBranches } from "../../hooks/useBranches";
 import { Loader } from "../../atoms/loader";
 
 const MAX_BADGES = 3;
@@ -36,6 +44,9 @@ const uploadImage = async (file: File): Promise<string> => {
 export const StoreSettingsForm = () => {
   const { settings, loading } = useStoreSettings();
   const { updateSettings, loading: saving } = useUpdateStoreSettings();
+  // La vista de tienda es solo ADMIN/MANAGEMENT (ROLE_VISIBLE_PATHS), así que
+  // GET /branches siempre está permitido acá (spec S1 / design D5).
+  const { branches } = useBranches();
 
   const [form, setForm] = useState<Partial<StoreSettings>>({});
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -209,6 +220,33 @@ export const StoreSettingsForm = () => {
             onCheckedChange={(v) => handleField("showNewsletter", v)}
           />
         </div>
+      </Card>
+
+      <Card className="space-y-4 p-5">
+        <div className="space-y-1">
+          <Label htmlFor="storeBranchId" className="text-sm font-semibold tracking-tight">
+            Sucursal de la tienda
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            La tienda online usa el stock de esta sucursal. Si no se configura,
+            se usa la casa central.
+          </p>
+        </div>
+        <Select
+          value={form.storeBranchId ?? ""}
+          onValueChange={(v) => handleField("storeBranchId", v || null)}
+        >
+          <SelectTrigger id="storeBranchId" aria-label="Sucursal de la tienda" className="w-full">
+            <SelectValue placeholder="Elegí la sucursal" />
+          </SelectTrigger>
+          <SelectContent>
+            {branches.map((branch) => (
+              <SelectItem key={branch.id} value={branch.id}>
+                {branch.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Card>
 
       <Card className="space-y-4 p-5">

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   canEditBranchStock,
+  resolveScannerBranchMode,
   STOCK_EDIT_ROLES,
 } from "../constants/rolePermissions";
 
@@ -60,5 +61,58 @@ describe("canEditBranchStock", () => {
     expect(STOCK_EDIT_ROLES).toContain("ADMIN");
     expect(STOCK_EDIT_ROLES).toContain("MANAGEMENT");
     expect(STOCK_EDIT_ROLES).toHaveLength(2);
+  });
+});
+
+/**
+ * Scanner branch resolution (spec F2): maps the logged user to the branch the
+ * scanner adjusts. ADMIN/MANAGEMENT choose among all branches; a VENDEDOR/
+ * CASHIER with exactly one assignment is pinned to it; with several, they pick
+ * among their own; with none (or any other role) the scanner is read-only.
+ */
+describe("resolveScannerBranchMode", () => {
+  it("gives ADMIN a selector over all branches, regardless of assignments", () => {
+    expect(resolveScannerBranchMode("ADMIN", ["b1"])).toEqual({ kind: "selector" });
+    expect(resolveScannerBranchMode("ADMIN", [])).toEqual({ kind: "selector" });
+    expect(resolveScannerBranchMode("ADMIN", undefined)).toEqual({ kind: "selector" });
+  });
+
+  it("gives MANAGEMENT a selector over all branches", () => {
+    expect(resolveScannerBranchMode("MANAGEMENT", null)).toEqual({ kind: "selector" });
+  });
+
+  it("pins a VENDEDOR with exactly one assignment to that branch", () => {
+    expect(resolveScannerBranchMode("VENDEDOR", ["b1"])).toEqual({
+      kind: "single",
+      branchId: "b1",
+    });
+  });
+
+  it("pins a CASHIER with exactly one assignment to that branch", () => {
+    expect(resolveScannerBranchMode("CASHIER", ["b9"])).toEqual({
+      kind: "single",
+      branchId: "b9",
+    });
+  });
+
+  it("restricts a VENDEDOR with several assignments to a selector over those branches", () => {
+    expect(resolveScannerBranchMode("VENDEDOR", ["b1", "b2"])).toEqual({
+      kind: "selector",
+      branchIds: ["b1", "b2"],
+    });
+  });
+
+  it("makes a VENDEDOR without assignments read-only", () => {
+    expect(resolveScannerBranchMode("VENDEDOR", [])).toEqual({ kind: "readonly" });
+    expect(resolveScannerBranchMode("VENDEDOR", null)).toEqual({ kind: "readonly" });
+    expect(resolveScannerBranchMode("VENDEDOR", undefined)).toEqual({ kind: "readonly" });
+  });
+
+  it("makes EMPLOYEE read-only even with assignments", () => {
+    expect(resolveScannerBranchMode("EMPLOYEE", ["b1"])).toEqual({ kind: "readonly" });
+  });
+
+  it("makes SUPERADMIN read-only (mirrors the backend policy)", () => {
+    expect(resolveScannerBranchMode("SUPERADMIN", ["b1"])).toEqual({ kind: "readonly" });
   });
 });

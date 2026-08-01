@@ -1,17 +1,34 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { Camera, CameraOff, Plus, Minus, Search, Link2, X, Barcode, Copy } from "lucide-react";
 import { ProductDrawer } from "@/components/molecules/ProductDrawer";
+import { useProductStock } from "@/components/hooks/useProductStock";
+import { useBranches } from "@/components/hooks/useBranches";
+import { resolveScannerBranchMode } from "@/constants/rolePermissions";
+import type { Role } from "@/constants/rolePermissions";
 import type { DataItem } from "@/types";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+/** Minimal typing for the (non-standard) BarcodeDetector browser API. */
+interface BarcodeDetectorLike {
+  detect(video: HTMLVideoElement): Promise<{ rawValue: string }[]>;
+}
+type BarcodeDetectorClass = {
+  new (options: { formats: string[] }): BarcodeDetectorLike;
+  getSupportedFormats(): Promise<string[]>;
+};
 
 interface Product {
   id: string; name: string; code: string; barcode: string; price: number;
@@ -23,8 +40,8 @@ interface Product {
 export const StockScannerPage = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const detectorRef = useRef<any>(null);
-  const scanTimerRef = useRef<any>(null);
+  const detectorRef = useRef<BarcodeDetectorLike | null>(null);
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [scanning, setScanning] = useState(false);
@@ -51,8 +68,77 @@ export const StockScannerPage = () => {
   const [dupDrawerOpen, setDupDrawerOpen] = useState(false);
   const [dupBarcode, setDupBarcode] = useState("");
 
+  // -------------------------------------------------------------------------
+  // Branch-aware stock (spec F2 / design D3): the scanner adjusts the
+  // ProductStock of the user's effective branch, never the global quantity.
+  // The branchIds from the login are only a UX hint; the server re-reads the
+  // BranchAssignment on every PUT.
+  // -------------------------------------------------------------------------
+  const currentUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  })();
+  const userRole = currentUser?.role as Role | undefined;
+  const userBranchIds = currentUser?.branchIds as string[] | undefined;
+
+  const mode = resolveScannerBranchMode(userRole, userBranchIds);
+  // ADMIN/MANAGEMENT pick from ALL branches (GET /branches is admin-only);
+  // VENDEDOR/CASHIER with several assignments pick among their own, named by
+  // the self-contained stock response (no extra permission needed).
+  const isAdminSelector = mode.kind === "selector" && !mode.branchIds;
+  const { branches: allBranches } = useBranches(isAdminSelector);
+
+  const { stock, updateBranchStock: saveBranchStock } =
+    useProductStock(product?.id);
+
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+
+  // Default the admin selector to the first branch once loaded.
+  useEffect(() => {
+    if (isAdminSelector && allBranches.length > 0 && !selectedBranchId) {
+      setSelectedBranchId(allBranches[0].id);
+    }
+  }, [isAdminSelector, allBranches, selectedBranchId]);
+
+  const restrictedOptions =
+    mode.kind === "selector" && mode.branchIds
+      ? (stock?.branches.filter((b) => mode.branchIds!.includes(b.branchId)) ?? [])
+      : [];
+
+  const effectiveBranchId = useMemo(() => {
+    if (mode.kind === "single") return mode.branchId;
+    if (mode.kind === "selector") {
+      if (mode.branchIds) return selectedBranchId ?? mode.branchIds[0] ?? null;
+      return selectedBranchId;
+    }
+    return null;
+  }, [mode, selectedBranchId]);
+
+  const effectiveBranchInfo = stock?.branches.find(
+    (b) => b.branchId === effectiveBranchId,
+  );
+
+  // The stock response is the source of truth once loaded; until then the
+  // legacy global quantity is a placeholder (it equals the HQ stock).
+  const [displayQty, setDisplayQty] = useState<number | null>(null);
+  const effectiveQty = effectiveBranchInfo?.quantity;
+  useEffect(() => {
+    if (effectiveQty !== undefined) setDisplayQty(effectiveQty);
+  }, [effectiveQty, effectiveBranchId]);
+  const shownQty = displayQty ?? product?.quantity ?? 0;
+
+  // Editing requires a known branch AND its current quantity: writing a
+  // +/- step without the real value could store a wrong number.
+  const canAdjust = effectiveBranchId != null && !!effectiveBranchInfo;
+
   const token = localStorage.getItem("token") || "";
-  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const headers = useMemo(
+    () => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" }),
+    [token],
+  );
 
   const playBeep = () => {
     try {
@@ -63,7 +149,7 @@ export const StockScannerPage = () => {
       osc.frequency.value = 880; osc.type = "sine";
       gain.gain.value = 0.15;
       osc.start(); osc.stop(ctx.currentTime + 0.12);
-    } catch {}
+    } catch { /* best-effort audio feedback; ignore failures */ }
   };
 
   const lookupProduct = async (code: string) => {
@@ -128,7 +214,7 @@ export const StockScannerPage = () => {
       setSearchResults(Array.isArray(data) ? data.slice(0, 12) : []);
     } catch { setSearchResults([]); }
     setSearching(false);
-  }, []);
+  }, [headers]);
 
   const assignCode = async (productId: string) => {
     setAssigning(true);
@@ -172,7 +258,7 @@ export const StockScannerPage = () => {
       variantAssignments: (p.variantAssignments || []).map(va => ({
         option: { id: va.option.id, value: va.option.value, variantId: va.option.variantId, variant: va.option.variant },
       })),
-    } as any);
+    } as DataItem);
     setDupDrawerOpen(true);
   };
 
@@ -214,8 +300,11 @@ export const StockScannerPage = () => {
       if (videoRef.current) videoRef.current.srcObject = stream;
 
       if ("BarcodeDetector" in window) {
-        const formats = await (window as any).BarcodeDetector.getSupportedFormats();
-        detectorRef.current = new (window as any).BarcodeDetector({ formats });
+        const BarcodeDetectorCtor = (window as unknown as { BarcodeDetector?: BarcodeDetectorClass }).BarcodeDetector;
+        if (BarcodeDetectorCtor) {
+          const formats = await BarcodeDetectorCtor.getSupportedFormats();
+          detectorRef.current = new BarcodeDetectorCtor({ formats });
+        }
       }
       setScanning(true);
       scanningRef.current = true;
@@ -227,19 +316,19 @@ export const StockScannerPage = () => {
             const barcodes = await detectorRef.current.detect(videoRef.current);
             if (barcodes.length > 0) { lookupProduct(barcodes[0].rawValue); return; }
           }
-        } catch {}
+        } catch { /* frame read errors are transient; keep scanning */ }
         scanTimerRef.current = setTimeout(scanLoop, 200);
       };
       scanLoop();
-    } catch (e: any) {
-      toast.error(e.message || "Permiso de cámara denegado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Permiso de cámara denegado");
     }
   };
 
   const stopScanner = () => {
     setScanning(false);
     scanningRef.current = false;
-    clearTimeout(scanTimerRef.current);
+    clearTimeout(scanTimerRef.current ?? undefined);
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
     if (videoRef.current) videoRef.current.srcObject = null;
   };
@@ -252,12 +341,14 @@ export const StockScannerPage = () => {
   }, [searchQuery, searchProducts]);
 
   const updateStock = async (qty: number) => {
-    if (!product) return;
+    if (!product || !effectiveBranchId) return;
     try {
-      await fetch(`${API_URL}/products/${product.id}`, { method: "PUT", headers, body: JSON.stringify({ quantity: qty }) });
-      setProduct(p => p ? { ...p, quantity: qty } : p);
+      await saveBranchStock({ branchId: effectiveBranchId, quantity: qty });
+      setDisplayQty(qty);
       toast.success(`Stock: ${qty}`);
-    } catch { toast.error("Error"); }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al actualizar el stock");
+    }
   };
 
   const resetAndScan = () => {
@@ -275,6 +366,27 @@ export const StockScannerPage = () => {
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4">
       <h1 className="text-xl font-semibold">Scanner</h1>
+
+      {/* Branch selector (spec F2): admin/management pick any branch; a
+          vendedor/cashier with several assignments picks among their own. */}
+      {mode.kind === "selector" && (isAdminSelector || product) && (
+        <div className="space-y-1.5">
+          <Label htmlFor="scanner-branch">Sucursal de trabajo</Label>
+          <Select value={effectiveBranchId ?? ""} onValueChange={setSelectedBranchId}>
+            <SelectTrigger id="scanner-branch" aria-label="Sucursal de trabajo" className="w-full">
+              <SelectValue placeholder="Elegí la sucursal" />
+            </SelectTrigger>
+            <SelectContent>
+              {(isAdminSelector
+                ? allBranches.map((b) => ({ id: b.id, name: b.name }))
+                : restrictedOptions.map((b) => ({ id: b.branchId, name: b.branchName }))
+              ).map((o) => (
+                <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Camera */}
       <Card className="relative aspect-square overflow-hidden bg-black rounded-xl">
@@ -368,18 +480,26 @@ export const StockScannerPage = () => {
           </div>
 
           <div className="flex items-center gap-3 pt-2 border-t">
-            <span className="text-sm text-muted-foreground">Stock:</span>
-            <span className={`text-2xl font-bold ${product.quantity <= 0 ? "text-destructive" : ""}`}>{product.quantity}</span>
-            <div className="flex gap-1 ml-auto">
-              <Button size="icon" variant="outline" onClick={() => updateStock(product.quantity - 1)}><Minus className="h-4 w-4" /></Button>
-              <Button size="icon" variant="outline" onClick={() => updateStock(product.quantity + 1)}><Plus className="h-4 w-4" /></Button>
-            </div>
+            <span className="text-sm text-muted-foreground">
+              Stock{effectiveBranchInfo ? ` · ${effectiveBranchInfo.branchName}` : ""}:
+            </span>
+            <span className={`text-2xl font-bold ${shownQty <= 0 ? "text-destructive" : ""}`}>{shownQty}</span>
+            {mode.kind === "readonly" ? (
+              <span className="ml-auto text-sm text-muted-foreground">Solo lectura</span>
+            ) : canAdjust ? (
+              <div className="flex gap-1 ml-auto">
+                <Button size="icon" variant="outline" aria-label="Disminuir stock" onClick={() => updateStock(shownQty - 1)}><Minus className="h-4 w-4" /></Button>
+                <Button size="icon" variant="outline" aria-label="Aumentar stock" onClick={() => updateStock(shownQty + 1)}><Plus className="h-4 w-4" /></Button>
+              </div>
+            ) : null}
           </div>
 
-          <div className="flex gap-2">
-            <Input type="number" placeholder="Cantidad..." value={adjustQty} onChange={e => setAdjustQty(e.target.value)} className="h-9" />
-            <Button size="sm" onClick={() => { const q = parseInt(adjustQty); if (!isNaN(q)) { updateStock(q); setAdjustQty(""); } }}>Actualizar</Button>
-          </div>
+          {canAdjust && (
+            <div className="flex gap-2">
+              <Input type="number" placeholder="Cantidad..." value={adjustQty} onChange={e => setAdjustQty(e.target.value)} className="h-9" />
+              <Button size="sm" onClick={() => { const q = parseInt(adjustQty); if (!isNaN(q)) { updateStock(q); setAdjustQty(""); } }}>Actualizar</Button>
+            </div>
+          )}
 
           {product.barcode && (
             <Button

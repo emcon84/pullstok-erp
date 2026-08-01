@@ -95,3 +95,35 @@ export function canEditBranchStock(
   }
   return false;
 }
+
+/**
+ * Which branch the StockScannerPage operates on for the logged user (spec F2):
+ * - ADMIN/MANAGEMENT: selector over ALL branches (backed by GET /branches).
+ * - VENDEDOR/CASHIER with exactly 1 assignment: pinned to that branch.
+ * - VENDEDOR/CASHIER with several assignments: selector restricted to them.
+ * - No assignments (or any other role): read-only — the scanner shows stock
+ *   but offers no edit controls.
+ *
+ * Mirrors the backend policy (design D3: branchIds in the login is only a UX
+ * hint; the server re-reads BranchAssignment on every PUT).
+ */
+export type ScannerBranchMode =
+  | { kind: "single"; branchId: string }
+  | { kind: "selector"; branchIds?: string[] }
+  | { kind: "readonly" };
+
+export function resolveScannerBranchMode(
+  role: string | null | undefined,
+  branchIds: string[] | null | undefined,
+): ScannerBranchMode {
+  if (role === "ADMIN" || role === "MANAGEMENT") {
+    return { kind: "selector" };
+  }
+  if (role === "VENDEDOR" || role === "CASHIER") {
+    const ids = Array.isArray(branchIds) ? branchIds : [];
+    if (ids.length === 1) return { kind: "single", branchId: ids[0] };
+    if (ids.length > 1) return { kind: "selector", branchIds: ids };
+    return { kind: "readonly" };
+  }
+  return { kind: "readonly" };
+}

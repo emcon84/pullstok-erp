@@ -11,10 +11,11 @@ import {
 } from "@/services/branchService";
 
 /** Fetches the list of active branches in the current organization. */
-export const useBranches = () => {
+export const useBranches = (enabled = true) => {
   const { data, error, isLoading, refetch } = useQuery<BranchData[], Error>({
     queryKey: ["branches"],
     queryFn: getBranches,
+    enabled,
   });
 
   return {

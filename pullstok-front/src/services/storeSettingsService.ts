@@ -17,6 +17,11 @@ export interface StoreSettings {
   contactEmail: string | null;
   contactPhone: string | null;
   address: string | null;
+  /**
+   * Branch whose ProductStock feeds the online store (spec S1). When null or
+   * unset, the storefront falls back to the casa central (server-side).
+   */
+  storeBranchId?: string | null;
 }
 
 const authHeaders = () => ({
