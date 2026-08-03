@@ -3,6 +3,7 @@ import AuthService from "../services/authServices";
 import { basePrisma } from "../config/db";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 import { requireOrganizationId } from "../config/tenantContext";
+import bcrypt from "bcryptjs";
 
 /** ADMIN o MANAGEMENT: crea un usuario dentro de SU organización. */
 export const createUser = async (req: AuthedRequest, res: Response) => {
@@ -93,7 +94,6 @@ export const listUsers = async (_req: AuthedRequest, res: Response) => {
  */
 export const resetPassword = async (req: AuthedRequest, res: Response) => {
   try {
-    const bcrypt = require("bcryptjs");
     const { id } = req.params;
     const { newPassword } = req.body;
 
@@ -104,7 +104,7 @@ export const resetPassword = async (req: AuthedRequest, res: Response) => {
     const organizationId = requireOrganizationId();
 
     // Verify the target user belongs to the admin's organization
-    const user = await prisma.user.findFirst({
+    const user = await basePrisma.user.findFirst({
       where: { id, organizationId },
     });
     if (!user) {
@@ -113,7 +113,7 @@ export const resetPassword = async (req: AuthedRequest, res: Response) => {
 
     const hashed = await bcrypt.hash(newPassword, 10);
 
-    await prisma.user.update({
+    await basePrisma.user.update({
       where: { id },
       data: { password: hashed },
     });
