@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Search,
   Plus,
@@ -43,6 +43,8 @@ import { toast } from "react-toastify";
 import { CartItem } from "../models/salesModel";
 import { ProductDrawer } from "../components/molecules/ProductDrawer";
 
+import { FilterChips } from "../components/molecules/FilterChips";
+
 // ── Types ──
 
 interface VendorDashboardProps {
@@ -58,32 +60,6 @@ const imgSrc = (image?: string) => {
 
 const branchQty = (p: DataItem) =>
   Number(p.stocks?.[0]?.quantity ?? 0);
-
-/** Scroll row that converts vertical wheel to horizontal scroll. */
-const ScrollRow = ({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) => {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const handler = (e: WheelEvent) => {
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    };
-    el.addEventListener("wheel", handler, { passive: false });
-    return () => el.removeEventListener("wheel", handler);
-  }, []);
-  return (
-    <div ref={ref} className={cn("flex overflow-x-auto scrollbar-none", className)}>
-      {children}
-    </div>
-  );
-};
 
 // ── Component ──
 
@@ -177,52 +153,6 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     }
   };
 
-  // ── Quick-filter categories (mobile-friendly) ──
-  const quickCategories = useMemo(() => {
-    if (!products) return [];
-    const seen = new Set<string>();
-    const cats: string[] = [];
-    for (const p of products) {
-      const name = (p as any).category?.name || p.category;
-      if (name && typeof name === "string" && !seen.has(name)) {
-        seen.add(name);
-        cats.push(name);
-      }
-    }
-    return cats.sort();
-  }, [products]);
-
-  // ── Variant group chips: grouped by variant name (Tamaño, Sabor, etc.) ──
-  const quickVariants = useMemo(() => {
-    if (!categoryFilter || !products) return [];
-    const filtered = products.filter((p) => {
-      const catName = (p as any).category?.name || p.category || "";
-      return String(catName).toLowerCase().includes(categoryFilter.toLowerCase());
-    });
-    // Group option values by variant name
-    const groups: Record<string, Set<string>> = {};
-    for (const p of filtered) {
-      const assignments = (p as any).variantAssignments as any[] | undefined;
-      if (assignments) {
-        for (const a of assignments) {
-          const variantName = a.option?.variant?.name;
-          const optionValue = a.option?.value;
-          if (variantName && optionValue) {
-            if (!groups[variantName]) groups[variantName] = new Set();
-            groups[variantName].add(optionValue);
-          }
-        }
-      }
-    }
-    // Convert to sorted arrays
-    return Object.entries(groups)
-      .map(([name, values]) => ({
-        name,
-        values: [...values].sort(),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [categoryFilter, products]);
-
   // ── Loading ──
 
   if (loading) {
@@ -257,93 +187,15 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         />
       </div>
 
-      {/* ── Active filters bar ── */}
-      {(categoryFilter || filter) && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Filtros:</span>
-          {categoryFilter && (
-            <Badge variant="secondary" className="gap-1 pr-1 text-xs">
-              {categoryFilter}
-              <button
-                onClick={() => setCategoryFilter("")}
-                className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
-          {filter.split(/\s+/).filter(w => w.length > 0).map((word) => (
-            <Badge key={word} variant="secondary" className="gap-1 pr-1 text-xs">
-              {word}
-              <button
-                onClick={() => {
-                  const words = filter.split(/\s+/).filter(w => w.length > 0 && w.toLowerCase() !== word.toLowerCase());
-                  setFilter(words.join(" "));
-                }}
-                className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-          <button
-            onClick={() => { setFilter(""); setCategoryFilter(""); }}
-            className="text-xs text-muted-foreground hover:text-foreground underline ml-1"
-          >
-            limpiar todo
-          </button>
-        </div>
-      )}
-
-      {/* ── Quick-filter chips ── */}
-      {quickCategories.length > 0 && (
-        <ScrollRow className="gap-2 pb-1">
-          {quickCategories.map((cat) => (
-            <Badge
-              key={cat}
-              variant={categoryFilter === cat ? "default" : "outline"}
-              className="shrink-0 cursor-pointer px-3 py-1.5 text-xs font-medium whitespace-nowrap"
-              onClick={() => setCategoryFilter(categoryFilter === cat ? "" : cat)}
-            >
-              {cat}
-            </Badge>
-          ))}
-        </ScrollRow>
-      )}
-
-      {/* ── Variant chips: grouped by type after selecting a category ── */}
-      {quickVariants.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {quickVariants.map((group) => (
-            <div key={group.name} className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground shrink-0 w-16">
-                {group.name}
-              </span>
-              <ScrollRow className="gap-1.5">
-                {group.values.map((v) => {
-                  const isActive = filter.toLowerCase().includes(v.toLowerCase());
-                  return (
-                    <Badge
-                      key={v}
-                      variant={isActive ? "secondary" : "outline"}
-                      className="shrink-0 cursor-pointer px-2.5 py-1 text-xs font-medium whitespace-nowrap"
-                      onClick={() =>
-                        setFilter(
-                          isActive
-                            ? filter.replace(new RegExp(`\\s?${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i"), "").trim()
-                            : `${filter} ${v}`.trim(),
-                        )
-                      }
-                    >
-                      {v}
-                    </Badge>
-                  );
-                })}
-              </ScrollRow>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* ── Filter chips ── */}
+      <FilterChips
+        products={products || []}
+        filter={filter}
+        categoryFilter={categoryFilter}
+        onFilterChange={setFilter}
+        onCategoryChange={setCategoryFilter}
+        onClear={() => { setFilter(""); setCategoryFilter(""); }}
+      />
 
       {/* ── Product grid ── */}
       {(!products || products.length === 0) ? (
