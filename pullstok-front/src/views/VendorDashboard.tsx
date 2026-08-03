@@ -233,7 +233,13 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       {/* ── Quick-filter chips (mobile) ── */}
       {quickCategories.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div
+          className="flex gap-2 overflow-x-auto pb-1 scrollbar-none"
+          onWheel={(e) => {
+            // Convert vertical scroll to horizontal on desktop
+            e.currentTarget.scrollLeft += e.deltaY;
+          }}
+        >
           {quickCategories.map((cat) => (
             <Badge
               key={cat}
@@ -255,7 +261,12 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
               <span className="text-xs font-medium text-muted-foreground shrink-0 w-16">
                 {group.name}
               </span>
-              <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+              <div
+                className="flex gap-1.5 overflow-x-auto scrollbar-none"
+                onWheel={(e) => {
+                  e.currentTarget.scrollLeft += e.deltaY;
+                }}
+              >
                 {group.values.map((v) => {
                   const isActive = filter.toLowerCase().includes(v.toLowerCase());
                   return (
