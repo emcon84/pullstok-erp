@@ -8,11 +8,8 @@ import axios from 'axios';
 
 export const getBudgets = async (branchId?: string): Promise<Budget[]> => {
   const token = localStorage.getItem('token');
-  const url = new URL(`${API_URL}/quotations`);
-  if (branchId) {
-    url.searchParams.set("branchId", branchId);
-  }
-  const response = await axios.get<Budget[]>(url.toString(), {
+  const response = await axios.get<Budget[]>(`${API_URL}/quotations`, {
+    params: branchId ? { branchId } : undefined,
     headers: {
       Authorization: `Bearer ${token}`,
     },

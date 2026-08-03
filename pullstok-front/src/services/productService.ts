@@ -121,11 +121,8 @@ export const products = async (branchId?: string) => {
   try {
     const token = localStorage.getItem("token");
 
-    const url = new URL(`${API_URL}/products`);
-    if (branchId) {
-      url.searchParams.set("branchId", branchId);
-    }
-    const response = await axios.get(url.toString(), {
+    const response = await axios.get(`${API_URL}/products`, {
+      params: branchId ? { branchId } : undefined,
       headers: {
         Authorization: `Bearer ${token}`,
       },
