@@ -59,6 +59,32 @@ const imgSrc = (image?: string) => {
 const branchQty = (p: DataItem) =>
   Number(p.stocks?.[0]?.quantity ?? 0);
 
+/** Scroll row that converts vertical wheel to horizontal scroll. */
+const ScrollRow = ({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
+  return (
+    <div ref={ref} className={cn("flex overflow-x-auto scrollbar-none", className)}>
+      {children}
+    </div>
+  );
+};
+
 // ── Component ──
 
 export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
@@ -233,13 +259,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       {/* ── Quick-filter chips (mobile) ── */}
       {quickCategories.length > 0 && (
-        <div
-          className="flex gap-2 overflow-x-auto pb-1 scrollbar-none"
-          onWheel={(e) => {
-            // Convert vertical scroll to horizontal on desktop
-            e.currentTarget.scrollLeft += e.deltaY;
-          }}
-        >
+        <ScrollRow className="gap-2 pb-1">
           {quickCategories.map((cat) => (
             <Badge
               key={cat}
@@ -250,7 +270,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
               {cat}
             </Badge>
           ))}
-        </div>
+        </ScrollRow>
       )}
 
       {/* ── Variant chips: grouped by type after selecting a category ── */}
@@ -261,12 +281,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
               <span className="text-xs font-medium text-muted-foreground shrink-0 w-16">
                 {group.name}
               </span>
-              <div
-                className="flex gap-1.5 overflow-x-auto scrollbar-none"
-                onWheel={(e) => {
-                  e.currentTarget.scrollLeft += e.deltaY;
-                }}
-              >
+              <ScrollRow className="gap-1.5">
                 {group.values.map((v) => {
                   const isActive = filter.toLowerCase().includes(v.toLowerCase());
                   return (
@@ -286,7 +301,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                     </Badge>
                   );
                 })}
-              </div>
+              </ScrollRow>
             </div>
           ))}
         </div>
@@ -294,9 +309,20 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       {/* ── Product grid ── */}
       {(!products || products.length === 0) ? (
-        <p className="py-12 text-center text-muted-foreground">
-          {filter || categoryFilter ? "Sin resultados." : "No hay productos."}
-        </p>
+        <div className="py-12 text-center space-y-3">
+          <p className="text-muted-foreground">
+            {filter || categoryFilter ? "Sin resultados con estos filtros." : "No hay productos."}
+          </p>
+          {(filter || categoryFilter) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setFilter(""); setCategoryFilter(""); }}
+            >
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
       ) : (
         <>
           {/* Desktop table */}
