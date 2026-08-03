@@ -181,6 +181,7 @@ describe("getStockSummary", () => {
     expect(mockedPrisma.branch.findMany).toHaveBeenCalledWith({
       where: { organizationId: orgId, isActive: true },
       select: { id: true, name: true, isHeadquarters: true },
+      orderBy: { name: "asc" },
     });
     expect(result.total).toBe(22);
     expect(result.branches).toEqual([

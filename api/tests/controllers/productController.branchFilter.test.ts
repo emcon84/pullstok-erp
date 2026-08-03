@@ -47,9 +47,9 @@ describe("productController.getProducts — branchId filter", () => {
     jest.clearAllMocks();
   });
 
-  it("adds stocks: { some: { branchId, quantity: { gt: 0 } } } when branchId is provided", async () => {
+  it("adds stocks include with branchId filter when branchId is provided", async () => {
     mockedPrisma.product.findMany.mockResolvedValue([
-      { id: "p-1", name: "Stocked Product", stocks: [{ branchId: "br-1", quantity: 5 }] },
+      { id: "p-1", name: "Stocked Product", stocks: [{ quantity: 5 }] },
     ]);
 
     const req = { query: { branchId: "br-1" } } as unknown as Request;
@@ -59,12 +59,16 @@ describe("productController.getProducts — branchId filter", () => {
 
     expect(mockedPrisma.product.findMany).toHaveBeenCalledTimes(1);
     const callArgs = mockedPrisma.product.findMany.mock.calls[0][0];
-    expect(callArgs.where.stocks).toEqual({
-      some: { branchId: "br-1", quantity: { gt: 0 } },
+    // where.stocks should NOT be used anymore (we use include.stocks instead)
+    expect(callArgs.where?.stocks).toBeUndefined();
+    // include.stocks should filter by branchId and select only quantity
+    expect(callArgs.include.stocks).toEqual({
+      where: { branchId: "br-1" },
+      select: { quantity: true },
     });
   });
 
-  it("omits stocks filter from where when branchId is not provided (org-wide, backward-compat)", async () => {
+  it("omits stocks include when branchId is not provided (org-wide, backward-compat)", async () => {
     mockedPrisma.product.findMany.mockResolvedValue([
       { id: "p-1", name: "Any Product" },
     ]);
@@ -76,10 +80,11 @@ describe("productController.getProducts — branchId filter", () => {
 
     expect(mockedPrisma.product.findMany).toHaveBeenCalledTimes(1);
     const callArgs = mockedPrisma.product.findMany.mock.calls[0][0];
-    expect(callArgs.where.stocks).toBeUndefined();
+    expect(callArgs.where?.stocks).toBeUndefined();
+    expect(callArgs.include.stocks).toBeUndefined();
   });
 
-  it("merges stocks filter with existing name/category/price filters", async () => {
+  it("merges stocks include with existing name filter when branchId is provided", async () => {
     mockedPrisma.product.findMany.mockResolvedValue([]);
 
     const req = {
@@ -90,13 +95,13 @@ describe("productController.getProducts — branchId filter", () => {
     await productController.getProducts(req, res);
 
     const callArgs = mockedPrisma.product.findMany.mock.calls[0][0];
-    // Verifica que el filtro de stock esté presente además del filtro de nombre
-    expect(callArgs.where.stocks).toEqual({
-      some: { branchId: "br-2", quantity: { gt: 0 } },
+    // stocks should be in include, not in where
+    expect(callArgs.include.stocks).toEqual({
+      where: { branchId: "br-2" },
+      select: { quantity: true },
     });
-    // Verifica que el filtro de nombre (search) también esté presente
+    // Name filter should still be in where
     expect(callArgs.where.OR).toBeDefined();
-    // Debe contener contains para "Zap"
     expect(callArgs.where.OR[0].name.contains).toBe("Zap");
   });
 });

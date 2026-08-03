@@ -3,6 +3,7 @@ import SaleService from '../services/salesService';
 import { prisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
 import { calculateInvoiceTotals, InvoiceLineInput } from "../services/invoiceCalc";
+import { AuthedRequest } from "../middlewares/authMiddleware";
 
 // Include estándar de Invoice (mismo shape que invoiceController).
 const invoiceInclude = {
@@ -11,10 +12,10 @@ const invoiceInclude = {
 } as const;
 
 // Create a new sale
-const createSale = async (req: Request, res: Response) => {
+const createSale = async (req: AuthedRequest, res: Response) => {
     try {
         const { products, orderId } = req.body;
-        const sale = await SaleService.createSale({ products, orderId });
+        const sale = await SaleService.createSale({ products, orderId }, req.user!.id, req.user!.role);
         res.status(201).json(sale);
     } catch (error: any) {
         res.status(400).json({ message: error.message });

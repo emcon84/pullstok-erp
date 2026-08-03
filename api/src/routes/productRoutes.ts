@@ -68,7 +68,7 @@ router.patch(
   checkStoreProductLimit,
   productController.publishProduct,
 );
-router.delete("/:id", authenticateJWT, productController.deleteProduct);
+router.delete("/:id", authenticateJWT, requireRole("ADMIN", "MANAGEMENT"), productController.deleteProduct);
 
 // Stock por sucursal (branch-stock, PR 2b): consulta autocontenida para
 // cualquier rol autenticado y edición con autorización server-side (A1/A2).

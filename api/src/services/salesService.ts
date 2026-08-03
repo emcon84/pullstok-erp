@@ -19,7 +19,7 @@ interface ISaleRequest {
   orderId?: string;
 }
 
-const createSale = async (saleRequest: ISaleRequest) => {
+const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: string) => {
   const organizationId = requireOrganizationId();
 
   if (!Array.isArray(saleRequest.products) || saleRequest.products.length === 0) {
@@ -28,8 +28,40 @@ const createSale = async (saleRequest: ISaleRequest) => {
 
   const orderId = saleRequest.orderId;
 
-  // Toda la venta se ejecuta en una transacción: o se descuenta TODO el stock
-  // y se crea la venta, o no se toca nada. Evita el "stock fantasma".
+  // ── Resolve seller's branch for VENDEDOR / CASHIER ──
+  // Only branch-assigned roles are scoped. ADMIN/MANAGEMENT keep the legacy
+  // product.quantity flow (HQ global stock). SUPERADMIN and other roles also
+  // fall through to the legacy path.
+  let sellerBranchId: string | null = null;
+  if (userId && (role === "VENDEDOR" || role === "CASHIER")) {
+    const assignments = await basePrisma.branchAssignment.findMany({
+      where: { userId },
+      select: { branchId: true },
+    });
+    const branchIds = assignments.map((a) => a.branchId);
+
+    if (branchIds.length === 0) {
+      throw new Error(
+        "No tenés una sucursal asignada. Contactá a un administrador.",
+      );
+    }
+    if (branchIds.length > 1) {
+      throw new Error(
+        "Tenés múltiples sucursales asignadas. Seleccioná una para vender.",
+      );
+    }
+    sellerBranchId = branchIds[0];
+
+    // Verify the branch exists and is active
+    const branch = await prisma.branch.findFirst({
+      where: { id: sellerBranchId, isActive: true },
+    });
+    if (!branch) {
+      throw new Error("Tu sucursal asignada no está activa.");
+    }
+  }
+
+  // ── Transaction ──
   const sale = await prisma.$transaction(async (tx) => {
     let totalAmount = 0;
     const saleItems: {
@@ -55,36 +87,70 @@ const createSale = async (saleRequest: ISaleRequest) => {
       if (!product) {
         throw new Error(`Producto ${item.productId} no encontrado`);
       }
-      if (product.quantity < quantity) {
-        throw new Error(`Stock insuficiente para el producto ${product.name}`);
-      }
 
-      // Descuento atómico y condicionado: solo descuenta si todavía hay stock.
-      const updated = await tx.product.updateMany({
-        where: { id: product.id, organizationId, quantity: { gte: quantity } },
-        data: { quantity: { decrement: quantity } },
-      });
-      if (updated.count === 0) {
-        throw new Error(`Stock insuficiente para el producto ${product.name}`);
+      if (sellerBranchId) {
+        // ── Branch-scoped sale: check & deduct from ProductStock ──
+        const stock = await tx.productStock.findFirst({
+          where: {
+            productId: product.id,
+            branchId: sellerBranchId,
+            organizationId,
+          },
+        });
+        if (!stock || stock.quantity < quantity) {
+          throw new Error(
+            `Stock insuficiente de "${product.name}" en tu sucursal`,
+          );
+        }
+
+        const updated = await tx.productStock.updateMany({
+          where: {
+            productId: product.id,
+            branchId: sellerBranchId,
+            organizationId,
+            quantity: { gte: quantity },
+          },
+          data: { quantity: { decrement: quantity } },
+        });
+        if (updated.count === 0) {
+          throw new Error(
+            `Stock insuficiente de "${product.name}" en tu sucursal`,
+          );
+        }
+      } else {
+        // ── Legacy / admin sale: deduct from product.quantity (HQ global) ──
+        if (product.quantity < quantity) {
+          throw new Error(
+            `Stock insuficiente para el producto ${product.name}`,
+          );
+        }
+
+        const updated = await tx.product.updateMany({
+          where: {
+            id: product.id,
+            organizationId,
+            quantity: { gte: quantity },
+          },
+          data: { quantity: { decrement: quantity } },
+        });
+        if (updated.count === 0) {
+          throw new Error(
+            `Stock insuficiente para el producto ${product.name}`,
+          );
+        }
       }
 
       saleItems.push({
         productId: product.id,
         name: product.name,
         quantity,
-        // SaleItem.category es snapshot histórico (string), no FK: queda
-        // congelado el nombre de categoría al momento de la venta aunque la
-        // Category se renombre o borre después.
         category: product.category?.name ?? "Sin categoría",
         price,
       });
       totalAmount += price * quantity;
     }
 
-    // Si la venta procesa un pedido de la tienda, validar la Order ANTES de
-    // crear la venta. tx.order.findFirst está scoped por la extensión anti-fuga
-    // (una Order de otra org devuelve null → 404 efectivo). No re-procesar un
-    // pedido ya cerrado (evita doble venta / doble mail).
+    // ── Order validation (same as before) ──
     if (orderId) {
       const order = await tx.order.findFirst({ where: { id: orderId } });
       if (!order) {
@@ -99,14 +165,13 @@ const createSale = async (saleRequest: ISaleRequest) => {
       data: {
         organizationId,
         totalAmount,
+        ...(sellerBranchId ? { branchId: sellerBranchId } : {}),
         ...(orderId ? { orderId } : {}),
         items: { create: saleItems },
       },
       include: { items: true },
     });
 
-    // Cerrar el pedido: update singular está bloqueado en modelos tenant, se usa
-    // updateMany (scoped a la org por la extensión).
     if (orderId) {
       await tx.order.updateMany({
         where: { id: orderId },
