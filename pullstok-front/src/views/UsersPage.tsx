@@ -558,7 +558,6 @@ export const UsersPage = () => {
               <Label>Resetear contraseña</Label>
               <div className="flex gap-2">
                 <Input
-                  type="password"
                   placeholder="Nueva contraseña (mín. 8)"
                   value={resetPwd}
                   onChange={(e) => setResetPwd(e.target.value)}

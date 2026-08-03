@@ -115,7 +115,7 @@ export const resetPassword = async (req: AuthedRequest, res: Response) => {
 
     await prisma.user.update({
       where: { id },
-      data: { password: hashed, mustChangePassword: true },
+      data: { password: hashed },
     });
 
     res.status(200).json({ message: "Contraseña actualizada" });
