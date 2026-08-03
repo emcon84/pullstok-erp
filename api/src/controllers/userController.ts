@@ -83,6 +83,43 @@ export const listUsers = async (_req: AuthedRequest, res: Response) => {
 
     res.status(200).json(mapped);
   } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /api/users/:id/reset-password — Admin resets another user's password.
+ * Bypasses the current-password check; only ADMIN/MANAGEMENT may call this.
+ */
+export const resetPassword = async (req: AuthedRequest, res: Response) => {
+  try {
+    const bcrypt = require("bcryptjs");
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ message: "La contraseña debe tener al menos 8 caracteres" });
+    }
+
+    const organizationId = requireOrganizationId();
+
+    // Verify the target user belongs to the admin's organization
+    const user = await prisma.user.findFirst({
+      where: { id, organizationId },
+    });
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id },
+      data: { password: hashed, mustChangePassword: true },
+    });
+
+    res.status(200).json({ message: "Contraseña actualizada" });
+  } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
 };

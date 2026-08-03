@@ -9,6 +9,7 @@ import {
   setUserActive,
   deleteUser,
   updateUser,
+  resetPassword,
 } from "../controllers/userController";
 
 const router = Router();
@@ -21,5 +22,6 @@ router.get("/", listUsers);
 router.patch("/:id/active", setUserActive);
 router.delete("/:id", deleteUser);
 router.put("/:id", updateUser);
+router.post("/:id/reset-password", resetPassword);
 
 export default router;

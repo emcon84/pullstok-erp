@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Users, Trash2, Pencil } from "lucide-react";
+import { Plus, Users, Trash2, Pencil, KeyRound } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -36,6 +36,7 @@ import { useConfirm } from "@/components/hooks/useConfirm";
 import {
   createUser as createUserApi,
   setUserActive as setUserActiveApi,
+  resetUserPassword,
   type UserData,
 } from "@/services/userService";
 import { ROLE_DISPLAY, type Role } from "@/constants/rolePermissions";
@@ -79,6 +80,25 @@ export const UsersPage = () => {
   const [editRole, setEditRole] = useState("");
   const [editBranchIds, setEditBranchIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [resetPwd, setResetPwd] = useState("");
+  const [resettingPwd, setResettingPwd] = useState(false);
+
+  const handleResetPassword = async () => {
+    if (!editUser || !resetPwd || resetPwd.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+    setResettingPwd(true);
+    try {
+      await resetUserPassword(editUser.id, resetPwd);
+      toast.success("Contraseña actualizada");
+      setResetPwd("");
+    } catch (e: any) {
+      toast.error(e.message || "Error al resetear contraseña");
+    } finally {
+      setResettingPwd(false);
+    }
+  };
 
   useEffect(() => {
     if (!loading) {
@@ -533,6 +553,27 @@ export const UsersPage = () => {
                 </div>
               </div>
             )}
+            {/* Reset password */}
+            <div className="space-y-1.5 pt-2 border-t">
+              <Label>Resetear contraseña</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  placeholder="Nueva contraseña (mín. 8)"
+                  value={resetPwd}
+                  onChange={(e) => setResetPwd(e.target.value)}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={handleResetPassword}
+                  disabled={resettingPwd}
+                >
+                  <KeyRound className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
             <Button className="w-full" onClick={handleUpdate} disabled={saving}>
               {saving ? "Guardando..." : "Guardar cambios"}
             </Button>

@@ -134,3 +134,25 @@ export const updateUser = async (
     throw new Error("An unknown error occurred");
   }
 };
+
+/** Admin resets another user's password (bypasses current-password check). */
+export const resetUserPassword = async (
+  id: string,
+  newPassword: string,
+): Promise<{ message: string }> => {
+  try {
+    const response = await axios.post<{ message: string }>(
+      `${API_URL}/users/${id}/reset-password`,
+      { newPassword },
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error resetting password",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
