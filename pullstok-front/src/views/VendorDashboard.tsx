@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Search,
   Plus,
@@ -87,7 +87,6 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     clearCart,
   } = useVendorCart();
 
-  const [filter, setFilter] = useState("");
   const [qtyModal, setQtyModal] = useState<{ product: DataItem } | null>(null);
   const [qty, setQty] = useState(1);
   const [cartOpen, setCartOpen] = useState(false);
