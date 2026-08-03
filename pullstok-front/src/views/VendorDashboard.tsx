@@ -358,14 +358,14 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       {/* ── Cart FAB ── */}
       {itemCount > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-1">
           {/* Radar rings */}
           <span className="absolute inset-0 -m-3 animate-ping rounded-full bg-primary/20" />
           <span className="absolute inset-0 -m-6 animate-ping rounded-full bg-primary/10 [animation-delay:300ms]" />
           {/* Button */}
           <button
             onClick={() => setCartOpen(true)}
-            className="relative flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 text-primary-foreground shadow-lg hover:bg-primary/90 transition-all active:scale-95"
+            className="relative flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 text-primary-foreground shadow-lg hover:bg-primary/90 transition-all active:scale-95 touch-manipulation"
           >
             <ShoppingCart className="h-5 w-5" />
             <span className="font-semibold text-sm">{itemCount}</span>
@@ -387,7 +387,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
               {qtyModal?.product.name}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+    <div className="space-y-4 pb-20">
             {qtyModal?.product.image && imgSrc(qtyModal.product.image) && (
               <div className="flex justify-center">
                 <img
