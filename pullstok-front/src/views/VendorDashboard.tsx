@@ -512,6 +512,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           setDrawerProduct(null);
         }}
         product={drawerProduct}
+        readOnly
       />
     </div>
   );

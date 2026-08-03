@@ -38,8 +38,9 @@ import type { DataItem } from "@/types";
 interface ProductDrawerProps {
   open: boolean;
   onClose: () => void;
-  product?: DataItem | null; // null/undefined = create mode
+  product?: DataItem | null;
   onCreated?: (product: DataItem) => void;
+  readOnly?: boolean;
 }
 
 /** Body sent to create/update product. quantity is only present in create
@@ -55,7 +56,7 @@ interface ProductPayload {
   categoryId?: string | null;
 }
 
-export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDrawerProps) => {
+export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: ProductDrawerProps) => {
   const isEdit = !!(product?._id || product?.id);
   const queryClient = useQueryClient();
   const { createProduct, loading } = useCreateProduct();
@@ -237,10 +238,14 @@ export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDraw
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent side="right" className="w-full sm:w-[560px] sm:max-w-[560px] max-w-[100vw] overflow-hidden p-0 flex flex-col">
         <SheetHeader className="px-6 pt-6 pb-2 shrink-0">
-          <SheetTitle>{isEdit ? "Editar producto" : "Agregar producto"}</SheetTitle>
+          <SheetTitle>
+            {readOnly ? product?.name || "Stock" : isEdit ? "Editar producto" : "Agregar producto"}
+          </SheetTitle>
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-6 pb-8 overflow-y-auto flex-1 min-h-0">
+          {!readOnly && (
+          <>
           {/* Nombre + Código */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -272,6 +277,8 @@ export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDraw
               </div>
             )}
           </div>
+          </>
+          )}
 
           {/* Stock por sucursal — edit mode (spec F1): una card por sucursal activa,
               con edición inline SOLO donde el usuario puede editar (canEdit). */}
@@ -293,7 +300,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDraw
                         {branch.quantity} en stock{branch.isHeadquarters ? " · Casa central" : ""}
                       </p>
                     </div>
-                    {canEditBranch(branch) ? (
+                    {!readOnly && canEditBranch(branch) ? (
                       <div className="flex shrink-0 items-center gap-2">
                         <Input
                           type="number"
@@ -321,6 +328,8 @@ export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDraw
             </div>
           )}
 
+          {!readOnly && (
+          <>
           {/* Descripción */}
           <div className="space-y-1.5">
             <Label htmlFor="p-desc">Descripción</Label>
@@ -371,6 +380,8 @@ export const ProductDrawer = ({ open, onClose, product, onCreated }: ProductDraw
               {saving ? "Guardando..." : isEdit ? "Actualizar" : "Crear producto"}
             </Button>
           </div>
+          </>
+          )}
         </div>
       </SheetContent>
     </Sheet>
