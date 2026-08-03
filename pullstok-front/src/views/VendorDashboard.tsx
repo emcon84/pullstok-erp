@@ -121,10 +121,12 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           id: i.productId,
           name: i.name,
           price: i.price,
+          quantity: i.stock,
           description: "",
           category: "",
         },
         quantity: i.quantity,
+        totalPrice: i.price * i.quantity,
       }));
       await createSale({ cart });
       clearCart();
