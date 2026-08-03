@@ -146,19 +146,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     }
   };
 
-  // ── Loading ──
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader />
-      </div>
-    );
-  }
-
-  // ── Render ──
-
-  // Extract unique categories for quick-filter chips (mobile-friendly)
+  // ── Quick-filter categories (mobile-friendly) ──
   const quickCategories = useMemo(() => {
     if (!products) return [];
     const seen = new Set<string>();
@@ -196,6 +184,18 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     }
     return vars.sort();
   }, [filter, products]);
+
+  // ── Loading ──
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
+
+  // ── Render ──
 
   return (
     <div className="space-y-4">
