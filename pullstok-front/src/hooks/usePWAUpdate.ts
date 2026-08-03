@@ -78,7 +78,23 @@ export function usePWAUpdate() {
 
   const applyUpdate = async () => {
     setDismissed(false);
-    await updateServiceWorker(true);
+    try {
+      // Post SKIP_WAITING to the waiting SW so it activates immediately.
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration?.waiting) {
+        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+      }
+
+      // Also call the vite-plugin-pwa handler (may trigger its own reload).
+      await updateServiceWorker(true);
+    } catch (e) {
+      console.error("PWA update failed:", e);
+    }
+
+    // Safety net: if the automatic reload didn't fire within 2s, force it.
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
   };
 
   const dismiss = () => setDismissed(true);
