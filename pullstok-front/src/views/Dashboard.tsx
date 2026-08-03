@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
+import { VendorDashboard } from "./VendorDashboard";
 
 type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
 
@@ -73,6 +74,11 @@ export const Dashboard = () => {
 
   // Admin drill-down: when ?branch=X is set, use it for the product hook only.
   const branchFilter = searchParams.get("branch") || undefined;
+
+  // ── Vendor/Cashier quick-sale dashboard ──
+  if (branchMode.kind === "single") {
+    return <VendorDashboard branchId={branchMode.branchId} />;
+  }
 
   const {
     products,
