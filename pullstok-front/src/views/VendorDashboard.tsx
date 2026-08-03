@@ -173,6 +173,30 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     return cats.sort();
   }, [products]);
 
+  // ── Variant chips: shown when a category filter is active ──
+  const quickVariants = useMemo(() => {
+    if (!filter || !products) return [];
+    const filtered = products.filter((p) => {
+      const catName = (p as any).category?.name || p.category || "";
+      return String(catName).toLowerCase() === filter.toLowerCase();
+    });
+    const seen = new Set<string>();
+    const vars: string[] = [];
+    for (const p of filtered) {
+      const assignments = (p as any).variantAssignments as any[] | undefined;
+      if (assignments) {
+        for (const a of assignments) {
+          const val = a.option?.variant?.name || a.option?.value;
+          if (val && typeof val === "string" && !seen.has(val)) {
+            seen.add(val);
+            vars.push(val);
+          }
+        }
+      }
+    }
+    return vars.sort();
+  }, [filter, products]);
+
   return (
     <div className="space-y-4">
       {/* ── Header ── */}
@@ -208,6 +232,27 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
               {cat}
             </Badge>
           ))}
+        </div>
+      )}
+
+      {/* ── Variant chips: appear after selecting a category ── */}
+      {quickVariants.length > 0 && (
+        <div className="md:hidden flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+          {quickVariants.map((v) => {
+            const isActive = filter.toLowerCase().includes(v.toLowerCase());
+            return (
+              <Badge
+                key={v}
+                variant={isActive ? "secondary" : "outline"}
+                className="shrink-0 cursor-pointer px-3 py-1.5 text-xs font-medium whitespace-nowrap"
+                onClick={() =>
+                  setFilter(isActive ? filter.replace(new RegExp(`\\s?${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, "i"), "").trim() : `${filter} ${v}`)
+                }
+              >
+                {v}
+              </Badge>
+            );
+          })}
         </div>
       )}
 
