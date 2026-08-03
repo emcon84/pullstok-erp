@@ -105,7 +105,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
   const { products, loading } = useProducts(
     branchId,
     debouncedFilter || undefined,
-    categoryFilter || undefined,
+    categoryFilter.trim() || undefined,
   );
   const { createSale } = useCreateSale();
   const {
@@ -257,7 +257,45 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         />
       </div>
 
-      {/* ── Quick-filter chips (mobile) ── */}
+      {/* ── Active filters bar ── */}
+      {(categoryFilter || filter) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Filtros:</span>
+          {categoryFilter && (
+            <Badge variant="secondary" className="gap-1 pr-1 text-xs">
+              {categoryFilter}
+              <button
+                onClick={() => setCategoryFilter("")}
+                className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filter.split(/\s+/).filter(w => w.length > 0).map((word) => (
+            <Badge key={word} variant="secondary" className="gap-1 pr-1 text-xs">
+              {word}
+              <button
+                onClick={() => {
+                  const words = filter.split(/\s+/).filter(w => w.length > 0 && w.toLowerCase() !== word.toLowerCase());
+                  setFilter(words.join(" "));
+                }}
+                className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+          <button
+            onClick={() => { setFilter(""); setCategoryFilter(""); }}
+            className="text-xs text-muted-foreground hover:text-foreground underline ml-1"
+          >
+            limpiar todo
+          </button>
+        </div>
+      )}
+
+      {/* ── Quick-filter chips ── */}
       {quickCategories.length > 0 && (
         <ScrollRow className="gap-2 pb-1">
           {quickCategories.map((cat) => (
