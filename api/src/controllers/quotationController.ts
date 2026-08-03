@@ -56,9 +56,15 @@ const createQuotation = async (req: Request, res: Response) => {
 };
 
 // Obtener todas las cotizaciones (scopeado por org)
-const getQuotations = async (_req: Request, res: Response) => {
+const getQuotations = async (req: Request, res: Response) => {
   try {
+    const branchId = req.query.branchId as string | undefined;
+    const where: Record<string, unknown> = {};
+    if (branchId) {
+      where.branchId = branchId;
+    }
     const quotations = await prisma.quotation.findMany({
+      where,
       include: {
         customer: true,
         items: { include: { product: true } },

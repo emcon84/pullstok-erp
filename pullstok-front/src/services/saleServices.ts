@@ -29,10 +29,14 @@ export const createSale = async (
   }
 };
 
-export const getSales = async (): Promise<Sale[]> => {
+export const getSales = async (branchId?: string): Promise<Sale[]> => {
   const token = localStorage.getItem("token");
   try {
-    const response = await axios.get(`${API_URL}/sales`, {
+    const url = new URL(`${API_URL}/sales`);
+    if (branchId) {
+      url.searchParams.set("branchId", branchId);
+    }
+    const response = await axios.get(url.toString(), {
       headers: {
         Authorization: `Bearer ${token}`,
       },

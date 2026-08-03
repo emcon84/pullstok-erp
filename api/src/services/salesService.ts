@@ -174,8 +174,14 @@ const createSale = async (saleRequest: ISaleRequest) => {
   return sale;
 };
 
-const getAllSales = async () => {
+const getAllSales = async (branchId?: string) => {
+  const where: Record<string, unknown> = {};
+  if (branchId) {
+    where.branchId = branchId;
+  }
+
   return prisma.sale.findMany({
+    where,
     include: {
       items: { include: { product: true } },
       // Expone si la venta ya tiene factura y su id (para que el front

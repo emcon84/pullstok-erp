@@ -127,3 +127,28 @@ export function resolveScannerBranchMode(
   }
   return { kind: "readonly" };
 }
+
+/**
+ * Dashboard branch scoping: different from scanner mode.
+ *
+ * - VENDEDOR/CASHIER with exactly 1 branch → auto-filter to that branch
+ * - Everyone else (ADMIN, MANAGEMENT, EMPLOYEE, SUPERADMIN, or any role with
+ *   null/0/multiple branches) → org-wide (no branch filter).
+ *
+ * Admin drill-down into a branch's products is handled separately via the
+ * `?branch=` URL search param (see Dashboard wiring).
+ */
+export type DashboardBranchMode =
+  | { kind: "single"; branchId: string }
+  | { kind: "org-wide" };
+
+export function resolveDashboardBranchMode(
+  role: string | null | undefined,
+  branchIds: string[] | null | undefined,
+): DashboardBranchMode {
+  if (role === "VENDEDOR" || role === "CASHIER") {
+    const ids = Array.isArray(branchIds) ? branchIds : [];
+    if (ids.length === 1) return { kind: "single", branchId: ids[0] };
+  }
+  return { kind: "org-wide" };
+}

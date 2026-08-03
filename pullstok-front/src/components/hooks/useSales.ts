@@ -40,14 +40,14 @@ export const useCreateSale = () => {
   };
 };
 
-export const useGetSales = () => {
+export const useGetSales = (branchId?: string) => {
   const {
     data: sales,
     error,
     isLoading,
   } = useQuery<Sale[], Error>({
-    queryKey: ["sales"],
-    queryFn: getSales,
+    queryKey: ["sales", branchId].filter(Boolean),
+    queryFn: () => getSales(branchId),
   });
 
   return {

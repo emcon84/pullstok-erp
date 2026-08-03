@@ -117,11 +117,15 @@ export const getStockSummary = async (): Promise<StockSummary> => {
   }
 };
 
-export const products = async () => {
+export const products = async (branchId?: string) => {
   try {
     const token = localStorage.getItem("token");
 
-    const response = await axios.get(`${API_URL}/products`, {
+    const url = new URL(`${API_URL}/products`);
+    if (branchId) {
+      url.searchParams.set("branchId", branchId);
+    }
+    const response = await axios.get(url.toString(), {
       headers: {
         Authorization: `Bearer ${token}`,
       },

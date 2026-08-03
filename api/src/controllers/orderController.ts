@@ -94,9 +94,15 @@ const createOrder = async (req: Request, res: Response) => {
 };
 
 // Get all orders (scopeado por org)
-const getOrders = async (_req: Request, res: Response) => {
+const getOrders = async (req: Request, res: Response) => {
   try {
+    const branchId = req.query.branchId as string | undefined;
+    const where: Record<string, unknown> = {};
+    if (branchId) {
+      where.branchId = branchId;
+    }
     const orders = await prisma.order.findMany({
+      where,
       include: {
         customer: true,
         items: { include: { product: true } },

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Upload, ShoppingCart, Search } from "lucide-react";
 import {
   FaShoppingCart,
@@ -27,6 +28,8 @@ import { toast } from "react-toastify";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
+import type { Role } from "@/constants/rolePermissions";
 
 type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
 
@@ -37,15 +40,47 @@ export const Dashboard = () => {
   const [isModalUploadOpen, setIsModalUploadOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const [selectedStat, setSelectedStat] = useState<StatType>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // --- Branch scope resolution ---
+  // Reads the current user from localStorage (same pattern as StockScannerPage).
+  // branchIds are already returned by GET /auth/me and persisted in localStorage
+  // by the login flow.
+  const currentUser = useMemo(() => {
+    const raw = localStorage.getItem("user");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const userRole = currentUser?.role as Role | undefined;
+  const userBranchIds = currentUser?.branchIds as string[] | undefined;
+
+  const branchMode = useMemo(
+    () => resolveDashboardBranchMode(userRole, userBranchIds),
+    [userRole, userBranchIds],
+  );
+
+  // For admins: the ?branch= URL param enables drill-down into a specific
+  // branch's product table. Not set by default (products are org-wide).
+  // For vendors/cashiers with a single branch: branchId is auto-resolved.
+  const resolvedBranchId =
+    branchMode.kind === "single" ? branchMode.branchId : undefined;
+
+  // Admin drill-down: when ?branch=X is set, use it for the product hook only.
+  const branchFilter = searchParams.get("branch") || undefined;
 
   const {
     products,
     loading: productsLoading,
     error: productsError,
-  } = useProducts();
-  const { sales, loading: salesLoading } = useGetSales();
-  const { budgets, loading: loadingBudgets } = useGetBudgets();
-  const { orders, loading: loadingOrders } = useOrders();
+  } = useProducts(branchFilter);
+  const { sales, loading: salesLoading } = useGetSales(resolvedBranchId);
+  const { budgets, loading: loadingBudgets } = useGetBudgets(resolvedBranchId);
+  const { orders, loading: loadingOrders } = useOrders(resolvedBranchId);
   const { createSale } = useCreateSale();
   const {
     summary: stockSummary,
@@ -215,8 +250,15 @@ export const Dashboard = () => {
             {stockSummary.branches.map((branch) => (
               <Card
                 key={branch.branchId}
+                onClick={
+                  userRole === "ADMIN" || userRole === "MANAGEMENT"
+                    ? () => setSearchParams({ branch: branch.branchId })
+                    : undefined
+                }
                 className={cn(
-                  "min-w-[180px] flex-1 basis-40 p-5",
+                  "min-w-[180px] flex-1 basis-40 p-5 transition-all",
+                  (userRole === "ADMIN" || userRole === "MANAGEMENT") &&
+                    "cursor-pointer hover:-translate-y-0.5 hover:shadow-md",
                   branch.isHeadquarters &&
                     "border-primary/50 ring-1 ring-primary/20",
                 )}

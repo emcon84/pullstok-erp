@@ -3,10 +3,10 @@ import { createOrder, getOrders, updateOrder, deleteOrder, getPendingOrdersCount
 import { CreateOrder, Order, UpdateOrder } from '../../models/orderModel';
 
 // Hook para obtener las órdenes
-export const useOrders = () => {
+export const useOrders = (branchId?: string) => {
   const { data: orders, error, isLoading } = useQuery<Order[], Error>({
-    queryKey: ['orders'],
-    queryFn: getOrders,
+    queryKey: ["orders", branchId].filter(Boolean),
+    queryFn: () => getOrders(branchId),
   });
 
   return {

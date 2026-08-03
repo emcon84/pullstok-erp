@@ -5,10 +5,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 
 
-export const useGetBudgets = () => {
+export const useGetBudgets = (branchId?: string) => {
   const { data: budgets, error, isLoading } = useQuery<Budget[], Error>({
-    queryKey: ['budgets'],
-    queryFn: getBudgets,
+    queryKey: ["budgets", branchId].filter(Boolean),
+    queryFn: () => getBudgets(branchId),
   });
 
   return {

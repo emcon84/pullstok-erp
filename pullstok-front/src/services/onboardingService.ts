@@ -37,6 +37,7 @@ export interface Me {
   organizationId: string;
   mustChangePassword: boolean;
   organization: Organization;
+  branchIds: string[];
 }
 
 export interface Category {

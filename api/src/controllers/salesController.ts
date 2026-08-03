@@ -24,7 +24,8 @@ const createSale = async (req: Request, res: Response) => {
 // Get all sales
 const getAllSales = async (req: Request, res: Response) => {
     try {
-        const sales = await SaleService.getAllSales();
+        const branchId = req.query.branchId as string | undefined;
+        const sales = await SaleService.getAllSales(branchId);
         res.status(200).json(sales);
     } catch (error: any) {
         res.status(500).json({ message: error.message });

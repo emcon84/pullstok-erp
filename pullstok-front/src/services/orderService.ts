@@ -3,9 +3,13 @@ import { CreateOrder, Order, UpdateOrder } from '../models/orderModel';
 import { API_URL } from '../constants';
 
 // Función para obtener las órdenes
-export const getOrders = async (): Promise<Order[]> => {
+export const getOrders = async (branchId?: string): Promise<Order[]> => {
   const token = localStorage.getItem('token');
-  const response = await axios.get<Order[]>(`${API_URL}/orders`, {
+  const url = new URL(`${API_URL}/orders`);
+  if (branchId) {
+    url.searchParams.set("branchId", branchId);
+  }
+  const response = await axios.get<Order[]>(url.toString(), {
     headers: {
       Authorization: `Bearer ${token}`,
     },

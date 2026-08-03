@@ -111,6 +111,9 @@ model Branch {
   assignments    BranchAssignment[]
   stocks         ProductStock[]
   storeSettings  StoreSettings[]
+  sales          Sale[]
+  orders         Order[]
+  quotations     Quotation[]
 
   @@unique([organizationId, name])
   @@map("branches")
@@ -272,6 +275,9 @@ model Order {
   // Puente Order→Sale: una Order de la tienda se cierra creando una Sale desde
   // el ERP. Opcional (Orders de compra/internas pueden no tener Sale asociada).
   sale           Sale?
+  // Branch scoping: nullable para backward-compat (existing rows = null = org-wide).
+  branchId       String?
+  branch         Branch?       @relation(fields: [branchId], references: [id])
 
   @@index([organizationId])
   @@map("orders")
@@ -301,6 +307,9 @@ model Quotation {
   orders         Order[]
   organizationId String
   organization   Organization    @relation(fields: [organizationId], references: [id])
+  // Branch scoping: nullable para backward-compat (existing rows = null = org-wide).
+  branchId       String?
+  branch         Branch?         @relation(fields: [branchId], references: [id])
 
   @@index([organizationId])
   @@map("quotations")
@@ -330,6 +339,9 @@ model Sale {
   // online, apunta a esa Order (1:1, @unique). null en ventas manuales del ERP.
   orderId        String?      @unique
   order          Order?       @relation(fields: [orderId], references: [id])
+  // Branch scoping: nullable para backward-compat (existing rows = null = org-wide).
+  branchId       String?
+  branch         Branch?      @relation(fields: [branchId], references: [id])
 
   @@index([organizationId])
   @@map("sales")

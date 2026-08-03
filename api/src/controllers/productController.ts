@@ -248,7 +248,7 @@ export const downloadTemplateCsv = async (req: Request, res: Response) => {
 // Get all products with optional filters (scopeado por org vía extension)
 const getProducts = async (req: Request, res: Response) => {
   try {
-    const { name, category, minPrice, maxPrice, description } = req.query;
+    const { name, category, minPrice, maxPrice, description, branchId } = req.query;
 
     const where: any = {};
 
@@ -283,6 +283,11 @@ const getProducts = async (req: Request, res: Response) => {
       where.description = {
         contains: description as string,
         mode: "insensitive",
+      };
+    }
+    if (branchId) {
+      where.stocks = {
+        some: { branchId: branchId as string, quantity: { gt: 0 } },
       };
     }
 
