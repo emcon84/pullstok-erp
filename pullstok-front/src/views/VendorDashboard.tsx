@@ -97,14 +97,14 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      setDebouncedFilter(filter);
+      setDebouncedFilter(filter.trim());
     }, 250);
     return () => clearTimeout(debounceRef.current);
   }, [filter]);
 
   const { products, loading } = useProducts(
     branchId,
-    debouncedFilter || undefined,
+    debouncedFilter?.trim() || undefined,
     categoryFilter.trim() || undefined,
   );
   const { createSale } = useCreateSale();
@@ -331,7 +331,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                         setFilter(
                           isActive
                             ? filter.replace(new RegExp(`\\s?${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i"), "").trim()
-                            : `${filter} ${v}`,
+                            : `${filter} ${v}`.trim(),
                         )
                       }
                     >
