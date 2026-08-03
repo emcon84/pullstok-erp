@@ -272,7 +272,7 @@ const getProducts = async (req: Request, res: Response) => {
       }
     }
     if (category) {
-      where.category = { name: category as string };
+      where.category = { name: { equals: category as string, mode: "insensitive" } };
     }
     if (minPrice || maxPrice) {
       where.price = {};

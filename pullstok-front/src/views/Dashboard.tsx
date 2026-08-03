@@ -188,7 +188,7 @@ export const Dashboard = () => {
     if (categoryFilter) {
       list = list.filter((p) => {
         const cat = (p as any).category?.name || p.category || "";
-        return String(cat).toLowerCase() === categoryFilter.toLowerCase();
+        return String(cat).toLowerCase().includes(categoryFilter.toLowerCase());
       });
     }
     // Text filter

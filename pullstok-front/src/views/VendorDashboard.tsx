@@ -197,7 +197,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     if (!categoryFilter || !products) return [];
     const filtered = products.filter((p) => {
       const catName = (p as any).category?.name || p.category || "";
-      return String(catName).toLowerCase() === categoryFilter.toLowerCase();
+      return String(catName).toLowerCase().includes(categoryFilter.toLowerCase());
     });
     // Group option values by variant name
     const groups: Record<string, Set<string>> = {};
