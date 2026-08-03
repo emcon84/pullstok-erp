@@ -221,7 +221,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       {/* ── Quick-filter chips (mobile) ── */}
       {quickCategories.length > 0 && (
-        <div className="md:hidden flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           {quickCategories.map((cat) => (
             <Badge
               key={cat}
@@ -237,7 +237,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       {/* ── Variant chips: appear after selecting a category ── */}
       {quickVariants.length > 0 && (
-        <div className="md:hidden flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           {quickVariants.map((v) => {
             const isActive = filter.toLowerCase().includes(v.toLowerCase());
             return (
