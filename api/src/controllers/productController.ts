@@ -285,12 +285,6 @@ const getProducts = async (req: Request, res: Response) => {
         mode: "insensitive",
       };
     }
-    if (branchId) {
-      where.stocks = {
-        some: { branchId: branchId as string, quantity: { gt: 0 } },
-      };
-    }
-
     const products = await prisma.product.findMany({
       where,
       include: {
@@ -302,6 +296,14 @@ const getProducts = async (req: Request, res: Response) => {
             },
           },
         },
+        ...(branchId
+          ? {
+              stocks: {
+                where: { branchId: branchId as string },
+                select: { quantity: true },
+              },
+            }
+          : {}),
       },
     });
     res.status(200).json(products);

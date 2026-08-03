@@ -52,9 +52,12 @@ export const ProductsTable = ({ products, onEdit, onDuplicate }: ProductsTablePr
   const { deleteProduct, loading } = useDeleteProduct();
   const confirm = useConfirm();
 
+  const branchQty = (p: DataItem) =>
+    Number(p.stocks?.[0]?.quantity ?? p.quantity);
+
   const sorted = [...products].sort((a, b) => {
-    const aVal = sortBy === "quantity" ? Number(a.quantity) : sortBy === "price" ? Number(a.price) : (a[sortBy] || "").toString().toLowerCase();
-    const bVal = sortBy === "quantity" ? Number(b.quantity) : sortBy === "price" ? Number(b.price) : (b[sortBy] || "").toString().toLowerCase();
+    const aVal = sortBy === "quantity" ? branchQty(a) : sortBy === "price" ? Number(a.price) : (a[sortBy] || "").toString().toLowerCase();
+    const bVal = sortBy === "quantity" ? branchQty(b) : sortBy === "price" ? Number(b.price) : (b[sortBy] || "").toString().toLowerCase();
     if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
     if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
     return 0;
@@ -118,7 +121,7 @@ export const ProductsTable = ({ products, onEdit, onDuplicate }: ProductsTablePr
           )}
           {slice.map((p) => {
             const id = p._id || p.id;
-            const qty = Number(p.quantity);
+            const qty = branchQty(p);
             const src = imgSrc(p.image);
 
             return (
