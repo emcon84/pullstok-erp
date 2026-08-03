@@ -41,6 +41,7 @@ export const Dashboard = () => {
   const [isModalSalesOpen, setIsModalSalesOpen] = useState(false);
   const [isModalUploadOpen, setIsModalUploadOpen] = useState(false);
   const [filter, setFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [selectedStat, setSelectedStat] = useState<StatType>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -165,8 +166,34 @@ export const Dashboard = () => {
     );
   }
 
+  // ── Quick-filter categories (from product list) ──
+  const quickCategories = useMemo(() => {
+    if (!products) return [];
+    const seen = new Set<string>();
+    const cats: string[] = [];
+    for (const p of products) {
+      const name = (p as any).category?.name || p.category;
+      if (name && typeof name === "string" && !seen.has(name)) {
+        seen.add(name);
+        cats.push(name);
+      }
+    }
+    return cats.sort();
+  }, [products]);
+
   const filterWords = filter.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-  const filteredProducts = products.filter((product) => {
+  const filteredProducts = useMemo(() => {
+    let list = products;
+    // Category filter (client-side)
+    if (categoryFilter) {
+      list = list.filter((p) => {
+        const cat = (p as any).category?.name || p.category || "";
+        return String(cat).toLowerCase() === categoryFilter.toLowerCase();
+      });
+    }
+    // Text filter
+    if (filterWords.length === 0) return list;
+    return list.filter((product) => {
     if (filterWords.length === 0) return true;
     const variantValues = (product as any).variantAssignments
       ?.map((pv: any) => pv.option?.value ?? "")
@@ -328,6 +355,22 @@ export const Dashboard = () => {
           onChange={(e) => setFilter(e.target.value)}
         />
       </div>
+
+      {/* ── Quick-filter chips ── */}
+      {quickCategories.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {quickCategories.map((cat) => (
+            <Badge
+              key={cat}
+              variant={categoryFilter === cat ? "default" : "outline"}
+              className="shrink-0 cursor-pointer px-3 py-1.5 text-xs font-medium whitespace-nowrap"
+              onClick={() => setCategoryFilter(categoryFilter === cat ? "" : cat)}
+            >
+              {cat}
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {/* Tabla de productos / stock */}
       <ProductsTable products={filteredProducts} onEdit={openEditDrawer} onDuplicate={openDuplicateDrawer} branchMode={!!branchFilter} />
