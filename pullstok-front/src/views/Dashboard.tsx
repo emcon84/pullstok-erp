@@ -74,13 +74,6 @@ export const Dashboard = () => {
   // Admin drill-down: when ?branch=X is set, use it for the product hook only.
   const branchFilter = searchParams.get("branch") || undefined;
 
-  // Resolve branch name for the active drill-down filter.
-  const selectedBranchName = useMemo(() => {
-    if (!branchFilter || !stockSummary?.branches) return null;
-    const b = stockSummary.branches.find((br) => br.branchId === branchFilter);
-    return b?.branchName ?? null;
-  }, [branchFilter, stockSummary?.branches]);
-
   const {
     products,
     loading: productsLoading,
@@ -95,6 +88,13 @@ export const Dashboard = () => {
     loading: stockSummaryLoading,
     error: stockSummaryError,
   } = useStockSummary();
+
+  // Resolve branch name for the active drill-down filter.
+  const selectedBranchName = useMemo(() => {
+    if (!branchFilter || !stockSummary?.branches) return null;
+    const b = stockSummary.branches.find((br) => br.branchId === branchFilter);
+    return b?.branchName ?? null;
+  }, [branchFilter, stockSummary?.branches]);
 
   useEffect(() => {
     if (stockSummaryError) {
