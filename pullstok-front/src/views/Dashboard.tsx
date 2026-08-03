@@ -194,13 +194,13 @@ export const Dashboard = () => {
     // Text filter
     if (filterWords.length === 0) return list;
     return list.filter((product) => {
-    if (filterWords.length === 0) return true;
-    const variantValues = (product as any).variantAssignments
-      ?.map((pv: any) => pv.option?.value ?? "")
-      .join(" ");
-    const haystack = `${product.name} ${product.code || ""} ${variantValues || ""}`.toLowerCase();
-    return filterWords.every(w => haystack.includes(w));
-  });
+      const variantValues = (product as any).variantAssignments
+        ?.map((pv: any) => pv.option?.value ?? "")
+        .join(" ");
+      const haystack = `${product.name} ${product.code || ""} ${variantValues || ""}`.toLowerCase();
+      return filterWords.every(w => haystack.includes(w));
+    });
+  }, [products, filterWords, categoryFilter]);
 
   if (selectedStat) {
     return (
