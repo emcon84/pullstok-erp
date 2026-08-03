@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Search,
   Plus,
@@ -158,6 +158,21 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
   // ── Render ──
 
+  // Extract unique categories for quick-filter chips (mobile-friendly)
+  const quickCategories = useMemo(() => {
+    if (!products) return [];
+    const seen = new Set<string>();
+    const cats: string[] = [];
+    for (const p of products) {
+      const name = (p as any).category?.name || p.category;
+      if (name && typeof name === "string" && !seen.has(name)) {
+        seen.add(name);
+        cats.push(name);
+      }
+    }
+    return cats.sort();
+  }, [products]);
+
   return (
     <div className="space-y-4">
       {/* ── Header ── */}
@@ -179,6 +194,22 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           autoFocus
         />
       </div>
+
+      {/* ── Quick-filter chips (mobile) ── */}
+      {quickCategories.length > 0 && (
+        <div className="md:hidden flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+          {quickCategories.map((cat) => (
+            <Badge
+              key={cat}
+              variant={filter === cat ? "default" : "outline"}
+              className="shrink-0 cursor-pointer px-3 py-1.5 text-xs font-medium whitespace-nowrap"
+              onClick={() => setFilter(filter === cat ? "" : cat)}
+            >
+              {cat}
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {/* ── Product grid ── */}
       {(!products || products.length === 0) ? (
@@ -358,7 +389,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       {/* ── Cart FAB ── */}
       {itemCount > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-1">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1">
           {/* Radar rings */}
           <span className="absolute inset-0 -m-3 animate-ping rounded-full bg-primary/20" />
           <span className="absolute inset-0 -m-6 animate-ping rounded-full bg-primary/10 [animation-delay:300ms]" />
