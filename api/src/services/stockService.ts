@@ -113,6 +113,7 @@ export const getStockSummary = async (orgId: string): Promise<StockSummary> => {
     prisma.branch.findMany({
       where: { organizationId: orgId, isActive: true },
       select: { id: true, name: true, isHeadquarters: true },
+      orderBy: { name: "asc" },
     }),
   ]);
 
