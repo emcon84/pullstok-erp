@@ -150,22 +150,6 @@ export const Dashboard = () => {
     }
   };
 
-  if (productsLoading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader />
-      </div>
-    );
-  }
-
-  if (productsError) {
-    return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-        Error al cargar productos: {productsError.message}
-      </div>
-    );
-  }
-
   // ── Quick-filter categories (from product list) ──
   const quickCategories = useMemo(() => {
     if (!products) return [];
@@ -184,14 +168,12 @@ export const Dashboard = () => {
   const filterWords = filter.toLowerCase().split(/\s+/).filter(w => w.length > 0);
   const filteredProducts = useMemo(() => {
     let list = products;
-    // Category filter (client-side)
     if (categoryFilter) {
       list = list.filter((p) => {
         const cat = (p as any).category?.name || p.category || "";
         return String(cat).toLowerCase().includes(categoryFilter.toLowerCase());
       });
     }
-    // Text filter
     if (filterWords.length === 0) return list;
     return list.filter((product) => {
       const variantValues = (product as any).variantAssignments
@@ -201,6 +183,22 @@ export const Dashboard = () => {
       return filterWords.every(w => haystack.includes(w));
     });
   }, [products, filterWords, categoryFilter]);
+
+  if (productsLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
+
+  if (productsError) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        Error al cargar productos: {productsError.message}
+      </div>
+    );
+  }
 
   if (selectedStat) {
     return (
