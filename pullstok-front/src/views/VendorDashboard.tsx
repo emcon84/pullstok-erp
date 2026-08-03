@@ -7,6 +7,7 @@ import {
   X,
   Package,
   ImageIcon,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,7 @@ import { DataItem } from "../types";
 import { Loader } from "../components/atoms/loader";
 import { toast } from "react-toastify";
 import { CartItem } from "../models/salesModel";
+import { ProductDrawer } from "../components/molecules/ProductDrawer";
 
 // ── Types ──
 
@@ -90,6 +92,15 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
   const [qty, setQty] = useState(1);
   const [cartOpen, setCartOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+
+  // ProductDrawer for viewing stock across all branches
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerProduct, setDrawerProduct] = useState<DataItem | null>(null);
+
+  const openDrawer = (product: DataItem) => {
+    setDrawerProduct(product);
+    setDrawerOpen(true);
+  };
 
   // ── Quantity modal ──
 
@@ -221,17 +232,31 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "font-medium",
-                            stock <= 0
-                              ? "border-destructive/30 bg-destructive/10 text-destructive"
-                              : "border-emerald-300 bg-emerald-50 text-emerald-700",
-                          )}
-                        >
-                          {stock <= 0 ? "Sin stock" : `${stock} u.`}
-                        </Badge>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "font-medium",
+                              stock <= 0
+                                ? "border-destructive/30 bg-destructive/10 text-destructive"
+                                : "border-emerald-300 bg-emerald-50 text-emerald-700",
+                            )}
+                          >
+                            {stock <= 0 ? "Sin stock" : `${stock} u.`}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            title="Ver stock en otras sucursales"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDrawer(p);
+                            }}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
                         ${Number(p.price).toLocaleString("es-AR")}
@@ -264,7 +289,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
           {/* Mobile cards */}
           <div className="md:hidden grid grid-cols-2 gap-3">
-            {filteredProducts.map((p) => {
+            {products.map((p) => {
               const id = p._id || p.id;
               const stock = branchQty(p);
               const inCart = cartItems.find((ci) => ci.productId === id);
@@ -310,6 +335,16 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                       {stock <= 0 ? "Sin stock" : stock}
                     </Badge>
                   </div>
+                  <button
+                    className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1 text-[10px] text-muted-foreground hover:bg-muted/50 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDrawer(p);
+                    }}
+                  >
+                    <Eye className="h-3 w-3" />
+                    Ver stock
+                  </button>
                   {inCart && (
                     <Badge variant="secondary" className="mt-1.5 text-[10px] w-full justify-center">
                       {inCart.quantity} en pedido
@@ -469,6 +504,16 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* ── Product Drawer (stock across all branches) ── */}
+      <ProductDrawer
+        open={drawerOpen}
+        onClose={() => {
+          setDrawerOpen(false);
+          setDrawerProduct(null);
+        }}
+        product={drawerProduct}
+      />
     </div>
   );
 };
