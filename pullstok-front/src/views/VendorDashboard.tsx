@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Search,
   Plus,
@@ -60,7 +60,20 @@ const branchQty = (p: DataItem) =>
 // ── Component ──
 
 export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
-  const { products, loading } = useProducts(branchId);
+  const [filter, setFilter] = useState("");
+  const [debouncedFilter, setDebouncedFilter] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Debounce search: wait 250ms after last keystroke before querying backend
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedFilter(filter);
+    }, 250);
+    return () => clearTimeout(debounceRef.current);
+  }, [filter]);
+
+  const { products, loading } = useProducts(branchId, debouncedFilter || undefined);
   const { createSale } = useCreateSale();
   const {
     items: cartItems,
@@ -77,22 +90,6 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
   const [qty, setQty] = useState(1);
   const [cartOpen, setCartOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
-
-  // ── Filtered products ──
-
-  const filterWords = filter.toLowerCase().split(/\s+/).filter((w) => w.length > 0);
-  const filteredProducts = useMemo(() => {
-    if (!products) return [];
-    if (filterWords.length === 0) return products;
-    return products.filter((p) => {
-      const variantValues = (p as any).variantAssignments
-        ?.map((pv: any) => pv.option?.value ?? "")
-        .join(" ");
-      const haystack =
-        `${p.name} ${p.code || ""} ${(p as any).category?.name || ""} ${variantValues}`.toLowerCase();
-      return filterWords.every((w) => haystack.includes(w));
-    });
-  }, [products, filterWords]);
 
   // ── Quantity modal ──
 
@@ -174,7 +171,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
       </div>
 
       {/* ── Product grid ── */}
-      {filteredProducts.length === 0 ? (
+      {(!products || products.length === 0) ? (
         <p className="py-12 text-center text-muted-foreground">
           {filter ? "Sin resultados." : "No hay productos."}
         </p>
@@ -192,7 +189,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((p) => {
+                {products.map((p) => {
                   const id = p._id || p.id;
                   const stock = branchQty(p);
                   const inCart = cartItems.find((ci) => ci.productId === id);

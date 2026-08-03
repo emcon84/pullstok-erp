@@ -32,10 +32,11 @@ export const usePorducts = () => {
 
 
 // Hook para obtener la lista de productos
-export const useProducts = (branchId?: string) => {
+export const useProducts = (branchId?: string, search?: string) => {
   const { data, error, isLoading } = useQuery<DataItem[], Error>({
-    queryKey: ["products", branchId].filter(Boolean),
-    queryFn: () => fetchProducts(branchId),
+    queryKey: ["products", branchId, search].filter(Boolean),
+    queryFn: () => fetchProducts(branchId, search),
+    placeholderData: (prev) => prev, // keep previous while fetching
   });
 
   return {

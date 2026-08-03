@@ -117,12 +117,16 @@ export const getStockSummary = async (): Promise<StockSummary> => {
   }
 };
 
-export const products = async (branchId?: string) => {
+export const products = async (branchId?: string, search?: string) => {
   try {
     const token = localStorage.getItem("token");
 
+    const params: Record<string, string> = {};
+    if (branchId) params.branchId = branchId;
+    if (search) params.name = search;
+
     const response = await axios.get(`${API_URL}/products`, {
-      params: branchId ? { branchId } : undefined,
+      params,
       headers: {
         Authorization: `Bearer ${token}`,
       },
