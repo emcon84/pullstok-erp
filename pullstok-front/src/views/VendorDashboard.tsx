@@ -63,6 +63,7 @@ const branchQty = (p: DataItem) =>
 
 export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
   const [filter, setFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [debouncedFilter, setDebouncedFilter] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -75,7 +76,11 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     return () => clearTimeout(debounceRef.current);
   }, [filter]);
 
-  const { products, loading } = useProducts(branchId, debouncedFilter || undefined);
+  const { products, loading } = useProducts(
+    branchId,
+    debouncedFilter || undefined,
+    categoryFilter || undefined,
+  );
   const { createSale } = useCreateSale();
   const {
     items: cartItems,
@@ -163,10 +168,10 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
   // ── Variant chips: shown when a category filter is active ──
   const quickVariants = useMemo(() => {
-    if (!filter || !products) return [];
+    if (!categoryFilter || !products) return [];
     const filtered = products.filter((p) => {
       const catName = (p as any).category?.name || p.category || "";
-      return String(catName).toLowerCase() === filter.toLowerCase();
+      return String(catName).toLowerCase() === categoryFilter.toLowerCase();
     });
     const seen = new Set<string>();
     const vars: string[] = [];
@@ -183,7 +188,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
       }
     }
     return vars.sort();
-  }, [filter, products]);
+  }, [categoryFilter, products]);
 
   // ── Loading ──
 
@@ -225,9 +230,9 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           {quickCategories.map((cat) => (
             <Badge
               key={cat}
-              variant={filter === cat ? "default" : "outline"}
+              variant={categoryFilter === cat ? "default" : "outline"}
               className="shrink-0 cursor-pointer px-3 py-1.5 text-xs font-medium whitespace-nowrap"
-              onClick={() => setFilter(filter === cat ? "" : cat)}
+              onClick={() => setCategoryFilter(categoryFilter === cat ? "" : cat)}
             >
               {cat}
             </Badge>
@@ -259,7 +264,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
       {/* ── Product grid ── */}
       {(!products || products.length === 0) ? (
         <p className="py-12 text-center text-muted-foreground">
-          {filter ? "Sin resultados." : "No hay productos."}
+          {filter || categoryFilter ? "Sin resultados." : "No hay productos."}
         </p>
       ) : (
         <>

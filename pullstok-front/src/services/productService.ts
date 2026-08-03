@@ -117,13 +117,14 @@ export const getStockSummary = async (): Promise<StockSummary> => {
   }
 };
 
-export const products = async (branchId?: string, search?: string) => {
+export const products = async (branchId?: string, search?: string, category?: string) => {
   try {
     const token = localStorage.getItem("token");
 
     const params: Record<string, string> = {};
     if (branchId) params.branchId = branchId;
     if (search) params.name = search;
+    if (category) params.category = category;
 
     const response = await axios.get(`${API_URL}/products`, {
       params,
