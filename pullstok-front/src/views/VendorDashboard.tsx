@@ -327,16 +327,22 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       {/* ── Cart FAB ── */}
       {itemCount > 0 && (
-        <button
-          onClick={() => setCartOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 text-primary-foreground shadow-lg hover:bg-primary/90 transition-all active:scale-95 md:top-20 md:bottom-auto"
-        >
-          <ShoppingCart className="h-5 w-5" />
-          <span className="font-semibold text-sm">{itemCount}</span>
-          <span className="hidden sm:inline text-sm">
-            — ${totalAmount.toLocaleString("es-AR")}
-          </span>
-        </button>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1">
+          {/* Radar rings */}
+          <span className="absolute inset-0 -m-3 animate-ping rounded-full bg-primary/20" />
+          <span className="absolute inset-0 -m-6 animate-ping rounded-full bg-primary/10 [animation-delay:300ms]" />
+          {/* Button */}
+          <button
+            onClick={() => setCartOpen(true)}
+            className="relative flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 text-primary-foreground shadow-lg hover:bg-primary/90 transition-all active:scale-95"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            <span className="font-semibold text-sm">{itemCount}</span>
+            <span className="hidden sm:inline text-sm">
+              — ${totalAmount.toLocaleString("es-AR")}
+            </span>
+          </button>
+        </div>
       )}
 
       {/* ── Quantity modal ── */}
@@ -405,18 +411,10 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       {/* ── Cart slide-over ── */}
       <Sheet open={cartOpen} onOpenChange={setCartOpen}>
-        <SheetContent className="w-full sm:max-w-md flex flex-col">
-          <SheetHeader>
+        <SheetContent className="w-full sm:max-w-md flex flex-col px-6">
+          <SheetHeader className="px-0">
             <SheetTitle className="flex items-center justify-between">
               <span>Tu pedido</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={clearCart}
-              >
-                <X className="h-4 w-4" />
-              </Button>
             </SheetTitle>
           </SheetHeader>
 
@@ -427,7 +425,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           ) : (
             <>
               {/* Cart items */}
-              <div className="flex-1 overflow-auto -mx-6 px-6 space-y-3 mt-4">
+              <div className="flex-1 overflow-auto -mx-6 px-6 space-y-3 mt-4 mb-2">
                 {cartItems.map((item) => (
                   <CartItemRow
                     key={item.productId}
@@ -438,22 +436,37 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                 ))}
               </div>
 
-              {/* Footer: total + confirm */}
-              <div className="border-t pt-4 space-y-3 mt-4">
+              {/* Footer: total + actions */}
+              <div className="border-t pt-4 space-y-3 mt-2 pb-2">
                 <div className="flex items-center justify-between text-lg font-bold">
                   <span>Total</span>
                   <span className="tabular-nums">
                     ${totalAmount.toLocaleString("es-AR")}
                   </span>
                 </div>
-                <Button
-                  className="w-full"
-                  size="lg"
-                  onClick={handleConfirmSale}
-                  disabled={confirming}
-                >
-                  {confirming ? "Procesando..." : "Confirmar pedido"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    size="lg"
+                    onClick={() => {
+                      clearCart();
+                      setCartOpen(false);
+                      toast.info("Pedido cancelado");
+                    }}
+                    disabled={confirming}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    size="lg"
+                    onClick={handleConfirmSale}
+                    disabled={confirming}
+                  >
+                    {confirming ? "Procesando..." : "Confirmar pedido"}
+                  </Button>
+                </div>
               </div>
             </>
           )}
