@@ -166,28 +166,35 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     return cats.sort();
   }, [products]);
 
-  // ── Variant chips: shown when a category filter is active ──
+  // ── Variant group chips: grouped by variant name (Tamaño, Sabor, etc.) ──
   const quickVariants = useMemo(() => {
     if (!categoryFilter || !products) return [];
     const filtered = products.filter((p) => {
       const catName = (p as any).category?.name || p.category || "";
       return String(catName).toLowerCase() === categoryFilter.toLowerCase();
     });
-    const seen = new Set<string>();
-    const vars: string[] = [];
+    // Group option values by variant name
+    const groups: Record<string, Set<string>> = {};
     for (const p of filtered) {
       const assignments = (p as any).variantAssignments as any[] | undefined;
       if (assignments) {
         for (const a of assignments) {
-          const val = a.option?.variant?.name || a.option?.value;
-          if (val && typeof val === "string" && !seen.has(val)) {
-            seen.add(val);
-            vars.push(val);
+          const variantName = a.option?.variant?.name;
+          const optionValue = a.option?.value;
+          if (variantName && optionValue) {
+            if (!groups[variantName]) groups[variantName] = new Set();
+            groups[variantName].add(optionValue);
           }
         }
       }
     }
-    return vars.sort();
+    // Convert to sorted arrays
+    return Object.entries(groups)
+      .map(([name, values]) => ({
+        name,
+        values: [...values].sort(),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [categoryFilter, products]);
 
   // ── Loading ──
@@ -240,24 +247,37 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         </div>
       )}
 
-      {/* ── Variant chips: appear after selecting a category ── */}
+      {/* ── Variant chips: grouped by type after selecting a category ── */}
       {quickVariants.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {quickVariants.map((v) => {
-            const isActive = filter.toLowerCase().includes(v.toLowerCase());
-            return (
-              <Badge
-                key={v}
-                variant={isActive ? "secondary" : "outline"}
-                className="shrink-0 cursor-pointer px-3 py-1.5 text-xs font-medium whitespace-nowrap"
-                onClick={() =>
-                  setFilter(isActive ? filter.replace(new RegExp(`\\s?${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, "i"), "").trim() : `${filter} ${v}`)
-                }
-              >
-                {v}
-              </Badge>
-            );
-          })}
+        <div className="flex flex-col gap-2">
+          {quickVariants.map((group) => (
+            <div key={group.name} className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground shrink-0 w-16">
+                {group.name}
+              </span>
+              <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+                {group.values.map((v) => {
+                  const isActive = filter.toLowerCase().includes(v.toLowerCase());
+                  return (
+                    <Badge
+                      key={v}
+                      variant={isActive ? "secondary" : "outline"}
+                      className="shrink-0 cursor-pointer px-2.5 py-1 text-xs font-medium whitespace-nowrap"
+                      onClick={() =>
+                        setFilter(
+                          isActive
+                            ? filter.replace(new RegExp(`\\s?${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i"), "").trim()
+                            : `${filter} ${v}`,
+                        )
+                      }
+                    >
+                      {v}
+                    </Badge>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
