@@ -257,17 +257,28 @@ const getProducts = async (req: Request, res: Response) => {
       // Split into words and search each — "Cat chow carne" matches
       // "CAT CHOW ADULTOS CARNE X 15 KG" even with words in between.
       const words = searchTerm.split(/\s+/).filter(w => w.length > 0);
+      const variantMatch = (w: string) => ({
+        variantAssignments: {
+          some: {
+            option: {
+              value: { contains: w, mode: "insensitive" as const },
+            },
+          },
+        },
+      });
       if (words.length > 1) {
         where.AND = words.map(w => ({
           OR: [
             { name: { contains: w, mode: "insensitive" } },
             { code: { contains: w, mode: "insensitive" } },
+            variantMatch(w),
           ],
         }));
       } else {
         where.OR = [
           { name: { contains: searchTerm, mode: "insensitive" } },
           { code: { contains: searchTerm, mode: "insensitive" } },
+          variantMatch(searchTerm),
         ];
       }
     }
