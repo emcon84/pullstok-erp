@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Upload, ShoppingCart, Search } from "lucide-react";
+import { Plus, Upload, ShoppingCart, Search, X } from "lucide-react";
 import {
   FaShoppingCart,
   FaFileInvoice,
@@ -26,6 +26,7 @@ import { useOrders } from "../components/hooks/useOrder";
 import { CartItem } from "../models/salesModel";
 import { toast } from "react-toastify";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
@@ -72,6 +73,13 @@ export const Dashboard = () => {
 
   // Admin drill-down: when ?branch=X is set, use it for the product hook only.
   const branchFilter = searchParams.get("branch") || undefined;
+
+  // Resolve branch name for the active drill-down filter.
+  const selectedBranchName = useMemo(() => {
+    if (!branchFilter || !stockSummary?.branches) return null;
+    const b = stockSummary.branches.find((br) => br.branchId === branchFilter);
+    return b?.branchName ?? null;
+  }, [branchFilter, stockSummary?.branches]);
 
   const {
     products,
@@ -261,6 +269,8 @@ export const Dashboard = () => {
                     "cursor-pointer hover:-translate-y-0.5 hover:shadow-md",
                   branch.isHeadquarters &&
                     "border-primary/50 ring-1 ring-primary/20",
+                  branchFilter === branch.branchId &&
+                    "ring-2 ring-primary border-primary/60 bg-primary/5",
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -288,6 +298,25 @@ export const Dashboard = () => {
         )}
       </div>
 
+      {/* Indicador de sucursal seleccionada */}
+      {selectedBranchName && (
+        <div className="flex items-center gap-2">
+          <Badge
+            variant="secondary"
+            className="gap-1.5 px-3 py-1.5 text-sm font-medium"
+          >
+            Viendo: {selectedBranchName}
+            <button
+              onClick={() => setSearchParams({})}
+              className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20"
+              aria-label="Quitar filtro de sucursal"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </Badge>
+        </div>
+      )}
+
       {/* Búsqueda */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -300,7 +329,7 @@ export const Dashboard = () => {
       </div>
 
       {/* Tabla de productos / stock */}
-      <ProductsTable products={filteredProducts} onEdit={openEditDrawer} onDuplicate={openDuplicateDrawer} />
+      <ProductsTable products={filteredProducts} onEdit={openEditDrawer} onDuplicate={openDuplicateDrawer} branchMode={!!branchFilter} />
 
       {/* Product Drawer (create/edit) */}
       <ProductDrawer open={drawerOpen} onClose={closeDrawer} product={drawerProduct} />

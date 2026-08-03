@@ -43,9 +43,10 @@ interface ProductsTableProps {
   products: DataItem[];
   onEdit: (product: DataItem) => void;
   onDuplicate: (product: DataItem) => void;
+  branchMode?: boolean;
 }
 
-export const ProductsTable = ({ products, onEdit, onDuplicate }: ProductsTableProps) => {
+export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: ProductsTableProps) => {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<"name" | "code" | "quantity" | "price">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -53,7 +54,9 @@ export const ProductsTable = ({ products, onEdit, onDuplicate }: ProductsTablePr
   const confirm = useConfirm();
 
   const branchQty = (p: DataItem) =>
-    Number(p.stocks?.[0]?.quantity ?? p.quantity);
+    branchMode
+      ? Number(p.stocks?.[0]?.quantity ?? 0)
+      : Number(p.stocks?.[0]?.quantity ?? p.quantity);
 
   const sorted = [...products].sort((a, b) => {
     const aVal = sortBy === "quantity" ? branchQty(a) : sortBy === "price" ? Number(a.price) : (a[sortBy] || "").toString().toLowerCase();
