@@ -576,6 +576,7 @@ export const StockScannerPage = () => {
                   </button>
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => assignCode(p.id)}>
                     <p className="font-medium text-sm leading-snug">{p.name}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{p.code || "—"}</p>
                     {p.variantAssignments && p.variantAssignments.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {p.variantAssignments.map((va, i) => (
