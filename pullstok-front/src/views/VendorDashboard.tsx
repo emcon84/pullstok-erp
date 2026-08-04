@@ -315,7 +315,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
       </div>
 
       {/* ── Search + filters (sticky) ── */}
-      <div className="sticky top-16 lg:top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 space-y-4 border-b bg-background/95 px-4 pb-3 pt-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 lg:px-8">
+      <div className="sticky top-16 lg:top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 space-y-4 border-b bg-background px-4 pb-3 pt-3 sm:px-6 lg:px-8">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input
