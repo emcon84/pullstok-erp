@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Search,
   Plus,
@@ -105,17 +105,17 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerProduct, setDrawerProduct] = useState<DataItem | null>(null);
 
-  const openDrawer = (product: DataItem) => {
+  const openDrawer = useCallback((product: DataItem) => {
     setDrawerProduct(product);
     setDrawerOpen(true);
-  };
+  }, []);
 
   // ── Quantity modal ──
 
-  const openQtyModal = (product: DataItem) => {
+  const openQtyModal = useCallback((product: DataItem) => {
     setQty(1);
     setQtyModal({ product });
-  };
+  }, []);
 
   const confirmAddToCart = () => {
     if (!qtyModal) return;
@@ -184,6 +184,114 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     });
   };
 
+  // ── Product table ──
+  // Memoized: only re-renders when products or cart change, not on each keystroke.
+  const productTable = useMemo(
+    () => (
+      <>
+        {/* Product table (all breakpoints) */}
+        <Card className="overflow-hidden p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Producto</TableHead>
+                <TableHead className="text-center">Stock</TableHead>
+                <TableHead className="text-right">Precio</TableHead>
+                <TableHead className="w-[100px]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {products.map((p) => {
+                const id = p._id || p.id;
+                const stock = branchQty(p);
+                const inCart = cartItems.find((ci) => ci.productId === id);
+                return (
+                  <TableRow
+                    key={id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openQtyModal(p)}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                          {imgSrc(p.image) ? (
+                            <img
+                              src={imgSrc(p.image)!}
+                              alt={p.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium leading-tight">{p.name}</p>
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {p.code || "—"}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-medium",
+                            stock <= 0
+                              ? "border-destructive/30 bg-destructive/10 text-destructive"
+                              : "border-emerald-300 bg-emerald-50 text-emerald-700",
+                          )}
+                        >
+                          {stock <= 0 ? "Sin stock" : `${stock} u.`}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          title="Ver stock en otras sucursales"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDrawer(p);
+                          }}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      ${Number(p.price).toLocaleString("es-AR")}
+                    </TableCell>
+                    <TableCell>
+                      {inCart ? (
+                        <Badge variant="secondary" className="text-xs">
+                          {inCart.quantity} en pedido
+                        </Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={stock <= 0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openQtyModal(p);
+                          }}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Card>
+      </>
+    ),
+    [products, cartItems, openQtyModal, openDrawer],
+  );
+
   // ── Loading ──
 
   if (loading) {
@@ -246,107 +354,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           )}
         </div>
       ) : (
-        <>
-          {/* Product table (all breakpoints) */}
-          <Card className="overflow-hidden p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Producto</TableHead>
-                  <TableHead className="text-center">Stock</TableHead>
-                  <TableHead className="text-right">Precio</TableHead>
-                  <TableHead className="w-[100px]" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((p) => {
-                  const id = p._id || p.id;
-                  const stock = branchQty(p);
-                  const inCart = cartItems.find((ci) => ci.productId === id);
-                  return (
-                    <TableRow
-                      key={id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => openQtyModal(p)}
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
-                            {imgSrc(p.image) ? (
-                              <img
-                                src={imgSrc(p.image)!}
-                                alt={p.name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-medium leading-tight">{p.name}</p>
-                            <p className="text-xs text-muted-foreground font-mono">
-                              {p.code || "—"}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "font-medium",
-                              stock <= 0
-                                ? "border-destructive/30 bg-destructive/10 text-destructive"
-                                : "border-emerald-300 bg-emerald-50 text-emerald-700",
-                            )}
-                          >
-                            {stock <= 0 ? "Sin stock" : `${stock} u.`}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            title="Ver stock en otras sucursales"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDrawer(p);
-                            }}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        ${Number(p.price).toLocaleString("es-AR")}
-                      </TableCell>
-                      <TableCell>
-                        {inCart ? (
-                          <Badge variant="secondary" className="text-xs">
-                            {inCart.quantity} en pedido
-                          </Badge>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={stock <= 0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openQtyModal(p);
-                            }}
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </Card>
-
-        </>
+        productTable
       )}
 
       {/* ── Cart FAB ── */}
