@@ -5,7 +5,6 @@ import {
   Minus,
   ShoppingCart,
   X,
-  Package,
   ImageIcon,
   Eye,
 } from "lucide-react";
@@ -247,8 +246,8 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         </div>
       ) : (
         <>
-          {/* Desktop table */}
-          <Card className="hidden md:block overflow-hidden p-0">
+          {/* Product table (all breakpoints) */}
+          <Card className="overflow-hidden p-0">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -346,73 +345,6 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
             </Table>
           </Card>
 
-          {/* Mobile cards */}
-          <div className="md:hidden grid grid-cols-2 gap-3">
-            {products.map((p) => {
-              const id = p._id || p.id;
-              const stock = branchQty(p);
-              const inCart = cartItems.find((ci) => ci.productId === id);
-              return (
-                <Card
-                  key={id}
-                  className={cn(
-                    "p-3 cursor-pointer active:scale-[0.98] transition-transform",
-                    stock <= 0 && "opacity-50",
-                  )}
-                  onClick={() => stock > 0 && openQtyModal(p)}
-                >
-                  <div className="flex h-24 items-center justify-center overflow-hidden rounded-md bg-muted mb-2">
-                    {imgSrc(p.image) ? (
-                      <img
-                        src={imgSrc(p.image)!}
-                        alt={p.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <Package className="h-8 w-8 text-muted-foreground/40" />
-                    )}
-                  </div>
-                  <p className="text-sm font-medium leading-tight line-clamp-2">
-                    {p.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                    {p.code || "—"}
-                  </p>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-sm font-bold tabular-nums">
-                      ${Number(p.price).toLocaleString("es-AR")}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-[10px] px-1.5",
-                        stock <= 0
-                          ? "border-destructive/30 text-destructive"
-                          : "border-emerald-300 text-emerald-700",
-                      )}
-                    >
-                      {stock <= 0 ? "Sin stock" : stock}
-                    </Badge>
-                  </div>
-                  <button
-                    className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1 text-[10px] text-muted-foreground hover:bg-muted/50 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openDrawer(p);
-                    }}
-                  >
-                    <Eye className="h-3 w-3" />
-                    Ver stock
-                  </button>
-                  {inCart && (
-                    <Badge variant="secondary" className="mt-1.5 text-[10px] w-full justify-center">
-                      {inCart.quantity} en pedido
-                    </Badge>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
         </>
       )}
 
