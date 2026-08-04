@@ -1,6 +1,6 @@
 import { Router } from "express";
 import SaleController from "../controllers/salesController";
-import { authenticateJWT } from "../middlewares/authMiddleware";
+import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
 import { checkSaleInvoicingEnabled } from "../middlewares/checkSaleInvoicingEnabled";
 import { validate } from "../middlewares/validate";
 import { createSaleSchema, createSaleInvoiceSchema } from "../validation/schemas";
@@ -15,6 +15,16 @@ router.post(
 );
 router.get("/", authenticateJWT, SaleController.getAllSales);
 router.get("/:id", authenticateJWT, SaleController.getSaleById);
+
+// Elimina una venta: solo ADMIN/MANAGEMENT. Restaura el stock y revierte el
+// pedido asociado a PENDING. Una venta con factura (cualquier estado) queda
+// protegida → 409 SALE_ALREADY_INVOICED.
+router.delete(
+  "/:id",
+  authenticateJWT,
+  requireRole("ADMIN", "MANAGEMENT"),
+  SaleController.deleteSale,
+);
 
 // Bridge Sale→Invoice: crea una Invoice DRAFT a partir de una venta existente.
 // Requiere PRO o PREMIUM (gate distinto al de /invoices, que era PREMIUM-only).

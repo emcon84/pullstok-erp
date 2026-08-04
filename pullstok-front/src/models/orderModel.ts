@@ -49,11 +49,12 @@ export interface CreateOrderDirectProduct {
 }
 
 export interface CreateOrder {
-  customer: string;
+  customer?: string; // Opcional: el flujo vendor guarda pedidos sin cliente (backend resuelve "Consumidor final")
   type: string; // Tipo de orden, e.g., "sale"
   quotationId?: string; // desde presupuesto
   products?: CreateOrderDirectProduct[]; // pedido directo
   totalAmount?: number;
+  branchId?: string; // Sucursal del flujo vendor (VendorDashboard)
 }
 
 export interface UpdateOrder {

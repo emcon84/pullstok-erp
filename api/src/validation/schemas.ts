@@ -219,11 +219,17 @@ const orderProductSchema = z.object({
   price: z.coerce.number().nonnegative(),
 });
 export const createOrderSchema = z.object({
-  customer: z.string().min(1, "El cliente es requerido"),
+  // customer opcional: el flujo de venta de mostrador (VendorDashboard) guarda
+  // pedidos sin cliente cargado; el controller resuelve el genérico
+  // "Consumidor final" de la org. Los flujos ERP (Orders view / presupuesto)
+  // siempre mandan customer.
+  customer: z.string().min(1, "El cliente es requerido").optional(),
   products: z.array(orderProductSchema).optional(),
   totalAmount: z.coerce.number().optional(),
   type: z.enum(["sale", "purchase"]),
   quotationId: z.string().nullable().optional(),
+  // Sucursal del flujo vendor (VendorDashboard). null en pedidos ERP org-wide.
+  branchId: z.string().optional(),
 });
 export const updateOrderStatusSchema = z.object({
   status: z.preprocess(

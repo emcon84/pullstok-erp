@@ -263,8 +263,86 @@ const getSaleById = async (id: string) => {
   });
 };
 
+// Elimina una venta y restaura el stock a su origen (ProductStock por sucursal
+// o Product global), revirtiendo el pedido asociado a PENDING si existía.
+// Ruta protegida: solo ADMIN/MANAGEMENT. Una venta FACTURADA no se puede borrar
+// (la factura queda como comprobante fiscal, sin importar su estado).
+export const deleteSale = async (id: string) => {
+  const organizationId = requireOrganizationId();
+
+  const sale = await prisma.sale.findFirst({
+    where: { id },
+    include: { items: true, invoice: true },
+  });
+  if (!sale) {
+    const err: any = new Error("Venta no encontrada");
+    err.code = "SALE_NOT_FOUND";
+    throw err;
+  }
+  if (sale.invoice) {
+    const err: any = new Error("No se puede eliminar una venta facturada");
+    err.code = "SALE_ALREADY_INVOICED";
+    throw err;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Los items se borran en cascada (onDelete: Cascade en el schema).
+    await tx.sale.deleteMany({ where: { id } });
+
+    if (sale.branchId) {
+      // Venta scoped a sucursal → reponer ProductStock.
+      for (const item of sale.items) {
+        await tx.productStock.updateMany({
+          where: {
+            productId: item.productId,
+            branchId: sale.branchId,
+            organizationId: sale.organizationId,
+          },
+          data: { quantity: { increment: item.quantity } },
+        });
+      }
+    } else {
+      // Venta legacy / admin → reponer Product.quantity (stock global).
+      for (const item of sale.items) {
+        await tx.product.updateMany({
+          where: {
+            id: item.productId,
+            organizationId: sale.organizationId,
+          },
+          data: { quantity: { increment: item.quantity } },
+        });
+      }
+    }
+
+    // Si la venta cerró un pedido, revertirlo a PENDING para poder revenderlo.
+    if (sale.orderId) {
+      await tx.order.updateMany({
+        where: { id: sale.orderId },
+        data: { status: "PENDING" },
+      });
+    }
+  });
+
+  // El conteo de pendientes pudo subir (order revertida a PENDING) → señal de
+  // tiempo real para refetchear. Try/catch: un fallo del socket NO debe
+  // afectar la venta ya commiteada.
+  if (sale.orderId) {
+    try {
+      emitOrdersChanged(organizationId);
+    } catch (socketError: any) {
+      console.error(
+        `[salesService.deleteSale] emitOrdersChanged falló (order=${sale.orderId}):`,
+        socketError?.message ?? socketError,
+      );
+    }
+  }
+
+  return { message: "Venta eliminada correctamente" };
+};
+
 export default {
   createSale,
   getAllSales,
   getSaleById,
+  deleteSale,
 };

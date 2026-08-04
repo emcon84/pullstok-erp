@@ -47,6 +47,24 @@ const getSaleById = async (req: Request, res: Response) => {
     }
 };
 
+// Elimina una venta (solo ADMIN/MANAGEMENT — requireRole en la ruta). Restaura
+// el stock y revierte el pedido asociado a PENDING. Una venta con factura
+// (cualquier estado) queda protegida → 409.
+const deleteSale = async (req: Request, res: Response) => {
+    try {
+        const result = await SaleService.deleteSale(req.params.id);
+        res.status(200).json(result);
+    } catch (error: any) {
+        if (error?.code === "SALE_NOT_FOUND") {
+            return res.status(404).json({ message: error.message });
+        }
+        if (error?.code === "SALE_ALREADY_INVOICED") {
+            return res.status(409).json({ error: error.code });
+        }
+        res.status(400).json({ message: error.message });
+    }
+};
+
 // Crea una Invoice DRAFT a partir de una Sale existente (bridge Sale→Invoice).
 // Ruta: POST /api/sales/:saleId/invoice (salesRoutes, no invoiceRoutes para
 // no heredar el router.use de checkInvoicingEnabled).
@@ -133,4 +151,5 @@ export default {
     getAllSales,
     getSaleById,
     createInvoiceFromSale,
+    deleteSale,
 };

@@ -36,11 +36,13 @@ import {
 import { cn } from "@/lib/utils";
 import { useProducts } from "../components/hooks/useProducts";
 import { useCreateSale } from "../components/hooks/useSales";
+import { useCreateOrder } from "../components/hooks/useOrder";
 import { useVendorCart, type VendorCartItem } from "../components/hooks/useVendorCart";
 import { DataItem } from "../types";
 import { Loader } from "../components/atoms/loader";
 import { toast } from "react-toastify";
 import { CartItem } from "../models/salesModel";
+import { CreateOrder } from "../models/orderModel";
 import { ProductDrawer } from "../components/molecules/ProductDrawer";
 
 import { FilterChips } from "../components/molecules/FilterChips";
@@ -84,6 +86,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     categoryFilter.trim() || undefined,
   );
   const { createSale } = useCreateSale();
+  const { submitOrder, loading: savingOrder } = useCreateOrder();
   const {
     items: cartItems,
     totalAmount,
@@ -151,6 +154,35 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     } finally {
       setConfirming(false);
     }
+  };
+
+  // ── Save cart as Pending Order ──
+  // Mismo shape que el pedido directo de la vista Pedidos (Orders.tsx), más el
+  // branchId de la sucursal del vendedor. Sin cliente: el backend resuelve el
+  // genérico "Consumidor final" de la org. Se vende después desde Pedidos
+  // (conversión order → sale ya existente).
+  const handleSaveOrder = () => {
+    if (cartItems.length === 0) return;
+    const orderPayload: CreateOrder = {
+      type: "sale",
+      products: cartItems.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+        price: i.price,
+      })),
+      totalAmount,
+      branchId,
+    };
+    submitOrder(orderPayload, {
+      onSuccess: () => {
+        clearCart();
+        setCartOpen(false);
+        toast.success("Pedido guardado — confirmá la venta desde Pedidos");
+      },
+      onError: (err: any) => {
+        toast.error(err?.message || "Error al guardar el pedido");
+      },
+    });
   };
 
   // ── Loading ──
@@ -503,27 +535,38 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                     ${totalAmount.toLocaleString("es-AR")}
                   </span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      size="lg"
+                      onClick={() => {
+                        clearCart();
+                        setCartOpen(false);
+                        toast.info("Pedido cancelado");
+                      }}
+                      disabled={confirming || savingOrder}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      size="lg"
+                      onClick={handleSaveOrder}
+                      disabled={confirming || savingOrder || cartItems.length === 0}
+                    >
+                      {savingOrder ? "Guardando..." : "Guardar pedido"}
+                    </Button>
+                  </div>
                   <Button
-                    variant="outline"
-                    className="flex-1"
-                    size="lg"
-                    onClick={() => {
-                      clearCart();
-                      setCartOpen(false);
-                      toast.info("Pedido cancelado");
-                    }}
-                    disabled={confirming}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    className="flex-1"
+                    className="w-full"
                     size="lg"
                     onClick={handleConfirmSale}
-                    disabled={confirming}
+                    disabled={confirming || savingOrder}
                   >
-                    {confirming ? "Procesando..." : "Confirmar pedido"}
+                    {confirming ? "Procesando..." : "Vender directo"}
                   </Button>
                 </div>
               </div>

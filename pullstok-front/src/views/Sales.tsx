@@ -1,4 +1,4 @@
-import { useState, ChangeEvent } from "react";
+import { useState, useMemo, ChangeEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import DateObject from "react-date-object";
 import { Plus, Search, Loader2 } from "lucide-react";
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Pagination } from "../components/molecules/pagination";
 import { DocumentCard } from "../components/molecules/DocumentCard";
-import { useGetSales, useCreateSale } from "../components/hooks/useSales";
+import { useGetSales, useCreateSale, useDeleteSale } from "../components/hooks/useSales";
 import { Loader } from "../components/atoms/loader";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { useOrders } from "../components/hooks/useOrder";
@@ -77,6 +77,7 @@ export const SalesPage = () => {
   const { orders } = useOrders();
   const { products } = usePorducts();
   const { createSale } = useCreateSale();
+  const { deleteSale } = useDeleteSale();
   const { customers } = useCustomers();
   const { submitCustomerAsync, loadingCustomer } = useCreateCustomer();
   const { invoiceFromSale, loadingInvoiceFromSale } = useCreateInvoiceFromSale();
@@ -183,6 +184,34 @@ export const SalesPage = () => {
     }
   };
 
+  // Eliminar venta: solo ADMIN/MANAGEMENT (mismo policy que el backend
+  // requireRole). El rol sale de localStorage (mismo patrón que Dashboard).
+  const currentUser = useMemo(() => {
+    const raw = localStorage.getItem("user");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }, []);
+  const canDeleteSale =
+    currentUser?.role === "ADMIN" || currentUser?.role === "MANAGEMENT";
+
+  const handleDeleteSale = (sale: Sale) => {
+    const saleId = sale.id || sale._id || "";
+    deleteSale(saleId, {
+      onSuccess: () => toast.success("Venta eliminada y stock restaurado"),
+      onError: (err: unknown) => {
+        const msg =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "";
+        toast.error(msg || "No se pudo eliminar la venta");
+      },
+    });
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const buildExport = (sale: any) => ({
     title: "Venta",
@@ -283,14 +312,36 @@ export const SalesPage = () => {
                 onExportPDF={() => exportToPDF(buildExport(sale))}
                 onExportExcel={() => exportToExcel(buildExport(sale))}
                 onInvoice={isInvoiced ? undefined : () => openInvoiceModal(sale)}
+                onDelete={
+                  canDeleteSale && !isInvoiced
+                    ? () => handleDeleteSale(sale)
+                    : undefined
+                }
                 badge={
-                  isInvoiced ? (
-                    <Link to={`/facturacion/${sale.invoice!.id}/editar`}>
-                      <Badge variant="secondary" className="cursor-pointer hover:opacity-80">
-                        Facturada
+                  <>
+                    {sale.orderId ? (
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground"
+                      >
+                        De pedido
                       </Badge>
-                    </Link>
-                  ) : undefined
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground"
+                      >
+                        Venta directa
+                      </Badge>
+                    )}
+                    {isInvoiced && (
+                      <Link to={`/facturacion/${sale.invoice!.id}/editar`}>
+                        <Badge variant="secondary" className="cursor-pointer hover:opacity-80">
+                          Facturada
+                        </Badge>
+                      </Link>
+                    )}
+                  </>
                 }
               />
             );

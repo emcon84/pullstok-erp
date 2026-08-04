@@ -53,4 +53,26 @@ export const getSales = async (branchId?: string): Promise<Sale[]> => {
   }
 };
 
+export const deleteSale = async (id: string): Promise<void> => {
+  const token = localStorage.getItem("token");
+  try {
+    await axios.delete(`${API_URL}/sales/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      console.error(
+        "Error al eliminar la venta:",
+        error.response?.data || error.message,
+      );
+      throw error.response?.data || error.message;
+    } else {
+      console.error("Error desconocido al eliminar la venta:", error);
+      throw error;
+    }
+  }
+};
+
 // Puedes agregar más métodos aquí si es necesario

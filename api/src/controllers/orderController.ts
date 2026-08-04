@@ -21,8 +21,46 @@ const notifyOrdersChanged = () => {
 const createOrder = async (req: Request, res: Response) => {
   try {
     const organizationId = requireOrganizationId();
-    const { customer, products, totalAmount, type, quotationId } = req.body;
+    const { customer, products, totalAmount, type, quotationId, branchId } =
+      req.body;
     const isSale = type === "sale";
+
+    // Sucursal del flujo vendor (VendorDashboard): validar que pertenece a la
+    // org (la extensión scopa Branch, así un id de otra org → null). Los
+    // pedidos ERP org-wide no mandan branchId.
+    let resolvedBranchId: string | undefined;
+    if (branchId) {
+      const branch = await prisma.branch.findFirst({
+        where: { id: branchId },
+      });
+      if (!branch) {
+        return res.status(400).json({ message: "Sucursal no encontrada" });
+      }
+      resolvedBranchId = branchId;
+    }
+
+    // Pedido sin cliente (venta de mostrador): usar el genérico "Consumidor
+    // final" de la org (find-or-create idempotente). Los flujos ERP siempre
+    // mandan customer; esto solo aplica al VendorDashboard.
+    let customerId = customer;
+    if (!customerId) {
+      const GENERIC_CUSTOMER_EMAIL = "consumidor-final@local";
+      const existing = await prisma.customer.findFirst({
+        where: { email: GENERIC_CUSTOMER_EMAIL },
+      });
+      if (existing) {
+        customerId = existing.id;
+      } else {
+        const created = await prisma.customer.create({
+          data: {
+            name: "Consumidor final",
+            email: GENERIC_CUSTOMER_EMAIL,
+            organizationId,
+          },
+        });
+        customerId = created.id;
+      }
+    }
 
     let quotation = null;
     if (quotationId) {
@@ -56,11 +94,12 @@ const createOrder = async (req: Request, res: Response) => {
       const order = await tx.order.create({
         data: {
           organizationId,
-          customerId: customer,
+          customerId,
           totalAmount: totalAmount || (quotation ? quotation.totalAmount : 0),
           status: "PENDING",
           type: isSale ? "SALE" : "PURCHASE",
           quotationId: quotationId || null,
+          ...(resolvedBranchId ? { branchId: resolvedBranchId } : {}),
           receipt: orderNumber,
           items: {
             create: orderProducts.map((p) => ({

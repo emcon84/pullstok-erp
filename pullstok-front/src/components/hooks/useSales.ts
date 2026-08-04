@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createSale, getSales } from "../../services/saleServices";
+import { createSale, deleteSale, getSales } from "../../services/saleServices";
 import { CartItem, Sale } from "../../models/salesModel";
 
 export const useCreateSale = () => {
@@ -34,6 +34,28 @@ export const useCreateSale = () => {
 
   return {
     createSale: mutation.mutate,
+    loading: mutation.isPending,
+    error: mutation.error,
+    success: mutation.isSuccess,
+  };
+};
+
+export const useDeleteSale = () => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation<void, Error, string>({
+    mutationFn: deleteSale,
+    onError: (error) => {
+      console.error("Error deleting sale:", error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sales"] }); // La lista de ventas cambió
+      queryClient.invalidateQueries({ queryKey: ["orders"] }); // Si la venta venía de un pedido, el backend lo revierte a PENDING
+    },
+  });
+
+  return {
+    deleteSale: mutation.mutate,
     loading: mutation.isPending,
     error: mutation.error,
     success: mutation.isSuccess,

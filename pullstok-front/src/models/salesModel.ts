@@ -41,6 +41,8 @@ export interface Sale {
   saleDate: string;
   createdAt?: string;
   __v?: number;
+  /** Presente cuando la venta se generó procesando un pedido (1:1 Order). */
+  orderId?: string;
   /** Presente cuando el backend incluye el select de invoice (getAllSales WS3). */
   invoice?: { id: string } | null;
 }
