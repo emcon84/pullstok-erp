@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useSearchParams, useInRouterContext, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import {
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
-import { Camera, CameraOff, Plus, Minus, Search, Link2, X, Barcode, Copy } from "lucide-react";
+import { Camera, CameraOff, Plus, Minus, Search, Link2, X, Barcode, Copy, ArrowLeft } from "lucide-react";
 import { ProductDrawer } from "@/components/molecules/ProductDrawer";
 import { useProductStock } from "@/components/hooks/useProductStock";
 import { useBranches } from "@/components/hooks/useBranches";
@@ -139,6 +140,41 @@ export const StockScannerPage = () => {
     () => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" }),
     [token],
   );
+
+  // Preload + assign mode: coming from the vendor list with ?assignTo=<productId>
+  // (e.g. /scanner?assignTo=abc) preselects the product and arms the correction
+  // flow so the NEXT scanned/typed code is written to that product. Without the
+  // param this page behaves exactly as a plain scanner.
+  const inRouter = useInRouterContext();
+  const [searchParams] = inRouter ? useSearchParams() : [null];
+  const navigate = inRouter ? useNavigate() : null;
+  const assignToId = searchParams?.get("assignTo") || null;
+
+  useEffect(() => {
+    if (!assignToId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${API_URL}/products/${encodeURIComponent(assignToId)}`,
+          { headers },
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok && data.id) {
+          setProduct(data);
+          setCorrectingBarcode(true);
+          correctingRef.current = true;
+          lastScannedRef.current = "";
+        } else {
+          toast.error(data.message || "No se encontró el producto");
+        }
+      } catch {
+        toast.error("Error al cargar el producto");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [assignToId, headers]);
 
   const playBeep = () => {
     try {
@@ -365,7 +401,33 @@ export const StockScannerPage = () => {
 
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4">
-      <h1 className="text-xl font-semibold">Scanner</h1>
+      <div className="flex items-center gap-2">
+        {assignToId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 px-2"
+            onClick={() => {
+              if (navigate && window.history.length > 1) {
+                navigate(-1);
+              } else {
+                window.location.href = "/dashboard";
+              }
+            }}
+            title="Volver al listado de productos"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        )}
+        <h1 className="text-xl font-semibold">
+          {assignToId ? "Asignar código" : "Scanner"}
+        </h1>
+        {assignToId && product && (
+          <Badge variant="secondary" className="ml-auto shrink-0 truncate max-w-[50%]">
+            {product.name}
+          </Badge>
+        )}
+      </div>
 
       {/* Branch selector (spec F2): admin/management pick any branch; a
           vendedor/cashier with several assignments picks among their own. */}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -7,6 +8,7 @@ import {
   X,
   ImageIcon,
   Eye,
+  Barcode,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,11 +64,41 @@ const imgSrc = (image?: string) => {
 const branchQty = (p: DataItem) =>
   Number(p.stocks?.[0]?.quantity ?? 0);
 
+// Clave de sessionStorage para restaurar el filtro del listado al volver del
+// scanner (la vista se desmonta al navegar a /scanner y el filtro es local).
+const VENDOR_FILTER_KEY = "vendor-dashboard-filter";
+
+interface StoredFilter {
+  filter: string;
+  categoryFilter: string;
+  branchId: string;
+}
+
+const readStoredFilter = (branchId: string): StoredFilter | null => {
+  try {
+    const raw = sessionStorage.getItem(VENDOR_FILTER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredFilter;
+    // Solo restauramos si la sucursal coincide (evita cruzar filtros entre
+    // vendedores/sucursales que comparten la misma pestaña).
+    if (parsed.branchId !== branchId) return null;
+    sessionStorage.removeItem(VENDOR_FILTER_KEY);
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
 // ── Component ──
 
 export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
-  const [filter, setFilter] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const navigate = useNavigate();
+  // Restaura el filtro guardado al volver del scanner (lee y limpia UNA vez).
+  const [storedFilter] = useState(() => readStoredFilter(branchId));
+  const [filter, setFilter] = useState(storedFilter?.filter ?? "");
+  const [categoryFilter, setCategoryFilter] = useState(
+    storedFilter?.categoryFilter ?? "",
+  );
   const [debouncedFilter, setDebouncedFilter] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -275,6 +307,28 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          title="Asignar código de barras"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Guardar el filtro activo para restaurarlo al volver
+                            // del scanner (la vista se desmonta al navegar).
+                            sessionStorage.setItem(
+                              VENDOR_FILTER_KEY,
+                              JSON.stringify({
+                                filter,
+                                categoryFilter,
+                                branchId,
+                              } satisfies StoredFilter),
+                            );
+                            navigate(`/scanner?assignTo=${id}`);
+                          }}
+                        >
+                          <Barcode className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">
@@ -307,7 +361,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         </Card>
       </>
     ),
-    [items, cartItems, openQtyModal, openDrawer],
+    [items, cartItems, openQtyModal, openDrawer, navigate],
   );
 
   // ── Loading (initial only) ──
