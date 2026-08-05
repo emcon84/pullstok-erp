@@ -219,7 +219,7 @@ export async function products(
       throw new Error("An unknown error occurred");
     }
   }
-};
+}
 export const createProduct = async (product: DataItem) => {
   try {
     const token = localStorage.getItem("token");
@@ -285,4 +285,73 @@ export const deleteProduct = async (productId: string): Promise<void> => {
       throw new Error("An unknown error occurred");
     }
   }
+};
+
+// ---------------------------------------------------------------------------
+// Bulk price update (sdd/bulk-price-update-selectors)
+// ---------------------------------------------------------------------------
+
+/** Payload compartido por preview (dryRun) y apply de la actualización masiva. */
+export interface BulkPriceUpdatePayload {
+  brandValues: string[];
+  categoryIds: string[];
+  excludeProductIds: string[];
+  percentage: number;
+}
+
+/** Fila del preview: producto afectado con precio viejo → nuevo y delta. */
+export interface BulkPricePreviewRow {
+  id: string;
+  name: string;
+  categoryName: string | null;
+  brandValues: string[];
+  oldPrice: number;
+  newPrice: number;
+  delta: number;
+}
+
+/** Respuesta del preview (dryRun): agregados sobre el set COMPLETO + página. */
+export interface BulkPricePreview {
+  affected: number;
+  previousTotal: number;
+  newTotal: number;
+  page: number;
+  pageSize: number;
+  total: number;
+  rows: BulkPricePreviewRow[];
+}
+
+/** Respuesta del apply: conteo autoritativo re-resuelto en el server. */
+export interface BulkPriceApplyResult {
+  affected: number;
+  previousTotal: number;
+  newTotal: number;
+}
+
+/**
+ * POST /products/bulk-price-update — preview (dryRun=true, paginado por page)
+ * o apply (sin flag). Plain fetch + token de localStorage: el endpoint se
+ * selecciona por query flag, no por verbo/URL, así que este caso deliberado no
+ * usa axios (el resto del archivo sí).
+ */
+export const bulkPriceUpdate = async (
+  payload: BulkPriceUpdatePayload,
+  dryRun: boolean,
+  page = 1,
+): Promise<BulkPricePreview | BulkPriceApplyResult> => {
+  const token = localStorage.getItem("token");
+  const query = dryRun ? `?dryRun=true&page=${page}` : "";
+  const res = await fetch(`${API_URL}/products/bulk-price-update${query}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "bulk price update failed");
+  }
+  return res.json();
 };
