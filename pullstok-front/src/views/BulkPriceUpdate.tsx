@@ -256,7 +256,7 @@ export const BulkPriceUpdate = () => {
                           ? "default"
                           : "outline"
                       }
-                      className="cursor-pointer transition-opacity hover:opacity-80"
+                      className="cursor-pointer uppercase transition-opacity hover:opacity-80"
                       onClick={() => toggleBrand(b.value)}
                     >
                       {b.value}
@@ -404,7 +404,7 @@ export const BulkPriceUpdate = () => {
                                 <TableCell className="text-muted-foreground">
                                   {row.categoryName ?? "—"}
                                 </TableCell>
-                                <TableCell className="text-muted-foreground">
+                                <TableCell className="text-muted-foreground uppercase">
                                   {row.brandValues.join(", ")}
                                 </TableCell>
                                 <TableCell>
