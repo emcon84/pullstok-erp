@@ -1,0 +1,31 @@
+name: Deploy a producción
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  deploy:
+    name: Deploy Pullstok ERP al VPS
+    runs-on: [self-hosted, dep]
+    environment: production
+    concurrency:
+      group: pullstok-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ejecutar deploy (backup + build + migraciones + health check + rollback)
+        working-directory: /var/www/pullstok
+        run: |
+          set -euo pipefail
+          echo "::group::Deploy pullstok"
+          if [ ! -x ./deploy.sh ]; then
+            echo "deploy.sh no existe o no es ejecutable en /var/www/pullstok"
+            exit 1
+          fi
+          ./deploy.sh
+          echo "::endgroup::"
