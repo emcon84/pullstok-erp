@@ -1,33 +1,13 @@
 import { useState, useEffect } from "react";
 import { ChevronRight, ChevronDown, ListTree } from "lucide-react";
-import { getCategories, Category } from "@/services/onboardingService";
+import { getCategories } from "@/services/onboardingService";
 import { Loader } from "@/components/atoms/loader";
-
-interface TreeNode extends Category {
-  children: TreeNode[];
-}
+import { buildTree, TreeNode } from "@/components/molecules/CategoryTreePicker/tree";
 
 interface CategoryTreePickerProps {
   value: string | null; // selected categoryId
   onChange: (categoryId: string) => void;
 }
-
-const buildTree = (flat: Category[]): TreeNode[] => {
-  const map = new Map<string, TreeNode>();
-  const roots: TreeNode[] = [];
-  for (const cat of flat) {
-    map.set(cat.id, { ...cat, children: [] });
-  }
-  for (const cat of flat) {
-    const node = map.get(cat.id)!;
-    if (cat.parentId && map.has(cat.parentId)) {
-      map.get(cat.parentId)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-  return roots;
-};
 
 const TreePickerRow = ({
   node,
