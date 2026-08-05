@@ -422,12 +422,13 @@ export const StockScannerPage = () => {
         <h1 className="text-xl font-semibold">
           {assignToId ? "Asignar código" : "Scanner"}
         </h1>
-        {assignToId && product && (
-          <Badge variant="secondary" className="ml-auto shrink-0 truncate max-w-[50%]">
-            {product.name}
-          </Badge>
-        )}
       </div>
+
+      {assignToId && product && (
+        <p className="text-sm text-muted-foreground -mt-3 truncate">
+          {product.name}
+        </p>
+      )}
 
       {/* Branch selector (spec F2): admin/management pick any branch; a
           vendedor/cashier with several assignments picks among their own. */}
