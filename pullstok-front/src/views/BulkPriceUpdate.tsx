@@ -26,6 +26,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CategoryTreePickerMulti } from "@/components/molecules/CategoryTreePickerMulti";
+import { CategoryOverridesPanel } from "@/components/molecules/CategoryOverridesPanel";
+import { recomputeRow } from "@/lib/priceOverride";
+import { getCategories } from "@/services/onboardingService";
 import {
   bulkPriceUpdate,
   BulkPricePreview,
@@ -59,6 +62,15 @@ export const BulkPriceUpdate = () => {
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [percentage, setPercentage] = useState("");
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+  const [categoryOverrides, setCategoryOverrides] = useState<
+    Record<string, string>
+  >({});
+  const [productOverrides, setProductOverrides] = useState<
+    Record<string, string>
+  >({});
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>(
+    [],
+  );
   const [preview, setPreview] = useState<BulkPricePreview | null>(null);
   const [page, setPage] = useState(1);
   const [loadingBrands, setLoadingBrands] = useState(true);
@@ -93,10 +105,20 @@ export const BulkPriceUpdate = () => {
       .finally(() => setLoadingBrands(false));
   }, []);
 
-  // Cualquier cambio de alcance invalida el preview y las exclusiones previas.
+  // Load categories for the overrides side panel (id → name)
+  useEffect(() => {
+    getCategories()
+      .then((data) =>
+        setCategories(data.map((c) => ({ id: c.id, name: c.name }))),
+      )
+      .catch(() => setCategories([]));
+  }, []);
+
+  // Any scope change invalidates preview, previous exclusions and category overrides.
   const scopeChanged = () => {
     setPreview(null);
     setExcludedIds(new Set());
+    setCategoryOverrides({});
     setPage(1);
   };
 
@@ -110,15 +132,28 @@ export const BulkPriceUpdate = () => {
   const payload = useCallback((): BulkPriceUpdatePayload | null => {
     const pct = parseFloat(percentage);
     if (selectedBrands.length === 0 || Number.isNaN(pct)) return null;
+    const categoryPercentages = Object.entries(categoryOverrides)
+      .filter(([, value]) => value.trim() !== "" && !Number.isNaN(parseFloat(value)))
+      .map(([categoryId, value]) => ({ categoryId, percentage: parseFloat(value) }));
+    const productPercentages = Object.entries(productOverrides)
+      .filter(([, value]) => value.trim() !== "" && !Number.isNaN(parseFloat(value)))
+      .map(([productId, value]) => ({ productId, percentage: parseFloat(value) }));
     return {
       brandValues: selectedBrands,
       categoryIds,
       excludeProductIds: [...excludedIds],
       percentage: pct,
-      categoryPercentages: [],
-      productPercentages: [],
+      categoryPercentages,
+      productPercentages,
     };
-  }, [selectedBrands, categoryIds, excludedIds, percentage]);
+  }, [
+    selectedBrands,
+    categoryIds,
+    excludedIds,
+    percentage,
+    categoryOverrides,
+    productOverrides,
+  ]);
 
   const handlePreview = async (targetPage = 1) => {
     const p = payload();
@@ -164,11 +199,29 @@ export const BulkPriceUpdate = () => {
   const hasMore = preview
     ? page * preview.pageSize < preview.total
     : false;
+  // Selected category nodes, in selection order, for the side panel.
+  const selectedNodes =
+    categoryIds.length && categories.length
+      ? categories.filter((c) => categoryIds.includes(c.id))
+      : [];
   const applyDisabled =
     !preview ||
     preview.affected === 0 ||
     excludedIds.size >= preview.affected ||
     submitting;
+
+  // Client-side recompute of totals: server newTotal + deltas from any product
+  // % overrides on the visible page (preview-only; server authoritative on apply).
+  const totalAdjustment =
+    preview?.rows.reduce((acc, row) => {
+      const override = productOverrides[row.id];
+      if (override === undefined || Number.isNaN(parseFloat(override))) {
+        return acc;
+      }
+      const recomputed = recomputeRow(row.oldPrice, parseFloat(override));
+      return acc + (recomputed - row.newPrice);
+    }, 0) ?? 0;
+  const adjustedNewTotal = preview ? preview.newTotal + totalAdjustment : null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -229,8 +282,18 @@ export const BulkPriceUpdate = () => {
                 />
               </div>
 
+              {selectedNodes.length > 0 && (
+                <CategoryOverridesPanel
+                  nodes={selectedNodes}
+                  values={categoryOverrides}
+                  onChange={(id, value) =>
+                    setCategoryOverrides((prev) => ({ ...prev, [id]: value }))
+                  }
+                />
+              )}
+
               <div className="space-y-1.5">
-                <Label htmlFor="pct">Porcentaje (%)</Label>
+                <Label htmlFor="pct">Porcentaje default (%)</Label>
                 <Input
                   id="pct"
                   type="number"
@@ -252,6 +315,10 @@ export const BulkPriceUpdate = () => {
                     Disminución: los precios se reducirán un {percentage}%
                   </p>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  0% = no cambia el precio pero cuenta en la corrida; destildar
+                  = fuera de la corrida.
+                </p>
               </div>
 
               <Button
@@ -290,61 +357,97 @@ export const BulkPriceUpdate = () => {
                   <div className="rounded-md bg-muted p-3">
                     <p className="text-xs text-muted-foreground">Total nuevo</p>
                     <p className="font-bold text-emerald-600">
-                      {formatPrice(preview.newTotal)}
+                      {formatPrice(adjustedNewTotal ?? preview.newTotal)}
                     </p>
                   </div>
                 </div>
 
                 <div className="max-h-[320px] overflow-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-10"></TableHead>
-                        <TableHead>Producto</TableHead>
-                        <TableHead>Categoría</TableHead>
-                        <TableHead>Marcas</TableHead>
-                        <TableHead>Precio</TableHead>
-                        <TableHead className="text-right">Δ</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {preview.rows.map((row) => (
-                        <TableRow key={row.id}>
-                          <TableCell>
-                            <Checkbox
-                              aria-label={`Excluir ${row.name}`}
-                              checked={!excludedIds.has(row.id)}
-                              onCheckedChange={() => toggleExclude(row.id)}
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {row.name}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {row.categoryName ?? "—"}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {row.brandValues.join(", ")}
-                          </TableCell>
-                          <TableCell>
-                            {formatPrice(row.oldPrice)} →{" "}
-                            <span className="font-medium">
-                              {formatPrice(row.newPrice)}
-                            </span>
-                          </TableCell>
-                          <TableCell
-                            className={`text-right font-medium ${
-                              row.delta < 0 ? "text-red-600" : ""
-                            }`}
-                          >
-                            {row.delta >= 0 ? "+" : ""}
-                            {formatPrice(row.delta)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10"></TableHead>
+                            <TableHead>Producto</TableHead>
+                            <TableHead>Categoría</TableHead>
+                            <TableHead>Marcas</TableHead>
+                            <TableHead className="w-24">%</TableHead>
+                            <TableHead>Precio</TableHead>
+                            <TableHead className="text-right">Δ</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {preview.rows.map((row) => {
+                            const override = productOverrides[row.id];
+                            const overridePct = override !== undefined
+                                ? parseFloat(override)
+                                : NaN;
+                            const hasOverride =
+                              override !== undefined &&
+                              !Number.isNaN(overridePct);
+                            const displayNew = hasOverride
+                              ? recomputeRow(row.oldPrice, overridePct)
+                              : row.newPrice;
+                            const displayDelta = displayNew - row.oldPrice;
+                            return (
+                              <TableRow key={row.id}>
+                                <TableCell>
+                                  <Checkbox
+                                    aria-label={`Excluir ${row.name}`}
+                                    checked={!excludedIds.has(row.id)}
+                                    onCheckedChange={() => toggleExclude(row.id)}
+                                  />
+                                </TableCell>
+                                <TableCell className="font-medium">
+                                  {row.name}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {row.categoryName ?? "—"}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {row.brandValues.join(", ")}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    step="0.5"
+                                    min="-100"
+                                    max="500"
+                                    className="h-8 w-20"
+                                    aria-label={`Porcentaje ${row.name}`}
+                                    value={
+                                      override !== undefined
+                                        ? override
+                                        : String(row.effectivePercentage ?? "")
+                                    }
+                                    placeholder="%"
+                                    onChange={(e) =>
+                                      setProductOverrides((prev) => ({
+                                        ...prev,
+                                        [row.id]: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {formatPrice(row.oldPrice)} →{" "}
+                                  <span className="font-medium">
+                                    {formatPrice(displayNew)}
+                                  </span>
+                                </TableCell>
+                                <TableCell
+                                  className={`text-right font-medium ${
+                                    displayDelta < 0 ? "text-red-600" : ""
+                                  }`}
+                                >
+                                  {displayDelta >= 0 ? "+" : ""}
+                                  {formatPrice(displayDelta)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
 
                 <div className="flex items-center justify-between">
                   <Button
@@ -384,8 +487,9 @@ export const BulkPriceUpdate = () => {
                       </AlertDialogTitle>
                       <AlertDialogDescription>
                         {preview.affected} productos · {formatPrice(preview.previousTotal)} →{" "}
-                        {formatPrice(preview.newTotal)}. El conteo final puede
-                        diferir si el catálogo cambió desde la vista previa.
+                        {formatPrice(adjustedNewTotal ?? preview.newTotal)}. El
+                        conteo final puede diferir si el catálogo cambió desde la
+                        vista previa.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

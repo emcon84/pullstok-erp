@@ -26,12 +26,19 @@ vi.mock("@/services/productService", () => ({
 
 import { BulkPriceUpdate } from "@/views/BulkPriceUpdate";
 import { bulkPriceUpdate } from "@/services/productService";
+import { getCategories } from "@/services/onboardingService";
 
 const mockBulkPriceUpdate = vi.mocked(bulkPriceUpdate);
+const mockGetCategories = vi.mocked(getCategories);
 
 const brands = [
   { id: "b-1", value: "Acme" },
   { id: "b-2", value: "Zap" },
+];
+
+const categories = [
+  { id: "cat-1", name: "Alimentos", organizationId: "o-1", parentId: null },
+  { id: "cat-2", name: "Bebidas", organizationId: "o-1", parentId: null },
 ];
 
 const page1 = {
@@ -50,6 +57,7 @@ const page1 = {
       oldPrice: 100,
       newPrice: 110,
       delta: 10,
+      effectivePercentage: 10,
     },
     {
       id: "p-2",
@@ -59,6 +67,7 @@ const page1 = {
       oldPrice: 200,
       newPrice: 220,
       delta: 20,
+      effectivePercentage: 10,
     },
   ],
 };
@@ -79,6 +88,7 @@ const page2 = {
       oldPrice: 0,
       newPrice: 0,
       delta: 0,
+      effectivePercentage: 0,
     },
   ],
 };
@@ -99,7 +109,7 @@ function renderView() {
 
 async function selectBrandAndPercent(percent = "10") {
   fireEvent.click(await screen.findByText("Acme"));
-  fireEvent.change(screen.getByLabelText(/porcentaje/i), {
+  fireEvent.change(screen.getByLabelText(/porcentaje default/i), {
     target: { value: percent },
   });
 }
@@ -111,6 +121,7 @@ describe("BulkPriceUpdate — preview, exclusions and apply", () => {
     localStorage.setItem("token", "test-token");
     mockFetch.mockResolvedValue({ ok: true, json: async () => brands });
     mockBulkPriceUpdate.mockResolvedValue(page1);
+    mockGetCategories.mockResolvedValue(categories);
   });
 
   it("shows every preview row checked by default", async () => {
@@ -141,6 +152,8 @@ describe("BulkPriceUpdate — preview, exclusions and apply", () => {
         expect.objectContaining({
           excludeProductIds: ["p-1"],
           percentage: 10,
+          categoryPercentages: [],
+          productPercentages: [],
         }),
         false,
       ),
@@ -190,6 +203,86 @@ describe("BulkPriceUpdate — preview, exclusions and apply", () => {
       expect(
         screen.getByRole("button", { name: "Aplicar cambios" }),
       ).toBeDisabled(),
+    );
+  });
+
+  it("labels the global percentage as default and shows 0% vs exclude copy", async () => {
+    renderView();
+    await selectBrandAndPercent();
+
+    expect(screen.getByLabelText(/porcentaje default/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/0% = no cambia el precio pero cuenta en la corrida/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/destildar = fuera de la corrida/i)).toBeInTheDocument();
+  });
+
+  it("shows the side panel with editable % per selected category", async () => {
+    renderView();
+    await selectBrandAndPercent();
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Alimentos" }));
+
+    expect(
+      await screen.findByText("Categorías seleccionadas"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/porcentaje alimentos/i),
+    ).toHaveAttribute("type", "number");
+
+    fireEvent.change(screen.getByLabelText(/porcentaje alimentos/i), {
+      target: { value: "5" },
+    });
+    expect(screen.getByLabelText(/porcentaje alimentos/i)).toHaveValue(5);
+  });
+
+  it("merges category overrides into the payload on apply", async () => {
+    renderView();
+    await selectBrandAndPercent();
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Alimentos" }));
+    fireEvent.change(await screen.findByLabelText(/porcentaje alimentos/i), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /calcular preview/i }));
+    await screen.findByText("Producto 1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar cambios" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Aplicar" }));
+
+    await waitFor(() =>
+      expect(mockBulkPriceUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          categoryPercentages: [{ categoryId: "cat-1", percentage: 5 }],
+        }),
+        false,
+      ),
+    );
+  });
+
+  it("edits a product row % cell, recomputes row and totals, and sends productPercentages", async () => {
+    renderView();
+    await selectBrandAndPercent();
+    fireEvent.click(screen.getByRole("button", { name: /calcular preview/i }));
+    await screen.findByText("Producto 1");
+
+    fireEvent.change(screen.getByLabelText(/porcentaje producto 1/i), {
+      target: { value: "20" },
+    });
+
+    // oldPrice 100 @20% → 120, delta +20; server newTotal 330 - 110 + 120 = 340
+    expect(await screen.findByText("$120,00")).toBeInTheDocument();
+    expect(screen.getByText("$340,00")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar cambios" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Aplicar" }));
+
+    await waitFor(() =>
+      expect(mockBulkPriceUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          productPercentages: [{ productId: "p-1", percentage: 20 }],
+        }),
+        false,
+      ),
     );
   });
 });
