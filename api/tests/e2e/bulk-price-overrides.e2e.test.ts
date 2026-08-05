@@ -22,8 +22,6 @@ describe('E2E: bulk price update overrides', () => {
   let organizationId: string;
   let accesoriosId: string;
   let collaresId: string;
-  let marcaAOptionId: string;
-  let marcaBOptionId: string;
   let pAccId: string;
   let pColAId: string;
   let pColBId: string;
@@ -93,42 +91,44 @@ describe('E2E: bulk price update overrides', () => {
       .send({ names: ['Collares'], parentId: accesoriosId });
     collaresId = colRes.body[0].id;
 
-    // Brand variant on Collares with MarcaA/MarcaB.
-    const varRes = await request(app)
-      .post(`/api/categories/${collaresId}/variants`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Marca' });
-    const marcaVariantId = varRes.body.id;
+    // Brand variant "Marca" on BOTH Accesorios and Collares, each with MarcaA/MarcaB.
+    const mkVariant = async (categoryId: string) => {
+      const vr = await request(app)
+        .post(`/api/categories/${categoryId}/variants`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'Marca' });
+      const vid = vr.body.id;
+      const oA = await request(app)
+        .post(`/api/categories/variants/${vid}/options`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ value: 'MarcaA' });
+      const oB = await request(app)
+        .post(`/api/categories/variants/${vid}/options`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ value: 'MarcaB' });
+      return { variantId: vid, optionAId: oA.body.id, optionBId: oB.body.id };
+    };
 
-    const optARes = await request(app)
-      .post(`/api/categories/variants/${marcaVariantId}/options`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ value: 'MarcaA' });
-    marcaAOptionId = optARes.body.id;
-
-    const optBRes = await request(app)
-      .post(`/api/categories/variants/${marcaVariantId}/options`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ value: 'MarcaB' });
-    marcaBOptionId = optBRes.body.id;
+    const accVariant = await mkVariant(accesoriosId);
+    const colVariant = await mkVariant(collaresId);
 
     // Products: pAcc in Accesorios (MarcaA), pColA/pColB in Collares (MarcaA/MarcaB).
     const pAcc = await request(app)
       .post('/api/products')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Accesorio MarcaA', price: 1000, quantity: 10, categoryId: accesoriosId, variantOptionIds: [marcaAOptionId] });
+      .send({ name: 'Accesorio MarcaA', price: 1000, quantity: 10, categoryId: accesoriosId, variantOptionIds: [accVariant.optionAId] });
     pAccId = pAcc.body.id;
 
     const pColA = await request(app)
       .post('/api/products')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Collar MarcaA', price: 2000, quantity: 10, categoryId: collaresId, variantOptionIds: [marcaAOptionId] });
+      .send({ name: 'Collar MarcaA', price: 2000, quantity: 10, categoryId: collaresId, variantOptionIds: [colVariant.optionAId] });
     pColAId = pColA.body.id;
 
     const pColB = await request(app)
       .post('/api/products')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Collar MarcaB', price: 1500, quantity: 10, categoryId: collaresId, variantOptionIds: [marcaBOptionId] });
+      .send({ name: 'Collar MarcaB', price: 1500, quantity: 10, categoryId: collaresId, variantOptionIds: [colVariant.optionBId] });
     pColBId = pColB.body.id;
 
     // Second org with the SAME brand value for tenant isolation.
