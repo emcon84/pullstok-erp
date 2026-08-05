@@ -76,7 +76,8 @@ fi
 # 2) ACTUALIZAR CODIGO
 # ---------------------------------------------------------------------------
 step "[2/9] Actualizando código desde Git..."
-git pull
+git fetch origin
+git reset --hard origin/main
 echo "✅ Código actualizado"
 
 # ---------------------------------------------------------------------------
