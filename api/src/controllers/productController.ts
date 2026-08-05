@@ -296,27 +296,68 @@ const getProducts = async (req: Request, res: Response) => {
         mode: "insensitive",
       };
     }
-    const products = await prisma.product.findMany({
-      where,
-      include: {
-        category: { select: { id: true, name: true } },
-        variantAssignments: {
-          include: {
-            option: {
-              include: { variant: { select: { id: true, name: true } } },
-            },
+    const include = {
+      category: { select: { id: true, name: true } },
+      variantAssignments: {
+        include: {
+          option: {
+            include: { variant: { select: { id: true, name: true } } },
           },
         },
-        ...(branchId
-          ? {
-              stocks: {
-                where: { branchId: branchId as string },
-                select: { quantity: true },
-              },
-            }
-          : {}),
       },
-    });
+      ...(branchId
+        ? {
+            stocks: {
+              where: { branchId: branchId as string },
+              select: { quantity: true },
+            },
+          }
+        : {}),
+    };
+
+    // Paginación SERVER-SIDE opt-in (vendor dashboard). Solo se activa cuando
+    // `page` y `pageSize` están presentes y son enteros positivos; si vienen
+    // malformados o faltan, se mantiene el comportamiento legacy byte-for-byte
+    // (array plano). Los llamadores existentes no cambian su shape.
+    let page: number | undefined;
+    let pageSize: number | undefined;
+
+    const rawPage = Number(req.query.page);
+    const rawPageSize = Number(req.query.pageSize);
+    if (
+      req.query.page !== undefined &&
+      req.query.pageSize !== undefined &&
+      Number.isInteger(rawPage) &&
+      Number.isInteger(rawPageSize) &&
+      rawPage > 0 &&
+      rawPageSize > 0
+    ) {
+      page = rawPage;
+      pageSize = rawPageSize;
+    }
+
+    if (page !== undefined && pageSize !== undefined) {
+      // orderBy determinista para que skip/take no derive entre páginas (solo
+      // afecta a la rama paginada — los llamadores legacy no se reordenan).
+      const take = pageSize;
+      const skip = (page - 1) * pageSize;
+
+      const [items, total] = await Promise.all([
+        prisma.product.findMany({ where, include, take, skip, orderBy: { name: "asc" } }),
+        prisma.product.count({ where }),
+      ]);
+
+      res.status(200).json({
+        items,
+        total,
+        page,
+        pageSize,
+        hasMore: skip + items.length < total,
+      });
+      return;
+    }
+
+    const products = await prisma.product.findMany({ where, include });
     res.status(200).json(products);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
