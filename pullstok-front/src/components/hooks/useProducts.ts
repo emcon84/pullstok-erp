@@ -1,19 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { productsList } from "../../controllers/productController";
-import { products as fetchProducts, createProduct as createNewProduct, updateProduct as updateExistingProduct, deleteProduct  } from '../../services/productService';
+import { PaginatedProducts, products as fetchProducts, createProduct as createNewProduct, updateProduct as updateExistingProduct, deleteProduct  } from '../../services/productService';
 import { DataItem } from "../../types";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, InfiniteData } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
 
 
 export const usePorducts = () => {
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<DataItem[]>([]);
 
   const getProducts = async () => {
     try {
       const response = await productsList();
-      setProducts(response);
+      setProducts(response || []);
     } catch (error) {
       console.error(error);     
     }
@@ -42,6 +42,58 @@ export const useProducts = (branchId?: string, search?: string, category?: strin
   return {
     products: data || [],
     loading: isLoading,
+    error,
+  };
+};
+
+/** Page size for the server-side paginated product list (infinite scroll). */
+export const PAGE_SIZE = 30;
+
+/**
+ * Infinite-scroll variant of useProducts (vendor dashboard). Opts in to
+ * server-side pagination by sending page/pageSize; merges pages into a flat
+ * `items: DataItem[]`. Keeps a deterministic order (name asc, server-side).
+ */
+export const useInfiniteProducts = (
+  branchId?: string,
+  search?: string,
+  category?: string,
+) => {
+  const queryKey = ["products", branchId, search, category].filter(Boolean);
+
+  const {
+    data,
+    error,
+    isPending,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery<
+    PaginatedProducts,
+    Error,
+    InfiniteData<PaginatedProducts>,
+    unknown[],
+    number
+  >({
+    queryKey,
+    queryFn: ({ pageParam }) =>
+      fetchProducts(branchId, search, category, pageParam, PAGE_SIZE),
+    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    initialPageParam: 1,
+    placeholderData: (prev) => prev, // keep previous pages while searching
+  });
+
+  const items = useMemo<DataItem[]>(
+    () => data?.pages.flatMap((p) => p.items) ?? [],
+    [data],
+  );
+
+  return {
+    items,
+    isLoadingInitial: isPending,
+    isFetchingNextPage,
+    hasNextPage,
+    loadMore: fetchNextPage,
     error,
   };
 };

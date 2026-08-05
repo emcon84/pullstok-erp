@@ -33,7 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { useProducts } from "../components/hooks/useProducts";
+import { useInfiniteProducts } from "../components/hooks/useProducts";
 import { useCreateSale } from "../components/hooks/useSales";
 import { useCreateOrder } from "../components/hooks/useOrder";
 import { useVendorCart, type VendorCartItem } from "../components/hooks/useVendorCart";
@@ -79,11 +79,29 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     return () => clearTimeout(debounceRef.current);
   }, [filter]);
 
-  const { products, loading } = useProducts(
-    branchId,
-    debouncedFilter?.trim() || undefined,
-    categoryFilter.trim() || undefined,
-  );
+  const { items, isLoadingInitial, isFetchingNextPage, hasNextPage, loadMore } =
+    useInfiniteProducts(
+      branchId,
+      debouncedFilter?.trim() || undefined,
+      categoryFilter.trim() || undefined,
+    );
+
+  // Infinite scroll: load the next page when the sentinel enters the viewport.
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          loadMore();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, loadMore]);
   const { createSale } = useCreateSale();
   const { submitOrder, loading: savingOrder } = useCreateOrder();
   const {
@@ -201,7 +219,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((p) => {
+              {items.map((p) => {
                 const id = p._id || p.id;
                 const stock = branchQty(p);
                 const inCart = cartItems.find((ci) => ci.productId === id);
@@ -289,12 +307,12 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         </Card>
       </>
     ),
-    [products, cartItems, openQtyModal, openDrawer],
+    [items, cartItems, openQtyModal, openDrawer],
   );
 
-  // ── Loading ──
+  // ── Loading (initial only) ──
 
-  if (loading) {
+  if (isLoadingInitial) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Loader />
@@ -328,7 +346,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         </div>
 
         <FilterChips
-          products={products || []}
+          products={items}
           filter={filter}
           categoryFilter={categoryFilter}
           onFilterChange={setFilter}
@@ -338,7 +356,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
       </div>
 
       {/* ── Product grid ── */}
-      {(!products || products.length === 0) ? (
+      {(items.length === 0) ? (
         <div className="py-12 text-center space-y-3">
           <p className="text-muted-foreground">
             {filter || categoryFilter ? "Sin resultados con estos filtros." : "No hay productos."}
@@ -356,6 +374,23 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
       ) : (
         productTable
       )}
+
+      {/* ── Infinite scroll: sentinel + "load more" footer ── */}
+      {hasNextPage && (
+        <div className="flex items-center justify-center py-6">
+          {isFetchingNextPage ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader />
+              <span>Cargando más…</span>
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              Desplazate para cargar más productos
+            </span>
+          )}
+        </div>
+      )}
+      <div ref={sentinelRef} className="h-1" aria-hidden="true" />
 
       {/* ── Cart FAB ── */}
       {itemCount > 0 && (

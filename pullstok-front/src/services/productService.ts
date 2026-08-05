@@ -117,7 +117,39 @@ export const getStockSummary = async (): Promise<StockSummary> => {
   }
 };
 
-export const products = async (branchId?: string, search?: string, category?: string) => {
+/** Server-side pagination envelope (opt-in, only when page + pageSize are sent). */
+export interface PaginatedProducts {
+  items: DataItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+/**
+ * Legacy callers (no page/pageSize) get the plain array; paginated callers
+ * (page + pageSize) get the envelope {@link PaginatedProducts}. Overloads let
+ * existing consumers keep the `DataItem[]` type without any change.
+ */
+export function products(
+  branchId?: string,
+  search?: string,
+  category?: string,
+): Promise<DataItem[]>;
+export function products(
+  branchId: string | undefined,
+  search: string | undefined,
+  category: string | undefined,
+  page: number,
+  pageSize: number,
+): Promise<PaginatedProducts>;
+export async function products(
+  branchId?: string,
+  search?: string,
+  category?: string,
+  page?: number,
+  pageSize?: number,
+): Promise<DataItem[] | PaginatedProducts> {
   try {
     const token = localStorage.getItem("token");
 
@@ -125,6 +157,10 @@ export const products = async (branchId?: string, search?: string, category?: st
     if (branchId) params.branchId = branchId;
     if (search) params.name = search;
     if (category) params.category = category;
+    if (page !== undefined && pageSize !== undefined) {
+      params.page = String(page);
+      params.pageSize = String(pageSize);
+    }
 
     const response = await axios.get(`${API_URL}/products`, {
       params,
