@@ -291,15 +291,23 @@ export const deleteProduct = async (productId: string): Promise<void> => {
 // Bulk price update (sdd/bulk-price-update-selectors)
 // ---------------------------------------------------------------------------
 
+/** Override de % sobre una categoría o producto en una corrida masiva. */
+export interface PriceOverride {
+  id: string;
+  percentage: number;
+}
+
 /** Payload compartido por preview (dryRun) y apply de la actualización masiva. */
 export interface BulkPriceUpdatePayload {
   brandValues: string[];
   categoryIds: string[];
   excludeProductIds: string[];
   percentage: number;
+  categoryPercentages: PriceOverride[];
+  productPercentages: PriceOverride[];
 }
 
-/** Fila del preview: producto afectado con precio viejo → nuevo y delta. */
+/** Fila del preview: producto con % efectivo resuelto por el server. */
 export interface BulkPricePreviewRow {
   id: string;
   name: string;
@@ -308,6 +316,7 @@ export interface BulkPricePreviewRow {
   oldPrice: number;
   newPrice: number;
   delta: number;
+  effectivePercentage: number;
 }
 
 /** Respuesta del preview (dryRun): agregados sobre el set COMPLETO + página. */

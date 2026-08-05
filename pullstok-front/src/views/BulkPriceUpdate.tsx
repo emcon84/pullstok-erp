@@ -115,6 +115,8 @@ export const BulkPriceUpdate = () => {
       categoryIds,
       excludeProductIds: [...excludedIds],
       percentage: pct,
+      categoryPercentages: [],
+      productPercentages: [],
     };
   }, [selectedBrands, categoryIds, excludedIds, percentage]);
 

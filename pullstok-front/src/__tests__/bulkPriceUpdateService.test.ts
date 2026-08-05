@@ -5,13 +5,29 @@ const { mockFetch } = vi.hoisted(() => ({ mockFetch: vi.fn() }));
 vi.stubGlobal("fetch", mockFetch);
 
 import { bulkPriceUpdate } from "../services/productService";
-import type { BulkPriceUpdatePayload } from "../services/productService";
+import type {
+  BulkPriceUpdatePayload,
+  BulkPricePreviewRow,
+} from "../services/productService";
 
 const payload: BulkPriceUpdatePayload = {
   brandValues: ["Acme"],
   categoryIds: ["a"],
   excludeProductIds: ["p-9"],
   percentage: 15,
+  categoryPercentages: [{ id: "cat-1", percentage: 8 }],
+  productPercentages: [{ id: "p-1", percentage: 20 }],
+};
+
+const row: BulkPricePreviewRow = {
+  id: "p-1",
+  name: "Producto 1",
+  categoryName: "Perros",
+  brandValues: ["Acme"],
+  oldPrice: 100,
+  newPrice: 120,
+  delta: 20,
+  effectivePercentage: 20,
 };
 
 describe("bulkPriceUpdate service — dryRun preview + apply", () => {
@@ -103,6 +119,43 @@ describe("bulkPriceUpdate service — dryRun preview + apply", () => {
       pageSize: 50,
       total: 2,
       rows: [],
+    });
+  });
+
+  it("sends the per-category and per-product override arrays in the request body", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ affected: 2, rows: [] }),
+    });
+
+    await bulkPriceUpdate(payload, true);
+
+    const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(sentBody.categoryPercentages).toEqual([
+      { id: "cat-1", percentage: 8 },
+    ]);
+    expect(sentBody.productPercentages).toEqual([
+      { id: "p-1", percentage: 20 },
+    ]);
+  });
+
+  it("exposes the server-computed effectivePercentage on every preview row", async () => {
+    expect(row).toMatchObject({
+      id: "p-1",
+      oldPrice: 100,
+      newPrice: 120,
+      effectivePercentage: 20,
+    });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ affected: 1, rows: [row] }),
+    });
+
+    const result = await bulkPriceUpdate(payload, true);
+
+    expect((result as { rows: BulkPricePreviewRow[] }).rows[0]).toMatchObject({
+      id: "p-1",
+      effectivePercentage: 20,
     });
   });
 });
