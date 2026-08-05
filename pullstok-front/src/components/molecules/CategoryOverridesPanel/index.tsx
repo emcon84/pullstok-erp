@@ -29,7 +29,7 @@ export const CategoryOverridesPanel = ({
         <ul className="space-y-2">
           {nodes.map((node) => (
             <li key={node.id} className="flex items-center gap-2">
-              <Label htmlFor={`cat-ov-${node.id}`} className="min-w-0 flex-1 truncate">
+              <Label htmlFor={`cat-ov-${node.id}`} className="min-w-0 flex-1 truncate uppercase">
                 {node.name}
               </Label>
               <Input

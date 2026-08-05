@@ -83,7 +83,7 @@ const TreeRow = ({
             onCheckedChange={() => onToggle(node)}
             aria-label={node.name}
           />
-          <span className="truncate text-sm">{node.name}</span>
+          <span className="truncate text-sm uppercase">{node.name}</span>
         </div>
       </div>
 
