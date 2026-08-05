@@ -394,12 +394,20 @@ export const updateBranchStockSchema = z.object({
 });
 
 // ---------- Bulk Price Update ----------
+// Selectores de alcance redefinidos (sdd/bulk-price-update-selectors): el
+// cliente manda los NODE ids de categoría seleccionados (categoryIds) y el
+// server expande cada subtree; excludeProductIds saca productos puntuales del
+// conjunto. percentage es con signo (−100..500). roundUp y categoryId (single)
+// fueron REMOVIDOS; .strip() los descarta si un cliente legacy los envía.
 export const bulkPriceUpdateSchema = z.object({
   brandValues: z.array(z.string().min(1)).min(1, "Seleccioná al menos una marca"),
-  percentage: z.coerce.number().min(0, "El porcentaje debe ser >= 0").max(500, "Máximo 500%"),
-  roundUp: z.boolean().default(false),
-  categoryId: z.string().uuid().optional(),
-});
+  percentage: z.coerce
+    .number()
+    .min(-100, "Mínimo -100%")
+    .max(500, "Máximo 500%"),
+  categoryIds: z.array(z.string().uuid("Categoría inválida")).default([]),
+  excludeProductIds: z.array(z.string().uuid("Producto inválido")).default([]),
+}).strip();
 
 // ---------- Branding de la app (ERP) ----------
 // Configuración de branding del ERP, 1:1 con Organization.

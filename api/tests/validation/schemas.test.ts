@@ -1,4 +1,7 @@
-import { createUserSchema } from "../../src/validation/schemas";
+import {
+  createUserSchema,
+  bulkPriceUpdateSchema,
+} from "../../src/validation/schemas";
 
 describe("createUserSchema — role enum expansion", () => {
   const validEmail = "test@example.com";
@@ -359,5 +362,132 @@ describe("updateAppBrandingSchema", () => {
     expect(result.success).toBe(true);
     expect(result.data).toEqual({ primaryColor: "#111111" });
     expect((result.data as any).extraField).toBeUndefined();
+  });
+});
+
+describe("bulkPriceUpdateSchema — selectors (categoryIds/excludeProductIds + signed %) ", () => {
+  const validBrandValues = ["Acme"];
+  const validUuid = "00000000-0000-4000-8000-000000000001";
+
+  it("accepts a valid full payload with categoryIds and excludeProductIds", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 15,
+      categoryIds: [validUuid],
+      excludeProductIds: [validUuid],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.categoryIds).toEqual([validUuid]);
+      expect(result.data.excludeProductIds).toEqual([validUuid]);
+      expect(result.data.percentage).toBe(15);
+    }
+  });
+
+  it("rejects an empty brandValues array (at least one brand required)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: [],
+      percentage: 10,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects percentage below -100", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: -101,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects percentage above 500", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 501,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts percentage at the boundaries -100 and 500", () => {
+    expect(
+      bulkPriceUpdateSchema.safeParse({
+        brandValues: validBrandValues,
+        percentage: -100,
+      }).success,
+    ).toBe(true);
+    expect(
+      bulkPriceUpdateSchema.safeParse({
+        brandValues: validBrandValues,
+        percentage: 500,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an invalid UUID inside categoryIds", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      categoryIds: ["not-a-uuid"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an invalid UUID inside excludeProductIds", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      excludeProductIds: ["bad-id"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts empty categoryIds and empty excludeProductIds (defaults to [])", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      categoryIds: [],
+      excludeProductIds: [],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.categoryIds).toEqual([]);
+      expect(result.data.excludeProductIds).toEqual([]);
+    }
+  });
+
+  it("omitting categoryIds/excludeProductIds defaults them to empty arrays", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.categoryIds).toEqual([]);
+      expect(result.data.excludeProductIds).toEqual([]);
+    }
+  });
+
+  it("strips the legacy roundUp field (removed from the schema)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      roundUp: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect((result.data as any).roundUp).toBeUndefined();
+    }
+  });
+
+  it("strips the legacy single categoryId field (replaced by categoryIds)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      categoryId: validUuid,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect((result.data as any).categoryId).toBeUndefined();
+    }
   });
 });

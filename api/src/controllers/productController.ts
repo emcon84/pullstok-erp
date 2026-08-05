@@ -602,86 +602,202 @@ export const getProductByCode = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * POST /products/bulk-price-update — actualización masiva de precios
+ * (sdd/bulk-price-update-selectors). Selectores: brands (multi, obligatorio) +
+ * categoryIds (node ids; el server expande cada subtree) + excludeProductIds
+ * (exclusiones por producto) + percentage con signo (−100..500, clamp ≥ 0,
+ * 2 decimales). dryRun=true → preview paginada (50/page) con agregados sobre el
+ * set completo; apply → re-resuelve el set DENTRO de un $transaction interactivo
+ * (autoritativo, nunca confía en el preview).
+ */
+
+// Cap del set afectado (spec/design: BULK_UPDATE_MAX = 5000). Preview y apply
+// lo reutilizan; superarlo → 400 (no se ejecuta nada).
+export const BULK_UPDATE_MAX = 5000;
+const PREVIEW_PAGE_SIZE = 50;
+
+/** newPrice = price * (1 + pct/100), clamp ≥ 0, round 2 decimals. */
+export const computeNewPrice = (price: number, pct: number) =>
+  Math.max(0, Math.round(price * (1 + pct / 100) * 100) / 100);
+
+/**
+ * Expande cada category node a SÍ MISMO + todos sus descendientes caminando la
+ * self-relation org-scoped Category.parentId/children. Deduplica la unión.
+ * Ids desconocidos no lanzan error (sin descendientes, inofensivos: el where
+ * con `in: [idDesconocido]` no matchea productos de la org).
+ */
+export async function resolveCategoryScope(
+  tx: any,
+  categoryIds: string[],
+): Promise<string[]> {
+  if (categoryIds.length === 0) return [];
+  const cats = await tx.category.findMany({ select: { id: true, parentId: true } });
+  const children = new Map<string, string[]>();
+  for (const c of cats) {
+    if (c.parentId) {
+      if (!children.has(c.parentId)) children.set(c.parentId, []);
+      children.get(c.parentId)!.push(c.id);
+    }
+  }
+  const seen = new Set<string>();
+  const walk = (id: string) => {
+    if (!seen.has(id)) {
+      seen.add(id);
+      (children.get(id) ?? []).forEach(walk);
+    }
+  };
+  categoryIds.forEach(walk);
+  return [...seen];
+}
+
+/**
+ * Where común de preview y apply: brand (some option.value in brandValues sobre
+ * variant "Marca") AND categoryId in expanded (solo si hay expansión) AND id
+ * notIn excludeProductIds (solo si hay exclusiones). SIN filtro
+ * publishedToStore: aplica a TODOS los productos matcheados, incluidos no
+ * publicados (comportamiento confirmado).
+ */
+export function buildBulkPriceWhere(
+  brandValues: string[],
+  expanded: string[],
+  excludeProductIds: string[],
+) {
+  const where: any = {
+    variantAssignments: {
+      some: {
+        option: {
+          value: { in: brandValues },
+          variant: { name: "Marca" },
+        },
+      },
+    },
+  };
+  if (expanded.length > 0) where.categoryId = { in: expanded };
+  if (excludeProductIds.length > 0) where.id = { notIn: excludeProductIds };
+  return where;
+}
+
 export const bulkPriceUpdate = async (req: Request, res: Response) => {
   try {
-    const { brandValues, percentage, roundUp, categoryId } = req.body as {
+    const {
+      brandValues,
+      percentage,
+      categoryIds = [],
+      excludeProductIds = [],
+    } = req.body as {
       brandValues: string[];
       percentage: number;
-      roundUp: boolean;
-      categoryId?: string;
+      categoryIds?: string[];
+      excludeProductIds?: string[];
     };
     const dryRun = req.query.dryRun === "true";
 
-    // Build where clause: products that have at least one of the selected brand options
-    const where: any = {
-      variantAssignments: {
-        some: {
-          option: {
-            value: { in: brandValues },
-            variant: { name: "Marca" },
+    const expanded = await resolveCategoryScope(prisma, categoryIds);
+    const where = buildBulkPriceWhere(brandValues, expanded, excludeProductIds);
+
+    const products = await prisma.product.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        category: { select: { name: true } },
+        variantAssignments: {
+          select: {
+            option: { select: { value: true, variant: { select: { name: true } } } },
           },
         },
       },
-    };
-
-    if (categoryId) {
-      where.categoryId = categoryId;
-    }
-
-    // Find all matching products
-    const products = await prisma.product.findMany({
-      where,
-      select: { id: true, price: true, name: true },
     });
 
-    if (products.length === 0) {
+    const rows = products.map((p) => {
+      const oldPrice = Math.round(Number(p.price) * 100) / 100;
+      const newPrice = computeNewPrice(oldPrice, percentage);
+      return {
+        id: p.id,
+        name: p.name,
+        categoryName: p.category?.name ?? null,
+        brandValues: p.variantAssignments
+          .filter((a) => a.option.variant.name === "Marca")
+          .map((a) => a.option.value),
+        oldPrice,
+        newPrice,
+        delta: Math.round((newPrice - oldPrice) * 100) / 100,
+      };
+    });
+
+    const affected = rows.length;
+    const previousTotal =
+      Math.round(rows.reduce((s, r) => s + r.oldPrice, 0) * 100) / 100;
+    const newTotal =
+      Math.round(rows.reduce((s, r) => s + r.newPrice, 0) * 100) / 100;
+
+    if (!dryRun) {
+      // Apply: re-resuelve el set afectado DENTRO del $transaction (autoritativo
+      // — nunca confía en un preview stale). Cap y exclusiones se chequean
+      // in-tx para que el >cap NUNCA escriba (rollback implícito).
+      const result = await prisma.$transaction(async (tx) => {
+        const expandedTx = await resolveCategoryScope(tx, categoryIds);
+        const rowsTx = await tx.product.findMany({
+          where: buildBulkPriceWhere(brandValues, expandedTx, excludeProductIds),
+          select: { id: true, price: true },
+        });
+        if (rowsTx.length === 0) {
+          return { affected: 0, previousTotal: 0, newTotal: 0, overCap: false };
+        }
+        if (rowsTx.length > BULK_UPDATE_MAX) {
+          return { affected: rowsTx.length, previousTotal: 0, newTotal: 0, overCap: true };
+        }
+        const updates = rowsTx.map((r) => ({
+          id: r.id,
+          newPrice: computeNewPrice(Number(r.price), percentage),
+        }));
+        await Promise.all(
+          updates.map((u) =>
+            tx.product.updateMany({ where: { id: u.id }, data: { price: u.newPrice } }),
+          ),
+        );
+        const prevTotal =
+          Math.round(rowsTx.reduce((s, r) => s + Number(r.price), 0) * 100) / 100;
+        const newTot =
+          Math.round(updates.reduce((s, u) => s + u.newPrice, 0) * 100) / 100;
+        return { affected: updates.length, previousTotal: prevTotal, newTotal: newTot, overCap: false };
+      });
+
+      if (result.overCap) {
+        return res.status(400).json({
+          message: `El lote supera el máximo de ${BULK_UPDATE_MAX} productos. Ajustá el alcance.`,
+        });
+      }
+      if (result.affected === 0) {
+        return res.status(400).json({
+          message: "Todos los productos fueron excluidos o no hay coincidencias",
+        });
+      }
       return res.status(200).json({
-        message: "No se encontraron productos con esas marcas",
-        affected: 0,
-        previousTotal: 0,
-        newTotal: 0,
+        affected: result.affected,
+        previousTotal: result.previousTotal,
+        newTotal: result.newTotal,
       });
     }
 
-    const multiplier = 1 + (percentage / 100);
-    const updates: { id: string; newPrice: number }[] = [];
-
-    for (const p of products) {
-      let newPrice = Number(p.price) * multiplier;
-      if (roundUp) {
-        const intPart = Math.floor(newPrice);
-        const decPart = newPrice - intPart;
-        if (decPart > 0.50) {
-          newPrice = intPart + 1;
-        } else {
-          newPrice = intPart;
-        }
-      }
-      updates.push({ id: p.id, newPrice: Math.round(newPrice * 100) / 100 });
+    // Preview (dryRun): cap y paginación; agregados sobre el set COMPLETO.
+    if (affected > BULK_UPDATE_MAX) {
+      return res.status(400).json({
+        message: `El lote supera el máximo de ${BULK_UPDATE_MAX} productos. Ajustá el alcance.`,
+      });
     }
-
-    const previousTotal = products.reduce((sum, p) => sum + Number(p.price), 0);
-    const newTotal = updates.reduce((sum, u) => sum + u.newPrice, 0);
-
-    if (!dryRun) {
-      // Update all products in a transaction
-      await prisma.$transaction(
-        updates.map((u) =>
-          prisma.product.updateMany({
-            where: { id: u.id },
-            data: { price: u.newPrice },
-          })
-        )
-      );
-    }
-
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const slice = rows.slice((page - 1) * PREVIEW_PAGE_SIZE, page * PREVIEW_PAGE_SIZE);
     res.status(200).json({
-      message: dryRun
-        ? `Preview: ${updates.length} productos serían actualizados`
-        : `${updates.length} productos actualizados`,
-      affected: updates.length,
-      previousTotal: Math.round(previousTotal * 100) / 100,
-      newTotal: Math.round(newTotal * 100) / 100,
+      affected,
+      previousTotal,
+      newTotal,
+      page,
+      pageSize: PREVIEW_PAGE_SIZE,
+      total: rows.length,
+      rows: slice,
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
