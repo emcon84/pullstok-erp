@@ -3,6 +3,8 @@ import productController, {
   computeNewPrice,
   resolveCategoryScope,
   buildBulkPriceWhere,
+  buildCategoryParentMap,
+  resolveEffectivePercentage,
   BULK_UPDATE_MAX,
 } from "../../src/controllers/productController";
 import { prisma } from "../../src/config/db";
@@ -148,6 +150,87 @@ describe("BULK_UPDATE_MAX module constant", () => {
   });
 });
 
+describe("buildCategoryParentMap — parent lookup for inheritance walk", () => {
+  it("maps each category to its parentId and roots to null", () => {
+    const map = buildCategoryParentMap([
+      { id: "a", parentId: null },
+      { id: "b", parentId: "a" },
+      { id: "c", parentId: "b" },
+    ]);
+    expect(map.get("a")).toBeNull();
+    expect(map.get("b")).toBe("a");
+    expect(map.get("c")).toBe("b");
+  });
+});
+
+describe("resolveEffectivePercentage — product > nearest category ancestor > global", () => {
+  // Tree: a → b → c (a parent of b, b parent of c)
+  const parentById = new Map<string, string | null>([
+    ["a", null],
+    ["b", "a"],
+    ["c", "b"],
+  ]);
+
+  const eff = (o: {
+    productId?: string | null;
+    categoryId?: string | null;
+    categoryPercentages?: Array<[string, number]>;
+    productPercentages?: Array<[string, number]>;
+    globalPct?: number;
+  }) =>
+    resolveEffectivePercentage({
+      productId: o.productId === undefined ? null : o.productId,
+      categoryId: o.categoryId === undefined ? "c" : o.categoryId,
+      parentById,
+      categoryPercentages: new Map(o.categoryPercentages ?? []),
+      productPercentages: new Map(o.productPercentages ?? []),
+      globalPct: o.globalPct ?? 15,
+    });
+
+  it("uses the global percentage when no override exists on the ancestry (S5)", () => {
+    expect(eff({ globalPct: 15 })).toBe(15);
+  });
+
+  it("product override wins over category and global (S4)", () => {
+    expect(
+      eff({
+        productId: "p-x",
+        productPercentages: [["p-x", 20]],
+        categoryPercentages: [["c", 10]],
+        globalPct: 0,
+      }),
+    ).toBe(20);
+  });
+
+  it("an exact-self category override applies (own category)", () => {
+    expect(eff({ categoryPercentages: [["c", 10]] })).toBe(10);
+  });
+
+  it("a parent override inherits down to a descendant leaf (S2)", () => {
+    expect(eff({ categoryPercentages: [["a", 10]] })).toBe(10);
+  });
+
+  it("a child override beats its ancestor override (S3)", () => {
+    expect(
+      eff({ categoryPercentages: [["a", 10], ["c", 5]] }),
+    ).toBe(5);
+  });
+
+  it("returns 0% for an explicit 0% override (S6)", () => {
+    expect(eff({ categoryPercentages: [["c", 0]], globalPct: 10 })).toBe(0);
+  });
+
+  it("falls to the product override when categoryId is null", () => {
+    expect(
+      eff({ categoryId: null, productId: "p-q", productPercentages: [["p-q", 25]] }),
+    ).toBe(25);
+  });
+
+  it("falls to the global when categoryId is null and no product override", () => {
+    expect(eff({ categoryId: null, globalPct: 12 })).toBe(12);
+  });
+});
+
 describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
   const mockedPrisma = prisma as unknown as {
     product: { findMany: jest.Mock };
@@ -172,6 +255,39 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
 
   const makeMany = (n: number) =>
     Array.from({ length: n }, (_, i) => makeProduct(i));
+
+  const prodWithCat = (
+    id: string,
+    catId: string | null,
+    catName: string,
+    price = 100,
+  ) => ({
+    id,
+    name: `Prod ${id}`,
+    price,
+    categoryId: catId,
+    category: catId ? { name: catName } : null,
+    variantAssignments: [
+      { option: { value: "Acme", variant: { name: "Marca" } } },
+    ],
+  });
+
+  const overrideDryRunReq = (overrides: {
+    categoryPercentages?: Array<{ categoryId: string; percentage: number }>;
+    productPercentages?: Array<{ productId: string; percentage: number }>;
+    percentage?: number;
+  }) =>
+    ({
+      body: {
+        brandValues: ["Acme"],
+        percentage: overrides.percentage ?? 10,
+        categoryIds: [],
+        excludeProductIds: [],
+        categoryPercentages: overrides.categoryPercentages ?? [],
+        productPercentages: overrides.productPercentages ?? [],
+      },
+      query: { dryRun: "true" },
+    } as unknown as Request);
 
   const mockResponse = () => {
     const res = {
@@ -260,6 +376,140 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
       const json = res.json.mock.calls[0][0];
       expect(json.affected).toBe(450);
       expect(json.rows).toHaveLength(50);
+    });
+
+    it("exposes effectivePercentage on every preview row (global when no overrides)", async () => {
+      mockedPrisma.product.findMany.mockResolvedValue(makeMany(2));
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(dryRunReq(1), res);
+
+      const rows = res.json.mock.calls[0][0].rows as Array<{
+        effectivePercentage: number;
+        newPrice: number;
+      }>;
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row.effectivePercentage).toBe(10);
+        expect(row.newPrice).toBe(110);
+      }
+    });
+
+    it("applies a per-category override to that category's products and recomputes aggregates", async () => {
+      mockedPrisma.product.findMany.mockResolvedValue([
+        prodWithCat("p-a", "aaa", "Perros", 100),
+        prodWithCat("p-b", "bbb", "Gatos", 120),
+      ]);
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        overrideDryRunReq({
+          percentage: 10,
+          categoryPercentages: [{ categoryId: "aaa", percentage: 20 }],
+        }),
+        res,
+      );
+
+      const json = res.json.mock.calls[0][0];
+      const rows = json.rows as Array<{
+        id: string;
+        effectivePercentage: number;
+        newPrice: number;
+      }>;
+      expect(rows.find((r) => r.id === "p-a")).toMatchObject({
+        effectivePercentage: 20,
+        newPrice: 120,
+      });
+      expect(rows.find((r) => r.id === "p-b")).toMatchObject({
+        effectivePercentage: 10,
+        newPrice: 132,
+      });
+      // previous 100+120=220; new 120+132=252
+      expect(json.previousTotal).toBe(220);
+      expect(json.newTotal).toBe(252);
+    });
+
+    it("inherits a parent category override to descendant products in preview (S2)", async () => {
+      // categories a (root) → b (child of a); product in b inherits override on a
+      mockedPrisma.category.findMany.mockResolvedValue([
+        { id: "a", parentId: null },
+        { id: "b", parentId: "a" },
+      ]);
+      mockedPrisma.product.findMany.mockResolvedValue([
+        prodWithCat("p-l", "b", "B", 100),
+      ]);
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        overrideDryRunReq({
+          percentage: 0,
+          categoryPercentages: [{ categoryId: "a", percentage: 10 }],
+        }),
+        res,
+      );
+
+      const rows = res.json.mock.calls[0][0].rows as Array<{
+        id: string;
+        effectivePercentage: number;
+        newPrice: number;
+      }>;
+      expect(rows[0]).toMatchObject({
+        effectivePercentage: 10,
+        newPrice: 110,
+      });
+      expect(res.json.mock.calls[0][0].affected).toBe(1);
+    });
+
+    it("keeps a 0%-override product included, unchanged and counted (S6)", async () => {
+      mockedPrisma.product.findMany.mockResolvedValue([
+        prodWithCat("p1", "aaa", "A", 100),
+        prodWithCat("p2", "bbb", "B", 120),
+      ]);
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        overrideDryRunReq({
+          percentage: 10,
+          categoryPercentages: [{ categoryId: "aaa", percentage: 0 }],
+        }),
+        res,
+      );
+
+      const json = res.json.mock.calls[0][0];
+      const rows = json.rows as Array<{
+        id: string;
+        effectivePercentage: number;
+        newPrice: number;
+      }>;
+      expect(rows.find((r) => r.id === "p1")).toMatchObject({
+        effectivePercentage: 0,
+        newPrice: 100,
+      });
+      expect(json.affected).toBe(2);
+      // previousTotal 220; new = 100 (p1) + 132 (p2) = 232
+      expect(json.newTotal).toBe(232);
+    });
+
+    it("ignores an out-of-scope override id (S10)", async () => {
+      mockedPrisma.product.findMany.mockResolvedValue(makeMany(1));
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        overrideDryRunReq({
+          percentage: 10,
+          categoryPercentages: [{ categoryId: "zzz", percentage: 50 }],
+        }),
+        res,
+      );
+
+      const rows = res.json.mock.calls[0][0].rows as Array<{
+        effectivePercentage: number;
+        newPrice: number;
+      }>;
+      expect(rows[0]).toEqual(expect.objectContaining({
+        effectivePercentage: 10,
+        newPrice: 110,
+      }));
     });
   });
 

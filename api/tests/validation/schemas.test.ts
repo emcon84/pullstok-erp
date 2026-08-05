@@ -491,3 +491,116 @@ describe("bulkPriceUpdateSchema — selectors (categoryIds/excludeProductIds + s
     }
   });
 });
+
+describe("bulkPriceUpdateSchema — per-category/product override arrays", () => {
+  const catA = "00000000-0000-4000-8000-0000000000aa";
+  const catB = "00000000-0000-4000-8000-0000000000bb";
+  const prodP = "00000000-0000-4000-8000-0000000000cc";
+  const validBrandValues = ["Acme"];
+
+  it("defaults missing override arrays to empty arrays (no-override payload still parses)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.categoryPercentages).toEqual([]);
+      expect(result.data.productPercentages).toEqual([]);
+    }
+  });
+
+  it("parses override entries with coerced numeric percentage", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      categoryPercentages: [{ categoryId: catA, percentage: "10" }],
+      productPercentages: [{ productId: prodP, percentage: 20 }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.categoryPercentages).toEqual([
+        { categoryId: catA, percentage: 10 },
+      ]);
+      expect(result.data.productPercentages).toEqual([
+        { productId: prodP, percentage: 20 },
+      ]);
+    }
+  });
+
+  it("rejects an override percentage above 500 (S11)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      productPercentages: [{ productId: prodP, percentage: 501 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an override percentage below -100 (S11)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      categoryPercentages: [{ categoryId: catA, percentage: -101 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an invalid uuid inside an override entry (S12)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      categoryPercentages: [{ categoryId: "nope", percentage: 10 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an override array with more than 500 entries (REQ-1 edge)", () => {
+    const many = Array.from({ length: 501 }, (_, i) => ({
+      categoryId: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+      percentage: 10,
+    }));
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      categoryPercentages: many,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const flat = result.error.issues.map((i) => i.message).join(" | ");
+      expect(flat).toContain("Máximo 500");
+    }
+  });
+
+  it("rejects duplicate categoryId entries naming the duplicated key (S9)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      categoryPercentages: [
+        { categoryId: catA, percentage: 10 },
+        { categoryId: catA, percentage: 20 },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const flat = result.error.issues.map((i) => i.message).join(" | ");
+      expect(flat).toContain(catA);
+    }
+  });
+
+  it("rejects duplicate productId entries naming the duplicated key (S9)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      productPercentages: [
+        { productId: prodP, percentage: 10 },
+        { productId: prodP, percentage: 20 },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const flat = result.error.issues.map((i) => i.message).join(" | ");
+      expect(flat).toContain(prodP);
+    }
+  });
+});

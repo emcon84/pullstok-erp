@@ -399,15 +399,64 @@ export const updateBranchStockSchema = z.object({
 // server expande cada subtree; excludeProductIds saca productos puntuales del
 // conjunto. percentage es con signo (−100..500). roundUp y categoryId (single)
 // fueron REMOVIDOS; .strip() los descarta si un cliente legacy los envía.
-export const bulkPriceUpdateSchema = z.object({
-  brandValues: z.array(z.string().min(1)).min(1, "Seleccioná al menos una marca"),
-  percentage: z.coerce
-    .number()
-    .min(-100, "Mínimo -100%")
-    .max(500, "Máximo 500%"),
-  categoryIds: z.array(z.string().uuid("Categoría inválida")).default([]),
-  excludeProductIds: z.array(z.string().uuid("Producto inválido")).default([]),
-}).strip();
+
+/** Entrada de override (categoría o producto): uuid del key + % con signo (−100..500). */
+const categoryOverrideSchema = z.object({
+  categoryId: z.string().uuid("Categoría inválida"),
+  percentage: z.coerce.number().min(-100, "Mínimo -100%").max(500, "Máximo 500%"),
+});
+const productOverrideSchema = z.object({
+  productId: z.string().uuid("Producto inválido"),
+  percentage: z.coerce.number().min(-100, "Mínimo -100%").max(500, "Máximo 500%"),
+});
+
+export const bulkPriceUpdateSchema = z
+  .object({
+    brandValues: z.array(z.string().min(1)).min(1, "Seleccioná al menos una marca"),
+    percentage: z.coerce
+      .number()
+      .min(-100, "Mínimo -100%")
+      .max(500, "Máximo 500%"),
+    categoryIds: z.array(z.string().uuid("Categoría inválida")).default([]),
+    excludeProductIds: z.array(z.string().uuid("Producto inválido")).default([]),
+    // Overrides por categoría/producto (sdd/bulk-price-overrides): % propio por
+    // nodo de categoría y por fila de producto. Precedencia product > category
+    // > global (percentage). 0% = incluido pero sin cambio; exclusión =
+    // fuera de la corrida. Duplicados → 400 nombrando la key (sin dedupe).
+    categoryPercentages: z
+      .array(categoryOverrideSchema)
+      .max(500, "Máximo 500 overrides por corrida")
+      .default([]),
+    productPercentages: z
+      .array(productOverrideSchema)
+      .max(500, "Máximo 500 overrides por corrida")
+      .default([]),
+  })
+  .strip()
+  .superRefine((data, ctx) => {
+    const seenCategories = new Set<string>();
+    data.categoryPercentages.forEach(({ categoryId }) => {
+      if (seenCategories.has(categoryId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["categoryPercentages"],
+          message: `Categoría duplicada: ${categoryId}`,
+        });
+      }
+      seenCategories.add(categoryId);
+    });
+    const seenProducts = new Set<string>();
+    data.productPercentages.forEach(({ productId }) => {
+      if (seenProducts.has(productId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["productPercentages"],
+          message: `Producto duplicado: ${productId}`,
+        });
+      }
+      seenProducts.add(productId);
+    });
+  });
 
 // ---------- Branding de la app (ERP) ----------
 // Configuración de branding del ERP, 1:1 con Organization.

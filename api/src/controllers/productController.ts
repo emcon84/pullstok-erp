@@ -678,6 +678,44 @@ export function buildBulkPriceWhere(
   return where;
 }
 
+/**
+ * Mapa id → parentId de todas las categorías de la org. Lo usan preview y
+ * apply para caminar ancestros al resolver el % efectivo de un producto
+ * (override de categoría hereda a TODO su subtree: nodo y descendientes).
+ */
+export function buildCategoryParentMap(
+  cats: { id: string; parentId: string | null }[],
+): ReadonlyMap<string, string | null> {
+  return new Map(cats.map((c) => [c.id, c.parentId]));
+}
+
+/**
+ * % efectivo de un producto: override por producto > override del nodo de
+ * categoría o su ancestro más cercano (incl. sí mismo) > global. 0% explícito
+ * es válido (incluido pero sin cambio de precio). null categoryId → salta la
+ * caminata de ancestros. productOverrides desconocido → null (producto sin
+ * override, se resuelve por categoría/global).
+ */
+export function resolveEffectivePercentage(a: {
+  productId: string | null;
+  categoryId: string | null;
+  parentById: ReadonlyMap<string, string | null>;
+  productPercentages: ReadonlyMap<string, number>;
+  categoryPercentages: ReadonlyMap<string, number>;
+  globalPct: number;
+}): number {
+  if (a.productId !== null && a.productPercentages.has(a.productId)) {
+    return a.productPercentages.get(a.productId)!;
+  }
+  let catId = a.categoryId;
+  while (catId !== null) {
+    const override = a.categoryPercentages.get(catId);
+    if (override !== undefined) return override;
+    catId = a.parentById.get(catId) ?? null;
+  }
+  return a.globalPct;
+}
+
 export const bulkPriceUpdate = async (req: Request, res: Response) => {
   try {
     const {
@@ -685,16 +723,34 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       percentage,
       categoryIds = [],
       excludeProductIds = [],
+      categoryPercentages = [],
+      productPercentages = [],
     } = req.body as {
       brandValues: string[];
       percentage: number;
       categoryIds?: string[];
       excludeProductIds?: string[];
+      categoryPercentages?: { categoryId: string; percentage: number }[];
+      productPercentages?: { productId: string; percentage: number }[];
     };
     const dryRun = req.query.dryRun === "true";
 
     const expanded = await resolveCategoryScope(prisma, categoryIds);
     const where = buildBulkPriceWhere(brandValues, expanded, excludeProductIds);
+
+    // Overrides: mapa de ancestros (para heredar override de categoría al
+    // subtree) + maps de % por categoría/producto. Preview Y apply resuelven
+    // el % efectivo con resolveEffectivePercentage (misma fuente de verdad).
+    const cats = await prisma.category.findMany({
+      select: { id: true, parentId: true },
+    });
+    const parentById = buildCategoryParentMap(cats);
+    const catPctMap = new Map(
+      categoryPercentages.map((c) => [c.categoryId, c.percentage]),
+    );
+    const prodPctMap = new Map(
+      productPercentages.map((p) => [p.productId, p.percentage]),
+    );
 
     const products = await prisma.product.findMany({
       where,
@@ -702,6 +758,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         id: true,
         name: true,
         price: true,
+        categoryId: true,
         category: { select: { name: true } },
         variantAssignments: {
           select: {
@@ -713,7 +770,15 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
 
     const rows = products.map((p) => {
       const oldPrice = Math.round(Number(p.price) * 100) / 100;
-      const newPrice = computeNewPrice(oldPrice, percentage);
+      const effectivePercentage = resolveEffectivePercentage({
+        productId: p.id,
+        categoryId: p.categoryId ?? null,
+        parentById,
+        productPercentages: prodPctMap,
+        categoryPercentages: catPctMap,
+        globalPct: percentage,
+      });
+      const newPrice = computeNewPrice(oldPrice, effectivePercentage);
       return {
         id: p.id,
         name: p.name,
@@ -724,6 +789,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         oldPrice,
         newPrice,
         delta: Math.round((newPrice - oldPrice) * 100) / 100,
+        effectivePercentage,
       };
     });
 
