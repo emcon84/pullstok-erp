@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { productsList } from "../../controllers/productController";
-import { PaginatedProducts, products as fetchProducts, createProduct as createNewProduct, updateProduct as updateExistingProduct, deleteProduct  } from '../../services/productService';
+import { PaginatedProducts, ProductFacets, products as fetchProducts, getProductFacets, createProduct as createNewProduct, updateProduct as updateExistingProduct, deleteProduct  } from '../../services/productService';
 import { DataItem } from "../../types";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, InfiniteData } from "@tanstack/react-query";
 import { toast } from "react-toastify";
@@ -98,6 +98,26 @@ export const useInfiniteProducts = (
   };
 };
 
+/**
+ * Fetches the complete filter facets (all org categories + variant groups for
+ * the selected category). When a category is selected the variants refetch for
+ * it; when cleared (category undefined) variants come back empty but the
+ * categories stay complete.
+ */
+export const useProductFacets = (category?: string) => {
+  const { data, isLoading } = useQuery<ProductFacets, Error>({
+    queryKey: ["product-facets", category || "all"],
+    queryFn: () => getProductFacets(category),
+    placeholderData: (prev) => prev, // keep previous while fetching
+  });
+
+  return {
+    categories: data?.categories ?? [],
+    variants: data?.variants ?? [],
+    loading: isLoading,
+  };
+};
+
 // Hook para crear un nuevo producto
 export const useCreateProduct = () => {
   const queryClient = useQueryClient();
@@ -109,6 +129,7 @@ export const useCreateProduct = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['products']});
+      queryClient.invalidateQueries({queryKey: ['product-facets']});
     },
   });
 
@@ -131,6 +152,7 @@ export const useUpdateProduct = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries();
+      queryClient.invalidateQueries({queryKey: ['product-facets']});
     },
   });
 
@@ -150,6 +172,7 @@ export const useDeleteProduct = () => {
     onSuccess: () => {
       toast.success('Producto eliminado correctamente');
       queryClient.invalidateQueries({queryKey: ['products']});
+      queryClient.invalidateQueries({queryKey: ['product-facets']});
     },
     onError: (error: Error) => {
       // Manejo de errores más específico basado en el mensaje del backend

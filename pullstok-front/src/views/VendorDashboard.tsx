@@ -35,7 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { useInfiniteProducts } from "../components/hooks/useProducts";
+import { useInfiniteProducts, useProductFacets } from "../components/hooks/useProducts";
 import { useCreateSale } from "../components/hooks/useSales";
 import { useCreateOrder } from "../components/hooks/useOrder";
 import { useVendorCart, type VendorCartItem } from "../components/hooks/useVendorCart";
@@ -117,6 +117,11 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
       debouncedFilter?.trim() || undefined,
       categoryFilter.trim() || undefined,
     );
+
+  // Complete facets for the filter chips: all org categories plus variant
+  // groups for the selected category. Independent of the paginated list.
+  const { categories: facetsCategories, variants: facetsVariants } =
+    useProductFacets(categoryFilter.trim() || undefined);
 
   // Infinite scroll: load the next page when the sentinel enters the viewport.
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -401,6 +406,8 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
         <FilterChips
           products={items}
+          quickCategories={facetsCategories.map((c) => c.name)}
+          quickVariants={facetsVariants}
           filter={filter}
           categoryFilter={categoryFilter}
           onFilterChange={setFilter}

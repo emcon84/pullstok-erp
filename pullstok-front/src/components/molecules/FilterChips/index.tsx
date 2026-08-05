@@ -13,6 +13,8 @@ export interface FilterChipsProps {
   onFilterChange: (filter: string) => void;
   onCategoryChange: (category: string) => void;
   onClear: () => void;
+  quickCategories?: string[];
+  quickVariants?: { name: string; values: string[] }[];
 }
 
 // ── ScrollRow ──
@@ -54,9 +56,14 @@ export const FilterChips = ({
   onFilterChange,
   onCategoryChange,
   onClear,
+  quickCategories: quickCategoriesProp,
+  quickVariants: quickVariantsProp,
 }: FilterChipsProps) => {
-  // Extract unique categories
+  // Extract unique categories. When the caller supplies complete facets
+  // (vendor dashboard), use them directly; otherwise derive from the loaded
+  // products as before.
   const quickCategories = useMemo(() => {
+    if (quickCategoriesProp !== undefined) return quickCategoriesProp;
     if (!products) return [];
     const seen = new Set<string>();
     const cats: string[] = [];
@@ -68,10 +75,13 @@ export const FilterChips = ({
       }
     }
     return cats.sort();
-  }, [products]);
+  }, [products, quickCategoriesProp]);
 
-  // Group variants by type when a category is selected
+  // Group variants by type when a category is selected. When the caller
+  // supplies complete facets, use them directly; otherwise derive from the
+  // loaded products as before.
   const quickVariants = useMemo(() => {
+    if (quickVariantsProp !== undefined) return quickVariantsProp;
     if (!categoryFilter || !products) return [];
     const filtered = products.filter((p) => {
       const catName = (p as any).category?.name || p.category || "";
@@ -96,7 +106,7 @@ export const FilterChips = ({
     return Object.entries(groups)
       .map(([name, values]) => ({ name, values: [...values].sort() }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [categoryFilter, products]);
+  }, [categoryFilter, products, quickVariantsProp]);
 
   const hasFilters = !!(categoryFilter || filter);
 

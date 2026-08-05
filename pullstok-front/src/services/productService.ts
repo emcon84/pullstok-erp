@@ -117,6 +117,47 @@ export const getStockSummary = async (): Promise<StockSummary> => {
   }
 };
 
+/** Complete filter facets: all org categories + variants for the selected category. */
+export interface ProductFacets {
+  categories: { id: string; name: string }[];
+  variants: { name: string; values: string[] }[];
+}
+
+/**
+ * Fetches the full filter facets (all categories that have products, plus
+ * variant groups for the matching category). Independent of the paginated list,
+ * so the chips always reflect the complete catalog.
+ */
+export const getProductFacets = async (
+  category?: string,
+): Promise<ProductFacets> => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const params: Record<string, string> = {};
+    if (category) params.category = category;
+
+    const response = await axios.get<ProductFacets>(
+      `${API_URL}/products/filter-facets`,
+      {
+        params,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "get product facets failed",
+      );
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+
 /** Server-side pagination envelope (opt-in, only when page + pageSize are sent). */
 export interface PaginatedProducts {
   items: DataItem[];
