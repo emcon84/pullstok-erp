@@ -308,7 +308,8 @@ export interface BulkPriceUpdatePayload {
   brandValues: string[];
   categoryIds: string[];
   excludeProductIds: string[];
-  percentage: number;
+  /** Global opcional: sin valor el server resuelve 0 para productos sin override. */
+  percentage?: number;
   categoryPercentages: CategoryPriceOverride[];
   productPercentages: ProductPriceOverride[];
 }

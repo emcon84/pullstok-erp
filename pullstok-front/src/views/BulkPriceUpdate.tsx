@@ -130,8 +130,13 @@ export const BulkPriceUpdate = () => {
   };
 
   const payload = useCallback((): BulkPriceUpdatePayload | null => {
-    const pct = parseFloat(percentage);
-    if (selectedBrands.length === 0 || Number.isNaN(pct)) return null;
+    if (selectedBrands.length === 0) return null;
+    const trimmed = percentage.trim();
+    // Global opcional: vacío/NaN → undefined (server resuelve 0). Los overrides
+    // propios por categoría/producto siguen aplicándose con prioridad.
+    const pct = trimmed === "" || Number.isNaN(parseFloat(trimmed))
+      ? undefined
+      : parseFloat(trimmed);
     const categoryPercentages = Object.entries(categoryOverrides)
       .filter(([, value]) => value.trim() !== "" && !Number.isNaN(parseFloat(value)))
       .map(([categoryId, value]) => ({ categoryId, percentage: parseFloat(value) }));
@@ -322,9 +327,7 @@ export const BulkPriceUpdate = () => {
               <Button
                 className="w-full"
                 size="lg"
-                disabled={
-                  selectedBrands.length === 0 || !percentage || submitting
-                }
+                disabled={selectedBrands.length === 0 || submitting}
                 onClick={() => handlePreview(1)}
               >
                 {submitting ? "Calculando..." : "Calcular preview"}

@@ -413,10 +413,14 @@ const productOverrideSchema = z.object({
 export const bulkPriceUpdateSchema = z
   .object({
     brandValues: z.array(z.string().min(1)).min(1, "Seleccioná al menos una marca"),
+    // percentage (global) es OPCIONAL: si no viene, el server resuelve 0 como
+    // default efectivo (productos sin override no cambian). Sirve para correr
+    // con SOLO overrides por categoría/producto sin default global.
     percentage: z.coerce
       .number()
       .min(-100, "Mínimo -100%")
-      .max(500, "Máximo 500%"),
+      .max(500, "Máximo 500%")
+      .optional(),
     categoryIds: z.array(z.string().uuid("Categoría inválida")).default([]),
     excludeProductIds: z.array(z.string().uuid("Producto inválido")).default([]),
     // Overrides por categoría/producto (sdd/bulk-price-overrides): % propio por

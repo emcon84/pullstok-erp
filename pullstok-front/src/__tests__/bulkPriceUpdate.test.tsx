@@ -259,6 +259,30 @@ describe("BulkPriceUpdate — preview, exclusions and apply", () => {
     );
   });
 
+  it("calculates preview with ONLY a category override and no global percentage", async () => {
+    renderView();
+    // Selecciona marcas pero NO carga porcentaje default.
+    fireEvent.click(await screen.findByText("Acme"));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Alimentos" }));
+    fireEvent.change(await screen.findByLabelText(/porcentaje alimentos/i), {
+      target: { value: "5" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /calcular preview/i }));
+    await screen.findByText("Producto 1");
+
+    await waitFor(() =>
+      expect(mockBulkPriceUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          percentage: undefined,
+          categoryPercentages: [{ categoryId: "cat-1", percentage: 5 }],
+        }),
+        true,
+        1,
+      ),
+    );
+  });
+
   it("edits a product row % cell, recomputes row and totals, and sends productPercentages", async () => {
     renderView();
     await selectBrandAndPercent();

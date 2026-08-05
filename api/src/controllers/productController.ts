@@ -727,13 +727,15 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       productPercentages = [],
     } = req.body as {
       brandValues: string[];
-      percentage: number;
+      percentage?: number;
       categoryIds?: string[];
       excludeProductIds?: string[];
       categoryPercentages?: { categoryId: string; percentage: number }[];
       productPercentages?: { productId: string; percentage: number }[];
     };
     const dryRun = req.query.dryRun === "true";
+    // Global opcional: sin valor → 0 (productos sin override no cambian).
+    const globalPct = percentage ?? 0;
 
     const expanded = await resolveCategoryScope(prisma, categoryIds);
     const where = buildBulkPriceWhere(brandValues, expanded, excludeProductIds);
@@ -776,7 +778,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         parentById,
         productPercentages: prodPctMap,
         categoryPercentages: catPctMap,
-        globalPct: percentage,
+        globalPct,
       });
       const newPrice = computeNewPrice(oldPrice, effectivePercentage);
       return {
@@ -825,7 +827,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
             parentById,
             productPercentages: prodPctMap,
             categoryPercentages: catPctMap,
-            globalPct: percentage,
+            globalPct,
           });
           return {
             id: r.id,

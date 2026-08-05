@@ -511,6 +511,48 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
         newPrice: 110,
       }));
     });
+
+    it("runs with ONLY category overrides and no global percentage (global defaults to 0)", async () => {
+      // p1 en categoría a (override 10% → 110); p2 en b → padre a (override
+      // 10%) → 110 también. p3 sin categoría → sin override → global 0 → 100.
+      mockedPrisma.product.findMany.mockResolvedValue([
+        prodWithCat("p1", "a", "A", 100),
+        prodWithCat("p2", "b", "B", 100),
+        prodWithCat("p3", null, "SinC", 100),
+      ]);
+      const res = mockResponse();
+
+      // percentage OMITIDO del body (como envía el front cuando no hay default).
+      const req = {
+        body: {
+          brandValues: ["Acme"],
+          categoryIds: ["a"],
+          excludeProductIds: [],
+          categoryPercentages: [{ categoryId: "a", percentage: 10 }],
+          productPercentages: [],
+        },
+        query: { dryRun: "true" },
+      } as unknown as Request;
+
+      await productController.bulkPriceUpdate(req, res);
+
+      const json = res.json.mock.calls[0][0];
+      const rows = json.rows as Array<{
+        id: string;
+        effectivePercentage: number;
+        newPrice: number;
+      }>;
+      expect(json.affected).toBe(3);
+      expect(rows.find((r) => r.id === "p1")).toMatchObject({
+        effectivePercentage: 10,
+        newPrice: 110,
+      });
+      // p3 sin categoría ni override → el default global es 0, no cambia.
+      expect(rows.find((r) => r.id === "p3")).toMatchObject({
+        effectivePercentage: 0,
+        newPrice: 100,
+      });
+    });
   });
 
   describe("apply (authoritative $transaction)", () => {

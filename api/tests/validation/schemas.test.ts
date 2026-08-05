@@ -384,6 +384,21 @@ describe("bulkPriceUpdateSchema — selectors (categoryIds/excludeProductIds + s
     }
   });
 
+  it("accepts a payload WITHOUT the global percentage (only category overrides)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      categoryIds: [validUuid],
+      excludeProductIds: [],
+      categoryPercentages: [{ categoryId: validUuid, percentage: 5 }],
+      productPercentages: [],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.percentage).toBeUndefined();
+      expect(result.data.categoryPercentages).toHaveLength(1);
+    }
+  });
+
   it("rejects an empty brandValues array (at least one brand required)", () => {
     const result = bulkPriceUpdateSchema.safeParse({
       brandValues: [],
