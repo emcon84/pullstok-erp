@@ -358,7 +358,8 @@ describe('E2E: bulk price update selectors', () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.affected).toBe(1); // only p1 (p3 was already 2200; p1 1000 -> 1100)
+    // p1 (1000 -> 1100) and p3 (2200 -> 2420) are both MarcaA in org1; org2 must stay untouched.
+    expect(res.body.affected).toBe(2);
 
     const org2ListRes = await request(app)
       .get('/api/products')
