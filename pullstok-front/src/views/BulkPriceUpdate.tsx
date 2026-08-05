@@ -228,12 +228,10 @@ export const BulkPriceUpdate = () => {
       <h1 className="text-2xl font-bold">Actualización masiva de precios</h1>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Columna izquierda: alcance */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Marcas</CardTitle>
-            </CardHeader>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Marcas</CardTitle>
+          </CardHeader>
             <CardContent>
               {loadingBrands ? (
                 <p className="text-sm text-muted-foreground">
@@ -333,7 +331,6 @@ export const BulkPriceUpdate = () => {
               </Button>
             </CardContent>
           </Card>
-        </div>
       </div>
 
         {/* Preview full-width (una sola columna → la tabla entra sin scroll horizontal) */}
@@ -473,14 +470,6 @@ export const BulkPriceUpdate = () => {
                 </div>
 
                 <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                  <Button
-                    className="w-full"
-                    size="lg"
-                    disabled={applyDisabled}
-                    onClick={() => setDialogOpen(true)}
-                  >
-                    Aplicar cambios
-                  </Button>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>
@@ -510,13 +499,22 @@ export const BulkPriceUpdate = () => {
           </CardContent>
         </Card>
 
-      <Button
-        variant="outline"
-        className="w-full"
-        onClick={() => navigate("/dashboard")}
-      >
-        Cancelar
-      </Button>
-    </div>
+        {/* Acciones: chicas, una al lado de la otra, alineadas a la derecha */}
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/dashboard")}
+          >
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            disabled={applyDisabled}
+            onClick={() => setDialogOpen(true)}
+          >
+            Aplicar cambios
+          </Button>
+        </div>
+      </div>
   );
 };
