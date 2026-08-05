@@ -4,10 +4,15 @@ import { basePrisma } from '../../src/config/db';
 
 /**
  * E2E tests for per-category & per-product percentage overrides
- * (bulk-price-overrides): precedence product > category (nearest ancestor
+ * (bulk-price-overrides): precedence product > category (nearest ancestor,
  * incl. subtree inheritance) > global, 0%-override vs exclude semantics,
  * authoritative apply resolving effective % inside the transaction, tenant
  * isolation, and byte-identical regression when no overrides are sent.
+ *
+ * Note: variants may only live on LEAF categories (createVariant enforces it),
+ * so all products sit on the leaf Collares; the parent-based inheritance is
+ * proven by placing the override on ancestor Accesorios (which expands to and
+ * inherits down to Collares).
  *
  * Requires a running database with SUPERADMIN seed (runs on the VPS only).
  */
@@ -15,16 +20,15 @@ describe('E2E: bulk price update overrides', () => {
   const superadminEmail = process.env.SEED_SUPERADMIN_EMAIL ?? 'superadmin@nexo.com';
   const superadminPassword = process.env.SEED_SUPERADMIN_PASSWORD ?? 'superadmin123';
 
-  const slug = `e2e-overrides-${Date.now()}`;
   const adminEmail = `admin-overrides-${Date.now()}@e2e-test.com`;
 
   let adminToken: string;
   let organizationId: string;
   let accesoriosId: string;
   let collaresId: string;
-  let pAccId: string;
-  let pColAId: string;
-  let pColBId: string;
+  let pAId: string;
+  let pA2Id: string;
+  let pBId: string;
 
   let org2Id: string;
   let admin2Token: string;
@@ -78,7 +82,7 @@ describe('E2E: bulk price update overrides', () => {
     organizationId = orgId;
     adminToken = token;
 
-    // Category tree: Accesorios (root) -> Collares (child); Camas (root).
+    // Category tree: Accesorios (root) -> Collares (leaf, only leaf can hold variants).
     const accRes = await request(app)
       .post('/api/categories')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -91,45 +95,43 @@ describe('E2E: bulk price update overrides', () => {
       .send({ names: ['Collares'], parentId: accesoriosId });
     collaresId = colRes.body[0].id;
 
-    // Brand variant "Marca" on BOTH Accesorios and Collares, each with MarcaA/MarcaB.
-    const mkVariant = async (categoryId: string) => {
-      const vr = await request(app)
-        .post(`/api/categories/${categoryId}/variants`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ name: 'Marca' });
-      const vid = vr.body.id;
-      const oA = await request(app)
-        .post(`/api/categories/variants/${vid}/options`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ value: 'MarcaA' });
-      const oB = await request(app)
-        .post(`/api/categories/variants/${vid}/options`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ value: 'MarcaB' });
-      return { variantId: vid, optionAId: oA.body.id, optionBId: oB.body.id };
-    };
+    // Brand variant "Marca" on the leaf Collares, with MarcaA/MarcaB.
+    const varRes = await request(app)
+      .post(`/api/categories/${collaresId}/variants`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Marca' });
+    const marcaVariantId = varRes.body.id;
 
-    const accVariant = await mkVariant(accesoriosId);
-    const colVariant = await mkVariant(collaresId);
+    const optARes = await request(app)
+      .post(`/api/categories/variants/${marcaVariantId}/options`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ value: 'MarcaA' });
+    const marcaAOptionId = optARes.body.id;
 
-    // Products: pAcc in Accesorios (MarcaA), pColA/pColB in Collares (MarcaA/MarcaB).
-    const pAcc = await request(app)
+    const optBRes = await request(app)
+      .post(`/api/categories/variants/${marcaVariantId}/options`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ value: 'MarcaB' });
+    const marcaBOptionId = optBRes.body.id;
+
+    // Products (all in Collares): pA (MarcaA), pA2 (MarcaA), pB (MarcaB).
+    const pA = await request(app)
       .post('/api/products')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Accesorio MarcaA', price: 1000, quantity: 10, categoryId: accesoriosId, variantOptionIds: [accVariant.optionAId] });
-    pAccId = pAcc.body.id;
+      .send({ name: 'Collar MarcaA', price: 1000, quantity: 10, categoryId: collaresId, variantOptionIds: [marcaAOptionId] });
+    pAId = pA.body.id;
 
-    const pColA = await request(app)
+    const pA2 = await request(app)
       .post('/api/products')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Collar MarcaA', price: 2000, quantity: 10, categoryId: collaresId, variantOptionIds: [colVariant.optionAId] });
-    pColAId = pColA.body.id;
+      .send({ name: 'Collar MarcaA 2', price: 2000, quantity: 10, categoryId: collaresId, variantOptionIds: [marcaAOptionId] });
+    pA2Id = pA2.body.id;
 
-    const pColB = await request(app)
+    const pB = await request(app)
       .post('/api/products')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Collar MarcaB', price: 1500, quantity: 10, categoryId: collaresId, variantOptionIds: [colVariant.optionBId] });
-    pColBId = pColB.body.id;
+      .send({ name: 'Collar MarcaB', price: 1500, quantity: 10, categoryId: collaresId, variantOptionIds: [marcaBOptionId] });
+    pBId = pB.body.id;
 
     // Second org with the SAME brand value for tenant isolation.
     const org2 = await createOrgWithAdmin(
@@ -181,9 +183,9 @@ describe('E2E: bulk price update overrides', () => {
     await basePrisma.$disconnect();
   });
 
-  // --- T1: parent override inherits to the subtree (preview) ---
+  // --- T1: override on ancestor inherits down to descendants (preview) ---
 
-  it('dryRun: override on parent category inherits down to descendants (T1)', async () => {
+  it('dryRun: override on ancestor category inherits down to leaf products (T1)', async () => {
     const res = await request(app)
       .post('/api/products/bulk-price-update?dryRun=true')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -197,18 +199,18 @@ describe('E2E: bulk price update overrides', () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.affected).toBe(2); // pAcc, pColA (MarcaA); pColB is MarcaB
-    const accRow = res.body.rows.find((r: any) => r.id === pAccId);
-    const colARow = res.body.rows.find((r: any) => r.id === pColAId);
-    expect(accRow.effectivePercentage).toBe(20);
-    expect(accRow.newPrice).toBe(1200); // 1000 * 1.20
-    expect(colARow.effectivePercentage).toBe(20); // inherited from ancestor Accesorios
-    expect(colARow.newPrice).toBe(2400); // 2000 * 1.20
+    expect(res.body.affected).toBe(2); // pA, pA2 (MarcaA); pB is MarcaB
+    const rowA = res.body.rows.find((r: any) => r.id === pAId);
+    const rowA2 = res.body.rows.find((r: any) => r.id === pA2Id);
+    expect(rowA.effectivePercentage).toBe(20); // inherited from ancestor Accesorios
+    expect(rowA.newPrice).toBe(1200); // 1000 * 1.20
+    expect(rowA2.effectivePercentage).toBe(20);
+    expect(rowA2.newPrice).toBe(2400); // 2000 * 1.20
   });
 
   // --- T2: product override beats category override and global ---
 
-  it('dryRun: product override wins over category and global (T2)', async () => {
+  it('dry-run: product override wins over category override and global (T2)', async () => {
     const res = await request(app)
       .post('/api/products/bulk-price-update?dryRun=true')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -218,45 +220,46 @@ describe('E2E: bulk price update overrides', () => {
         excludeProductIds: [],
         percentage: 10,
         categoryPercentages: [{ categoryId: accesoriosId, percentage: 20 }],
-        productPercentages: [{ productId: pColAId, percentage: 5 }],
+        productPercentages: [{ productId: pAId, percentage: 5 }],
       });
 
     expect(res.status).toBe(200);
-    const accRow = res.body.rows.find((r: any) => r.id === pAccId);
-    const colARow = res.body.rows.find((r: any) => r.id === pColAId);
-    expect(accRow.effectivePercentage).toBe(20); // category override
-    expect(colARow.effectivePercentage).toBe(5); // product override wins
-    expect(colARow.newPrice).toBe(2100); // 2000 * 1.05
+    const rowA = res.body.rows.find((r: any) => r.id === pAId);
+    const rowA2 = res.body.rows.find((r: any) => r.id === pA2Id);
+    expect(rowA.effectivePercentage).toBe(5); // product override wins
+    expect(rowA.newPrice).toBe(1050); // 1000 * 1.05
+    expect(rowA2.effectivePercentage).toBe(20); // category override on remainder
+    expect(rowA2.newPrice).toBe(2400);
   });
 
   // --- T3: 0% override vs exclude semantics ---
 
-  it('dryRun: 0% override keeps price unchanged but counts; exclude removes (T3)', async () => {
+  it('dry-run: 0% override keeps price unchanged but counts; exclude removes (T3)', async () => {
     const res = await request(app)
       .post('/api/products/bulk-price-update?dryRun=true')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         brandValues: ['MarcaA'],
         categoryIds: [accesoriosId],
-        excludeProductIds: [pAccId],
+        excludeProductIds: [pAId],
         percentage: 10,
         categoryPercentages: [],
-        productPercentages: [{ productId: pColAId, percentage: 0 }],
+        productPercentages: [{ productId: pA2Id, percentage: 0 }],
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.affected).toBe(1); // pAcc excluded, pColA 0%-override counted
-    const colARow = res.body.rows.find((r: any) => r.id === pColAId);
-    expect(colARow.effectivePercentage).toBe(0);
-    expect(colARow.newPrice).toBe(2000); // unchanged
-    expect(colARow.delta).toBe(0);
+    expect(res.body.affected).toBe(1); // pA excluded; pA2 0%-override counted
+    const rowA2 = res.body.rows.find((r: any) => r.id === pA2Id);
+    expect(rowA2.effectivePercentage).toBe(0);
+    expect(rowA2.newPrice).toBe(2000); // unchanged
+    expect(rowA2.delta).toBe(0);
   });
 
   // --- T4: apply is authoritative and writes effective % per product ---
 
   it('apply writes per-product effective prices using overrides (T4)', async () => {
     // Category override +20% on Accesorios (inherits to Collares), product
-    // override -50% on pColB (MarcaB) to prove product beats category/global.
+    // override -50% on pB to prove product beats category/global.
     const res = await request(app)
       .post('/api/products/bulk-price-update')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -266,23 +269,23 @@ describe('E2E: bulk price update overrides', () => {
         excludeProductIds: [],
         percentage: 10,
         categoryPercentages: [{ categoryId: accesoriosId, percentage: 20 }],
-        productPercentages: [{ productId: pColBId, percentage: -50 }],
+        productPercentages: [{ productId: pBId, percentage: -50 }],
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.affected).toBe(3); // pAcc, pColA, pColB
+    expect(res.body.affected).toBe(3); // pA, pA2, pB
     expect(res.body.previousTotal).toBe(4500);
     expect(res.body.newTotal).toBe(4350); // 1200 + 2400 + 750
 
     const listRes = await request(app)
       .get('/api/products')
       .set('Authorization', `Bearer ${adminToken}`);
-    const pAcc = listRes.body.find((p: any) => p.id === pAccId);
-    const pColA = listRes.body.find((p: any) => p.id === pColAId);
-    const pColB = listRes.body.find((p: any) => p.id === pColBId);
-    expect(pAcc.price).toBe(1200); // 1000 * 1.20 (category override on Accesorios)
-    expect(pColA.price).toBe(2400); // 2000 * 1.20 (inherited)
-    expect(pColB.price).toBe(750); // 1500 * 0.50 (product override beats category/global)
+    const pA = listRes.body.find((p: any) => p.id === pAId);
+    const pA2 = listRes.body.find((p: any) => p.id === pA2Id);
+    const pB = listRes.body.find((p: any) => p.id === pBId);
+    expect(pA.price).toBe(1200); // 1000 * 1.20 (category override inherited)
+    expect(pA2.price).toBe(2400); // 2000 * 1.20
+    expect(pB.price).toBe(750); // 1500 * 0.50 (product override beats category/global)
   });
 
   // --- T5: 0% override at apply leaves price untouched and counts ---
@@ -297,23 +300,23 @@ describe('E2E: bulk price update overrides', () => {
         excludeProductIds: [],
         percentage: 10,
         categoryPercentages: [],
-        productPercentages: [{ productId: pColAId, percentage: 0 }],
+        productPercentages: [{ productId: pA2Id, percentage: 0 }],
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.affected).toBe(2); // pAcc (10%) + pColA (0%)
-    expect(res.body.newTotal).toBe(1320 + 2400); // pAcc 1200*1.10, pColA unchanged 2400
+    expect(res.body.affected).toBe(2); // pA (10%) + pA2 (0%)
+    expect(res.body.newTotal).toBe(1320 + 2400); // pA 1200*1.10, pA2 unchanged 2400
 
     const listRes = await request(app)
       .get('/api/products')
       .set('Authorization', `Bearer ${adminToken}`);
-    const pColA = listRes.body.find((p: any) => p.id === pColAId);
-    expect(pColA.price).toBe(2400); // untouched
+    const pA2 = listRes.body.find((p: any) => p.id === pA2Id);
+    expect(pA2.price).toBe(2400); // untouched
   });
 
   // --- T6: regression — no overrides behaves exactly as before ---
 
-  it('dryRun without overrides matches the baseline single-percentage behavior (T6)', async () => {
+  it('dry-run without overrides matches the baseline single-percentage behavior (T6)', async () => {
     const res = await request(app)
       .post('/api/products/bulk-price-update?dryRun=true')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -327,7 +330,7 @@ describe('E2E: bulk price update overrides', () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.affected).toBe(2); // pAcc, pColA
+    expect(res.body.affected).toBe(2); // pA, pA2
     expect(res.body.previousTotal).toBe(1320 + 2400);
     expect(res.body.newTotal).toBe(1452 + 2640); // both +10%
     const rows = res.body.rows;
@@ -352,7 +355,7 @@ describe('E2E: bulk price update overrides', () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.affected).toBe(2);
+    expect(res.body.affected).toBe(2); // pA, pA2
 
     const org2ListRes = await request(app)
       .get('/api/products')
