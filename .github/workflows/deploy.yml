@@ -18,14 +18,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Ejecutar deploy (backup + build + migraciones + health check + rollback)
-        working-directory: /var/www/pullstok
+      - name: Sincronizar deploy.sh y ejecutar deploy
         run: |
           set -euo pipefail
+          # El runner corre como "deploy"; /var/www/pullstok tiene archivos previos
+          # de root, así que confiamos el directorio a git para evitar "dubious ownership".
+          git config --global --add safe.directory /var/www/pullstok
+
           echo "::group::Deploy pullstok"
-          if [ ! -x ./deploy.sh ]; then
-            echo "deploy.sh no existe o no es ejecutable en /var/www/pullstok"
-            exit 1
-          fi
+          # Poner la versión del deploy.sh del commit sobre el VPS, y ejecutarla.
+          cp "$GITHUB_WORKSPACE/deploy.sh" /var/www/pullstok/deploy.sh
+          chmod +x /var/www/pullstok/deploy.sh
+          cd /var/www/pullstok
           ./deploy.sh
           echo "::endgroup::"
