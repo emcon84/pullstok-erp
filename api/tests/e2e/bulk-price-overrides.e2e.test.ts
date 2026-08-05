@@ -255,6 +255,31 @@ describe('E2E: bulk price update overrides', () => {
     expect(rowA2.delta).toBe(0);
   });
 
+  // --- T3b: only category overrides, no global percentage (global defaults to 0) ---
+
+  it('dry-run without global percentage works with only category overrides (T3b)', async () => {
+    const res = await request(app)
+      .post('/api/products/bulk-price-update?dryRun=true')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        brandValues: ['MarcaA'],
+        categoryIds: [accesoriosId],
+        excludeProductIds: [],
+        // percentage OMITIDO a propósito → server resuelve 0 como global.
+        categoryPercentages: [{ categoryId: accesoriosId, percentage: 20 }],
+        productPercentages: [],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.affected).toBe(2); // pA, pA2
+    const rowA = res.body.rows.find((r: any) => r.id === pAId);
+    const rowA2 = res.body.rows.find((r: any) => r.id === pA2Id);
+    expect(rowA.effectivePercentage).toBe(20); // inherited override, no global needed
+    expect(rowA.newPrice).toBe(1200);
+    expect(rowA2.effectivePercentage).toBe(20);
+    expect(rowA2.newPrice).toBe(2400);
+  });
+
   // --- T4: apply is authoritative and writes effective % per product ---
 
   it('apply writes per-product effective prices using overrides (T4)', async () => {
@@ -363,30 +388,5 @@ describe('E2E: bulk price update overrides', () => {
     const org2Prod = org2ListRes.body.find((p: any) => p.id === org2ProductId);
     expect(org2Prod).toBeDefined();
     expect(org2Prod.price).toBe(5000); // untouched by org1's override apply
-  });
-
-  // --- T8: only category overrides, no global percentage (global defaults to 0) ---
-
-  it('dry-run without global percentage works with only category overrides (T8)', async () => {
-    const res = await request(app)
-      .post('/api/products/bulk-price-update?dryRun=true')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({
-        brandValues: ['MarcaA'],
-        categoryIds: [accesoriosId],
-        excludeProductIds: [],
-        // percentage OMITIDO a propósito → server resuelve 0 como global.
-        categoryPercentages: [{ categoryId: accesoriosId, percentage: 20 }],
-        productPercentages: [],
-      });
-
-    expect(res.status).toBe(200);
-    expect(res.body.affected).toBe(2); // pA, pA2
-    const rowA = res.body.rows.find((r: any) => r.id === pAId);
-    const rowA2 = res.body.rows.find((r: any) => r.id === pA2Id);
-    expect(rowA.effectivePercentage).toBe(20); // inherited override, no global needed
-    expect(rowA.newPrice).toBe(1200);
-    expect(rowA2.effectivePercentage).toBe(20);
-    expect(rowA2.newPrice).toBe(2400);
   });
 });
