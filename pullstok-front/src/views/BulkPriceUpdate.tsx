@@ -334,8 +334,9 @@ export const BulkPriceUpdate = () => {
             </CardContent>
           </Card>
         </div>
+      </div>
 
-        {/* Columna derecha: preview + apply */}
+        {/* Preview full-width (una sola columna → la tabla entra sin scroll horizontal) */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Vista previa</CardTitle>
@@ -370,6 +371,7 @@ export const BulkPriceUpdate = () => {
                             <TableHead>Producto</TableHead>
                             <TableHead>Categoría</TableHead>
                             <TableHead>Marcas</TableHead>
+                            <TableHead className="w-24">%</TableHead>
                             <TableHead>Precio</TableHead>
                             <TableHead className="text-right">Δ</TableHead>
                           </TableRow>
@@ -406,35 +408,32 @@ export const BulkPriceUpdate = () => {
                                   {row.brandValues.join(", ")}
                                 </TableCell>
                                 <TableCell>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="whitespace-nowrap text-muted-foreground">
-                                      {formatPrice(row.oldPrice)}
-                                    </span>
-                                    <span className="text-muted-foreground">→</span>
-                                    <Input
-                                      type="number"
-                                      step="0.5"
-                                      min="-100"
-                                      max="500"
-                                      className="h-8 w-16 px-1.5 text-center"
-                                      aria-label={`Porcentaje ${row.name}`}
-                                      value={
-                                        override !== undefined
-                                          ? override
-                                          : String(row.effectivePercentage ?? "")
-                                      }
-                                      placeholder="%"
-                                      onChange={(e) =>
-                                        setProductOverrides((prev) => ({
-                                          ...prev,
-                                          [row.id]: e.target.value,
-                                        }))
-                                      }
-                                    />
-                                    <span className="whitespace-nowrap font-medium">
-                                      {formatPrice(displayNew)}
-                                    </span>
-                                  </div>
+                                  <Input
+                                    type="number"
+                                    step="0.5"
+                                    min="-100"
+                                    max="500"
+                                    className="h-8 w-20"
+                                    aria-label={`Porcentaje ${row.name}`}
+                                    value={
+                                      override !== undefined
+                                        ? override
+                                        : String(row.effectivePercentage ?? "")
+                                    }
+                                    placeholder="%"
+                                    onChange={(e) =>
+                                      setProductOverrides((prev) => ({
+                                        ...prev,
+                                        [row.id]: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap">
+                                  {formatPrice(row.oldPrice)} →{" "}
+                                  <span className="font-medium">
+                                    {formatPrice(displayNew)}
+                                  </span>
                                 </TableCell>
                                 <TableCell
                                   className={`text-right font-medium ${
@@ -510,7 +509,6 @@ export const BulkPriceUpdate = () => {
             )}
           </CardContent>
         </Card>
-      </div>
 
       <Button
         variant="outline"
