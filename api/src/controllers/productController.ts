@@ -364,6 +364,65 @@ const getProducts = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * GET /products/filter-facets?category=...
+ * Complete filter facets for the vendor dashboard chips, independent of the
+ * paginated product list (which only reflects loaded pages). Always returns
+ * ALL categories of the org that have at least one product, sorted by name.
+ * Variants are derived only from products whose category matches the optional
+ * `category` param (case-insensitive substring); without the param → [].
+ * Tenant scoping is handled by the extended Prisma client (TENANT_MODELS).
+ */
+export const getProductFilterFacets = async (req: Request, res: Response) => {
+  try {
+    const category = req.query.category as string | undefined;
+
+    const categories = await prisma.category.findMany({
+      where: { products: { some: {} } },
+      select: { id: true, name: true },
+    });
+    categories.sort((a, b) => a.name.localeCompare(b.name));
+
+    let variants: { name: string; values: string[] }[] = [];
+
+    if (category && category.trim() !== "") {
+      const products = await prisma.product.findMany({
+        where: {
+          category: { name: { contains: category, mode: "insensitive" } },
+        },
+        select: {
+          categoryId: true,
+          category: { select: { id: true, name: true } },
+          variantAssignments: {
+            select: {
+              option: { select: { value: true, variant: { select: { name: true } } } },
+            },
+          },
+        },
+      });
+
+      const groups: Record<string, Set<string>> = {};
+      for (const p of products) {
+        for (const a of p.variantAssignments) {
+          const variantName = a.option.variant.name;
+          const optionValue = a.option.value;
+          if (variantName && optionValue) {
+            if (!groups[variantName]) groups[variantName] = new Set();
+            groups[variantName].add(optionValue);
+          }
+        }
+      }
+      variants = Object.entries(groups)
+        .map(([name, values]) => ({ name, values: [...values].sort() }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    res.status(200).json({ categories, variants });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get a single product by ID
 const getProductById = async (req: Request, res: Response) => {
   try {
@@ -757,6 +816,7 @@ export default {
   createProduct,
   bulkUploadProducts,
   getProducts,
+  getProductFilterFacets,
   getProductById,
   updateProduct,
   publishProduct,

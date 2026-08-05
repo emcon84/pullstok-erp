@@ -54,6 +54,15 @@ router.get(
   productController.getStockSummary,
 );
 
+// Complete filter facets (categories + variants per category) for the vendor
+// dashboard chips. Must be registered BEFORE "/:id" so a literal id like
+// "filter-facets" doesn't match the parametric route.
+router.get(
+  "/filter-facets",
+  authenticateJWT,
+  productController.getProductFilterFacets,
+);
+
 router.get("/:id", authenticateJWT, productController.getProductById);
 router.put(
   "/:id",
