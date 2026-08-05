@@ -807,7 +807,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         const expandedTx = await resolveCategoryScope(tx, categoryIds);
         const rowsTx = await tx.product.findMany({
           where: buildBulkPriceWhere(brandValues, expandedTx, excludeProductIds),
-          select: { id: true, price: true },
+          select: { id: true, price: true, categoryId: true },
         });
         if (rowsTx.length === 0) {
           return { affected: 0, previousTotal: 0, newTotal: 0, overCap: false };
@@ -815,10 +815,23 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         if (rowsTx.length > BULK_UPDATE_MAX) {
           return { affected: rowsTx.length, previousTotal: 0, newTotal: 0, overCap: true };
         }
-        const updates = rowsTx.map((r) => ({
-          id: r.id,
-          newPrice: computeNewPrice(Number(r.price), percentage),
-        }));
+        // Autoritativo: cada producto lleva su % EFECTIVO (product > categoría
+        // ancestro más cercana > global), igual que el preview. Nunca global a
+        // ciegas — los overrides se aplican al escribir (REQ-5).
+        const updates = rowsTx.map((r) => {
+          const effective = resolveEffectivePercentage({
+            productId: r.id,
+            categoryId: r.categoryId ?? null,
+            parentById,
+            productPercentages: prodPctMap,
+            categoryPercentages: catPctMap,
+            globalPct: percentage,
+          });
+          return {
+            id: r.id,
+            newPrice: computeNewPrice(Number(r.price), effective),
+          };
+        });
         await Promise.all(
           updates.map((u) =>
             tx.product.updateMany({ where: { id: u.id }, data: { price: u.newPrice } }),

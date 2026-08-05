@@ -625,5 +625,106 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
         data: { price: 80 },
       });
     });
+
+    it("applies a per-category override inside the transaction (S2/S4 apply-side)", async () => {
+      mockTx.product.findMany.mockResolvedValue([
+        { id: "p-1", price: 100, categoryId: "a" },
+        { id: "p-2", price: 200, categoryId: "b" },
+      ]);
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        {
+          body: {
+            brandValues: ["Acme"],
+            percentage: 10,
+            categoryIds: ["a"],
+            excludeProductIds: [],
+            categoryPercentages: [{ categoryId: "a", percentage: 20 }],
+            productPercentages: [],
+          },
+          query: {},
+        } as unknown as Request,
+        res,
+      );
+
+      // In-tx findMany must select categoryId so effective % can be resolved
+      expect(mockTx.product.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({ categoryId: true }),
+        }),
+      );
+      // p-1 (category a) uses the 20% override → 120; p-2 (category b, child of a)
+      // inherits from ancestor a → 20% → 240
+      expect(mockTx.product.updateMany).toHaveBeenCalledWith({
+        where: { id: "p-1" },
+        data: { price: 120 },
+      });
+      expect(mockTx.product.updateMany).toHaveBeenCalledWith({
+        where: { id: "p-2" },
+        data: { price: 240 },
+      });
+      const json = res.json.mock.calls[0][0];
+      expect(json.newTotal).toBe(360);
+    });
+
+    it("applies a per-product override beating category and global (S4 apply-side)", async () => {
+      mockTx.product.findMany.mockResolvedValue([
+        { id: "p-1", price: 100, categoryId: "a" },
+      ]);
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        {
+          body: {
+            brandValues: ["Acme"],
+            percentage: 10,
+            categoryIds: ["a"],
+            excludeProductIds: [],
+            categoryPercentages: [{ categoryId: "a", percentage: 20 }],
+            productPercentages: [{ productId: "p-1", percentage: 30 }],
+          },
+          query: {},
+        } as unknown as Request,
+        res,
+      );
+
+      expect(mockTx.product.updateMany).toHaveBeenCalledWith({
+        where: { id: "p-1" },
+        data: { price: 130 },
+      });
+      const json = res.json.mock.calls[0][0];
+      expect(json.newTotal).toBe(130);
+    });
+
+    it("keeps a 0%-override product included, unchanged and counted at apply (S6 apply-side)", async () => {
+      mockTx.product.findMany.mockResolvedValue([
+        { id: "p-1", price: 100, categoryId: "a" },
+      ]);
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        {
+          body: {
+            brandValues: ["Acme"],
+            percentage: 10,
+            categoryIds: ["a"],
+            excludeProductIds: [],
+            categoryPercentages: [],
+            productPercentages: [{ productId: "p-1", percentage: 0 }],
+          },
+          query: {},
+        } as unknown as Request,
+        res,
+      );
+
+      expect(mockTx.product.updateMany).toHaveBeenCalledWith({
+        where: { id: "p-1" },
+        data: { price: 100 },
+      });
+      const json = res.json.mock.calls[0][0];
+      expect(json.affected).toBe(1);
+      expect(json.newTotal).toBe(100);
+    });
   });
 });
