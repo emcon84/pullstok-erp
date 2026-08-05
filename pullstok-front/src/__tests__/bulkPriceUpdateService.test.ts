@@ -15,8 +15,8 @@ const payload: BulkPriceUpdatePayload = {
   categoryIds: ["a"],
   excludeProductIds: ["p-9"],
   percentage: 15,
-  categoryPercentages: [{ id: "cat-1", percentage: 8 }],
-  productPercentages: [{ id: "p-1", percentage: 20 }],
+  categoryPercentages: [{ categoryId: "cat-1", percentage: 8 }],
+  productPercentages: [{ productId: "p-1", percentage: 20 }],
 };
 
 const row: BulkPricePreviewRow = {
@@ -132,10 +132,10 @@ describe("bulkPriceUpdate service — dryRun preview + apply", () => {
 
     const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(sentBody.categoryPercentages).toEqual([
-      { id: "cat-1", percentage: 8 },
+      { categoryId: "cat-1", percentage: 8 },
     ]);
     expect(sentBody.productPercentages).toEqual([
-      { id: "p-1", percentage: 20 },
+      { productId: "p-1", percentage: 20 },
     ]);
   });
 
