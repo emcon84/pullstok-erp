@@ -9,14 +9,49 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
+// Limpia la sesión local (token, refresh, user) y cierra el socket compartido.
+// Separado de logout() para que los interceptors puedan limpiar sin redirigir
+// en loops (p.ej. si ya estamos en la ruta destino).
+export const clearSession = () => {
+  try {
+    disconnectSocket();
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+/**
+ * Cierra la sesión y redirige. `redirectTo` permite reusar el mismo flujo para
+ * el 401 clásico ("/") y para OUTSIDE_BUSINESS_HOURS ("/fuera-de-horario").
+ * Guard loop: si ya estamos en la ruta destino no se vuelve a redirigir.
+ */
+export const logout = (redirectTo = '/') => {
+  clearSession();
+  if (window.location.pathname !== redirectTo) {
+    window.location.href = redirectTo;
+  }
+  return true;
+};
+
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
-    if (error.response?.status === 401) {      
-      logout(); 
-      window.location.href = '/'; 
+    const status = error.response?.status;
+    const data = error.response?.data;
+    // 401 → token inválido/vencido: logout clásico al login.
+    if (status === 401) {
+      logout('/');
+    }
+    // 403 OUTSIDE_BUSINESS_HOURS (sdd/business-hours-access): un rol operativo
+    // intentó operar fuera del horario comercial → limpiar sesión + pantalla
+    // de bloqueo público (fuera del sidebar).
+    if (status === 403 && data?.error === 'OUTSIDE_BUSINESS_HOURS') {
+      logout('/fuera-de-horario');
     }
     return Promise.reject(error);
   }
@@ -33,20 +68,6 @@ export const login = async (email: string, password: string) => {
       return true;
     }
     return false;
-  } catch (error) {
-    console.error(error);
-    return false;
-  }
-};
-
-export const logout = () => {
-  try {
-    // Cierra el socket compartido (pedidos + chat) antes de tirar el token:
-    // no queremos una conexión colgada autenticada con un token invalidado.
-    disconnectSocket();
-    localStorage.removeItem('token');
-    window.location.href = '/';
-    return true;
   } catch (error) {
     console.error(error);
     return false;

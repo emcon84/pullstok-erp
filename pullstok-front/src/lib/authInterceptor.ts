@@ -1,5 +1,6 @@
 import axios from "axios";
 import { toast } from "react-toastify";
+import { clearSession } from "../controllers/authController";
 
 /**
  * Interceptor GLOBAL de respuestas: ante un 401 (token vencido o inválido),
@@ -26,14 +27,27 @@ axios.interceptors.response.use(
       url.includes("/auth/login") || url.includes("/auth/refresh");
 
     if (status === 401 && !isAuthCall && !redirecting) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("user");
+      clearSession();
 
       // Solo redirigir si no estamos ya en el login (evita loops).
       if (window.location.pathname !== "/") {
         redirecting = true;
         window.location.href = "/";
+      }
+    }
+
+    // 403 OUTSIDE_BUSINESS_HOURS (sdd/business-hours-access): un rol operativo
+    // con sesión viva golpeó una ruta fuera del horario comercial. Limpiamos
+    // la sesión y vamos a la pantalla pública de bloqueo. Guard loop: si ya
+    // estamos en /fuera-de-horario no volvemos a redirigir (evita ciclos).
+    if (status === 403 && data?.error === "OUTSIDE_BUSINESS_HOURS") {
+      clearSession();
+      if (
+        window.location.pathname !== "/fuera-de-horario" &&
+        !redirecting
+      ) {
+        redirecting = true;
+        window.location.href = "/fuera-de-horario";
       }
     }
 

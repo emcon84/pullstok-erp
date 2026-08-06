@@ -30,6 +30,11 @@ const OrganizationSuspended = lazy(() =>
     default: m.OrganizationSuspended,
   })),
 );
+const OutsideBusinessHours = lazy(() =>
+  import("./views/OutsideBusinessHours").then((m) => ({
+    default: m.OutsideBusinessHours,
+  })),
+);
 const Dashboard = lazy(() =>
   import("./views/Dashboard").then((m) => ({ default: m.Dashboard })),
 );
@@ -199,6 +204,22 @@ const AppRoutes = () => (
               }
             >
               <OrganizationSuspended />
+            </Suspense>
+          </OnboardingLayout>
+        }
+      />
+      <Route
+        path="/fuera-de-horario"
+        element={
+          <OnboardingLayout>
+            <Suspense
+              fallback={
+                <div className="flex min-h-[60vh] items-center justify-center">
+                  <Loader />
+                </div>
+              }
+            >
+              <OutsideBusinessHours />
             </Suspense>
           </OnboardingLayout>
         }
