@@ -18,6 +18,7 @@ import {
   Settings,
   Wrench,
   Palette,
+  Clock,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 import type { Role } from "@/constants/rolePermissions";
@@ -72,6 +73,7 @@ export const navGroups: NavGroup[] = [
       { to: "/usuarios", label: "Usuarios", icon: UserPlus, visibleRoles: ["ADMIN", "MANAGEMENT"] },
       { to: "/sucursales", label: "Sucursales", icon: Building, visibleRoles: ["ADMIN", "MANAGEMENT"] },
       { to: "/ajustes", label: "Ajustes", icon: Palette, moduleKey: "branding", visibleRoles: ["ADMIN"] },
+      { to: "/ajustes/horarios", label: "Horario comercial", icon: Clock, visibleRoles: ["ADMIN"] },
       { to: "/mensajes", label: "Mensajes", icon: MessageSquare, visibleRoles: ["ADMIN", "MANAGEMENT"] },
     ],
   },
