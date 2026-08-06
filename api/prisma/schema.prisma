@@ -68,6 +68,7 @@ model Organization {
   appBranding           AppBranding?
   branches              Branch[]
   productStocks         ProductStock[]
+  businessHours         BusinessHourSetting?
 
   @@map("organizations")
 }
@@ -624,4 +625,22 @@ model AppBranding {
   updatedAt      DateTime     @updatedAt
 
   @@map("app_branding")
+}
+
+// Configuración de horario comercial por organización, 1:1 con Organization.
+// A PROPÓSITO fuera de TENANT_MODELS (ver db.ts): se accede vía basePrisma
+// filtrando por organizationId directamente (mismo patrón que StoreSettings).
+// `days` es un Json con 7 entradas { day: 0(domingo)..6(sábado), enabled,
+// open: "HH:MM", close: "HH:MM" }. Sin fila = sin restricción (backwards
+// compatible: el gate de business-hours solo se activa cuando un ADMIN guarda
+// la config por primera vez).
+model BusinessHourSetting {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  timezone       String       @default("America/Argentina/Buenos_Aires")
+  days           Json
+  updatedAt      DateTime     @updatedAt
+
+  @@map("business_hour_settings")
 }
