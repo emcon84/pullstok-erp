@@ -21,6 +21,7 @@ import botRoutes from "./botRoutes";
 import branchRoutes from "./branchRoutes";
 import brandingRoutes from "./brandingRoutes";
 import backupRoutes from "./backupRoutes";
+import businessHoursRoutes from "./businessHoursRoutes";
 
 const router = Router();
 
@@ -50,5 +51,6 @@ router.use("/bot", botRoutes);
 router.use("/branches", branchRoutes);
 router.use("/app-branding", brandingRoutes);
 router.use("/backups", backupRoutes);
+router.use("/business-hours", businessHoursRoutes);
 
 export default router;

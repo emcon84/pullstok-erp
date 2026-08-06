@@ -475,3 +475,74 @@ export const updateAppBrandingSchema = z.object({
   displayName: z.string().max(100, "Máximo 100 caracteres").optional(),
   showDisplayName: z.boolean().optional(),
 }).strip();
+
+// ---------- Horario comercial (business-hours-access) ----------
+// Config 1:1 con Organization (BusinessHourSetting). El gate bloquea a roles
+// operativos fuera del horario configurado — un schema inválido aquí NO debe
+// poder inhabilitar el comercio por accidente, así que se valida duro:
+//  - `timezone`: IANA válida (Intl.supportedValuesOf con fallback manual)
+//  - `days`: exactamente 7 entradas, una por día 0(domingo)..6(sábado)
+//  - cada día: enabled + open/close "HH:MM" zero-padded, con open < close
+//    (comparación de strings padded: "09:00" < "19:00" es correcto y evita
+//    parsear horas manualmente)
+//  - al menos 1 día habilitado (sin días habilitados el gate bloquearía
+//    SIEMPRE, incluso en el horario — un estado sin sentido)
+const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const businessHourDaySchema = z
+  .object({
+    day: z.number().int().min(0).max(6),
+    enabled: z.boolean(),
+    open: z.string().regex(HHMM_REGEX, "Formato inválido (esperado HH:MM)"),
+    close: z.string().regex(HHMM_REGEX, "Formato inválido (esperado HH:MM)"),
+  })
+  .refine((d) => d.open < d.close, {
+    message: "La hora de apertura debe ser anterior al cierre",
+    path: ["close"],
+  });
+
+// IANA timezones válidas: Intl.supportedValuesOf devuelve la lista del
+// runtime, pero OMITE zonas canónicas duplicadas (alias) — por ejemplo Node 24
+// excluye "America/Argentina/Buenos_Aires", la timezone por defecto de esta
+// feature. La validación robusta es construir un Intl.DateTimeFormat con la
+// zona: si es inválida tira RangeError. Acepta alias y canonical sin depender
+// de la lista que devuelva cada runtime.
+const isValidTimezone = (tz: string): boolean => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const timezoneSchema = z
+  .string()
+  .min(1, "La zona horaria es requerida")
+  .refine(isValidTimezone, "Zona horaria inválida (debe ser una IANA timezone)");
+
+export const updateBusinessHoursSchema = z
+  .object({
+    timezone: timezoneSchema,
+    days: z.array(businessHourDaySchema).length(7, "Debe haber exactamente 7 días"),
+  })
+  .superRefine((data, ctx) => {
+    const daysByNumber = new Map(data.days.map((d) => [d.day, d]));
+    for (let day = 0; day <= 6; day++) {
+      if (!daysByNumber.has(day)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["days"],
+          message: `Falta el día ${day} (0=domingo)`,
+        });
+        return;
+      }
+    }
+    if (!data.days.some((d) => d.enabled)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["days"],
+        message: "Debe haber al menos un día habilitado",
+      });
+    }
+  });

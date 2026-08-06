@@ -1,6 +1,7 @@
 import {
   createUserSchema,
   bulkPriceUpdateSchema,
+  updateBusinessHoursSchema,
 } from "../../src/validation/schemas";
 
 describe("createUserSchema — role enum expansion", () => {
@@ -617,5 +618,72 @@ describe("bulkPriceUpdateSchema — per-category/product override arrays", () =>
       const flat = result.error.issues.map((i) => i.message).join(" | ");
       expect(flat).toContain(prodP);
     }
+  });
+});
+
+describe("updateBusinessHoursSchema — horario comercial", () => {
+  const validDays = [
+    { day: 0, enabled: false, open: "09:00", close: "19:00" },
+    { day: 1, enabled: true, open: "09:00", close: "19:00" },
+    { day: 2, enabled: true, open: "09:00", close: "19:00" },
+    { day: 3, enabled: true, open: "09:00", close: "19:00" },
+    { day: 4, enabled: true, open: "09:00", close: "19:00" },
+    { day: 5, enabled: true, open: "09:00", close: "19:00" },
+    { day: 6, enabled: false, open: "09:00", close: "19:00" },
+  ];
+
+  it("acepta timezone IANA válida + 7 días con al menos uno enabled", () => {
+    const result = updateBusinessHoursSchema.safeParse({
+      timezone: "America/Argentina/Buenos_Aires",
+      days: validDays,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rechaza timezone inválida", () => {
+    const result = updateBusinessHoursSchema.safeParse({
+      timezone: "Mars/OlympusMons",
+      days: validDays,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza menos de 7 días (el gate necesita el día completo)", () => {
+    const result = updateBusinessHoursSchema.safeParse({
+      timezone: "America/Argentina/Buenos_Aires",
+      days: validDays.slice(0, 3),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza open >= close (string compare zero-padded)", () => {
+    const badDays = validDays.map((d) =>
+      d.day === 1 ? { ...d, open: "19:00", close: "09:00" } : d,
+    );
+    const result = updateBusinessHoursSchema.safeParse({
+      timezone: "America/Argentina/Buenos_Aires",
+      days: badDays,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza formato HH:MM inválido", () => {
+    const badDays = validDays.map((d) =>
+      d.day === 1 ? { ...d, open: "9am" } : d,
+    );
+    const result = updateBusinessHoursSchema.safeParse({
+      timezone: "America/Argentina/Buenos_Aires",
+      days: badDays,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza todos los días disabled (sin sentido: bloquearía siempre)", () => {
+    const allDisabled = validDays.map((d) => ({ ...d, enabled: false }));
+    const result = updateBusinessHoursSchema.safeParse({
+      timezone: "America/Argentina/Buenos_Aires",
+      days: allDisabled,
+    });
+    expect(result.success).toBe(false);
   });
 });
