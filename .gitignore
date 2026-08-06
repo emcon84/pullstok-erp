@@ -5,6 +5,7 @@
 
 # Builds
 **/dist
+**/dist.bak-*
 **/build
 
 # Entorno — solo los .example se commitean
