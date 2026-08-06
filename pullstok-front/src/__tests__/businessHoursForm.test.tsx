@@ -231,4 +231,28 @@ describe("BusinessHoursForm — horario cortado (múltiples turnos)", () => {
     const saved = onSave.mock.calls[0][0] as BusinessHoursSettings;
     expect(saved.days[1].slots).toEqual([{ open: "09:00", close: "19:00" }]);
   });
+
+  it("migra días legacy { open, close } (sin slots) al shape actual sin romper el render", () => {
+    // Respuesta de un server todavía en el formato viejo: cada día trae
+    // open/close en vez de slots. El form debe renderizar y guardar con slots.
+    const legacyDays = sevenDays.map((d, i) =>
+      i === 1
+        ? { day: 1, enabled: true, open: "08:00", close: "12:00" }
+        : { day: d.day, enabled: false, open: "09:00", close: "19:00" },
+    ) as unknown as BusinessHoursSettings["days"];
+
+    const { onSave } = renderForm({
+      timezone: "America/Argentina/Buenos_Aires",
+      days: legacyDays,
+    });
+
+    // Sin TypeError: el día legacy aparece con un turno migrado.
+    expect(screen.getByLabelText("Apertura turno 1 Lunes")).toHaveValue("08:00");
+    expect(screen.getByLabelText("Cierre turno 1 Lunes")).toHaveValue("12:00");
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar horario" }));
+    const saved = onSave.mock.calls[0][0] as BusinessHoursSettings;
+    expect(saved.days[1].slots).toEqual([{ open: "08:00", close: "12:00" }]);
+    expect(saved.days[1]).not.toHaveProperty("open");
+  });
 });

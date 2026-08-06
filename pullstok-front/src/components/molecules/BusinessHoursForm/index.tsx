@@ -43,6 +43,26 @@ const DEFAULT_DAYS: BusinessHoursDay[] = Array.from({ length: 7 }, (_, day) => (
   slots: DEFAULT_SLOTS.map((s) => ({ ...s })),
 }));
 
+// Normaliza días legacy o incompletos al shape actual. Un día servido con el
+// formato viejo { open, close } (sin slots) se migra a un único turno y se
+// descartan las claves legacy; un día sin ninguna de las dos formas cae al slot
+// default. Sin esto, un día sin `slots` rompe el render con `d.slots.length`
+// (TypeError de producción) y el PUT arrastra open/close muertos.
+const normalizeDays = (days: BusinessHoursDay[] | undefined): BusinessHoursDay[] => {
+  if (!days?.length) return DEFAULT_DAYS;
+  return days.map((d) => {
+    if (d.slots?.length) return d;
+    const { open, close, ...rest } = d as BusinessHoursDay & {
+      open?: string;
+      close?: string;
+    };
+    return {
+      ...rest,
+      slots: [{ open: open || "09:00", close: close || "19:00" }],
+    };
+  });
+};
+
 interface BusinessHoursFormProps {
   settings: BusinessHoursSettings | null;
   loading: boolean;
@@ -62,14 +82,14 @@ export const BusinessHoursForm = ({
     settings?.timezone ?? "America/Argentina/Buenos_Aires",
   );
   const [days, setDays] = useState<BusinessHoursDay[]>(
-    settings?.days?.length ? settings.days : DEFAULT_DAYS,
+    normalizeDays(settings?.days),
   );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (settings) {
       setTimezone(settings.timezone);
-      setDays(settings.days?.length ? settings.days : DEFAULT_DAYS);
+      setDays(normalizeDays(settings.days));
       setError(null);
     }
   }, [settings]);
