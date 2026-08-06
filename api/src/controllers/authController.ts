@@ -13,6 +13,12 @@ export const login = async (req: Request, res: Response) => {
     const result = await AuthService.login(email, password);
     res.status(200).json(result);
   } catch (error: any) {
+    // Error tipado del gate de horario comercial (sdd/business-hours-access):
+    // el front lo distingue de un 401 genérico por errorCode para redirigir a
+    // la pantalla de bloqueo /fuera-de-horario.
+    if (error?.statusCode === 403 && error?.errorCode === "OUTSIDE_BUSINESS_HOURS") {
+      return res.status(403).json({ error: error.errorCode, message: error.message });
+    }
     res.status(401).json({ message: error.message });
   }
 };
@@ -22,6 +28,9 @@ export const refresh = async (req: Request, res: Response) => {
     const result = await AuthService.refresh(req.body.refreshToken);
     res.status(200).json(result);
   } catch (error: any) {
+    if (error?.statusCode === 403 && error?.errorCode === "OUTSIDE_BUSINESS_HOURS") {
+      return res.status(403).json({ error: error.errorCode, message: error.message });
+    }
     res.status(401).json({ message: error.message });
   }
 };

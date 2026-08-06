@@ -22,6 +22,9 @@ jest.mock('../../src/config/db', () => ({
     branchAssignment: {
       findMany: jest.fn(),
     },
+    businessHourSetting: {
+      findUnique: jest.fn(),
+    },
   },
 }));
 
@@ -54,6 +57,7 @@ jest.mock('../../src/services/rateLimiter', () => ({
 const mockedPrisma = basePrisma as unknown as {
   user: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
   branchAssignment: { findMany: jest.Mock };
+  businessHourSetting: { findUnique: jest.Mock };
 };
 const mockedBcrypt = bcrypt as unknown as { compare: jest.Mock; hash: jest.Mock };
 const mockedGenAccess = generateAccessToken as jest.Mock;
@@ -466,6 +470,152 @@ describe('AuthService', () => {
       await expect(
         AuthService.resetPassword('fake-token', 'newPass123'),
       ).rejects.toThrow('El enlace expiró o no es válido');
+    });
+  });
+
+  describe('business hours gate (sdd/business-hours-access)', () => {
+    // Instante fijo: 2026-08-06T18:00:00Z = 15:00 (jueves) en Buenos Aires.
+    const SETTING_INSIDE = {
+      timezone: 'America/Argentina/Buenos_Aires',
+      days: [
+        { day: 4, enabled: true, open: '09:00', close: '19:00' },
+        { day: 0, enabled: false, open: '09:00', close: '19:00' },
+      ],
+    };
+    const SETTING_OUTSIDE = {
+      timezone: 'America/Argentina/Buenos_Aires',
+      days: [
+        { day: 4, enabled: true, open: '09:00', close: '12:00' },
+      ],
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-08-06T18:00:00.000Z'));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+      // Limpiar implementaciones persistentes (mockReset, NO solo clear): sin
+      // esto los mocks de findFirst/findUnique/businessHourSetting seteados acá
+      // contaminan los describe posteriores (createUser usa findFirst para
+      // detectar duplicados y fallaría con "Ya existe un usuario...").
+      mockedPrisma.user.findFirst.mockReset();
+      mockedPrisma.user.findUnique.mockReset();
+      mockedPrisma.businessHourSetting.findUnique.mockReset();
+      mockedVerify.mockReset();
+    });
+
+    it('login de rol operativo fuera de horario → typed error 403 OUTSIDE_BUSINESS_HOURS (sin tokens)', async () => {
+      mockedPrisma.user.findFirst.mockResolvedValue({
+        ...baseUser,
+        role: 'VENDEDOR',
+      });
+      mockedPrisma.businessHourSetting.findUnique.mockResolvedValue(SETTING_OUTSIDE);
+      mockedBcrypt.compare.mockResolvedValue(true);
+
+      let caught: any;
+      try {
+        await AuthService.login('test@example.com', 'password123');
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeDefined();
+      expect(caught.statusCode).toBe(403);
+      expect(caught.errorCode).toBe('OUTSIDE_BUSINESS_HOURS');
+      expect(caught.message).toMatch(/horario del comercio/i);
+      expect(mockedGenAccess).not.toHaveBeenCalled();
+    });
+
+    it('login de rol operativo dentro de horario → emite tokens normalmente', async () => {
+      mockedPrisma.user.findFirst.mockResolvedValue({
+        ...baseUser,
+        role: 'VENDEDOR',
+      });
+      mockedPrisma.businessHourSetting.findUnique.mockResolvedValue(SETTING_INSIDE);
+      mockedPrisma.branchAssignment.findMany.mockResolvedValue([]);
+      mockedBcrypt.compare.mockResolvedValue(true);
+      mockedGenAccess.mockReturnValue('access-token');
+      mockedGenRefresh.mockReturnValue('refresh-token');
+
+      const result = await AuthService.login('test@example.com', 'password123');
+
+      expect(result.accessToken).toBe('access-token');
+      expect(result.refreshToken).toBe('refresh-token');
+    });
+
+    it('login sin setting configurado → emite tokens (org sin restricción)', async () => {
+      mockedPrisma.user.findFirst.mockResolvedValue({
+        ...baseUser,
+        role: 'EMPLOYEE',
+      });
+      mockedPrisma.businessHourSetting.findUnique.mockResolvedValue(null);
+      mockedPrisma.branchAssignment.findMany.mockResolvedValue([]);
+      mockedBcrypt.compare.mockResolvedValue(true);
+      mockedGenAccess.mockReturnValue('access-token');
+      mockedGenRefresh.mockReturnValue('refresh-token');
+
+      const result = await AuthService.login('test@example.com', 'password123');
+
+      expect(result.accessToken).toBe('access-token');
+    });
+
+    it('login de rol NO operativo (ADMIN) → nunca consulta businessHourSetting', async () => {
+      mockedPrisma.user.findFirst.mockResolvedValue({ ...baseUser });
+      mockedPrisma.branchAssignment.findMany.mockResolvedValue([]);
+      mockedBcrypt.compare.mockResolvedValue(true);
+      mockedGenAccess.mockReturnValue('access-token');
+      mockedGenRefresh.mockReturnValue('refresh-token');
+
+      await AuthService.login('test@example.com', 'password123');
+
+      expect(mockedPrisma.businessHourSetting.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('refresh de rol operativo fuera de horario → typed error 403 OUTSIDE_BUSINESS_HOURS', async () => {
+      mockedVerify.mockReturnValue({ id: 'u1', type: 'refresh' });
+      mockedPrisma.user.findUnique.mockResolvedValue({
+        ...baseUser,
+        role: 'CASHIER',
+      });
+      mockedPrisma.businessHourSetting.findUnique.mockResolvedValue(SETTING_OUTSIDE);
+
+      let caught: any;
+      try {
+        await AuthService.refresh('refresh-valido');
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeDefined();
+      expect(caught.statusCode).toBe(403);
+      expect(caught.errorCode).toBe('OUTSIDE_BUSINESS_HOURS');
+      expect(mockedGenAccess).not.toHaveBeenCalled();
+    });
+
+    it('refresh de rol operativo dentro de horario → emite access token', async () => {
+      mockedVerify.mockReturnValue({ id: 'u1', type: 'refresh' });
+      mockedPrisma.user.findUnique.mockResolvedValue({
+        ...baseUser,
+        role: 'VENDEDOR',
+      });
+      mockedPrisma.businessHourSetting.findUnique.mockResolvedValue(SETTING_INSIDE);
+      mockedGenAccess.mockReturnValue('nuevo-access');
+
+      const result = await AuthService.refresh('refresh-valido');
+
+      expect(result).toEqual({ accessToken: 'nuevo-access' });
+    });
+
+    it('refresh de rol NO operativo (ADMIN) → nunca consulta businessHourSetting', async () => {
+      mockedVerify.mockReturnValue({ id: 'u1', type: 'refresh' });
+      mockedPrisma.user.findUnique.mockResolvedValue({ ...baseUser });
+      mockedGenAccess.mockReturnValue('nuevo-access');
+
+      await AuthService.refresh('refresh-valido');
+
+      expect(mockedPrisma.businessHourSetting.findUnique).not.toHaveBeenCalled();
     });
   });
 

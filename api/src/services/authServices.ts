@@ -2,11 +2,8 @@ import { basePrisma } from "../config/db";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { Role, Plan } from "@prisma/client";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyToken,
-} from "../utils/jwtUtils";
+import { generateAccessToken, generateRefreshToken, verifyToken } from "../utils/jwtUtils";
+import { isWithinBusinessHours, DaySetting } from "../utils/businessHours";
 import { sendMail } from "./mailService";
 import { resetPasswordEmail } from "./mailTemplates";
 import { RateLimiter } from "./rateLimiter";
@@ -35,6 +32,11 @@ class AuthService {
         "Tu organización está suspendida, contactá al administrador.",
       );
     }
+
+    // Horario comercial (sdd/business-hours-access): fuera del horario de la
+    // org, los roles operativos no reciben tokens aunque las credenciales sean
+    // válidas. MANAGEMENT/ADMIN/SUPERADMIN y orgs sin config pasan directo.
+    await AuthService.assertBusinessHoursOpen(user);
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
@@ -87,6 +89,47 @@ class AuthService {
     return assignments.map((a) => a.branchId);
   }
 
+  /**
+   * Gate de horario comercial para login/refresh (sdd/business-hours-access):
+   * SÓLO roles operativos (VENDEDOR/CASHIER/EMPLOYEE) con organización. Sin
+   * BusinessHourSetting → sin restricción. Fuera de horario → error tipado
+   * { statusCode: 403, errorCode: "OUTSIDE_BUSINESS_HOURS" } que authController
+   * propaga como 403 { error, message } para que el front distinga este caso
+   * de un 401 genérico y redirija a la pantalla de bloqueo.
+   */
+  private static async assertBusinessHoursOpen(user: {
+    role: Role;
+    organizationId: string | null;
+  }) {
+    const OPERATIVE_ROLES = ["VENDEDOR", "CASHIER", "EMPLOYEE"];
+    if (!user.organizationId || !OPERATIVE_ROLES.includes(user.role)) {
+      return;
+    }
+
+    const setting = await basePrisma.businessHourSetting.findUnique({
+      where: { organizationId: user.organizationId },
+    });
+    if (!setting) {
+      return; // sin config → sin restricción
+    }
+
+    const { allowed } = isWithinBusinessHours(
+      new Date(),
+      setting.timezone,
+      setting.days as unknown as DaySetting[],
+    );
+    if (allowed) {
+      return;
+    }
+
+    const err: any = new Error(
+      "Fuera del horario comercial. El acceso al sistema está disponible solo dentro del horario del comercio.",
+    );
+    err.statusCode = 403;
+    err.errorCode = "OUTSIDE_BUSINESS_HOURS";
+    throw err;
+  }
+
   /** Emite un nuevo access token a partir de un refresh token válido. */
   static async refresh(refreshToken: string) {
     let payload: { id: string; type?: string };
@@ -115,6 +158,11 @@ class AuthService {
         "Tu organización está suspendida, contactá al administrador.",
       );
     }
+
+    // Mismo gate de horario comercial que en login: el refresh NO debe renovar
+    // el access token fuera del horario de la org (el front hoy no usa refresh,
+    // esto es future-proofing del contrato server-side).
+    await AuthService.assertBusinessHoursOpen(user);
 
     const accessToken = generateAccessToken({
       id: user.id,

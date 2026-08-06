@@ -72,6 +72,26 @@ describe('AuthController', () => {
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({ message: 'Credenciales inválidas' });
     });
+
+    it('devuelve 403 { error: OUTSIDE_BUSINESS_HOURS, message } cuando el service rechaza por horario', async () => {
+      const err: any = new Error(
+        'Fuera del horario comercial. El acceso al sistema está disponible solo dentro del horario del comercio.',
+      );
+      err.statusCode = 403;
+      err.errorCode = 'OUTSIDE_BUSINESS_HOURS';
+      mockedAuthService.login.mockRejectedValue(err);
+
+      const req = mockRequest({ email: 'test@example.com', password: 'ok' });
+      const res = mockResponse();
+
+      await login(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'OUTSIDE_BUSINESS_HOURS',
+        message: err.message,
+      });
+    });
   });
 
   describe('refresh', () => {
