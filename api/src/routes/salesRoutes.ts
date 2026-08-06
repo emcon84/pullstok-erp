@@ -1,6 +1,7 @@
 import { Router } from "express";
 import SaleController from "../controllers/salesController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
+import { checkBusinessHours } from "../middlewares/checkBusinessHours";
 import { checkSaleInvoicingEnabled } from "../middlewares/checkSaleInvoicingEnabled";
 import { validate } from "../middlewares/validate";
 import { createSaleSchema, createSaleInvoiceSchema } from "../validation/schemas";
@@ -10,11 +11,12 @@ const router = Router();
 router.post(
   "/",
   authenticateJWT,
+  checkBusinessHours,
   validate(createSaleSchema),
   SaleController.createSale,
 );
-router.get("/", authenticateJWT, SaleController.getAllSales);
-router.get("/:id", authenticateJWT, SaleController.getSaleById);
+router.get("/", authenticateJWT, checkBusinessHours, SaleController.getAllSales);
+router.get("/:id", authenticateJWT, checkBusinessHours, SaleController.getSaleById);
 
 // Elimina una venta: solo ADMIN/MANAGEMENT. Restaura el stock y revierte el
 // pedido asociado a PENDING. Una venta con factura (cualquier estado) queda
@@ -22,6 +24,7 @@ router.get("/:id", authenticateJWT, SaleController.getSaleById);
 router.delete(
   "/:id",
   authenticateJWT,
+  checkBusinessHours,
   requireRole("ADMIN", "MANAGEMENT"),
   SaleController.deleteSale,
 );
@@ -33,6 +36,7 @@ router.delete(
 router.post(
   "/:saleId/invoice",
   authenticateJWT,
+  checkBusinessHours,
   checkSaleInvoicingEnabled,
   validate(createSaleInvoiceSchema),
   SaleController.createInvoiceFromSale,

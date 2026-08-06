@@ -5,6 +5,7 @@ import productController, {
   getProductByCode,
 } from "../controllers/productController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
+import { checkBusinessHours } from "../middlewares/checkBusinessHours";
 import { upload } from "../middlewares/uploadMiddleware";
 import { validate } from "../middlewares/validate";
 import {
@@ -25,6 +26,7 @@ const router = Router();
 router.post(
   "/",
   authenticateJWT,
+  checkBusinessHours,
   validate(createProductSchema),
   checkProductLimit,
   productController.createProduct,
@@ -32,18 +34,20 @@ router.post(
 router.post(
   "/bulk",
   authenticateJWT,
+  checkBusinessHours,
   validate(bulkProductsSchema),
   productController.bulkUploadProducts,
 );
 router.post(
   "/upload-csv",
   authenticateJWT,
+  checkBusinessHours,
   upload.single("file"),
   uploadProductsCsv,
 );
 router.get("/template-csv", downloadTemplateCsv);
-router.get("/by-code/:code", authenticateJWT, getProductByCode);
-router.get("/", authenticateJWT, productController.getProducts);
+router.get("/by-code/:code", authenticateJWT, checkBusinessHours, getProductByCode);
+router.get("/", authenticateJWT, checkBusinessHours, productController.getProducts);
 
 // Resumen de stock de toda la org (dashboard). Debe registrarse ANTES de
 // "/:id" (un id literal "stock-summary" la matchearía) y antes de la sección
@@ -51,6 +55,7 @@ router.get("/", authenticateJWT, productController.getProducts);
 router.get(
   "/stock-summary",
   authenticateJWT,
+  checkBusinessHours,
   productController.getStockSummary,
 );
 
@@ -60,31 +65,35 @@ router.get(
 router.get(
   "/filter-facets",
   authenticateJWT,
+  checkBusinessHours,
   productController.getProductFilterFacets,
 );
 
-router.get("/:id", authenticateJWT, productController.getProductById);
+router.get("/:id", authenticateJWT, checkBusinessHours, productController.getProductById);
 router.put(
   "/:id",
   authenticateJWT,
+  checkBusinessHours,
   validate(updateProductSchema),
   productController.updateProduct,
 );
 router.patch(
   "/:id/publish",
   authenticateJWT,
+  checkBusinessHours,
   validate(publishProductSchema),
   checkStoreProductLimit,
   productController.publishProduct,
 );
-router.delete("/:id", authenticateJWT, requireRole("ADMIN", "MANAGEMENT"), productController.deleteProduct);
+router.delete("/:id", authenticateJWT, checkBusinessHours, requireRole("ADMIN", "MANAGEMENT"), productController.deleteProduct);
 
 // Stock por sucursal (branch-stock, PR 2b): consulta autocontenida para
 // cualquier rol autenticado y edición con autorización server-side (A1/A2).
-router.get("/:id/stock", authenticateJWT, productController.getProductStock);
+router.get("/:id/stock", authenticateJWT, checkBusinessHours, productController.getProductStock);
 router.put(
   "/:id/stock/:branchId",
   authenticateJWT,
+  checkBusinessHours,
   validate(updateBranchStockSchema),
   productController.updateBranchStock,
 );
@@ -93,6 +102,7 @@ router.put(
 router.post(
   "/bulk-price-update",
   authenticateJWT,
+  checkBusinessHours,
   requireRole("ADMIN"),
   validate(bulkPriceUpdateSchema),
   productController.bulkPriceUpdate,

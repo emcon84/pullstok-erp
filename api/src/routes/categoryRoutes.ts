@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { authenticate, requireRole } from "../middlewares/authMiddleware";
+import { checkBusinessHours } from "../middlewares/checkBusinessHours";
 import { validate } from "../middlewares/validate";
 import { prisma } from "../config/db";
 import {
@@ -53,6 +54,7 @@ const router = Router();
 router.post(
   "/",
   authenticate,
+  checkBusinessHours,
   requireRole("ADMIN"),
   validate(createCategoriesSchema),
   createCategories,
@@ -60,32 +62,35 @@ router.post(
 router.post(
   "/single",
   authenticate,
+  checkBusinessHours,
   requireRole("ADMIN"),
   validate(createCategorySchema),
   createCategory,
 );
-router.get("/", authenticate, getCategories);
+router.get("/", authenticate, checkBusinessHours, getCategories);
 // /tree MUST come before /:id/children to avoid matching "tree" as an :id param
-router.get("/tree", authenticate, getTree);
-router.get("/variant-options", authenticate, getVariantOptionsByDef);
-router.get("/:id/children", authenticate, getCategoryChildren);
+router.get("/tree", authenticate, checkBusinessHours, getTree);
+router.get("/variant-options", authenticate, checkBusinessHours, getVariantOptionsByDef);
+router.get("/:id/children", authenticate, checkBusinessHours, getCategoryChildren);
 router.put(
   "/:id",
   authenticate,
+  checkBusinessHours,
   requireRole("ADMIN"),
   validate(updateCategorySchema),
   updateCategory,
 );
-router.delete("/:id", authenticate, requireRole("ADMIN"), deleteCategory);
+router.delete("/:id", authenticate, checkBusinessHours, requireRole("ADMIN"), deleteCategory);
 
 // =========================================================================
 // Variant Definitions (nested under categories)
 // =========================================================================
 
-router.get("/:id/variants", authenticate, getCategoryVariants);
+router.get("/:id/variants", authenticate, checkBusinessHours, getCategoryVariants);
 router.post(
   "/:id/variants",
   authenticate,
+  checkBusinessHours,
   requireRole("ADMIN"),
   validate(createVariantSchema),
   createVariant,
@@ -98,11 +103,12 @@ router.post(
 router.put(
   "/variants/:id",
   authenticate,
+  checkBusinessHours,
   requireRole("ADMIN"),
   validate(updateVariantSchema),
   updateVariant,
 );
-router.delete("/variants/:id", authenticate, requireRole("ADMIN"), deleteVariant);
+router.delete("/variants/:id", authenticate, checkBusinessHours, requireRole("ADMIN"), deleteVariant);
 
 // =========================================================================
 // Variant Options (standalone — nested under variant ID)
@@ -111,6 +117,7 @@ router.delete("/variants/:id", authenticate, requireRole("ADMIN"), deleteVariant
 router.post(
   "/variants/:id/options",
   authenticate,
+  checkBusinessHours,
   requireRole("ADMIN"),
   validate(createVariantOptionSchema),
   createVariantOption,
@@ -118,10 +125,11 @@ router.post(
 router.put(
   "/options/:id",
   authenticate,
+  checkBusinessHours,
   requireRole("ADMIN"),
   validate(updateVariantOptionSchema),
   updateVariantOption,
 );
-router.delete("/options/:id", authenticate, requireRole("ADMIN"), deleteVariantOption);
+router.delete("/options/:id", authenticate, checkBusinessHours, requireRole("ADMIN"), deleteVariantOption);
 
 export default router;

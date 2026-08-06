@@ -1,6 +1,7 @@
 import { Router } from "express";
 import customerController from "../controllers/customerController";
 import { authenticateJWT } from "../middlewares/authMiddleware";
+import { checkBusinessHours } from "../middlewares/checkBusinessHours";
 import { validate } from "../middlewares/validate";
 import {
   createCustomerSchema,
@@ -12,17 +13,19 @@ const router = Router();
 router.post(
   "/",
   authenticateJWT,
+  checkBusinessHours,
   validate(createCustomerSchema),
   customerController.createCustomer,
 );
-router.get("/", authenticateJWT, customerController.getCustomers);
-router.get("/:id", authenticateJWT, customerController.getCustomerById);
+router.get("/", authenticateJWT, checkBusinessHours, customerController.getCustomers);
+router.get("/:id", authenticateJWT, checkBusinessHours, customerController.getCustomerById);
 router.put(
   "/:id",
   authenticateJWT,
+  checkBusinessHours,
   validate(updateCustomerSchema),
   customerController.updateCustomer,
 );
-router.delete("/:id", authenticateJWT, customerController.deleteCustomer);
+router.delete("/:id", authenticateJWT, checkBusinessHours, customerController.deleteCustomer);
 
 export default router;
