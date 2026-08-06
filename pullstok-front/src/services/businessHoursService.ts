@@ -4,11 +4,16 @@ import { API_URL } from "../constants";
 // Config de horario comercial (business-hours-access). Espejo de
 // storeSettingsService: misma firma axios + headers, 1:1 con la org. El
 // backend devuelve los defaults si la org nunca guardó (create-on-read).
+export interface BusinessHourSlot {
+  open: string; // "HH:MM" (zero-padded)
+  close: string; // "HH:MM" (zero-padded)
+}
+
 export interface BusinessHoursDay {
   day: number; // 0 (domingo) .. 6 (sábado)
   enabled: boolean;
-  open: string; // "HH:MM" (zero-padded)
-  close: string; // "HH:MM" (zero-padded)
+  // Uno o más turnos por día (horario cortado, ej. 08:00-12:00 y 16:00-20:00).
+  slots: BusinessHourSlot[];
 }
 
 export interface BusinessHoursSettings {

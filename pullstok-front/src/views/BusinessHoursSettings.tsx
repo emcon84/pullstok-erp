@@ -11,7 +11,7 @@ import { BusinessHoursForm } from "../components/molecules/BusinessHoursForm";
  */
 export const BusinessHoursSettings = () => {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
-  const { settings, loading } = useBusinessHours();
+  const { settings, loading, error } = useBusinessHours();
   const { updateSettings, loading: isSaving } = useUpdateBusinessHours();
 
   // Guard client-side: la ruta vive en ProtectedLayout pero la config es solo
@@ -34,6 +34,7 @@ export const BusinessHoursSettings = () => {
         settings={settings}
         loading={loading}
         saving={isSaving}
+        loadError={error?.message ?? null}
         onSave={updateSettings}
       />
     </div>

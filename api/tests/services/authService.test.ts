@@ -478,14 +478,14 @@ describe('AuthService', () => {
     const SETTING_INSIDE = {
       timezone: 'America/Argentina/Buenos_Aires',
       days: [
-        { day: 4, enabled: true, open: '09:00', close: '19:00' },
-        { day: 0, enabled: false, open: '09:00', close: '19:00' },
+        { day: 4, enabled: true, slots: [{ open: '09:00', close: '19:00' }] },
+        { day: 0, enabled: false, slots: [{ open: '09:00', close: '19:00' }] },
       ],
     };
     const SETTING_OUTSIDE = {
       timezone: 'America/Argentina/Buenos_Aires',
       days: [
-        { day: 4, enabled: true, open: '09:00', close: '12:00' },
+        { day: 4, enabled: true, slots: [{ open: '09:00', close: '12:00' }] },
       ],
     };
 

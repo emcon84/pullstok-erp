@@ -28,13 +28,13 @@ const mockResponse = () => {
 };
 
 const DEFAULT_DAYS = [
-  { day: 0, enabled: false, open: "09:00", close: "19:00" },
-  { day: 1, enabled: false, open: "09:00", close: "19:00" },
-  { day: 2, enabled: false, open: "09:00", close: "19:00" },
-  { day: 3, enabled: false, open: "09:00", close: "19:00" },
-  { day: 4, enabled: false, open: "09:00", close: "19:00" },
-  { day: 5, enabled: false, open: "09:00", close: "19:00" },
-  { day: 6, enabled: false, open: "09:00", close: "19:00" },
+  { day: 0, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 1, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 2, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 3, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 4, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 5, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 6, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
 ];
 
 describe("businessHoursController.getBusinessHours", () => {

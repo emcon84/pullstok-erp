@@ -7,11 +7,17 @@ import { toZonedTime } from "date-fns-tz";
 // es la forma correcta de obtener la "hora de pared" de una zona IANA sin
 // parsear strings de forma manual.
 
+export interface BusinessHourSlot {
+  open: string; // "HH:MM" (zero-padded)
+  close: string; // "HH:MM" (zero-padded)
+}
+
 export interface DaySetting {
   day: number; // 0 (domingo) .. 6 (sábado)
   enabled: boolean;
-  open: string; // "HH:MM" (zero-padded)
-  close: string; // "HH:MM" (zero-padded)
+  // 1..N turnos por día (horario cortado del interior: ej. 08:00-12:00 y
+  // 16:00-20:00). El día está "abierto" si `now` cae dentro de CUALQUIER slot.
+  slots: BusinessHourSlot[];
 }
 
 /** Resuelve weekday (0..6) y minutesOfDay (0..1439) en la timezone de la org. */
@@ -30,8 +36,9 @@ export const resolveLocalTime = (now: Date, timezone: string) => {
 
 /**
  * Devuelve si `now` está dentro del horario comercial de la org.
- * Inclusive start / exclusive end: `minutesOfDay >= open && minutesOfDay < close`.
- * Día deshabilitado o ausente → bloqueado.
+ * Cada día puede tener 1..N turnos (slots); está abierto si cae dentro de
+ * CUALQUIER turno. Inclusive start / exclusive end por slot.
+ * Día deshabilitado o ausente → bloqueado. Día habilitado sin slots → bloqueado.
  */
 export const isWithinBusinessHours = (
   now: Date,
@@ -40,14 +47,17 @@ export const isWithinBusinessHours = (
 ): { allowed: boolean } => {
   const { weekday, minutesOfDay } = resolveLocalTime(now, timezone);
   const day = days.find((d) => d.day === weekday);
-  if (!day?.enabled) {
+  if (!day?.enabled || !day.slots || day.slots.length === 0) {
     return { allowed: false };
   }
 
-  const [openHour, openMin] = day.open.split(":").map(Number);
-  const [closeHour, closeMin] = day.close.split(":").map(Number);
-  const open = openHour * 60 + openMin;
-  const close = closeHour * 60 + closeMin;
-
-  return { allowed: minutesOfDay >= open && minutesOfDay < close };
+  return {
+    allowed: day.slots.some((slot) => {
+      const [openHour, openMin] = slot.open.split(":").map(Number);
+      const [closeHour, closeMin] = slot.close.split(":").map(Number);
+      const open = openHour * 60 + openMin;
+      const close = closeHour * 60 + closeMin;
+      return minutesOfDay >= open && minutesOfDay < close;
+    }),
+  };
 };

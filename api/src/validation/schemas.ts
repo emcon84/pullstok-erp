@@ -482,24 +482,31 @@ export const updateAppBrandingSchema = z.object({
 // poder inhabilitar el comercio por accidente, así que se valida duro:
 //  - `timezone`: IANA válida (Intl.supportedValuesOf con fallback manual)
 //  - `days`: exactamente 7 entradas, una por día 0(domingo)..6(sábado)
-//  - cada día: enabled + open/close "HH:MM" zero-padded, con open < close
-//    (comparación de strings padded: "09:00" < "19:00" es correcto y evita
-//    parsear horas manualmente)
+//  - cada día: enabled + 1..N slots (turnos) open/close "HH:MM" zero-padded,
+//    con open < close por slot (comparación de strings padded: "09:00" <
+//    "19:00" es correcto y evita parsear horas manualmente). Los slots
+//    soportan horario cortado (ej. 08:00-12:00 y 16:00-20:00).
 //  - al menos 1 día habilitado (sin días habilitados el gate bloquearía
 //    SIEMPRE, incluso en el horario — un estado sin sentido)
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-const businessHourDaySchema = z
+const businessHourSlotSchema = z
   .object({
-    day: z.number().int().min(0).max(6),
-    enabled: z.boolean(),
     open: z.string().regex(HHMM_REGEX, "Formato inválido (esperado HH:MM)"),
     close: z.string().regex(HHMM_REGEX, "Formato inválido (esperado HH:MM)"),
   })
-  .refine((d) => d.open < d.close, {
+  .refine((s) => s.open < s.close, {
     message: "La hora de apertura debe ser anterior al cierre",
     path: ["close"],
   });
+
+const businessHourDaySchema = z.object({
+  day: z.number().int().min(0).max(6),
+  enabled: z.boolean(),
+  slots: z
+    .array(businessHourSlotSchema)
+    .min(1, "Cada día necesita al menos un turno"),
+});
 
 // IANA timezones válidas: Intl.supportedValuesOf devuelve la lista del
 // runtime, pero OMITE zonas canónicas duplicadas (alias) — por ejemplo Node 24

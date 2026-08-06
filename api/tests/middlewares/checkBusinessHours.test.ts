@@ -40,8 +40,8 @@ const mockRequest = (role: string) =>
 const INSIDE_SETTING = {
   timezone: "America/Argentina/Buenos_Aires",
   days: [
-    { day: 4, enabled: true, open: "09:00", close: "19:00" },
-    { day: 0, enabled: false, open: "09:00", close: "19:00" },
+    { day: 4, enabled: true, slots: [{ open: "09:00", close: "19:00" }] },
+    { day: 0, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
   ],
 };
 
@@ -60,7 +60,7 @@ describe("checkBusinessHours", () => {
       timezone: "America/Argentina/Buenos_Aires",
       days: [
         // Jueves habilitado de 09:00 a 12:00 — 15:00 local queda FUERA.
-        { day: 4, enabled: true, open: "09:00", close: "12:00" },
+        { day: 4, enabled: true, slots: [{ open: "09:00", close: "12:00" }] },
       ],
     });
     const req = mockRequest("VENDEDOR");
@@ -124,7 +124,7 @@ describe("checkBusinessHours", () => {
       timezone: "America/Argentina/Buenos_Aires",
       days: [
         // Jueves (day 4) deshabilitado — aunque sea de 00:00 a 23:59.
-        { day: 4, enabled: false, open: "00:00", close: "23:59" },
+        { day: 4, enabled: false, slots: [{ open: "00:00", close: "23:59" }] },
       ],
     });
     const req = mockRequest("VENDEDOR");

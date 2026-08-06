@@ -12,13 +12,13 @@ import { DaySetting } from "../utils/businessHours";
 const DEFAULT_TIMEZONE = "America/Argentina/Buenos_Aires";
 
 const DEFAULT_DAYS: DaySetting[] = [
-  { day: 0, enabled: false, open: "09:00", close: "19:00" },
-  { day: 1, enabled: false, open: "09:00", close: "19:00" },
-  { day: 2, enabled: false, open: "09:00", close: "19:00" },
-  { day: 3, enabled: false, open: "09:00", close: "19:00" },
-  { day: 4, enabled: false, open: "09:00", close: "19:00" },
-  { day: 5, enabled: false, open: "09:00", close: "19:00" },
-  { day: 6, enabled: false, open: "09:00", close: "19:00" },
+  { day: 0, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 1, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 2, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 3, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 4, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 5, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+  { day: 6, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
 ];
 
 /** ADMIN: devuelve los horarios de SU organización. Create-on-read: si todavía

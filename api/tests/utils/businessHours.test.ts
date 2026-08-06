@@ -16,8 +16,7 @@ const DAYS = (overrides: Partial<Record<number, Partial<DaySetting>>> = {}) => {
   const days: DaySetting[] = Array.from({ length: 7 }, (_, day) => ({
     day,
     enabled: false,
-    open: "09:00",
-    close: "19:00",
+    slots: [{ open: "09:00", close: "19:00" }],
     ...overrides[day],
   }));
   return days;
@@ -59,28 +58,28 @@ describe("resolveLocalTime", () => {
 describe("isWithinBusinessHours", () => {
   it("permite a las 09:00 exactas (inclusive start)", () => {
     const now = new Date("2026-08-06T12:00:00.000Z"); // 09:00 jueves
-    const days = DAYS({ 4: { enabled: true, open: "09:00", close: "19:00" } });
+    const days = DAYS({ 4: { enabled: true, slots: [{ open: "09:00", close: "19:00" }] } });
 
     expect(isWithinBusinessHours(now, TZ_AR, days).allowed).toBe(true);
   });
 
   it("bloquea a las 19:00 exactas (exclusive end)", () => {
     const now = new Date("2026-08-06T22:00:00.000Z"); // 19:00 jueves
-    const days = DAYS({ 4: { enabled: true, open: "09:00", close: "19:00" } });
+    const days = DAYS({ 4: { enabled: true, slots: [{ open: "09:00", close: "19:00" }] } });
 
     expect(isWithinBusinessHours(now, TZ_AR, days).allowed).toBe(false);
   });
 
   it("bloquea antes de la apertura", () => {
     const now = new Date("2026-08-06T11:59:00.000Z"); // 08:59 jueves
-    const days = DAYS({ 4: { enabled: true, open: "09:00", close: "19:00" } });
+    const days = DAYS({ 4: { enabled: true, slots: [{ open: "09:00", close: "19:00" }] } });
 
     expect(isWithinBusinessHours(now, TZ_AR, days).allowed).toBe(false);
   });
 
   it("permite dentro del rango (horario del medio)", () => {
     const now = new Date("2026-08-06T18:00:00.000Z"); // 15:00 jueves
-    const days = DAYS({ 4: { enabled: true, open: "09:00", close: "19:00" } });
+    const days = DAYS({ 4: { enabled: true, slots: [{ open: "09:00", close: "19:00" }] } });
 
     expect(isWithinBusinessHours(now, TZ_AR, days).allowed).toBe(true);
   });
@@ -102,7 +101,7 @@ describe("isWithinBusinessHours", () => {
 
   it("respeta un horario con minutos no redondos", () => {
     // 08:45 jueves (bloqueado), 09:00 jueves (permitido) con open 08:45.
-    const days = DAYS({ 4: { enabled: true, open: "08:45", close: "18:30" } });
+    const days = DAYS({ 4: { enabled: true, slots: [{ open: "08:45", close: "18:30" }] } });
 
     expect(
       isWithinBusinessHours(new Date("2026-08-06T11:44:00.000Z"), TZ_AR, days)
@@ -120,5 +119,46 @@ describe("isWithinBusinessHours", () => {
       isWithinBusinessHours(new Date("2026-08-06T21:30:00.000Z"), TZ_AR, days)
         .allowed,
     ).toBe(false); // 18:30 local
+  });
+
+  it("soporta horario cortado (múltiples turnos por día)", () => {
+    // Jueves abierto 08:00-12:00 Y 16:00-20:00 (horario de interior).
+    // Referencias UTC-3: 08:00Z=05:00 local? no — 05:00Z=02:00 local? Reviso:
+    // BA = UTC-3 → hora local = hora UTC - 3. 11:00Z -> 08:00 local.
+    const days = DAYS({
+      4: {
+        enabled: true,
+        slots: [
+          { open: "08:00", close: "12:00" },
+          { open: "16:00", close: "20:00" },
+        ],
+      },
+    });
+
+    // Dentro del primer turno: 09:00 local (12:00Z).
+    expect(
+      isWithinBusinessHours(new Date("2026-08-06T12:00:00.000Z"), TZ_AR, days)
+        .allowed,
+    ).toBe(true);
+    // Hueco entre turnos: 13:00 local (16:00Z) → BLOQUEADO.
+    expect(
+      isWithinBusinessHours(new Date("2026-08-06T16:00:00.000Z"), TZ_AR, days)
+        .allowed,
+    ).toBe(false);
+    // Dentro del segundo turno: 17:30 local (20:30Z).
+    expect(
+      isWithinBusinessHours(new Date("2026-08-06T20:30:00.000Z"), TZ_AR, days)
+        .allowed,
+    ).toBe(true);
+    // Después del cierre del segundo turno: 20:00 local exacto (23:00Z) → bloqueado (exclusive end).
+    expect(
+      isWithinBusinessHours(new Date("2026-08-06T23:00:00.000Z"), TZ_AR, days)
+        .allowed,
+    ).toBe(false);
+    // Antes de la apertura: 07:59 local (10:59Z) → bloqueado.
+    expect(
+      isWithinBusinessHours(new Date("2026-08-06T10:59:00.000Z"), TZ_AR, days)
+        .allowed,
+    ).toBe(false);
   });
 });

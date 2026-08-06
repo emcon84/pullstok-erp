@@ -623,13 +623,13 @@ describe("bulkPriceUpdateSchema — per-category/product override arrays", () =>
 
 describe("updateBusinessHoursSchema — horario comercial", () => {
   const validDays = [
-    { day: 0, enabled: false, open: "09:00", close: "19:00" },
-    { day: 1, enabled: true, open: "09:00", close: "19:00" },
-    { day: 2, enabled: true, open: "09:00", close: "19:00" },
-    { day: 3, enabled: true, open: "09:00", close: "19:00" },
-    { day: 4, enabled: true, open: "09:00", close: "19:00" },
-    { day: 5, enabled: true, open: "09:00", close: "19:00" },
-    { day: 6, enabled: false, open: "09:00", close: "19:00" },
+    { day: 0, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
+    { day: 1, enabled: true, slots: [{ open: "09:00", close: "19:00" }] },
+    { day: 2, enabled: true, slots: [{ open: "09:00", close: "19:00" }] },
+    { day: 3, enabled: true, slots: [{ open: "09:00", close: "19:00" }] },
+    { day: 4, enabled: true, slots: [{ open: "09:00", close: "19:00" }] },
+    { day: 5, enabled: true, slots: [{ open: "09:00", close: "19:00" }] },
+    { day: 6, enabled: false, slots: [{ open: "09:00", close: "19:00" }] },
   ];
 
   it("acepta timezone IANA válida + 7 días con al menos uno enabled", () => {
@@ -658,7 +658,7 @@ describe("updateBusinessHoursSchema — horario comercial", () => {
 
   it("rechaza open >= close (string compare zero-padded)", () => {
     const badDays = validDays.map((d) =>
-      d.day === 1 ? { ...d, open: "19:00", close: "09:00" } : d,
+      d.day === 1 ? { ...d, slots: [{ open: "19:00", close: "09:00" }] } : d,
     );
     const result = updateBusinessHoursSchema.safeParse({
       timezone: "America/Argentina/Buenos_Aires",
@@ -669,7 +669,7 @@ describe("updateBusinessHoursSchema — horario comercial", () => {
 
   it("rechaza formato HH:MM inválido", () => {
     const badDays = validDays.map((d) =>
-      d.day === 1 ? { ...d, open: "9am" } : d,
+      d.day === 1 ? { ...d, slots: [{ open: "9am", close: "19:00" }] } : d,
     );
     const result = updateBusinessHoursSchema.safeParse({
       timezone: "America/Argentina/Buenos_Aires",
