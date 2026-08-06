@@ -13,13 +13,7 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { CategoryTreePicker } from "@/components/molecules/CategoryTreePicker";
 import { useCreateProduct } from "@/components/hooks/useProducts";
 import { useProductStock } from "@/components/hooks/useProductStock";
@@ -354,20 +348,15 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
               {variants.map((def) => (
                 <div key={def.id} className="space-y-1">
                   <Label className="text-xs">{def.name}</Label>
-                  <Select
+                  <NativeSelect
                     value={variantSelections[def.id] || ""}
                     onValueChange={(v) => setVariantSelections(prev => ({ ...prev, [def.id]: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={`Elegí ${def.name.toLowerCase()}`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">—</SelectItem>
-                      {def.options.map((opt) => (
-                        <SelectItem key={opt.id} value={opt.id}>{opt.value}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder={`Elegí ${def.name.toLowerCase()}`}
+                    options={[
+                      { value: "", label: "—" },
+                      ...def.options.map((opt) => ({ value: opt.id, label: opt.value })),
+                    ]}
+                  />
                 </div>
               ))}
             </div>

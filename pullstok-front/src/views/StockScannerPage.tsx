@@ -6,9 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
@@ -435,19 +433,17 @@ export const StockScannerPage = () => {
       {mode.kind === "selector" && (isAdminSelector || product) && (
         <div className="space-y-1.5">
           <Label htmlFor="scanner-branch">Sucursal de trabajo</Label>
-          <Select value={effectiveBranchId ?? ""} onValueChange={setSelectedBranchId}>
-            <SelectTrigger id="scanner-branch" aria-label="Sucursal de trabajo" className="w-full">
-              <SelectValue placeholder="Elegí la sucursal" />
-            </SelectTrigger>
-            <SelectContent>
-              {(isAdminSelector
-                ? allBranches.map((b) => ({ id: b.id, name: b.name }))
-                : restrictedOptions.map((b) => ({ id: b.branchId, name: b.branchName }))
-              ).map((o) => (
-                <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <NativeSelect
+            id="scanner-branch"
+            ariaLabel="Sucursal de trabajo"
+            value={effectiveBranchId ?? ""}
+            onValueChange={(v) => setSelectedBranchId(v || null)}
+            placeholder="Elegí la sucursal"
+            options={(isAdminSelector
+              ? allBranches.map((b) => ({ value: b.id, label: b.name }))
+              : restrictedOptions.map((b) => ({ value: b.branchId, label: b.branchName }))
+            )}
+          />
         </div>
       )}
 
