@@ -1,0 +1,26 @@
+[Unit]
+Description=Pullstok ERP API
+After=network.target postgresql.service
+Documentation=https://github.com/emcon84/pullstok-erp
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/var/www/pullstok/api
+EnvironmentFile=/var/www/pullstok/api/.env
+ExecStart=/usr/bin/node /var/www/pullstok/api/dist/bundle.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Seguridad adicional (sin permisos innecesarios)
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/www/pullstok/api/uploads /var/www/pullstok/api/invoices
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

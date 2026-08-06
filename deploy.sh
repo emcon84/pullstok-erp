@@ -6,7 +6,7 @@
 # en /var/www/pullstok.
 #
 # Se corre como el usuario "deploy" (o via self-hosted runner de GitHub Actions).
-# Los comandos privilegiados (nginx, pm2 de pullstok-api, pg_dump) se invocan
+# Los comandos privilegiados (nginx, systemctl de pullstok-api, pg_dump) se invocan
 # con sudo+NOPASSWD restringido en /etc/sudoers.d/pullstok-deploy — NUNCA root libre.
 #
 # Seguridad habilitada:
@@ -20,7 +20,7 @@ set -euo pipefail
 
 PROJECT_DIR="/var/www/pullstok"
 API_DIR="$PROJECT_DIR/api"
-PM2_APP_NAME="pullstok-api"
+SERVICE_NAME="pullstok-api"
 BACKUP_DIR="/var/backups/pullstok"
 DATABASE="pullstok"
 
@@ -120,24 +120,16 @@ step "[6/9] Aplicando migraciones de Prisma..."
 echo "✅ Migraciones aplicadas"
 
 # ---------------------------------------------------------------------------
-# 7) REINICIAR PM2 (pullstok-api SOLO)
+# 7) REINICIAR SERVICIO (systemd)
 # ---------------------------------------------------------------------------
-step "[7/9] Reiniciando proceso PM2 ($PM2_APP_NAME)..."
-(
-    cd "$API_DIR"
-    set -a
-    . ./.env
-    set +a
-    if sudo -n pm2 describe "$PM2_APP_NAME" > /dev/null 2>&1; then
-        sudo -n pm2 restart "$PM2_APP_NAME" --update-env
-    else
-        warn "El proceso $PM2_APP_NAME no existe en PM2; intentando arrancarlo..."
-        sudo -n pm2 start dist/bundle.js --name "$PM2_APP_NAME" \
-            || warn "No se pudo crear el proceso: crealo manualmente como root."
-    fi
-)
-sudo -n pm2 save
-echo "✅ PM2 actualizado y persistido"
+step "[7/9] Reiniciando servicio systemd ($SERVICE_NAME)..."
+if sudo -n systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+    sudo -n systemctl restart "$SERVICE_NAME"
+else
+    warn "El servicio $SERVICE_NAME no está activo; intentando arrancarlo..."
+    sudo -n systemctl start "$SERVICE_NAME" || warn "No se pudo iniciar $SERVICE_NAME: revisar con systemctl status $SERVICE_NAME"
+fi
+echo "✅ Servicio $SERVICE_NAME reiniciado"
 
 # ---------------------------------------------------------------------------
 # 8) RECARGAR NGINX
@@ -178,11 +170,7 @@ else
     fail "Health check no pasó. Ejecutando AUTO-ROLLBACK al commit $PREVIOUS_COMMIT..."
     git checkout --force "$PREVIOUS_COMMIT"
     pnpm -r build
-    (
-        cd "$API_DIR"
-        set -a; . ./.env; set +a
-        sudo -n pm2 restart "$PM2_APP_NAME" --update-env
-    )
+    sudo -n systemctl restart "$SERVICE_NAME"
     sudo -n nginx -t
     sudo -n systemctl reload nginx
     fail "Auto-rollback completado al commit ${PREVIOUS_COMMIT:0:12}. Revisar logs."
@@ -191,8 +179,8 @@ fi
 
 echo ""
 echo "Verificá con:"
-echo "  pm2 status"
-echo "  pm2 logs $PM2_APP_NAME --lines 50"
+echo "  systemctl status $SERVICE_NAME"
+echo "  journalctl -u $SERVICE_NAME -f"
 echo ""
 echo "Recordatorios:"
 echo "  - No seedea la base."
