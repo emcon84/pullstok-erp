@@ -167,12 +167,13 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
             return (
               <TableRow
                 key={id}
-                className="relative flex cursor-pointer flex-wrap items-center gap-y-2 py-3 pl-3 pr-2 hover:bg-muted/50 sm:table-row sm:flex-nowrap sm:items-stretch sm:gap-0 sm:py-0 sm:pl-0 sm:pr-0"
+                className="relative flex cursor-pointer flex-wrap items-center gap-y-2 py-3 pl-3 pr-3 hover:bg-muted/50 sm:table-row sm:flex-nowrap sm:items-center sm:gap-0 sm:py-0 sm:pl-0 sm:pr-0"
                 onClick={() => onEdit(p)}
               >
-                {/* Producto — mobile: línea 1 (imagen + nombre + código) */}
-                <TableCell className="w-full min-w-0 sm:table-cell sm:w-auto sm:flex-none sm:p-2">
-                  <div className="flex items-center gap-3 pr-24 sm:pr-0">
+                {/* Línea 1 (mobile): imagen + nombre + precio a la derecha.
+                    Desktop: columna Producto (el precio vive en su propia columna). */}
+                <TableCell className="w-full min-w-0 p-0 sm:w-auto sm:flex-none sm:table-cell sm:p-2">
+                  <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                       {src ? (
                         <img
@@ -184,22 +185,25 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                         <ImageIcon className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="font-medium leading-tight">{p.name}</p>
                       <p className="text-xs text-muted-foreground font-mono">
                         {p.code || "—"}
                       </p>
                     </div>
+                    <span className="shrink-0 font-medium tabular-nums sm:hidden">
+                      ${Number(p.price).toLocaleString("es-AR")}
+                    </span>
                   </div>
                 </TableCell>
 
-                {/* Categoría · Stock · Precio — mobile: línea 2 en columnas */}
-                <TableCell className="min-w-0 flex-1 sm:table-cell sm:flex-none sm:w-auto sm:p-2">
+                {/* Línea 2 (mobile): Categoría · Stock. Desktop: columnas propias. */}
+                <TableCell className="min-w-0 flex-1 p-0 sm:flex-none sm:w-auto sm:table-cell sm:p-2">
                   <span className="block truncate text-sm text-muted-foreground sm:inline sm:overflow-visible sm:whitespace-normal">
                     {(p.category as any)?.name || p.category || "—"}
                   </span>
                 </TableCell>
-                <TableCell className="flex-1 text-center sm:table-cell sm:flex-none sm:w-auto sm:p-2">
+                <TableCell className="flex-1 text-right p-0 sm:flex-none sm:w-auto sm:table-cell sm:p-2 sm:text-center">
                   <Badge
                     variant="outline"
                     className={cn(
@@ -214,17 +218,19 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                     {qty <= 0 ? "Sin stock" : `${qty} u.`}
                   </Badge>
                 </TableCell>
-                <TableCell className="flex-1 text-right font-medium tabular-nums sm:table-cell sm:flex-none sm:w-auto sm:p-2">
+
+                {/* Precio — solo desktop (en mobile va en la línea 1) */}
+                <TableCell className="hidden text-right font-medium tabular-nums sm:table-cell sm:p-2">
                   ${Number(p.price).toLocaleString("es-AR")}
                 </TableCell>
 
-                {/* Acciones — mobile: fijas arriba a la derecha; desktop: última columna */}
-                <TableCell className="absolute right-1 top-2 sm:static sm:table-cell sm:p-2 sm:text-right">
-                  <div className="flex gap-1 sm:justify-end">
+                {/* Línea 3 (mobile): acciones abajo a la derecha. Desktop: última columna. */}
+                <TableCell className="w-full min-w-0 p-0 pt-1 sm:w-auto sm:flex-none sm:table-cell sm:p-2 sm:text-right">
+                  <div className="flex justify-end gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 sm:h-8 sm:w-8"
+                      className="h-8 w-8"
                       title="Duplicar producto"
                       onClick={(e) => { e.stopPropagation(); onDuplicate(p); }}
                     >
@@ -233,7 +239,7 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 sm:h-8 sm:w-8"
+                      className="h-8 w-8"
                       onClick={(e) => { e.stopPropagation(); onEdit(p); }}
                     >
                       <Pencil className="h-4 w-4" />
@@ -241,7 +247,7 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       disabled={loading}
                       onClick={(e) => { e.stopPropagation(); handleDelete(id); }}
                     >
