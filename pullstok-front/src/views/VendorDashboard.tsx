@@ -328,12 +328,10 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           return;
         }
         if (key === "Enter" && !isTypingInInput) {
+          // NO auto-vender con Enter: el modal se abrió al presionar Enter en el
+          // buscador y un segundo Enter lo cerraría sellando antes de fijar la
+          // cantidad. El usuario elige la acción con V / P o los botones.
           e.preventDefault();
-          if (branchQty(qtyModal.product) > 0) {
-            handleDirectSale();
-          } else {
-            confirmAddToCart();
-          }
           return;
         }
         return;
