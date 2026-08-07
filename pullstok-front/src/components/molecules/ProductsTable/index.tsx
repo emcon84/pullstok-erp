@@ -17,6 +17,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -95,8 +102,38 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
 
   return (
     <Card className="overflow-hidden p-0">
+      {/* Sort compacto — solo mobile, porque en mobile no hay header con columnas */}
+      <div className="flex items-center gap-2 border-b px-3 py-2 sm:hidden">
+        <Select
+          value={sortBy}
+          onValueChange={(v) => toggleSort(v as typeof sortBy)}
+        >
+          <SelectTrigger className="h-8 w-full" aria-label="Ordenar productos por">
+            <SelectValue placeholder="Ordenar por" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name">Producto</SelectItem>
+            <SelectItem value="quantity">Stock</SelectItem>
+            <SelectItem value="price">Precio</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          title={sortDir === "asc" ? "Ascendente" : "Descendente"}
+          onClick={() => { setSortDir(d => d === "asc" ? "desc" : "asc"); setPage(1); }}
+        >
+          {sortDir === "asc" ? (
+            <ArrowUp className="h-4 w-4" />
+          ) : (
+            <ArrowDown className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+
       <Table>
-        <TableHeader>
+        <TableHeader className="hidden sm:table-header-group">
           <TableRow className="hover:bg-transparent">
             <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
               <div className="flex items-center gap-1">Producto <SortIcon col="name" /></div>
@@ -113,10 +150,10 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
         </TableHeader>
         <TableBody>
           {slice.length === 0 && (
-            <TableRow>
+            <TableRow className="flex w-full sm:table-row">
               <TableCell
                 colSpan={5}
-                className="h-32 text-center text-muted-foreground"
+                className="w-full h-32 text-center text-muted-foreground sm:table-cell"
               >
                 No hay productos todavía.
               </TableCell>
@@ -128,9 +165,14 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
             const src = imgSrc(p.image);
 
             return (
-              <TableRow key={id} className="cursor-pointer hover:bg-muted/50" onClick={() => onEdit(p)}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
+              <TableRow
+                key={id}
+                className="relative flex cursor-pointer flex-wrap items-center gap-y-2 py-3 pl-3 pr-2 hover:bg-muted/50 sm:table-row sm:flex-nowrap sm:items-stretch sm:gap-0 sm:py-0 sm:pl-0 sm:pr-0"
+                onClick={() => onEdit(p)}
+              >
+                {/* Producto — mobile: línea 1 (imagen + nombre + código) */}
+                <TableCell className="w-full min-w-0 sm:table-cell sm:w-auto sm:flex-none sm:p-2">
+                  <div className="flex items-center gap-3 pr-24 sm:pr-0">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                       {src ? (
                         <img
@@ -150,12 +192,14 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <span className="text-sm text-muted-foreground">
+
+                {/* Categoría · Stock · Precio — mobile: línea 2 en columnas */}
+                <TableCell className="min-w-0 flex-1 sm:table-cell sm:flex-none sm:w-auto sm:p-2">
+                  <span className="block truncate text-sm text-muted-foreground sm:inline sm:overflow-visible sm:whitespace-normal">
                     {(p.category as any)?.name || p.category || "—"}
                   </span>
                 </TableCell>
-                <TableCell className="text-center">
+                <TableCell className="flex-1 text-center sm:table-cell sm:flex-none sm:w-auto sm:p-2">
                   <Badge
                     variant="outline"
                     className={cn(
@@ -170,15 +214,17 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                     {qty <= 0 ? "Sin stock" : `${qty} u.`}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right font-medium tabular-nums">
+                <TableCell className="flex-1 text-right font-medium tabular-nums sm:table-cell sm:flex-none sm:w-auto sm:p-2">
                   ${Number(p.price).toLocaleString("es-AR")}
                 </TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-1">
+
+                {/* Acciones — mobile: fijas arriba a la derecha; desktop: última columna */}
+                <TableCell className="absolute right-1 top-2 sm:static sm:table-cell sm:p-2 sm:text-right">
+                  <div className="flex gap-1 sm:justify-end">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-7 w-7 sm:h-8 sm:w-8"
                       title="Duplicar producto"
                       onClick={(e) => { e.stopPropagation(); onDuplicate(p); }}
                     >
@@ -187,15 +233,15 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
-                      onClick={() => onEdit(p)}
+                      className="h-7 w-7 sm:h-8 sm:w-8"
+                      onClick={(e) => { e.stopPropagation(); onEdit(p); }}
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       disabled={loading}
                       onClick={(e) => { e.stopPropagation(); handleDelete(id); }}
                     >
