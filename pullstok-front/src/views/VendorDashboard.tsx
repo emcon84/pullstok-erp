@@ -292,13 +292,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     }
   }, [selectedIndex]);
 
-  // Reset keyboard selection when search/filters change
-  useEffect(() => {
-    setSelectedIndex(-1);
-    itemRefs.current = [];
-  }, [debouncedFilter, categoryFilter]);
-
-  // Global Keyboard Shortcuts (B, L, ↑, ↓, Enter, +, -, P, V)
+  // Global Keyboard Shortcuts (/, L, ↑, ↓, Enter, +, -, P, V)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeElement = document.activeElement;
@@ -376,16 +370,25 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           if (isTypingInInput) {
             searchInputRef.current?.blur();
           }
-          setSelectedIndex((prev) => Math.min(items.length - 1, prev < 0 ? 0 : prev + 1));
+          setSelectedIndex((prev) => {
+            if (prev < 0) return 0;
+            return Math.min(items.length - 1, prev + 1);
+          });
           return;
         }
       }
 
       // Flecha arriba (ArrowUp): Navega hacia arriba en el listado
       if (key === "ArrowUp") {
-        if (items.length > 0 && !isTypingInInput) {
+        if (items.length > 0) {
           e.preventDefault();
-          setSelectedIndex((prev) => Math.max(0, prev - 1));
+          if (isTypingInInput) {
+            searchInputRef.current?.blur();
+          }
+          setSelectedIndex((prev) => {
+            if (prev <= 0) return 0;
+            return prev - 1;
+          });
           return;
         }
       }
@@ -691,7 +694,10 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
             className="pl-10 text-lg h-12"
             placeholder="Buscar por nombre, código, categoría o variante... [/]"
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setSelectedIndex(-1);
+            }}
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
@@ -743,9 +749,19 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           quickVariants={facetsVariants}
           filter={filter}
           categoryFilter={categoryFilter}
-          onFilterChange={setFilter}
-          onCategoryChange={setCategoryFilter}
-          onClear={() => { setFilter(""); setCategoryFilter(""); }}
+          onFilterChange={(f) => {
+            setFilter(f);
+            setSelectedIndex(-1);
+          }}
+          onCategoryChange={(c) => {
+            setCategoryFilter(c);
+            setSelectedIndex(-1);
+          }}
+          onClear={() => {
+            setFilter("");
+            setCategoryFilter("");
+            setSelectedIndex(-1);
+          }}
         />
       </div>
 
