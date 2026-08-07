@@ -289,11 +289,11 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                           {/* Desktop: nombre simple */}
                           <p className="hidden font-medium leading-tight sm:block">{p.name}</p>
 
-                          {/* Mobile: contenedor con scroll horizontal interno si el nombre es muy largo */}
-                          <div className="w-full overflow-x-auto whitespace-nowrap text-sm font-medium leading-tight sm:hidden pb-0.5 scrollbar-thin">
+                          {/* Mobile: nombre se cae en 2 renglones (con scroll vertical interno si es super largo) */}
+                          <div className="max-h-10 overflow-y-auto break-words text-sm font-medium leading-tight sm:hidden scrollbar-none">
                             {p.name}
                           </div>
-                          <p className="text-[11px] text-muted-foreground font-mono leading-none">{p.code || "—"}</p>
+                          <p className="text-[11px] text-muted-foreground font-mono leading-none mt-0.5">{p.code || "—"}</p>
 
                           {/* Mobile: stock + acciones en la misma fila */}
                           <div className="mt-1 flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none sm:hidden">
