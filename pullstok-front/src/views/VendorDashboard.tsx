@@ -93,6 +93,11 @@ const readStoredFilter = (branchId: string): StoredFilter | null => {
 
 export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
   const navigate = useNavigate();
+  // Refs & state for keyboard navigation and shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const itemRefs = useRef<(HTMLTableRowElement | null)[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+
   // Restaura el filtro guardado al volver del scanner (lee y limpia UNA vez).
   const [storedFilter] = useState(() => readStoredFilter(branchId));
   const [filter, setFilter] = useState(storedFilter?.filter ?? "");
@@ -277,6 +282,157 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     });
   };
 
+  // Auto-scroll selected row into view when navigating with arrow keys or L
+  useEffect(() => {
+    if (selectedIndex >= 0 && itemRefs.current[selectedIndex]) {
+      itemRefs.current[selectedIndex]?.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    }
+  }, [selectedIndex]);
+
+  // Reset keyboard selection when search/filters change
+  useEffect(() => {
+    setSelectedIndex(-1);
+    itemRefs.current = [];
+  }, [debouncedFilter, categoryFilter]);
+
+  // Global Keyboard Shortcuts (B, L, ↑, ↓, Enter, +, -, P, V)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeElement = document.activeElement;
+      const isTypingInInput =
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          (activeElement as HTMLElement).isContentEditable);
+
+      const key = e.key;
+
+      // ── MODAL DE CANTIDAD ABIERTO ──
+      if (qtyModal) {
+        if (key === "+" || key === "=" || e.code === "NumpadAdd") {
+          e.preventDefault();
+          const maxStock = branchQty(qtyModal.product);
+          setQty((q) => Math.min(maxStock > 0 ? maxStock : 999, q + 1));
+          return;
+        }
+        if (key === "-" || e.code === "NumpadSubtract") {
+          e.preventDefault();
+          setQty((q) => Math.max(1, q - 1));
+          return;
+        }
+        if ((key === "p" || key === "P") && !isTypingInInput) {
+          e.preventDefault();
+          confirmAddToCart();
+          return;
+        }
+        if ((key === "v" || key === "V") && !isTypingInInput) {
+          e.preventDefault();
+          handleDirectSale();
+          return;
+        }
+        if (key === "Enter" && !isTypingInInput) {
+          e.preventDefault();
+          if (branchQty(qtyModal.product) > 0) {
+            handleDirectSale();
+          } else {
+            confirmAddToCart();
+          }
+          return;
+        }
+        return;
+      }
+
+      // ── TECLAS GENERALES (SIN MODAL) ──
+
+      // Tecla B: Posiciona el cursor en el buscador
+      if ((key === "b" || key === "B") && !isTypingInInput) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // Tecla L: Salta al listado de productos (selecciona el primer ítem)
+      if ((key === "l" || key === "L") && !isTypingInInput) {
+        e.preventDefault();
+        searchInputRef.current?.blur();
+        if (items.length > 0) {
+          setSelectedIndex((prev) => (prev < 0 ? 0 : prev));
+        }
+        return;
+      }
+
+      // Flecha abajo (ArrowDown): Navega hacia abajo en el listado
+      if (key === "ArrowDown") {
+        if (items.length > 0) {
+          e.preventDefault();
+          if (isTypingInInput) {
+            searchInputRef.current?.blur();
+          }
+          setSelectedIndex((prev) => Math.min(items.length - 1, prev < 0 ? 0 : prev + 1));
+          return;
+        }
+      }
+
+      // Flecha arriba (ArrowUp): Navega hacia arriba en el listado
+      if (key === "ArrowUp") {
+        if (items.length > 0 && !isTypingInInput) {
+          e.preventDefault();
+          setSelectedIndex((prev) => Math.max(0, prev - 1));
+          return;
+        }
+      }
+
+      // Tecla Enter: Abre el modal del producto seleccionado
+      if (key === "Enter" && !isTypingInInput) {
+        if (selectedIndex >= 0 && selectedIndex < items.length) {
+          e.preventDefault();
+          openQtyModal(items[selectedIndex]);
+          return;
+        }
+      }
+
+      // Tecla P: Genera / guarda pedido
+      if ((key === "p" || key === "P") && !isTypingInInput) {
+        e.preventDefault();
+        if (cartItems.length > 0) {
+          handleSaveOrder();
+        } else {
+          toast.info("Agregá productos al pedido primero");
+        }
+        return;
+      }
+
+      // Tecla V: Venta directa del carrito o abre modal del producto seleccionado
+      if ((key === "v" || key === "V") && !isTypingInInput) {
+        e.preventDefault();
+        if (cartItems.length > 0) {
+          handleConfirmSale();
+        } else if (selectedIndex >= 0 && selectedIndex < items.length) {
+          openQtyModal(items[selectedIndex]);
+        } else {
+          toast.info("Seleccioná un producto del listado primero");
+        }
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    qtyModal,
+    items,
+    selectedIndex,
+    cartItems,
+    confirmAddToCart,
+    handleDirectSale,
+    openQtyModal,
+    handleSaveOrder,
+    handleConfirmSale,
+  ]);
+
   // ── Product table ──
   // Memoized: only re-renders when products or cart change, not on each keystroke.
   // Mobile: card apilado con imagen+nombre+stock+acciones al centro, divisor
@@ -296,15 +452,23 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((p) => {
+            {items.map((p, index) => {
                 const id = p._id || p.id;
                 const stock = branchQty(p);
                 const inCart = cartItems.find((ci) => ci.productId === id);
+                const isSelected = index === selectedIndex;
                 return (
                   <TableRow
                     key={id}
-                    className="cursor-pointer hover:bg-muted/50 sm:table-row [&>td]:!whitespace-normal [&>td]:min-w-0"
-                    onClick={() => openQtyModal(p)}
+                    ref={(el) => { itemRefs.current[index] = el; }}
+                    className={cn(
+                      "cursor-pointer hover:bg-muted/50 sm:table-row [&>td]:!whitespace-normal [&>td]:min-w-0 transition-all",
+                      isSelected && "bg-primary/10 ring-2 ring-primary/60 dark:bg-primary/20",
+                    )}
+                    onClick={() => {
+                      setSelectedIndex(index);
+                      openQtyModal(p);
+                    }}
                   >
                     {/* Celda "producto". Mobile: card apilado. Desktop: fila clásica. */}
                     <TableCell className="p-0 sm:table-cell sm:p-2">
@@ -488,7 +652,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         </Card>
       </>
     ),
-    [items, cartItems, openQtyModal, openDrawer, navigate, filter, categoryFilter, branchId],
+    [items, cartItems, openQtyModal, openDrawer, navigate, filter, categoryFilter, branchId, selectedIndex],
   );
 
   // ── Loading (initial only) ──
@@ -518,12 +682,35 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={searchInputRef}
             className="pl-10 text-lg h-12"
             placeholder="Buscar por nombre, código, categoría o variante..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             autoFocus
           />
+        </div>
+
+        {/* Legend de atajos de teclado */}
+        <div className="hidden sm:flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground pt-0.5">
+          <span className="font-semibold text-foreground">Atajos:</span>
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">B</kbd>
+          <span>Buscador</span>
+          <span className="text-muted-foreground/40">•</span>
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">L</kbd>
+          <span>Listado</span>
+          <span className="text-muted-foreground/40">•</span>
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">↑/↓</kbd>
+          <span>Navegar</span>
+          <span className="text-muted-foreground/40">•</span>
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">Enter</kbd>
+          <span>Elegir</span>
+          <span className="text-muted-foreground/40">•</span>
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">V</kbd>
+          <span>Venta directa</span>
+          <span className="text-muted-foreground/40">•</span>
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">P</kbd>
+          <span>Pedido</span>
         </div>
 
         <FilterChips
