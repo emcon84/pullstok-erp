@@ -9,35 +9,39 @@ import {
 } from "@/components/ui/sheet";
 import type { VendorCartItem } from "@/components/hooks/useVendorCart";
 
-interface VendorCartSheetProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  cartItems: VendorCartItem[];
+interface VendorCartData {
+  items: VendorCartItem[];
   totalAmount: number;
-  itemCount: number;
+}
+
+interface VendorCartStatus {
   confirming: boolean;
   savingOrder: boolean;
-  onUpdateQty: (productId: string, quantity: number) => void;
-  onRemove: (productId: string) => void;
-  onClearCart: () => void;
-  onSaveOrder: () => void;
-  onConfirmSale: () => void;
+}
+
+interface VendorCartHandlers {
+  onOpenChange: (open: boolean) => void;
+  updateQty: (productId: string, quantity: number) => void;
+  remove: (productId: string) => void;
+  clearCart: () => void;
+  saveOrder: () => void;
+  confirmSale: () => void;
+}
+
+interface VendorCartSheetProps {
+  open: boolean;
+  cart: VendorCartData;
+  status: VendorCartStatus;
+  handlers: VendorCartHandlers;
 }
 
 export const VendorCartSheet = ({
   open,
-  onOpenChange,
-  cartItems,
-  totalAmount,
-  confirming,
-  savingOrder,
-  onUpdateQty,
-  onRemove,
-  onClearCart,
-  onSaveOrder,
-  onConfirmSale,
+  cart,
+  status,
+  handlers,
 }: VendorCartSheetProps) => (
-  <Sheet open={open} onOpenChange={onOpenChange}>
+  <Sheet open={open} onOpenChange={handlers.onOpenChange}>
     <SheetContent className="w-full sm:max-w-md flex flex-col px-6">
       <SheetHeader className="px-0">
         <SheetTitle className="flex items-center justify-between">
@@ -45,7 +49,7 @@ export const VendorCartSheet = ({
         </SheetTitle>
       </SheetHeader>
 
-      {cartItems.length === 0 ? (
+      {cart.items.length === 0 ? (
         <p className="py-12 text-center text-muted-foreground">
           El pedido está vacío.
         </p>
@@ -53,12 +57,12 @@ export const VendorCartSheet = ({
         <>
           {/* Cart items */}
           <div className="flex-1 overflow-auto -mx-6 px-6 space-y-3 mt-4 mb-2">
-            {cartItems.map((item) => (
+            {cart.items.map((item) => (
               <CartItemRow
                 key={item.productId}
                 item={item}
-                onUpdateQty={(qty) => onUpdateQty(item.productId, qty)}
-                onRemove={() => onRemove(item.productId)}
+                onUpdateQty={(qty) => handlers.updateQty(item.productId, qty)}
+                onRemove={() => handlers.remove(item.productId)}
               />
             ))}
           </div>
@@ -68,7 +72,7 @@ export const VendorCartSheet = ({
             <div className="flex items-center justify-between text-lg font-bold">
               <span>Total</span>
               <span className="tabular-nums">
-                ${totalAmount.toLocaleString("es-AR")}
+                ${cart.totalAmount.toLocaleString("es-AR")}
               </span>
             </div>
             <div className="flex flex-col gap-2">
@@ -78,11 +82,11 @@ export const VendorCartSheet = ({
                   className="flex-1"
                   size="lg"
                   onClick={() => {
-                    onClearCart();
-                    onOpenChange(false);
+                    handlers.clearCart();
+                    handlers.onOpenChange(false);
                     toast.info("Pedido cancelado");
                   }}
-                  disabled={confirming || savingOrder}
+                  disabled={status.confirming || status.savingOrder}
                 >
                   Cancelar
                 </Button>
@@ -90,19 +94,23 @@ export const VendorCartSheet = ({
                   variant="outline"
                   className="flex-1"
                   size="lg"
-                  onClick={onSaveOrder}
-                  disabled={confirming || savingOrder || cartItems.length === 0}
+                  onClick={handlers.saveOrder}
+                  disabled={
+                    status.confirming ||
+                    status.savingOrder ||
+                    cart.items.length === 0
+                  }
                 >
-                  {savingOrder ? "Guardando..." : "Guardar pedido"}
+                  {status.savingOrder ? "Guardando..." : "Guardar pedido"}
                 </Button>
               </div>
               <Button
                 className="w-full"
                 size="lg"
-                onClick={onConfirmSale}
-                disabled={confirming || savingOrder}
+                onClick={handlers.confirmSale}
+                disabled={status.confirming || status.savingOrder}
               >
-                {confirming ? "Procesando..." : "Vender directo"}
+                {status.confirming ? "Procesando..." : "Vender directo"}
               </Button>
             </div>
           </div>

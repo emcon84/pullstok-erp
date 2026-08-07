@@ -10,7 +10,8 @@ import { ProductTable } from "@/components/molecules/ProductTable";
 import { QuantityModal } from "@/components/molecules/QuantityModal";
 import { VendorCartSheet } from "@/components/molecules/VendorCartSheet";
 import { useVendorCatalog } from "@/components/hooks/useVendorCatalog";
-import { useVendorSaleActions } from "@/components/hooks/useVendorSaleActions";
+import { useVendorQuantityModal } from "@/components/hooks/useVendorQuantityModal";
+import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useVendorKeyboard } from "@/components/hooks/useVendorKeyboard";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import {
@@ -28,28 +29,40 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
   const navigate = useNavigate();
   const catalog = useVendorCatalog(branchId);
   const cart = useVendorCart();
-  const saleActions = useVendorSaleActions({
+  const {
+    qtyModal,
+    qty,
+    setQty,
+    directSelling,
+    openQtyModal,
+    closeQtyModal,
+    confirmAddToCart,
+    handleDirectSale,
+  } = useVendorQuantityModal({ branchId, addToCart: cart.addToCart });
+  const [cartOpen, setCartOpen] = useState(false);
+  const checkout = useVendorCheckout({
     branchId,
+    cartOpen,
+    setCartOpen,
     cartItems: cart.items,
-    addToCart: cart.addToCart,
     clearCart: cart.clearCart,
     totalAmount: cart.totalAmount,
   });
 
   useVendorKeyboard({
-    qtyModal: saleActions.qtyModal,
-    qty: saleActions.qty,
-    setQty: saleActions.setQty,
+    qtyModal,
+    qty,
+    setQty,
     items: catalog.items,
     selectedIndex: catalog.selectedIndex,
     setSelectedIndex: catalog.setSelectedIndex,
     searchInputRef: catalog.searchInputRef,
     cartItems: cart.items,
-    confirmAddToCart: saleActions.confirmAddToCart,
-    handleDirectSale: saleActions.handleDirectSale,
-    handleSaveOrder: saleActions.handleSaveOrder,
-    handleConfirmSale: saleActions.handleConfirmSale,
-    openQtyModal: saleActions.openQtyModal,
+    confirmAddToCart,
+    handleDirectSale,
+    handleSaveOrder: checkout.handleSaveOrder,
+    handleConfirmSale: checkout.handleConfirmSale,
+    openQtyModal,
     branchQty,
   });
 
@@ -65,9 +78,9 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
   const handleRowClick = useCallback(
     (index: number, product: DataItem) => {
       catalog.setSelectedIndex(index);
-      saleActions.openQtyModal(product);
+      openQtyModal(product);
     },
-    [catalog.setSelectedIndex, saleActions.openQtyModal],
+    [catalog.setSelectedIndex, openQtyModal],
   );
 
   const handleSearchChange = useCallback(
@@ -143,7 +156,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           onChange={handleSearchChange}
           selectedIndex={catalog.selectedIndex}
           items={catalog.items}
-          onOpenQty={saleActions.openQtyModal}
+          onOpenQty={openQtyModal}
           inputRef={catalog.searchInputRef}
         />
         <FilterChips
@@ -184,7 +197,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           selectedIndex={catalog.selectedIndex}
           registerRow={catalog.registerRow}
           onRowClick={handleRowClick}
-          onOpenQty={saleActions.openQtyModal}
+          onOpenQty={openQtyModal}
           onOpenDrawer={openDrawer}
           onAssignBarcode={handleAssignBarcode}
         />
@@ -215,7 +228,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           <span className="absolute inset-0 -m-6 animate-ping rounded-full bg-primary/10 [animation-delay:300ms]" />
           {/* Button */}
           <button
-            onClick={() => saleActions.setCartOpen(true)}
+            onClick={() => setCartOpen(true)}
             className="relative flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 text-primary-foreground shadow-lg hover:bg-primary/90 transition-all active:scale-95 touch-manipulation"
           >
             <ShoppingCart className="h-5 w-5" />
@@ -229,30 +242,35 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       {/* ── Quantity modal ── */}
       <QuantityModal
-        product={saleActions.qtyModal?.product ?? null}
-        qty={saleActions.qty}
-        setQty={saleActions.setQty}
-        maxStock={saleActions.qtyModal ? branchQty(saleActions.qtyModal.product) : 0}
-        directSelling={saleActions.directSelling}
-        onDirectSale={saleActions.handleDirectSale}
-        onAddToCart={saleActions.confirmAddToCart}
-        onClose={saleActions.closeQtyModal}
+        product={qtyModal?.product ?? null}
+        qty={qty}
+        setQty={setQty}
+        maxStock={qtyModal ? branchQty(qtyModal.product) : 0}
+        directSelling={directSelling}
+        onDirectSale={handleDirectSale}
+        onAddToCart={confirmAddToCart}
+        onClose={closeQtyModal}
       />
 
       {/* ── Cart slide-over ── */}
       <VendorCartSheet
-        open={saleActions.cartOpen}
-        onOpenChange={saleActions.setCartOpen}
-        cartItems={cart.items}
-        totalAmount={cart.totalAmount}
-        itemCount={cart.itemCount}
-        confirming={saleActions.confirming}
-        savingOrder={saleActions.savingOrder}
-        onUpdateQty={cart.updateQuantity}
-        onRemove={cart.removeFromCart}
-        onClearCart={cart.clearCart}
-        onSaveOrder={saleActions.handleSaveOrder}
-        onConfirmSale={saleActions.handleConfirmSale}
+        open={cartOpen}
+        cart={{
+          items: cart.items,
+          totalAmount: cart.totalAmount,
+        }}
+        status={{
+          confirming: checkout.confirming,
+          savingOrder: checkout.savingOrder,
+        }}
+        handlers={{
+          onOpenChange: setCartOpen,
+          updateQty: cart.updateQuantity,
+          remove: cart.removeFromCart,
+          clearCart: cart.clearCart,
+          saveOrder: checkout.handleSaveOrder,
+          confirmSale: checkout.handleConfirmSale,
+        }}
       />
 
       {/* ── Product Drawer (stock across all branches) ── */}
