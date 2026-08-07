@@ -46,6 +46,10 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
       const key = e.key;
 
       // ── MODAL DE CANTIDAD ABIERTO ──
+      // Dentro del modal no hay inputs propios, y el check isTypingInInput no
+      // sirve acá: en iOS el buscador de atrás nunca pierde foco, así que esas
+      // teclas quedarían muertas. El modal es el dueño del teclado mientras
+      // está abierto.
       if (o.qtyModal) {
         if (key === "+" || key === "=" || e.code === "NumpadAdd") {
           e.preventDefault();
@@ -58,17 +62,17 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
           o.setQty((q) => Math.max(1, q - 1));
           return;
         }
-        if ((key === "p" || key === "P") && !isTypingInInput) {
+        if (key === "p" || key === "P") {
           e.preventDefault();
           o.confirmAddToCart();
           return;
         }
-        if ((key === "v" || key === "V") && !isTypingInInput) {
+        if (key === "v" || key === "V") {
           e.preventDefault();
           o.handleDirectSale();
           return;
         }
-        if (key === "Enter" && !isTypingInInput) {
+        if (key === "Enter") {
           // NO auto-vender con Enter: el modal se abrió al presionar Enter en el
           // buscador y un segundo Enter lo cerraría sellando antes de fijar la
           // cantidad. El usuario elige la acción con V / P o los botones.
