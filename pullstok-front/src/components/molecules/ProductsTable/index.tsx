@@ -247,8 +247,8 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
 
                     {/* Derecha (mobile): divisor vertical + precio grande */}
                     <div className="flex shrink-0 flex-col justify-center border-l pl-3 sm:hidden">
-                      <p className="text-lg font-semibold tabular-nums">
-                        ${Number(p.price).toLocaleString("es-AR")}
+                      <p className="text-base font-semibold tabular-nums">
+                        ${Number(p.price ?? 0).toLocaleString("es-AR")}
                       </p>
                     </div>
                   </div>
@@ -276,7 +276,7 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden text-right font-medium tabular-nums sm:table-cell">
-                  ${Number(p.price).toLocaleString("es-AR")}
+                  ${Number(p.price ?? 0).toLocaleString("es-AR")}
                 </TableCell>
                 <TableCell className="hidden sm:table-cell sm:text-right">
                   <div className="flex justify-end gap-1">
