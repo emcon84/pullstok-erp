@@ -23,8 +23,14 @@ export interface VendorKeyboardOptions {
 
 /**
  * Accesos rápidos globales del vendor (/, L, ↑, ↓, Enter, +, -, P, V).
- * Registra el listener UNA vez y lee las últimas opciones desde un ref para no
- * re-registrarse en cada render.
+ * Registra el listener UNA vez en fase CAPTURE y lee las últimas opciones
+ * desde un ref para no re-registrarse en cada render.
+ *
+ * Fase capture: es lo PRIMERO que corre (window capture > document capture >
+ * target > document bubble > window bubble). Las extensiones de navegador
+ * (Vimium: V=visual mode, P=pegar URL, L=forward, / = quick find) registran en
+ * document bubble y se comerían las teclas antes que la app. En capture + con
+ * stopPropagation la app se queda con la tecla y la extensión no la ve.
  */
 export function useVendorKeyboard(options: VendorKeyboardOptions) {
   const optionsRef = useRef(options);
@@ -53,22 +59,26 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
       if (o.qtyModal) {
         if (key === "+" || key === "=" || e.code === "NumpadAdd") {
           e.preventDefault();
+          e.stopPropagation();
           const maxStock = o.branchQty(o.qtyModal.product);
           o.setQty((q) => Math.min(maxStock > 0 ? maxStock : 999, q + 1));
           return;
         }
         if (key === "-" || e.code === "NumpadSubtract") {
           e.preventDefault();
+          e.stopPropagation();
           o.setQty((q) => Math.max(1, q - 1));
           return;
         }
         if (key === "p" || key === "P") {
           e.preventDefault();
+          e.stopPropagation();
           o.confirmAddToCart();
           return;
         }
         if (key === "v" || key === "V") {
           e.preventDefault();
+          e.stopPropagation();
           o.handleDirectSale();
           return;
         }
@@ -77,6 +87,7 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
           // buscador y un segundo Enter lo cerraría sellando antes de fijar la
           // cantidad. El usuario elige la acción con V / P o los botones.
           e.preventDefault();
+          e.stopPropagation();
           return;
         }
         return;
@@ -91,6 +102,7 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
         !isTypingInInput
       ) {
         e.preventDefault();
+        e.stopPropagation();
         o.searchInputRef.current?.focus();
         o.searchInputRef.current?.select();
         return;
@@ -99,6 +111,7 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
       // Tecla L: Salta al listado de productos (selecciona el primer ítem)
       if ((key === "l" || key === "L") && !isTypingInInput) {
         e.preventDefault();
+        e.stopPropagation();
         o.searchInputRef.current?.blur();
         if (o.items.length > 0) {
           o.setSelectedIndex((prev) => (prev < 0 ? 0 : prev));
@@ -110,6 +123,7 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
       if (key === "ArrowDown") {
         if (o.items.length > 0) {
           e.preventDefault();
+          e.stopPropagation();
           if (isTypingInInput) {
             o.searchInputRef.current?.blur();
           }
@@ -125,6 +139,7 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
       if (key === "ArrowUp") {
         if (o.items.length > 0) {
           e.preventDefault();
+          e.stopPropagation();
           if (isTypingInInput) {
             o.searchInputRef.current?.blur();
           }
@@ -140,6 +155,7 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
       if (key === "Enter" && !isTypingInInput) {
         if (o.selectedIndex >= 0 && o.selectedIndex < o.items.length) {
           e.preventDefault();
+          e.stopPropagation();
           o.openQtyModal(o.items[o.selectedIndex]);
           return;
         }
@@ -148,6 +164,7 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
       // Tecla P: Genera / guarda pedido
       if ((key === "p" || key === "P") && !isTypingInInput) {
         e.preventDefault();
+        e.stopPropagation();
         if (o.cartItems.length > 0) {
           o.handleSaveOrder();
         } else {
@@ -159,6 +176,7 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
       // Tecla V: Venta directa del carrito o abre modal del producto seleccionado
       if ((key === "v" || key === "V") && !isTypingInInput) {
         e.preventDefault();
+        e.stopPropagation();
         if (o.cartItems.length > 0) {
           o.handleConfirmSale();
         } else if (o.selectedIndex >= 0 && o.selectedIndex < o.items.length) {
@@ -170,7 +188,9 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    // Fase capture (true): nuestra app se queda con la tecla antes que las
+    // extensiones del navegador (Vimium y similares) que escuchan en document.
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, []);
 }
