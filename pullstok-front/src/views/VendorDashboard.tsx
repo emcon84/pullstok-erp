@@ -172,12 +172,50 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     setQtyModal({ product });
   }, []);
 
+  const [directSelling, setDirectSelling] = useState(false);
+
   const confirmAddToCart = () => {
     if (!qtyModal) return;
     const stock = branchQty(qtyModal.product);
     addToCart(qtyModal.product, qty, branchId, stock);
     toast.success(`"${qtyModal.product.name}" agregado al pedido`);
     setQtyModal(null);
+  };
+
+  // ── Direct sale from showroom modal (1-tap single product sale) ──
+  const handleDirectSale = async () => {
+    if (!qtyModal) return;
+    const p = qtyModal.product;
+    const stock = branchQty(p);
+    if (stock <= 0) {
+      toast.error("Producto sin stock");
+      return;
+    }
+    setDirectSelling(true);
+    try {
+      const cart: CartItem[] = [
+        {
+          product: {
+            _id: (p._id || p.id) as string,
+            id: (p._id || p.id) as string,
+            name: p.name,
+            price: Number(p.price ?? 0),
+            quantity: stock,
+            description: "",
+            category: "",
+          },
+          quantity: qty,
+          totalPrice: Number(p.price ?? 0) * qty,
+        },
+      ];
+      await createSale({ cart });
+      toast.success(`Venta directa realizada (${qty}x "${p.name}")`);
+      setQtyModal(null);
+    } catch (err: any) {
+      toast.error(err?.message || "Error al realizar la venta directa");
+    } finally {
+      setDirectSelling(false);
+    }
   };
 
   // ── Confirm sale ──
@@ -613,10 +651,29 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
               </Button>
             </div>
 
-            <Button className="w-full" size="lg" onClick={confirmAddToCart}>
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar al pedido
-            </Button>
+            <div className="flex flex-col gap-2 pt-2">
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={handleDirectSale}
+                disabled={directSelling || (qtyModal ? branchQty(qtyModal.product) <= 0 : true)}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                {directSelling
+                  ? "Procesando venta..."
+                  : `Vender directo ($${((qtyModal ? Number(qtyModal.product.price ?? 0) : 0) * qty).toLocaleString("es-AR")})`}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                size="lg"
+                onClick={confirmAddToCart}
+                disabled={directSelling}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar al pedido
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

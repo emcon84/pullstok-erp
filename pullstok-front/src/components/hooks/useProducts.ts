@@ -5,7 +5,36 @@ import { DataItem } from "../../types";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, InfiniteData } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
+/**
+ * Helper to calculate effective stock quantity for a product item.
+ */
+export const getProductStockQty = (p: DataItem): number => {
+  if (p.stocks && Array.isArray(p.stocks) && p.stocks.length > 0) {
+    return Number(p.stocks[0].quantity ?? 0);
+  }
+  return Number(p.quantity ?? 0);
+};
 
+/**
+ * Standard product sorter:
+ * Products WITH STOCK (> 0) ALWAYS come first.
+ * Products WITHOUT STOCK (<= 0) go to the bottom.
+ * Within each group, products are sorted alphabetically by name.
+ */
+export const sortProductsStockFirst = <T extends DataItem>(products: T[]): T[] => {
+  return [...products].sort((a, b) => {
+    const aStock = getProductStockQty(a);
+    const bStock = getProductStockQty(b);
+    const aHasStock = aStock > 0 ? 1 : 0;
+    const bHasStock = bStock > 0 ? 1 : 0;
+
+    if (aHasStock !== bHasStock) {
+      return bHasStock - aHasStock; // Stock (>0) above no-stock (<=0)
+    }
+
+    return (a.name || "").localeCompare(b.name || "", "es", { sensitivity: "base" });
+  });
+};
 
 export const usePorducts = () => {
   const [products, setProducts] = useState<DataItem[]>([]);
@@ -13,7 +42,7 @@ export const usePorducts = () => {
   const getProducts = async () => {
     try {
       const response = await productsList();
-      setProducts(response || []);
+      setProducts(sortProductsStockFirst(response || []));
     } catch (error) {
       console.error(error);     
     }
@@ -29,8 +58,6 @@ export const usePorducts = () => {
   };
 }
 
-
-
 // Hook para obtener la lista de productos
 export const useProducts = (branchId?: string, search?: string, category?: string) => {
   const { data, error, isLoading } = useQuery<DataItem[], Error>({
@@ -39,8 +66,12 @@ export const useProducts = (branchId?: string, search?: string, category?: strin
     placeholderData: (prev) => prev, // keep previous while fetching
   });
 
+  const sortedProducts = useMemo(() => {
+    return data ? sortProductsStockFirst(data) : [];
+  }, [data]);
+
   return {
-    products: data || [],
+    products: sortedProducts,
     loading: isLoading,
     error,
   };
@@ -52,7 +83,7 @@ export const PAGE_SIZE = 30;
 /**
  * Infinite-scroll variant of useProducts (vendor dashboard). Opts in to
  * server-side pagination by sending page/pageSize; merges pages into a flat
- * `items: DataItem[]`. Keeps a deterministic order (name asc, server-side).
+ * `items: DataItem[]`. Keeps a deterministic order (stock first, then name asc).
  */
 export const useInfiniteProducts = (
   branchId?: string,
@@ -84,7 +115,10 @@ export const useInfiniteProducts = (
   });
 
   const items = useMemo<DataItem[]>(
-    () => data?.pages.flatMap((p) => p.items) ?? [],
+    () => {
+      const raw = data?.pages.flatMap((p) => p.items) ?? [];
+      return sortProductsStockFirst(raw);
+    },
     [data],
   );
 

@@ -66,8 +66,19 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
       : Number(p.stocks?.[0]?.quantity ?? p.quantity);
 
   const sorted = [...products].sort((a, b) => {
-    const aVal = sortBy === "quantity" ? branchQty(a) : sortBy === "price" ? Number(a.price) : (a[sortBy] || "").toString().toLowerCase();
-    const bVal = sortBy === "quantity" ? branchQty(b) : sortBy === "price" ? Number(b.price) : (b[sortBy] || "").toString().toLowerCase();
+    const aQty = branchQty(a);
+    const bQty = branchQty(b);
+    const aHasStock = aQty > 0 ? 1 : 0;
+    const bHasStock = bQty > 0 ? 1 : 0;
+
+    // Regla principal: productos CON STOCK (>0) SIEMPRE primero que SIN STOCK (<=0)
+    if (aHasStock !== bHasStock) {
+      return bHasStock - aHasStock;
+    }
+
+    // Regla secundaria: orden por la columna elegida dentro de cada grupo
+    const aVal = sortBy === "quantity" ? aQty : sortBy === "price" ? Number(a.price ?? 0) : (a[sortBy] || "").toString().toLowerCase();
+    const bVal = sortBy === "quantity" ? bQty : sortBy === "price" ? Number(b.price ?? 0) : (b[sortBy] || "").toString().toLowerCase();
     if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
     if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
     return 0;
