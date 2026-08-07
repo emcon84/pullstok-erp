@@ -699,20 +699,21 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
               setSelectedIndex(-1);
             }}
             onKeyDown={(e) => {
-              if (e.key === "ArrowDown") {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                // Dejamos que el handler global navegue (↑/↓ son de la lista global)
+                return;
+              }
+              if (e.key === "Enter") {
+                // Si ya hay un ítem seleccionado con ↓, abrir ese; si no, el primero.
                 e.preventDefault();
-                searchInputRef.current?.blur();
-                if (items.length > 0) {
-                  setSelectedIndex(0);
-                }
-              } else if (e.key === "Enter") {
-                e.preventDefault();
-                searchInputRef.current?.blur();
-                if (items.length > 0) {
-                  setSelectedIndex(0);
+                if (selectedIndex >= 0 && selectedIndex < items.length) {
+                  openQtyModal(items[selectedIndex]);
+                } else if (items.length > 0) {
                   openQtyModal(items[0]);
                 }
-              } else if (e.key === "Escape") {
+                return;
+              }
+              if (e.key === "Escape") {
                 e.preventDefault();
                 searchInputRef.current?.blur();
               }
