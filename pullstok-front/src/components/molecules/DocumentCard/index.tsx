@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ExportButtons } from "../ExportButtons";
+import { DocTable } from "../DocTable";
 
 interface DocItem {
   quantity?: number;
@@ -106,33 +107,8 @@ export const DocumentCard = ({
         </div>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="w-16 px-3 py-2 text-center font-medium">Cant.</th>
-              <th className="py-2 text-left font-medium">Producto</th>
-              <th className="py-2 text-right font-medium">P. unit.</th>
-              <th className="px-3 py-2 text-right font-medium">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {items.map((it, i) => (
-              <tr key={i}>
-                <td className="px-3 py-2 text-center tabular-nums">
-                  {it.quantity ?? 1}
-                </td>
-                <td className="py-2">{it.name}</td>
-                <td className="py-2 text-right tabular-nums">
-                  {money(it.price ?? 0)}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {money((it.quantity ?? 1) * (it.price ?? 0))}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-4">
+        <DocTable items={items} showUnitPrice />
       </div>
 
       <div className="mt-3 flex items-center justify-end gap-3 border-t pt-3">

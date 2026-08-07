@@ -368,7 +368,7 @@ export const SalesPage = () => {
 
       {/* Modal de facturación */}
       <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) closeInvoiceModal(); }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Facturar venta</DialogTitle>
           </DialogHeader>

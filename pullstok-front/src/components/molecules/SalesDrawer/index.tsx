@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ProductSelector } from "../ProductSelector";
+import { DocTable } from "../DocTable";
 import { ProductsProps } from "../../../models/productsModel";
 import { Customer } from "../../../models/customerModel";
 import { CartItem } from "../../../models/salesModel";
@@ -345,45 +346,19 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-lg border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
-                      <tr>
-                        <th className="w-16 px-3 py-2 text-center font-medium">
-                          Cant.
-                        </th>
-                        <th className="py-2 text-left font-medium">Producto</th>
-                        <th className="py-2 text-right font-medium">Total</th>
-                        {!isFromSource && <th className="w-10" />}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {cart.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-3 py-2 text-center tabular-nums">
-                            {item.quantity}
-                          </td>
-                          <td className="py-2">{item.product.name}</td>
-                          <td className="py-2 text-right tabular-nums">
-                            ${item.totalPrice.toLocaleString("es-AR")}
-                          </td>
-                          {!isFromSource && (
-                            <td className="px-2 text-center">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => handleRemoveItem(index)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DocTable
+                  items={cart.map((item) => ({
+                    quantity: item.quantity,
+                    name: item.product.name,
+                    // Conserva el precio de la línea (historial de pedido/budget):
+                    // Total = quantity * effective unit = totalPrice exacto.
+                    price:
+                      item.quantity && item.totalPrice
+                        ? item.totalPrice / item.quantity
+                        : Number(item.product.price) || 0,
+                  }))}
+                  onRemove={isFromSource ? undefined : handleRemoveItem}
+                />
               )}
             </div>
           </div>
