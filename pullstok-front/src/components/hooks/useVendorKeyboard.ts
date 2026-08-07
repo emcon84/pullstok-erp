@@ -96,11 +96,14 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
 
       // ── TECLAS GENERALES (SIN MODAL) ──
 
-      // Tecla / o Cmd+K / Ctrl+K: Posiciona el cursor en el buscador y selecciona el texto
+      // Tecla / o Cmd+K / Ctrl+K: Posiciona el cursor en el buscador y selecciona el texto.
+      // NO lleva el guard isTypingInInput: es la tecla de "volver al buscador" por
+      // diseño. Si la "barra" dependiera del foco, al cerrar un modal (que restaura
+      // el foco al trigger o deja la página sin foco) dejaría de funcionar justo
+      // cuando más se la necesita.
       if (
-        (key === "/" ||
-          ((e.metaKey || e.ctrlKey) && key.toLowerCase() === "k")) &&
-        !isTypingInInput
+        key === "/" ||
+        ((e.metaKey || e.ctrlKey) && key.toLowerCase() === "k")
       ) {
         e.preventDefault();
         e.stopPropagation();
