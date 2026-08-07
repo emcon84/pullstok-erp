@@ -19,10 +19,11 @@ export interface VendorKeyboardOptions {
   handleConfirmSale: () => void;
   openQtyModal: (product: DataItem) => void;
   branchQty: (p: DataItem) => number;
+  setCartOpen: (open: boolean) => void;
 }
 
 /**
- * Accesos rápidos globales del vendor (/, L, ↑, ↓, Enter, +, -, P, V).
+ * Accesos rápidos globales del vendor (/, L, ↑, ↓, Enter, +, -, C, P, V).
  * Registra el listener UNA vez en fase CAPTURE y lee las últimas opciones
  * desde un ref para no re-registrarse en cada render.
  *
@@ -183,6 +184,19 @@ export function useVendorKeyboard(options: VendorKeyboardOptions) {
           o.openQtyModal(o.items[o.selectedIndex]);
         } else {
           toast.info("Seleccioná un producto del listado primero");
+        }
+        return;
+      }
+
+      // Tecla C: Abre el drawer del carrito para revisar el pedido antes de
+      // guardarlo (P) o venderlo directo (V). Sin ítems, avisa.
+      if ((key === "c" || key === "C") && !isTypingInInput) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (o.cartItems.length > 0) {
+          o.setCartOpen(true);
+        } else {
+          toast.info("Agregá productos al pedido primero");
         }
         return;
       }

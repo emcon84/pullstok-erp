@@ -64,6 +64,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     handleConfirmSale: checkout.handleConfirmSale,
     openQtyModal,
     branchQty,
+    setCartOpen,
   });
 
   // ProductDrawer for viewing stock across all branches

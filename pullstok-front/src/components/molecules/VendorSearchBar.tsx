@@ -73,6 +73,9 @@ export const VendorSearchBar = ({
       <span className="text-muted-foreground/40">•</span>
       <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">P</kbd>
       <span>Pedido</span>
+      <span className="text-muted-foreground/40">•</span>
+      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">C</kbd>
+      <span>Ver pedido</span>
     </div>
   </>
 );
