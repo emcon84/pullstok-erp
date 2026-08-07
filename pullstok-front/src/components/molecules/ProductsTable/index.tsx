@@ -167,13 +167,13 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
             return (
               <TableRow
                 key={id}
-                className="relative flex cursor-pointer flex-wrap items-center gap-y-2 py-3 pl-3 pr-3 hover:bg-muted/50 sm:table-row sm:flex-nowrap sm:items-center sm:gap-0 sm:py-0 sm:pl-0 sm:pr-0"
+                className="relative cursor-pointer hover:bg-muted/50 sm:table-row [&>td]:!whitespace-normal [&>td]:min-w-0"
                 onClick={() => onEdit(p)}
               >
-                {/* Línea 1 (mobile): imagen + nombre + precio a la derecha.
-                    Desktop: columna Producto (el precio vive en su propia columna). */}
-                <TableCell className="w-full min-w-0 p-0 sm:w-auto sm:flex-none sm:table-cell sm:p-2">
-                  <div className="flex items-center gap-3">
+                {/* Celda "producto". En mobile renderiza el card apilado completo;
+                    en desktop conserva la fila clásica. */}
+                <TableCell className="p-0 sm:table-cell sm:p-2">
+                  <div className="flex items-start gap-3 px-3 py-3 sm:items-center sm:px-0 sm:py-0">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                       {src ? (
                         <img
@@ -185,25 +185,84 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                         <ImageIcon className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium leading-tight">{p.name}</p>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {p.code || "—"}
+
+                    {/* Contenido del card mobile (escritorio reusa la parte superior) */}
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-2 sm:inline">
+                        {/* Desktop: nombre simple al lado de la imagen */}
+                        <p className="hidden font-medium leading-tight sm:block">{p.name}</p>
+                        {/* Mobile: nombre se rompe en varias líneas */}
+                        <p className="break-words font-medium leading-snug sm:hidden">
+                          {p.name}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">{p.code || "—"}</p>
+
+                      {/* Mobile: línea de info (categoría · stock) */}
+                      <div className="mt-2 flex items-center justify-between gap-3 sm:hidden">
+                        <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                          {(p.category as any)?.name || p.category || "—"}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "shrink-0 font-medium",
+                            qty <= 0
+                              ? "border-destructive/30 bg-destructive/10 text-destructive"
+                              : qty <= LOW_STOCK
+                                ? "border-amber-300 bg-amber-50 text-amber-700"
+                                : "border-emerald-300 bg-emerald-50 text-emerald-700",
+                          )}
+                        >
+                          {qty <= 0 ? "Sin stock" : `${qty} u.`}
+                        </Badge>
+                      </div>
+
+                      {/* Mobile: precio grande, a la izquierda */}
+                      <p className="mt-1 text-lg font-semibold tabular-nums sm:hidden">
+                        ${Number(p.price).toLocaleString("es-AR")}
                       </p>
+
+                      {/* Mobile: acciones abajo a la derecha */}
+                      <div className="mt-1 flex justify-end gap-1 sm:hidden">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Duplicar producto"
+                          onClick={(e) => { e.stopPropagation(); onDuplicate(p); }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          disabled={loading}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(id); }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <span className="shrink-0 font-medium tabular-nums sm:hidden">
-                      ${Number(p.price).toLocaleString("es-AR")}
-                    </span>
                   </div>
                 </TableCell>
 
-                {/* Línea 2 (mobile): Categoría · Stock. Desktop: columnas propias. */}
-                <TableCell className="min-w-0 flex-1 p-0 sm:flex-none sm:w-auto sm:table-cell sm:p-2">
-                  <span className="block truncate text-sm text-muted-foreground sm:inline sm:overflow-visible sm:whitespace-normal">
+                {/* Columnas desktop — ocultas en mobile */}
+                <TableCell className="hidden sm:table-cell">
+                  <span className="text-sm text-muted-foreground">
                     {(p.category as any)?.name || p.category || "—"}
                   </span>
                 </TableCell>
-                <TableCell className="flex-1 text-right p-0 sm:flex-none sm:w-auto sm:table-cell sm:p-2 sm:text-center">
+                <TableCell className="hidden text-center sm:table-cell">
                   <Badge
                     variant="outline"
                     className={cn(
@@ -218,14 +277,10 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                     {qty <= 0 ? "Sin stock" : `${qty} u.`}
                   </Badge>
                 </TableCell>
-
-                {/* Precio — solo desktop (en mobile va en la línea 1) */}
-                <TableCell className="hidden text-right font-medium tabular-nums sm:table-cell sm:p-2">
+                <TableCell className="hidden text-right font-medium tabular-nums sm:table-cell">
                   ${Number(p.price).toLocaleString("es-AR")}
                 </TableCell>
-
-                {/* Línea 3 (mobile): acciones abajo a la derecha. Desktop: última columna. */}
-                <TableCell className="w-full min-w-0 p-0 pt-1 sm:w-auto sm:flex-none sm:table-cell sm:p-2 sm:text-right">
+                <TableCell className="hidden sm:table-cell sm:text-right">
                   <div className="flex justify-end gap-1">
                     <Button
                       variant="ghost"
