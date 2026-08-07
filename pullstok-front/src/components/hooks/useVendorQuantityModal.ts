@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import type { RefObject } from "react";
 import { toast } from "react-toastify";
 import { useCreateSale } from "./useSales";
 import { branchQty } from "./vendorCatalogHelpers";
@@ -7,6 +8,7 @@ import type { CartItem } from "../../models/salesModel";
 
 interface UseVendorQuantityModalParams {
   branchId: string;
+  searchInputRef: RefObject<HTMLInputElement>;
   addToCart: (
     product: DataItem,
     quantity: number,
@@ -19,9 +21,16 @@ interface UseVendorQuantityModalParams {
  * Dominio del modal de cantidad del vendor: apertura/cierre, cantidad elegida,
  * agregar al pedido y venta directa 1-tap desde el showroom. Presentational
  * sólo: no conoce UI más allá del estado que expone.
+ *
+ * Al cerrar, libera el foco del buscador: si queda foco en el input, los
+ * atajos globales de una sola letra (C/P/V) quedan bloqueados por el guard
+ * isTypingInInput y la letra se escribe en el buscador en vez de ejecutar
+ * el acceso rápido. Es el guard que protege tipear "café", así que el blur
+ * acá es lo que deja la C viva DESPUÉS de armar el pedido.
  */
 export function useVendorQuantityModal({
   branchId,
+  searchInputRef,
   addToCart,
 }: UseVendorQuantityModalParams) {
   const { createSale } = useCreateSale();
@@ -30,6 +39,10 @@ export function useVendorQuantityModal({
   const [qty, setQty] = useState(1);
   const [directSelling, setDirectSelling] = useState(false);
 
+  const releaseSearchFocus = useCallback(() => {
+    searchInputRef.current?.blur();
+  }, [searchInputRef]);
+
   const openQtyModal = useCallback((product: DataItem) => {
     setQty(1);
     setQtyModal({ product });
@@ -37,7 +50,8 @@ export function useVendorQuantityModal({
 
   const closeQtyModal = useCallback(() => {
     setQtyModal(null);
-  }, []);
+    releaseSearchFocus();
+  }, [releaseSearchFocus]);
 
   const confirmAddToCart = useCallback(() => {
     if (!qtyModal) return;
@@ -45,7 +59,8 @@ export function useVendorQuantityModal({
     addToCart(qtyModal.product, qty, branchId, stock);
     toast.success(`"${qtyModal.product.name}" agregado al pedido`);
     setQtyModal(null);
-  }, [qtyModal, qty, addToCart, branchId]);
+    releaseSearchFocus();
+  }, [qtyModal, qty, addToCart, branchId, releaseSearchFocus]);
 
   // ── Direct sale from showroom modal (1-tap single product sale) ──
   const handleDirectSale = useCallback(async () => {
@@ -76,12 +91,13 @@ export function useVendorQuantityModal({
       await createSale({ cart });
       toast.success(`Venta directa realizada (${qty}x "${p.name}")`);
       setQtyModal(null);
+      releaseSearchFocus();
     } catch (err: any) {
       toast.error(err?.message || "Error al realizar la venta directa");
     } finally {
       setDirectSelling(false);
     }
-  }, [qtyModal, qty, createSale]);
+  }, [qtyModal, qty, createSale, releaseSearchFocus]);
 
   return {
     qtyModal,

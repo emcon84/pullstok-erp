@@ -38,7 +38,11 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     closeQtyModal,
     confirmAddToCart,
     handleDirectSale,
-  } = useVendorQuantityModal({ branchId, addToCart: cart.addToCart });
+  } = useVendorQuantityModal({
+    branchId,
+    searchInputRef: catalog.searchInputRef,
+    addToCart: cart.addToCart,
+  });
   const [cartOpen, setCartOpen] = useState(false);
   const checkout = useVendorCheckout({
     branchId,
