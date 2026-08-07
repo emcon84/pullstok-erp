@@ -347,10 +347,15 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
       // ── TECLAS GENERALES (SIN MODAL) ──
 
-      // Tecla B: Posiciona el cursor en el buscador
-      if ((key === "b" || key === "B") && !isTypingInInput) {
+      // Tecla / o Cmd+K / Ctrl+K: Posiciona el cursor en el buscador y selecciona el texto
+      if (
+        (key === "/" ||
+          ((e.metaKey || e.ctrlKey) && key.toLowerCase() === "k")) &&
+        !isTypingInInput
+      ) {
         e.preventDefault();
         searchInputRef.current?.focus();
+        searchInputRef.current?.select();
         return;
       }
 
@@ -684,9 +689,28 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           <Input
             ref={searchInputRef}
             className="pl-10 text-lg h-12"
-            placeholder="Buscar por nombre, código, categoría o variante..."
+            placeholder="Buscar por nombre, código, categoría o variante... [/]"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                searchInputRef.current?.blur();
+                if (items.length > 0) {
+                  setSelectedIndex(0);
+                }
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                searchInputRef.current?.blur();
+                if (items.length > 0) {
+                  setSelectedIndex(0);
+                  openQtyModal(items[0]);
+                }
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                searchInputRef.current?.blur();
+              }
+            }}
             autoFocus
           />
         </div>
@@ -694,11 +718,11 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         {/* Legend de atajos de teclado */}
         <div className="hidden sm:flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground pt-0.5">
           <span className="font-semibold text-foreground">Atajos:</span>
-          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">B</kbd>
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">/</kbd>
           <span>Buscador</span>
           <span className="text-muted-foreground/40">•</span>
-          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">L</kbd>
-          <span>Listado</span>
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">↓/Enter</kbd>
+          <span>Ir a Lista</span>
           <span className="text-muted-foreground/40">•</span>
           <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">↑/↓</kbd>
           <span>Navegar</span>
