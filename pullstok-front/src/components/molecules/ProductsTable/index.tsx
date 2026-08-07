@@ -170,11 +170,14 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                 className="relative cursor-pointer hover:bg-muted/50 sm:table-row [&>td]:!whitespace-normal [&>td]:min-w-0"
                 onClick={() => onEdit(p)}
               >
-                {/* Celda "producto". En mobile renderiza el card apilado completo;
-                    en desktop conserva la fila clásica. */}
+                {/* Celda "producto". En mobile renderiza el card del diseño:
+                    imagen grande a la izq, nombre+stock+acciones al centro,
+                    divisor vertical + precio grande a la derecha.
+                    En desktop conserva la fila clásica. */}
                 <TableCell className="p-0 sm:table-cell sm:p-2">
-                  <div className="flex items-start gap-3 px-3 py-3 sm:items-center sm:px-0 sm:py-0">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                  <div className="flex items-stretch gap-3 px-3 py-3 sm:items-center sm:px-0 sm:py-0">
+                    {/* Imagen — grande en mobile, estándar en desktop */}
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted sm:h-10 sm:w-10">
                       {src ? (
                         <img
                           src={src}
@@ -186,23 +189,18 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                       )}
                     </div>
 
-                    {/* Contenido del card mobile (escritorio reusa la parte superior) */}
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between gap-2 sm:inline">
-                        {/* Desktop: nombre simple al lado de la imagen */}
-                        <p className="hidden font-medium leading-tight sm:block">{p.name}</p>
-                        {/* Mobile: nombre se rompe en varias líneas */}
-                        <p className="break-words font-medium leading-snug sm:hidden">
-                          {p.name}
-                        </p>
-                      </div>
+                    {/* Centro: nombre (varios renglones) + fila stock/acciones */}
+                    <div className="min-w-0 flex-1">
+                      {/* Desktop: nombre simple */}
+                      <p className="hidden font-medium leading-tight sm:block">{p.name}</p>
+                      {/* Mobile: nombre se cae en varios renglones */}
+                      <p className="break-words font-medium leading-snug sm:hidden">
+                        {p.name}
+                      </p>
                       <p className="text-xs text-muted-foreground font-mono">{p.code || "—"}</p>
 
-                      {/* Mobile: línea de info (categoría · stock) */}
-                      <div className="mt-2 flex items-center justify-between gap-3 sm:hidden">
-                        <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-                          {(p.category as any)?.name || p.category || "—"}
-                        </span>
+                      {/* Mobile: badge de stock + acciones en la misma fila */}
+                      <div className="mt-1.5 flex items-center gap-2 sm:hidden">
                         <Badge
                           variant="outline"
                           className={cn(
@@ -216,42 +214,42 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                         >
                           {qty <= 0 ? "Sin stock" : `${qty} u.`}
                         </Badge>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Duplicar producto"
+                            onClick={(e) => { e.stopPropagation(); onDuplicate(p); }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            disabled={loading}
+                            onClick={(e) => { e.stopPropagation(); handleDelete(id); }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
+                    </div>
 
-                      {/* Mobile: precio grande, a la izquierda */}
-                      <p className="mt-1 text-lg font-semibold tabular-nums sm:hidden">
+                    {/* Derecha (mobile): divisor vertical + precio grande */}
+                    <div className="flex shrink-0 flex-col justify-center border-l pl-3 sm:hidden">
+                      <p className="text-lg font-semibold tabular-nums">
                         ${Number(p.price).toLocaleString("es-AR")}
                       </p>
-
-                      {/* Mobile: acciones abajo a la derecha */}
-                      <div className="mt-1 flex justify-end gap-1 sm:hidden">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          title="Duplicar producto"
-                          onClick={(e) => { e.stopPropagation(); onDuplicate(p); }}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => { e.stopPropagation(); onEdit(p); }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          disabled={loading}
-                          onClick={(e) => { e.stopPropagation(); handleDelete(id); }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
                     </div>
                   </div>
                 </TableCell>
