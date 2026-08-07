@@ -241,13 +241,15 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
 
   // ── Product table ──
   // Memoized: only re-renders when products or cart change, not on each keystroke.
+  // Mobile: card apilado con imagen+nombre+stock+acciones al centro, divisor
+  // vertical y precio grande a la derecha (mismo diseño que ProductsTable).
   const productTable = useMemo(
     () => (
       <>
         {/* Product table (all breakpoints) */}
         <Card className="overflow-hidden p-0">
           <Table>
-            <TableHeader>
+            <TableHeader className="hidden sm:table-header-group">
               <TableRow className="hover:bg-transparent">
                 <TableHead>Producto</TableHead>
                 <TableHead className="text-center">Stock</TableHead>
@@ -263,12 +265,14 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                 return (
                   <TableRow
                     key={id}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50 sm:table-row [&>td]:!whitespace-normal [&>td]:min-w-0"
                     onClick={() => openQtyModal(p)}
                   >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                    {/* Celda "producto". Mobile: card apilado. Desktop: fila clásica. */}
+                    <TableCell className="p-0 sm:table-cell sm:p-2">
+                      <div className="flex items-stretch gap-3 px-3 py-3 sm:items-center sm:px-0 sm:py-0">
+                        {/* Imagen — grande en mobile */}
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted sm:h-10 sm:w-10">
                           {imgSrc(p.image) ? (
                             <img
                               src={imgSrc(p.image)!}
@@ -279,15 +283,96 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                             <ImageIcon className="h-4 w-4 text-muted-foreground" />
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-medium leading-tight">{p.name}</p>
+
+                        {/* Centro: nombre + fila stock/acciones */}
+                        <div className="min-w-0 flex-1">
+                          {/* Desktop: nombre simple */}
+                          <p className="hidden font-medium leading-tight sm:block">{p.name}</p>
+                          {/* Mobile: nombre se cae en varios renglones */}
+                          <p className="break-words font-medium leading-snug sm:hidden">
+                            {p.name}
+                          </p>
                           <p className="text-xs text-muted-foreground font-mono">
                             {p.code || "—"}
+                          </p>
+
+                          {/* Mobile: stock + acciones en la misma fila */}
+                          <div className="mt-1.5 flex items-center gap-2 sm:hidden">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "shrink-0 font-medium",
+                                stock <= 0
+                                  ? "border-destructive/30 bg-destructive/10 text-destructive"
+                                  : "border-emerald-300 bg-emerald-50 text-emerald-700",
+                              )}
+                            >
+                              {stock <= 0 ? "Sin stock" : `${stock} u.`}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              title="Ver stock en otras sucursales"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDrawer(p);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              title="Asignar código de barras"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sessionStorage.setItem(
+                                  VENDOR_FILTER_KEY,
+                                  JSON.stringify({
+                                    filter,
+                                    categoryFilter,
+                                    branchId,
+                                  } satisfies StoredFilter),
+                                );
+                                navigate(`/scanner?assignTo=${id}`);
+                              }}
+                            >
+                              <Barcode className="h-4 w-4" />
+                            </Button>
+                            {inCart ? (
+                              <Badge variant="secondary" className="shrink-0 text-xs">
+                                {inCart.quantity} en pedido
+                              </Badge>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="shrink-0"
+                                disabled={stock <= 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openQtyModal(p);
+                                }}
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Derecha (mobile): divisor vertical + precio grande */}
+                        <div className="flex shrink-0 flex-col justify-center border-l pl-3 sm:hidden">
+                          <p className="text-lg font-semibold tabular-nums">
+                            ${Number(p.price).toLocaleString("es-AR")}
                           </p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-center">
+
+                    {/* Columnas desktop — ocultas en mobile */}
+                    <TableCell className="hidden text-center sm:table-cell">
                       <div className="flex items-center justify-center gap-1.5">
                         <Badge
                           variant="outline"
@@ -319,8 +404,6 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                           title="Asignar código de barras"
                           onClick={(e) => {
                             e.stopPropagation();
-                            // Guardar el filtro activo para restaurarlo al volver
-                            // del scanner (la vista se desmonta al navegar).
                             sessionStorage.setItem(
                               VENDOR_FILTER_KEY,
                               JSON.stringify({
@@ -336,10 +419,10 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
+                    <TableCell className="hidden text-right font-medium tabular-nums sm:table-cell">
                       ${Number(p.price).toLocaleString("es-AR")}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       {inCart ? (
                         <Badge variant="secondary" className="text-xs">
                           {inCart.quantity} en pedido
@@ -366,7 +449,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         </Card>
       </>
     ),
-    [items, cartItems, openQtyModal, openDrawer, navigate],
+    [items, cartItems, openQtyModal, openDrawer, navigate, filter, categoryFilter, branchId],
   );
 
   // ── Loading (initial only) ──
