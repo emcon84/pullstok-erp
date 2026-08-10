@@ -3,6 +3,7 @@ import { requireOrganizationId } from "../config/tenantContext";
 import { sendMail } from "./mailService";
 import { saleConfirmedEmail } from "./mailTemplates";
 import { emitOrdersChanged } from "../realtime/socket";
+import { round2 } from "../utils/money";
 
 interface IProductSale {
   productId: string;
@@ -10,6 +11,9 @@ interface IProductSale {
   quantity: number;
   category: string;
   price: number;
+  // Modo de venta del renglón (sdd/venta-alimento-suelto B-08): ausente =
+  // legacy BOLSA_CERRADA (el schema lo normaliza con .default()).
+  saleMode?: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO";
 }
 
 interface ISaleRequest {
@@ -70,6 +74,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       quantity: number;
       category: string;
       price: number;
+      saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO";
     }[] = [];
 
     for (const item of saleRequest.products) {
@@ -77,8 +82,12 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         throw new Error("Faltan campos requeridos en un producto de la venta");
       }
 
-      const quantity = parseInt(String(item.quantity), 10);
+      // B-06: la cantidad puede ser decimal (kg / monto). Number() en lugar de
+      // parseInt (que truncaba los kg sueltos): el schema ya validó la forma.
+      const quantity = Number(String(item.quantity));
       const price = parseFloat(String(item.price));
+      const saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" =
+        item.saleMode ?? "BOLSA_CERRADA";
 
       const product = await tx.product.findFirst({
         where: { id: item.productId, organizationId },
@@ -86,6 +95,43 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       });
       if (!product) {
         throw new Error(`Producto ${item.productId} no encontrado`);
+      }
+
+      // ── Loose mode gates (B-08/B-06 amendment) — antes de tocar stock ──
+      if (saleMode === "POR_PESO" || saleMode === "POR_MONTO") {
+        const priceKgSuelto = product.priceKgSuelto as number | null;
+        if (!(priceKgSuelto && priceKgSuelto > 0)) {
+          const err: any = new Error(
+            `"${product.name}" no tiene precio por kg suelto configurado`,
+          );
+          err.code = "LOOSE_NOT_ELIGIBLE";
+          throw err;
+        }
+        if (!sellerBranchId) {
+          // B-06 amendment: el stock suelto fraccionario solo se puede
+          // bookkeepear en ProductStock (sucursal); Product.quantity (legacy,
+          // Int) no puede mantener fracciones de kg.
+          const err: any = new Error(
+            "Las ventas sueltas requieren una sucursal asignada (el stock fraccionario se descuenta de la sucursal)",
+          );
+          err.code = "LOOSE_REQUIRES_BRANCH";
+          throw err;
+        }
+      }
+
+      // ── Resolución de cantidad y precio por modo ──
+      // BOLSA_CERRADA / POR_PESO: la cantidad ya es la unidad final (bolsas /
+      // kg) y el precio es el unitario (para sueltos, el front manda
+      // priceKgSuelto como price). POR_MONTO: el cliente manda el MONTO en
+      // quantity; el server convierte de forma autoritativa (B-07) y guarda el
+      // snapshot de priceKgSuelto para que kg × priceKgSuelto reproduzca el
+      // total exactamente.
+      let lineQuantity = quantity;
+      let linePrice = price;
+      if (saleMode === "POR_MONTO") {
+        const priceKgSuelto = product.priceKgSuelto as number;
+        lineQuantity = round2(quantity / priceKgSuelto); // kg = round2(amount ÷ priceKgSuelto)
+        linePrice = priceKgSuelto; // snapshot congelado (B-04)
       }
 
       if (sellerBranchId) {
@@ -97,7 +143,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
             organizationId,
           },
         });
-        if (!stock || stock.quantity < quantity) {
+        if (!stock || stock.quantity < lineQuantity) {
           throw new Error(
             `Stock insuficiente de "${product.name}" en tu sucursal`,
           );
@@ -108,9 +154,9 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
             productId: product.id,
             branchId: sellerBranchId,
             organizationId,
-            quantity: { gte: quantity },
+            quantity: { gte: lineQuantity },
           },
-          data: { quantity: { decrement: quantity } },
+          data: { quantity: { decrement: lineQuantity } },
         });
         if (updated.count === 0) {
           throw new Error(
@@ -119,7 +165,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         }
       } else {
         // ── Legacy / admin sale: deduct from product.quantity (HQ global) ──
-        if (product.quantity < quantity) {
+        if (product.quantity < lineQuantity) {
           throw new Error(
             `Stock insuficiente para el producto ${product.name}`,
           );
@@ -129,9 +175,9 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
           where: {
             id: product.id,
             organizationId,
-            quantity: { gte: quantity },
+            quantity: { gte: lineQuantity },
           },
-          data: { quantity: { decrement: quantity } },
+          data: { quantity: { decrement: lineQuantity } },
         });
         if (updated.count === 0) {
           throw new Error(
@@ -140,14 +186,17 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         }
       }
 
+      // Per-line total: round2 en el límite (D2). POR_MONTO ya viene resuelto
+      // como kg × priceKgSuelto (B-07) → round2 de nuevo no cambia nada.
       saleItems.push({
         productId: product.id,
         name: product.name,
-        quantity,
+        quantity: lineQuantity,
         category: product.category?.name ?? "Sin categoría",
-        price,
+        price: linePrice,
+        saleMode,
       });
-      totalAmount += price * quantity;
+      totalAmount += round2(lineQuantity * linePrice);
     }
 
     // ── Order validation (same as before) ──

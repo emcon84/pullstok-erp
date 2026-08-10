@@ -152,6 +152,10 @@ export const createProductSchema = z.object({
   // Variant option IDs (categories-variants-redesign). Array de UUIDs de
   // CategoryVariantOption. El controller valida pertenencia a la categoría.
   variantOptionIds: z.array(z.string().uuid()).optional(),
+  // Venta suelta (sdd/venta-alimento-suelto B-01/A-02): opcionales en el alta.
+  // No hay recompute en create (regla de staleness B-05) — pesan en el PUT.
+  weightKg: z.coerce.number().positive("El peso debe ser mayor a 0").multipleOf(0.01).optional(),
+  bulkFactor: z.coerce.number().positive("El factor debe ser mayor a 0").multipleOf(0.01).optional(),
 });
 // En edición, categoryId puede venir null: un producto sin categoría es válido
 // (la FK es nullable en la DB). createProductSchema lo exige string min(1), así
@@ -163,6 +167,19 @@ export const updateProductSchema = createProductSchema.partial().extend({
     .nullable()
     .optional(),
   variantOptionIds: z.array(z.string().uuid()).optional(),
+  // bulkFactor null = usar el factor por defecto de la org (B-01/A-02).
+  bulkFactor: z.coerce
+    .number()
+    .positive("El factor debe ser mayor a 0")
+    .multipleOf(0.01)
+    .nullable()
+    .optional(),
+  // priceKgSuelto es SOLO lectura: se deriva de price/weightKg/factor vía el
+  // recompute service (B-04/B-05b). z.never() rechaza cualquier intento de
+  // edición manual (A-02) — el campo no existe en el payload válido.
+  priceKgSuelto: z.never({
+    message: "priceKgSuelto no se puede editar manualmente",
+  }).optional(),
 });
 
 // Toggle dedicado "Publicar en tienda" (WS4 — UI de Tienda/listado de
@@ -197,12 +214,43 @@ export const createCustomerSchema = z.object({
 export const updateCustomerSchema = createCustomerSchema.partial();
 
 // ---------- Ventas ----------
+// saleMode (sdd/venta-alimento-suelto B-08): opcional en el payload —
+// ausente = legado BOLSA_CERRADA. superRefine aplica las reglas por modo:
+// BOLSA_CERRADA exige cantidad entera (bolsa física); POR_PESO/POR_MONTO
+// exigen decimal <= 2dp (kg o monto, B-06/B-07). Discriminated-union
+// rechazada: rompe backward-compat con payloads legacy sin saleMode (D7).
 const saleProductSchema = z.object({
   productId: z.string().min(1),
   name: z.string().optional(),
-  quantity: z.coerce.number().int().positive("La cantidad debe ser mayor a 0"),
+  quantity: z.coerce.number().positive("La cantidad debe ser mayor a 0"),
   price: z.coerce.number().nonnegative(),
   category: z.string().optional(),
+  saleMode: z
+    .enum(["BOLSA_CERRADA", "POR_PESO", "POR_MONTO"], {
+      message: "saleMode inválido",
+    })
+    .default("BOLSA_CERRADA"),
+}).superRefine((item, ctx) => {
+  const mode = item.saleMode ?? "BOLSA_CERRADA";
+  if (mode === "BOLSA_CERRADA") {
+    if (!Number.isInteger(item.quantity)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["quantity"],
+        message: "La cantidad debe ser un número entero (bolsa cerrada)",
+      });
+    }
+    return;
+  }
+  // POR_PESO / POR_MONTO: <= 2 decimales (multipleOf 0.01) y > 0 (ya
+  // garantizado por .positive() arriba).
+  if (Math.round(item.quantity * 100) !== item.quantity * 100) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["quantity"],
+      message: "La cantidad suelta admite hasta 2 decimales",
+    });
+  }
 });
 export const createSaleSchema = z.object({
   products: z.array(saleProductSchema).min(1, "La venta debe tener al menos un producto"),

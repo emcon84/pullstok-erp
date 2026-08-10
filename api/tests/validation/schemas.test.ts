@@ -2,6 +2,7 @@ import {
   createUserSchema,
   bulkPriceUpdateSchema,
   updateBusinessHoursSchema,
+  createSaleSchema,
 } from "../../src/validation/schemas";
 
 describe("createUserSchema — role enum expansion", () => {
@@ -617,6 +618,156 @@ describe("bulkPriceUpdateSchema — per-category/product override arrays", () =>
     if (!result.success) {
       const flat = result.error.issues.map((i) => i.message).join(" | ");
       expect(flat).toContain(prodP);
+    }
+  });
+});
+
+describe("createSaleSchema — saleMode-aware quantity validation (B-06/B-08)", () => {
+  const base = {
+    productId: "p-1",
+    quantity: 3,
+    price: 100,
+  };
+
+  it("absent saleMode + integer quantity = legacy bolsa-cerrada sale stays valid", () => {
+    const result = createSaleSchema.safeParse({ products: [base] });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.products[0].saleMode).toBe("BOLSA_CERRADA");
+      expect(result.data.products[0].quantity).toBe(3);
+    }
+  });
+
+  it("BOLSA_CERRADA accepts positive integers", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ ...base, saleMode: "BOLSA_CERRADA", quantity: 7 }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("BOLSA_CERRADA rejects fractional quantity (2.5)", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ ...base, saleMode: "BOLSA_CERRADA", quantity: 2.5 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("POR_PESO accepts positive decimal kg with 2dp (2.35)", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ ...base, saleMode: "POR_PESO", quantity: 2.35 }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("POR_PESO rejects quantity with more than 2 decimals (1.234 — B-06)", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ ...base, saleMode: "POR_PESO", quantity: 1.234 }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const flat = result.error.issues.map((i) => i.message).join(" | ");
+      expect(flat).toMatch(/0\.01|2|decimal/i);
+    }
+  });
+
+  it("POR_MONTO accepts positive amounts with 2dp", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ ...base, saleMode: "POR_MONTO", quantity: 500 }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("POR_MONTO rejects non-positive amount (B-07)", () => {
+    expect(
+      createSaleSchema.safeParse({
+        products: [{ ...base, saleMode: "POR_MONTO", quantity: 0 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      createSaleSchema.safeParse({
+        products: [{ ...base, saleMode: "POR_MONTO", quantity: -10 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects an unknown saleMode value", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ ...base, saleMode: "POR_KILO" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("mixed cart: bolsa integer line + loose decimal line both accepted (B-08)", () => {
+    const result = createSaleSchema.safeParse({
+      products: [
+        { ...base, quantity: 3 },
+        { ...base, quantity: 2.35, saleMode: "POR_PESO" },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("mixed cart rejects a bad loose line while the bolsa line is fine", () => {
+    const result = createSaleSchema.safeParse({
+      products: [
+        { ...base, quantity: 3 },
+        { ...base, quantity: 1.234, saleMode: "POR_PESO" },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("updateProductSchema — weightKg/bulkFactor + priceKgSuelto read-only (A-02)", () => {
+  const { updateProductSchema, createProductSchema } = require("../../src/validation/schemas");
+
+  it("accepts weightKg (positive, 2dp) and bulkFactor (positive, 2dp)", () => {
+    const result = updateProductSchema.safeParse({
+      weightKg: 7.5,
+      bulkFactor: 1.25,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.weightKg).toBe(7.5);
+      expect(result.data.bulkFactor).toBe(1.25);
+    }
+  });
+
+  it("accepts bulkFactor: null = use org default", () => {
+    const result = updateProductSchema.safeParse({ bulkFactor: null });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.bulkFactor).toBeNull();
+  });
+
+  it("rejects weightKg with more than 2 decimals", () => {
+    const result = updateProductSchema.safeParse({ weightKg: 7.555 });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects non-positive weightKg and bulkFactor", () => {
+    expect(updateProductSchema.safeParse({ weightKg: 0 }).success).toBe(false);
+    expect(updateProductSchema.safeParse({ bulkFactor: 0 }).success).toBe(false);
+    expect(updateProductSchema.safeParse({ weightKg: -1 }).success).toBe(false);
+  });
+
+  it("REJECTS body.priceKgSuelto — priceKgSuelto is never hand-editable (A-02)", () => {
+    const result = updateProductSchema.safeParse({ priceKgSuelto: 123 });
+    expect(result.success).toBe(false);
+  });
+
+  it("createProductSchema accepts optional weightKg/bulkFactor (no recompute on create — staleness rule)", () => {
+    const result = createProductSchema.safeParse({
+      name: "Alimento 15kg",
+      price: 4500,
+      categoryId: "c-1",
+      quantity: 10,
+      weightKg: 15,
+      bulkFactor: 1.2,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.weightKg).toBe(15);
+      expect(result.data.bulkFactor).toBe(1.2);
     }
   });
 });
