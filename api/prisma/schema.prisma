@@ -69,6 +69,7 @@ model Organization {
   branches              Branch[]
   productStocks         ProductStock[]
   businessHours         BusinessHourSetting?
+  pricingSetting        PricingSetting?
 
   @@map("organizations")
 }
@@ -218,6 +219,17 @@ model Product {
   category           Category?         @relation(fields: [categoryId], references: [id])
   image              String?
   quantity           Int
+  // ── Venta de alimento suelto (sdd/venta-alimento-suelto) ──
+  // Precio por kg CONGELADO (B-01/B-04): se calcula en recompute
+  // (priceKgSuelto = round2(price/weightKg × effectiveFactor)) y se guarda.
+  // La venta SIEMPRE usa el valor almacenado, nunca el factor en vivo.
+  // null = producto NO elegible para venta suelta (isLooseEligible=false).
+  priceKgSuelto      Float?
+  // Override por producto del factor org (null = usa el default de la org,
+  // que nace en PricingSetting.bulkFactor = 1.20).
+  bulkFactor         Float?
+  // Peso del envase/bolsa en kg (entrada del backfill o del admin).
+  weightKg           Float?
   // Visibilidad en la tienda online pública (negocio.pullstok.com). Default
   // false: un producto nunca aparece publicado sin que el dueño lo decida.
   publishedToStore   Boolean           @default(false)
@@ -247,7 +259,10 @@ model ProductStock {
   product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
   branchId       String
   branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  quantity       Int          @default(0)
+  // Float (sdd/venta-alimento-suelto B-06, deviation user-confirmed): el stock
+  // de sucursal debe poder bookkeep fracciones de kg (vender 2.35 de 10.0 →
+  // 7.65). Product.quantity (legacy, casa central) SIGUE Int.
+  quantity       Float        @default(0)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
 
@@ -355,11 +370,24 @@ model SaleItem {
   productId String
   product   Product @relation(fields: [productId], references: [id])
   name      String
-  quantity  Int
+  // Float (sdd/venta-alimento-suelto B-03): kg decimales en venta suelta
+  // (precedente: InvoiceItem.quantity Float). Las filas legacy se leen como
+  // números enteros (3.0) con saleMode default BOLSA_CERRADA.
+  quantity  Float
   category  String
   price     Float
+  // Modo de venta del renglón: BOLSA_CERRADA (int, legacy) | POR_PESO (kg) |
+  // POR_MONTO (monto → kg autoritativo en server). Default BOLSA_CERRADA:
+  // las filas legacy/no-declaradas se comportan como bolsa cerrada (B-03).
+  saleMode  SaleMode @default(BOLSA_CERRADA)
 
   @@map("sale_items")
+}
+
+enum SaleMode {
+  BOLSA_CERRADA
+  POR_PESO
+  POR_MONTO
 }
 
 model Receipt {
@@ -643,4 +671,24 @@ model BusinessHourSetting {
   updatedAt      DateTime     @updatedAt
 
   @@map("business_hour_settings")
+}
+
+// Configuración de precios de la org, 1:1 con Organization
+// (sdd/venta-alimento-suelto B-02). A PROPÓSITO fuera de TENANT_MODELS (ver
+// db.ts): se accede vía basePrisma filtrando por organizationId directamente
+// (mismo patrón que AppBranding / StoreSettings / BusinessHourSetting).
+// Sin fila = default 1.20 (la GET devuelve el default sin crear nada; la PUT
+// hace upsert). Los productos con bulkFactor propio NO se tocan al guardar el
+// factor org (recompute WHERE bulkFactor IS NULL — B-05a).
+model PricingSetting {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  // Factor mayorista default de la org: priceKgSuelto = round2(price/weightKg
+  // × bulkFactor). El ADMIN lo edita desde "Configuración de precios"
+  // (A-01); nunca hardcodeado en el código.
+  bulkFactor     Float        @default(1.20)
+  updatedAt      DateTime     @updatedAt
+
+  @@map("pricing_settings")
 }

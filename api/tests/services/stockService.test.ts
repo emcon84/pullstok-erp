@@ -152,6 +152,41 @@ describe("syncHqStock", () => {
     expect(tx.productStock.updateMany).not.toHaveBeenCalled();
     expect(tx.product.updateMany).not.toHaveBeenCalled();
   });
+
+  it("decimal quantity: ProductStock stores the exact float, Product.quantity mirror is Math.round (B-06, Product.quantity stays Int)", async () => {
+    const tx = makeTx();
+    mockedTransaction.mockImplementation((cb: any) => cb(tx));
+    tx.branch.findFirst.mockResolvedValue({ id: "hq-1" });
+    tx.productStock.findFirst.mockResolvedValue(null);
+
+    await syncHqStock(orgId, productId, 7.65);
+
+    expect(tx.productStock.create).toHaveBeenCalledWith({
+      data: { productId, branchId: "hq-1", quantity: 7.65, organizationId: orgId },
+    });
+    expect(tx.product.updateMany).toHaveBeenCalledWith({
+      where: { id: productId, organizationId: orgId },
+      data: { quantity: 8 },
+    });
+  });
+
+  it("decimal quantity on update path: ProductStock gets exact float, mirror rounded", async () => {
+    const tx = makeTx();
+    mockedTransaction.mockImplementation((cb: any) => cb(tx));
+    tx.branch.findFirst.mockResolvedValue({ id: "hq-1" });
+    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 10 });
+
+    await syncHqStock(orgId, productId, 9.35);
+
+    expect(tx.productStock.updateMany).toHaveBeenCalledWith({
+      where: { productId, branchId: "hq-1", organizationId: orgId },
+      data: { quantity: 9.35 },
+    });
+    expect(tx.product.updateMany).toHaveBeenCalledWith({
+      where: { id: productId, organizationId: orgId },
+      data: { quantity: 9 },
+    });
+  });
 });
 
 describe("getStockSummary", () => {

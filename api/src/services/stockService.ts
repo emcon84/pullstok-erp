@@ -90,7 +90,10 @@ export const syncHqStock = async (
 
     await tx.product.updateMany({
       where: { id: productId, organizationId: orgId },
-      data: { quantity },
+      // B-06: ProductStock.quantity es Float (kg fraccionarios), pero
+      // Product.quantity (legacy casa central) SIGUE Int → mirror con
+      // Math.round (la fracción no se puede representar en la columna Int).
+      data: { quantity: Math.round(quantity) },
     });
   });
 };
