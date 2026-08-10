@@ -134,6 +134,17 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         linePrice = priceKgSuelto; // snapshot congelado (B-04)
       }
 
+      // ── Conversión BOLSA_CERRADA a kg cuando el stock está en kg ──
+      // Después del backfill, ProductStock.quantity está en kg (no en bolsas).
+      // Vender 1 bolsa de 15 kg descuenta 15 kg del stock, no 1.
+      const productWeightKg = (product.weightKg && product.weightKg > 0)
+        ? product.weightKg
+        : null;
+      const stockUnits =
+        saleMode === "BOLSA_CERRADA" && productWeightKg
+          ? round2(lineQuantity * productWeightKg)
+          : lineQuantity;
+
       if (sellerBranchId) {
         // ── Branch-scoped sale: check & deduct from ProductStock ──
         const stock = await tx.productStock.findFirst({
@@ -143,7 +154,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
             organizationId,
           },
         });
-        if (!stock || stock.quantity < lineQuantity) {
+        if (!stock || stock.quantity < stockUnits) {
           throw new Error(
             `Stock insuficiente de "${product.name}" en tu sucursal`,
           );
@@ -154,9 +165,9 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
             productId: product.id,
             branchId: sellerBranchId,
             organizationId,
-            quantity: { gte: lineQuantity },
+            quantity: { gte: stockUnits },
           },
-          data: { quantity: { decrement: lineQuantity } },
+          data: { quantity: { decrement: stockUnits } },
         });
         if (updated.count === 0) {
           throw new Error(
@@ -165,7 +176,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         }
       } else {
         // ── Legacy / admin sale: deduct from product.quantity (HQ global) ──
-        if (product.quantity < lineQuantity) {
+        if (product.quantity < stockUnits) {
           throw new Error(
             `Stock insuficiente para el producto ${product.name}`,
           );
@@ -175,9 +186,9 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
           where: {
             id: product.id,
             organizationId,
-            quantity: { gte: lineQuantity },
+            quantity: { gte: stockUnits },
           },
-          data: { quantity: { decrement: lineQuantity } },
+          data: { quantity: { decrement: stockUnits } },
         });
         if (updated.count === 0) {
           throw new Error(
