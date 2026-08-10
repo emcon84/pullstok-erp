@@ -108,6 +108,12 @@ const BusinessHoursSettings = lazy(() =>
   })),
 );
 
+const PricingSettings = lazy(() =>
+  import("./views/PricingSettings").then((m) => ({
+    default: m.PricingSettings,
+  })),
+);
+
 const AppRoutes = () => (
   <Router>
     <Routes>
@@ -253,6 +259,7 @@ const AppRoutes = () => (
         <Route path="/actualizar-precios" element={<BulkPriceUpdate />} />
         <Route path="/ajustes" element={<BrandingSettings />} />
         <Route path="/ajustes/horarios" element={<BusinessHoursSettings />} />
+        <Route path="/configuracion-precios" element={<PricingSettings />} />
       </Route>
 
       {/* Panel superadmin (sdd/planes-y-billing): rutas de plataforma, fuera

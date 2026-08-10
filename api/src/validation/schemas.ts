@@ -524,6 +524,17 @@ export const updateAppBrandingSchema = z.object({
   showDisplayName: z.boolean().optional(),
 }).strip();
 
+// ---------- Configuración de precios (venta suelta) ----------
+// Factor de mayorista de la org (PricingSetting, 1:1 con Organization).
+// Positivo, hasta 2 decimales (B-04: factor = COALESCE(product.bulkFactor,
+// org.bulkFactor, 1.20)). El controller corre el recompute en el PUT.
+export const updatePricingSettingSchema = z.object({
+  bulkFactor: z.coerce
+    .number()
+    .positive("El factor debe ser mayor a 0")
+    .multipleOf(0.01, "El factor admite hasta 2 decimales"),
+}).strip();
+
 // ---------- Horario comercial (business-hours-access) ----------
 // Config 1:1 con Organization (BusinessHourSetting). El gate bloquea a roles
 // operativos fuera del horario configurado — un schema inválido aquí NO debe

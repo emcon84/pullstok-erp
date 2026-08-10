@@ -48,9 +48,11 @@ export const isLooseEligible = (p: {
 
 interface RecomputeRow {
   id: string;
+  name?: string;
   price: number;
   weightKg: number | null;
   bulkFactor: number | null;
+  priceKgSuelto?: number | null;
 }
 
 /** Lee el factor org (PricingSetting) o el default si no hay fila. */
@@ -97,20 +99,53 @@ const writeRows = async (
  * intactos). Corre dentro del mismo $transaction del upsert del factor.
  * Doble garantía: el selector pide bulkFactor IS NULL Y el loop saltea
  * defensivamente cualquier fila con override que llegara al set (B-05a).
+ *
+ * `opts.preview` (dry-run de la pantalla A-01): resuelve el MISMO set pero NO
+ * escribe — devuelve affected + una muestra before/after para el preview.
  */
+export interface FactorSavePreviewRow {
+  id: string;
+  name: string;
+  oldKgPrice: number | null;
+  newKgPrice: number | null;
+}
+
 export const recomputeForFactorSave = async (
   tx: any,
   orgId: string,
   factor: number,
-): Promise<{ affected: number }> => {
-  const rows: RecomputeRow[] = await tx.product.findMany({
+  opts?: { preview?: boolean; sampleSize?: number },
+): Promise<{ affected: number; sample?: FactorSavePreviewRow[] }> => {
+  const rows: Array<RecomputeRow & { name: string }> = await tx.product.findMany({
     where: { organizationId: orgId, bulkFactor: null },
-    select: { id: true, price: true, weightKg: true, bulkFactor: true },
+    select: {
+      id: true,
+      name: true,
+      price: true,
+      weightKg: true,
+      bulkFactor: true,
+      priceKgSuelto: true,
+    },
   });
   // Defensive: nunca escribir una fila con override por producto en un factor
   // save — aunque el selector ya lo excluye, esta red protege de futuros
   // refactors del where.
   const factorRows = rows.filter((r) => r.bulkFactor == null);
+
+  if (opts?.preview) {
+    const sampleSize = opts.sampleSize ?? 10;
+    const sample = factorRows.slice(0, sampleSize).map((r) => ({
+      id: r.id,
+      name: r.name ?? r.id,
+      oldKgPrice:
+        r.priceKgSuelto != null && typeof (r as any).priceKgSuelto === "number"
+          ? ((r as any).priceKgSuelto as number)
+          : null,
+      newKgPrice: computePriceKgSuelto(Number(r.price), r.weightKg ?? null, factor),
+    }));
+    return { affected: factorRows.length, sample };
+  }
+
   const affected = await writeRows(tx, orgId, factorRows, factor);
   return { affected };
 };

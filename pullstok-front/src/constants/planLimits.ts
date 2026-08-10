@@ -37,6 +37,7 @@ export const PLAN_LIMITS: Record<
       "tienda",
       "facturacion",
       "branding",
+      "pricing",
     ],
   },
   PREMIUM: {
@@ -58,6 +59,7 @@ export const PLAN_LIMITS: Record<
       // otro plan, replicar acá.
       "bot",
       "branding",
+      "pricing",
     ],
   },
 };

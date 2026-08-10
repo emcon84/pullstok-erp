@@ -22,6 +22,7 @@ import branchRoutes from "./branchRoutes";
 import brandingRoutes from "./brandingRoutes";
 import backupRoutes from "./backupRoutes";
 import businessHoursRoutes from "./businessHoursRoutes";
+import pricingRoutes from "./pricingRoutes";
 
 const router = Router();
 
@@ -52,5 +53,6 @@ router.use("/branches", branchRoutes);
 router.use("/app-branding", brandingRoutes);
 router.use("/backups", backupRoutes);
 router.use("/business-hours", businessHoursRoutes);
+router.use("/pricing-settings", pricingRoutes);
 
 export default router;

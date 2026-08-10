@@ -123,6 +123,48 @@ describe("recomputeForFactorSave — org-scoped, only bulkFactor IS NULL rows", 
     expect(result.affected).toBe(0);
     expect(tx.product.updateMany).not.toHaveBeenCalled();
   });
+
+  it("preview mode (dry-run): resolves the same set but writes NOTHING and returns a before/after sample (A-01)", async () => {
+    const tx = buildTx();
+    tx.product.findMany.mockResolvedValue([
+      { id: "p-1", name: "Alimento 15kg", price: 4500, weightKg: 15, priceKgSuelto: null },
+      { id: "p-2", name: "Alimento 7.5kg", price: 2500, weightKg: 7.5, priceKgSuelto: 340 },
+    ]);
+
+    const result = await recomputeForFactorSave(tx as any, "org-1", 1.25, {
+      preview: true,
+      sampleSize: 10,
+    });
+
+    expect(result.affected).toBe(2);
+    expect(result.sample).toEqual([
+      { id: "p-1", name: "Alimento 15kg", oldKgPrice: null, newKgPrice: 375 },
+      // 2500/7.5×1.25 = 416.666... → round2 = 416.67 (el precio viejo se expone tal cual, sin recalcular)
+      { id: "p-2", name: "Alimento 7.5kg", oldKgPrice: 340, newKgPrice: 416.67 },
+    ]);
+    // Dry-run: ningún write.
+    expect(tx.product.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("preview mode caps the sample at sampleSize while affected counts the full set", async () => {
+    const tx = buildTx();
+    tx.product.findMany.mockResolvedValue(
+      Array.from({ length: 25 }, (_, i) => ({
+        id: `p-${i}`,
+        name: `Prod ${i}`,
+        price: 1000,
+        weightKg: 10,
+      })),
+    );
+
+    const result = await recomputeForFactorSave(tx as any, "org-1", 1.2, {
+      preview: true,
+      sampleSize: 5,
+    });
+
+    expect(result.affected).toBe(25);
+    expect(result.sample).toHaveLength(5);
+  });
 });
 
 // ── recomputeForProduct (B-05b: after single PUT) ──
