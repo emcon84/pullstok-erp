@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "ts-node-dev src/server.ts",
     "test": "jest",
-    "build": "node build.js",
+    "build": "prisma generate && node build.js",
     "start": "node dist/bundle.js",
     "seed": "ts-node prisma/seed.ts",
     "reset:demo": "ts-node prisma/reset-demo.ts",
