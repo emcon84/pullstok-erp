@@ -16,9 +16,13 @@ jest.mock('../../src/config/db', () => ({
       create: jest.fn(),
       createMany: jest.fn(),
       updateMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     productVariant: {
       createMany: jest.fn(),
+    },
+    pricingSetting: {
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     // syncHqStock corre con basePrisma (fuera de ALS) en el import CSV; sin HQ
     // branch el sync no toca nada (early return), así los tests existentes no

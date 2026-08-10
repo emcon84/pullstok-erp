@@ -6,6 +6,11 @@ import {
   canEditBranchStock,
   getStockSummary as getStockSummaryService,
 } from "../services/stockService";
+import {
+  recomputeForProduct,
+  recomputeForBulkPriceUpdate,
+  recomputeForCsvImport,
+} from "../services/priceLooseService";
 import { requireOrganizationId } from "../config/tenantContext";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
@@ -475,6 +480,10 @@ const updateProduct = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
+    // Recompute priceKgSuelto after any data change that may affect it
+    // (price, weightKg, bulkFactor). Runs inside the same implied tx.
+    await recomputeForProduct(prisma, req.params.id);
+
     // Sincronizar ProductStock(HQ) cuando la edición trae quantity (spec D4).
     if (data.quantity !== undefined) {
       await syncHqStock(requireOrganizationId(), req.params.id, data.quantity);
@@ -734,6 +743,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       productPercentages?: { productId: string; percentage: number }[];
     };
     const dryRun = req.query.dryRun === "true";
+    const organizationId = requireOrganizationId();
     // Global opcional: sin valor → 0 (productos sin override no cambian).
     const globalPct = percentage ?? 0;
 
@@ -839,6 +849,13 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
             tx.product.updateMany({ where: { id: u.id }, data: { price: u.newPrice } }),
           ),
         );
+
+        // B-05c: recompute priceKgSuelto for the SAME resolved set after
+        // the price writes, inside the same $transaction. Overrides (per-product
+        // bulkFactor) are resolved per row by the service.
+        const recomputeWhere = buildBulkPriceWhere(brandValues, expandedTx, excludeProductIds);
+        await recomputeForBulkPriceUpdate(tx, recomputeWhere, organizationId);
+
         const prevTotal =
           Math.round(rowsTx.reduce((s, r) => s + Number(r.price), 0) * 100) / 100;
         const newTot =

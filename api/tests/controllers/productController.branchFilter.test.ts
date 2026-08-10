@@ -19,6 +19,12 @@ jest.mock("../../src/config/tenantContext", () => ({
   requireOrganizationId: jest.fn().mockReturnValue("org-1"),
 }));
 
+jest.mock("../../src/services/priceLooseService", () => ({
+  recomputeForProduct: jest.fn().mockResolvedValue({ affected: 0, priceKgSuelto: null }),
+  recomputeForBulkPriceUpdate: jest.fn().mockResolvedValue({ affected: 0 }),
+  recomputeForCsvImport: jest.fn().mockResolvedValue({ affected: 0 }),
+}));
+
 jest.mock("../../src/services/stockService", () => ({
   syncHqStock: jest.fn(),
   canEditBranchStock: jest.fn().mockReturnValue(true),

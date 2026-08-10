@@ -240,3 +240,104 @@ describe("ProductDrawer — create mode keeps the global quantity flow", () => {
     );
   });
 });
+
+// ── Venta suelta fields (sdd/venta-alimento-suelto A-02) ──
+
+describe("ProductDrawer — loose-sale fields (weightKg, bulkFactor, priceKgSuelto)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    setLoggedUser("ADMIN");
+    mockUseProductStock.mockReturnValue({
+      stock: stock([hq()]),
+      loading: false,
+      error: null,
+      updateBranchStock: mockUpdateBranchStock,
+      updating: false,
+    });
+    mockUseCreateProduct.mockReturnValue({
+      createProduct: vi.fn(),
+      loading: false,
+      error: null,
+      success: false,
+    });
+  });
+
+  it("renders weightKg and bulkFactor inputs in edit mode", () => {
+    renderDrawer({
+      open: true,
+      onClose: vi.fn(),
+      product: { ...editProduct, weightKg: 15, bulkFactor: 1.3, priceKgSuelto: 360 },
+    });
+    expect(screen.getByLabelText("Peso (kg)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Factor mayorista propio")).toBeInTheDocument();
+  });
+
+  it("shows read-only priceKgSuelto when product has it", () => {
+    renderDrawer({
+      open: true,
+      onClose: vi.fn(),
+      product: { ...editProduct, weightKg: 15, bulkFactor: null, priceKgSuelto: 360 },
+    });
+    expect(screen.getByText("Precio por kilo (calculado)")).toBeInTheDocument();
+    expect(screen.getByText(/\$360,00/)).toBeInTheDocument();
+  });
+
+  it("does not show priceKgSuelto block when product has no priceKgSuelto", () => {
+    renderDrawer({
+      open: true,
+      onClose: vi.fn(),
+      product: { ...editProduct, weightKg: null, priceKgSuelto: null },
+    });
+    expect(screen.queryByText("Precio por kilo (calculado)")).not.toBeInTheDocument();
+  });
+
+  it("hides loose fields in readOnly mode", () => {
+    renderDrawer({
+      open: true,
+      onClose: vi.fn(),
+      product: { ...editProduct, weightKg: 15, priceKgSuelto: 360 },
+      readOnly: true,
+    });
+    // In readOnly mode, the !readOnly wrapper hides weight/bulk inputs.
+    expect(screen.queryByLabelText("Peso (kg)")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Factor mayorista propio")).not.toBeInTheDocument();
+  });
+
+  it("sends weightKg and bulkFactor in update payload", async () => {
+    updateProductMock.mockResolvedValue({ message: "ok" });
+    renderDrawer({
+      open: true,
+      onClose: vi.fn(),
+      product: { ...editProduct, weightKg: 15, priceKgSuelto: 360 },
+    });
+
+    // Set the weight and factor inputs
+    fireEvent.change(screen.getByLabelText("Peso (kg)"), { target: { value: "7.5" } });
+    fireEvent.change(screen.getByLabelText("Factor mayorista propio"), { target: { value: "1.25" } });
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar" }));
+
+    await waitFor(() => expect(updateProductMock).toHaveBeenCalled());
+    const payload = updateProductMock.mock.calls[0][0];
+    expect(payload.weightKg).toBe(7.5);
+    expect(payload.bulkFactor).toBe(1.25);
+  });
+
+  it("sends null bulkFactor when input is empty (use org default)", async () => {
+    updateProductMock.mockResolvedValue({ message: "ok" });
+    renderDrawer({
+      open: true,
+      onClose: vi.fn(),
+      product: { ...editProduct, weightKg: 15 },
+    });
+
+    // Leave bulkFactor empty, set weight
+    fireEvent.change(screen.getByLabelText("Peso (kg)"), { target: { value: "7.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar" }));
+
+    await waitFor(() => expect(updateProductMock).toHaveBeenCalled());
+    const payload = updateProductMock.mock.calls[0][0];
+    expect(payload.weightKg).toBe(7.5);
+    expect(payload.bulkFactor).toBeNull(); // empty → null (org default)
+  });
+});

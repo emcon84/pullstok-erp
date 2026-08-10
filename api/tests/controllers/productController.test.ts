@@ -34,6 +34,12 @@ jest.mock('../../src/config/tenantContext', () => ({
   requireOrganizationId: jest.fn().mockReturnValue('org-1'),
 }));
 
+jest.mock('../../src/services/priceLooseService', () => ({
+  recomputeForProduct: jest.fn().mockResolvedValue({ affected: 0, priceKgSuelto: null }),
+  recomputeForBulkPriceUpdate: jest.fn().mockResolvedValue({ affected: 0 }),
+  recomputeForCsvImport: jest.fn().mockResolvedValue({ affected: 0 }),
+}));
+
 const mockedPrisma = prisma as unknown as {
   category: { findFirst: jest.Mock };
   product: { create: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };

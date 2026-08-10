@@ -48,6 +48,8 @@ interface ProductPayload {
   variantOptionIds: string[];
   quantity?: number;
   categoryId?: string | null;
+  weightKg?: number | null;
+  bulkFactor?: number | null;
 }
 
 export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: ProductDrawerProps) => {
@@ -69,6 +71,11 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
   // Draft per-branch quantities + which branch is saving right now (edit mode).
   const [branchDrafts, setBranchDrafts] = useState<Record<string, string>>({});
   const [savingBranch, setSavingBranch] = useState<string | null>(null);
+
+  // Loose-sale fields (sdd/venta-alimento-suelto A-02):
+  const [weightKg, setWeightKg] = useState("");
+  const [bulkFactor, setBulkFactor] = useState("");
+  // priceKgSuelto is read-only (derived server-side from price/weightKg/factor).
 
   // Stock por sucursal (edit mode): self-contained response, no GET /branches.
   const productId = isEdit ? (product?._id || product?.id) : undefined;
@@ -134,6 +141,8 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         setQuantity(product.quantity?.toString() || "");
         setImageUrl(product.image || "");
         setImageFile(null);
+        setWeightKg(product.weightKg != null ? String(product.weightKg) : "");
+        setBulkFactor(product.bulkFactor != null ? String(product.bulkFactor) : "");
         // Pre-select variants if available
         if (product.variantAssignments) {
           const pre: Record<string, string> = {};
@@ -153,6 +162,8 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         setQuantity("");
         setImageUrl("");
         setImageFile(null);
+        setWeightKg("");
+        setBulkFactor("");
         setVariants([]);
         setVariantSelections({});
       }
@@ -207,6 +218,11 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
       if (!isEdit) {
         payload.quantity = parseInt(quantity) || 0;
       }
+      // Loose-sale fields (A-02): weightKg always sent, bulkFactor optional (null = org default).
+      const parsedWeightKg = parseFloat(weightKg);
+      payload.weightKg = !isNaN(parsedWeightKg) && parsedWeightKg > 0 ? parsedWeightKg : null;
+      const parsedFactor = parseFloat(bulkFactor);
+      payload.bulkFactor = !isNaN(parsedFactor) && parsedFactor > 0 ? parsedFactor : null;
 
       if (isEdit && product) {
         payload.categoryId = categoryId || null;
@@ -272,6 +288,57 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
             )}
           </div>
           </>
+          )}
+
+          {/* ── Venta suelta (sdd/venta-alimento-suelto A-02) ── */}
+          {!readOnly && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="p-weightKg">Peso (kg)</Label>
+              <Input
+                id="p-weightKg"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={weightKg}
+                onChange={(e) => setWeightKg(e.target.value)}
+                placeholder="Ej: 15"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Peso del producto para calcular precio por kilo.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="p-bulkFactor">Factor mayorista propio</Label>
+              <Input
+                id="p-bulkFactor"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={bulkFactor}
+                onChange={(e) => setBulkFactor(e.target.value)}
+                placeholder="Usar el de la org"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Vacío = usa el factor de la organización.
+              </p>
+            </div>
+          </div>
+          )}
+
+          {/* priceKgSuelto — read-only, derived (A-02). Shown in both edit/readOnly. */}
+          {isEdit && product && (product.priceKgSuelto != null) && (
+            <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3">
+              <Label className="text-xs text-muted-foreground">Precio por kilo (calculado)</Label>
+              <p className="text-lg font-bold tabular-nums">
+                ${Number(product.priceKgSuelto).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Se recalcula al guardar cambios en peso o factor.
+              </p>
+            </div>
           )}
 
           {/* Stock por sucursal — edit mode (spec F1): una card por sucursal activa,

@@ -2,6 +2,7 @@ import csvParser from "csv-parser";
 import fs from "fs";
 import { basePrisma, prisma } from "../config/db";
 import { syncHqStock } from "./stockService";
+import { recomputeForCsvImport } from "./priceLooseService";
 
 interface ProductInput {
   name: string;
@@ -113,6 +114,7 @@ export const bulkAddProducts = async (
         try {
           const errors: string[] = [];
           let productsCreated = 0;
+          const createdIds: string[] = [];
 
           for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
@@ -142,6 +144,7 @@ export const bulkAddProducts = async (
                   await syncHqStock(organizationId, product.id, row.quantity, basePrisma);
                 }
 
+                createdIds.push(product.id);
                 productsCreated++;
                 continue;
               }
@@ -207,10 +210,16 @@ export const bulkAddProducts = async (
                 await syncHqStock(organizationId, product.id, row.quantity, basePrisma);
               }
 
+              createdIds.push(product.id);
               productsCreated++;
             } catch (rowError: any) {
               errors.push(`Fila ${lineNum} (${row.name || "sin nombre"}): ${rowError.message}`);
             }
+          }
+
+          // B-05d: recompute priceKgSuelto for all newly created products.
+          if (createdIds.length > 0) {
+            await recomputeForCsvImport(basePrisma, organizationId, createdIds);
           }
 
           resolve({ count: productsCreated, errors });
