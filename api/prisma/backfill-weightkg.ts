@@ -155,9 +155,9 @@ async function main() {
          FROM "product_variants" pv
          JOIN "category_variant_options" cvo ON cvo.id = pv."optionId"
          JOIN "category_variant_definitions" cvd ON cvd.id = cvo."variantId"
-         WHERE pv."productId" = ANY($1::uuid[])
+         WHERE pv."productId" = ANY($1::text[])
            AND cvd.name = 'Tamaño'
-           AND pv."organizationId" = $2`,
+           AND pv."organizationId" = $2::text`,
         remainingIds,
         orgId,
       );
