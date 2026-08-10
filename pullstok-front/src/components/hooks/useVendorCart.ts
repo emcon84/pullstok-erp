@@ -46,7 +46,6 @@ export function useVendorCart() {
       branchId: string,
       stock: number,
       saleMode?: SaleMode,
-      priceKgSuelto?: number | null,
     ) => {
       setItems((prev) => {
         const pid = product._id || product.id;

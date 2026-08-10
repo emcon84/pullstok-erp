@@ -34,7 +34,7 @@ const formatPrice = (n: number | null): string => {
  *  Mirror de BrandingSettings + BulkPriceUpdate dry-run pattern. */
 export const PricingSettings = () => {
   const { pricing, loading } = usePricingSettings();
-  const { updatePricing, result, loading: isSaving } = useUpdatePricingSettings();
+  const { updatePricing, loading: isSaving } = useUpdatePricingSettings();
 
   const [factor, setFactor] = useState("");
   const [preview, setPreview] = useState<PricingDryRunResult | null>(null);

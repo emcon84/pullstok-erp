@@ -117,13 +117,6 @@ const sampleProduct: DataItem = {
   priceKgSuelto: 360,
 };
 
-const sampleProduct2: DataItem = {
-  id: "p-2",
-  name: "Alimento 7.5kg",
-  price: 2500,
-  priceKgSuelto: 340,
-};
-
 describe("useVendorCart — saleMode merge + decimal counts (WU4, V-02)", () => {
   it("adds cart item with BOLSA_CERRADA saleMode by default", () => {
     const result = reducer.addToCart([], sampleProduct, 3, "branch-1", 10);
