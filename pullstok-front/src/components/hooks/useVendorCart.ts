@@ -68,7 +68,7 @@ export function useVendorCart() {
             name: product.name,
             code: product.code || "",
             image: product.image,
-            price: mode === "POR_PESO"
+            price: mode !== "BOLSA_CERRADA"
               ? (product.priceKgSuelto ?? Number(product.price))
               : Number(product.price),
             stock,
