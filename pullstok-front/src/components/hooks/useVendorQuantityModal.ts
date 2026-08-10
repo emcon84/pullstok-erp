@@ -69,7 +69,7 @@ export function useVendorQuantityModal({
     const stock = branchQty(qtyModal.product);
     const actualQty =
       saleMode === "POR_MONTO"
-        ? round2(amount / (qtyModal.product.priceKgSuelto ?? 1))
+        ? amount
         : qty;
     const priceKgSuelto = qtyModal.product.priceKgSuelto ?? null;
     addToCart(qtyModal.product, actualQty, branchId, stock, saleMode, priceKgSuelto);
@@ -89,7 +89,7 @@ export function useVendorQuantityModal({
     }
     const actualQty =
       saleMode === "POR_MONTO"
-        ? round2(amount / (p.priceKgSuelto ?? 1))
+        ? amount
         : qty;
     setDirectSelling(true);
     try {
@@ -99,7 +99,7 @@ export function useVendorQuantityModal({
             _id: (p._id || p.id) as string,
             id: (p._id || p.id) as string,
             name: p.name,
-            price: saleMode === "POR_PESO"
+            price: saleMode !== "BOLSA_CERRADA"
               ? (p.priceKgSuelto ?? Number(p.price ?? 0))
               : Number(p.price ?? 0),
             quantity: stock,
