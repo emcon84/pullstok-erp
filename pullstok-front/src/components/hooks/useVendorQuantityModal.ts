@@ -6,7 +6,6 @@ import { branchQty } from "./vendorCatalogHelpers";
 import type { DataItem } from "../../types";
 import type { CartItem } from "../../models/salesModel";
 import type { SaleMode } from "./useVendorCart";
-import { round2 } from "../../lib/money";
 
 interface UseVendorQuantityModalParams {
   branchId: string;
