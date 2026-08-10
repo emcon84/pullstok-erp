@@ -69,9 +69,25 @@ export const QuantityModal = ({
       ? amount
       : round2(displayPrice * (saleMode === "POR_PESO" ? qty : qty));
 
-  // Stock guard: decimal for loose, int for bolsa.
+  // Display stock per mode: kg for loose, bags for BOLSA_CERRADA.
+  // After DB conversion, ProductStock.quantity is in kg.
+  const weightKg = product?.weightKg ?? null;
+  const maxBags =
+    weightKg && weightKg > 0 ? Math.floor(maxStock / weightKg) : Math.floor(maxStock);
+
+  // effectiveMax: bags for BOLSA, kg for loose.
   const effectiveMax =
-    saleMode === "BOLSA_CERRADA" ? Math.floor(maxStock) : maxStock;
+    saleMode === "BOLSA_CERRADA" ? maxBags : maxStock;
+
+  // When switching to BOLSA_CERRADA from loose, reset qty to 1 bag.
+  const setModeAndQty = (mode: SaleMode) => {
+    setSaleMode(mode);
+    if (mode === "BOLSA_CERRADA") {
+      setQty(1);
+    } else {
+      setQty(0.01);
+    }
+  };
 
   return (
     <Dialog open={!!product} onOpenChange={(open) => !open && onClose()}>
@@ -117,7 +133,7 @@ export const QuantityModal = ({
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                   onClick={() => {
-                    setSaleMode(mode);
+                    setModeAndQty(mode);
                     if (mode === "BOLSA_CERRADA") setQty(1);
                     else if (mode === "POR_PESO") setQty(0.01);
                     else setAmount(0);
@@ -155,8 +171,13 @@ export const QuantityModal = ({
               <p className="text-sm text-muted-foreground">
                 Stock disponible:{" "}
                 <span className="font-medium text-foreground">
-                  {maxStock.toFixed(2)} kg
+                  {maxBags} u.
                 </span>
+                {weightKg && (
+                  <span className="text-muted-foreground">
+                    {" "}({maxStock.toFixed(2)} kg)
+                  </span>
+                )}
               </p>
             </>
           )}
@@ -184,21 +205,28 @@ export const QuantityModal = ({
                 />
               </div>
               {kgPreview && (
-                <p className="text-sm">
-                  ≈{" "}
-                  <span className="font-medium tabular-nums">
+                <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Equivale a
+                  </p>
+                  <p className="text-2xl font-bold tabular-nums text-primary">
                     {kgPreview.toFixed(2)} kg
-                  </span>{" "}
-                  <span className="text-muted-foreground">
-                    (${priceKgSuelto?.toFixed(2)}/kg)
-                  </span>
-                </p>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    a ${priceKgSuelto?.toFixed(2)}/kg
+                  </p>
+                </div>
               )}
               <p className="text-sm text-muted-foreground">
                 Stock disponible:{" "}
                 <span className="font-medium text-foreground">
                   {maxStock.toFixed(2)} kg
                 </span>
+                {weightKg && (
+                  <span className="text-muted-foreground">
+                    {" "}({maxBags} bolsas)
+                  </span>
+                )}
               </p>
             </>
           )}
@@ -209,8 +237,13 @@ export const QuantityModal = ({
               <p className="text-sm text-muted-foreground">
                 Stock disponible:{" "}
                 <span className="font-medium text-foreground">
-                  {Math.floor(maxStock)} u.
+                  {maxStock.toFixed(2)} kg
                 </span>
+                {weightKg && (
+                  <span className="text-muted-foreground">
+                    {" "}({maxBags} bolsas)
+                  </span>
+                )}
               </p>
               <p className="text-lg font-bold">
                 ${Number(product ? product.price : 0).toLocaleString("es-AR")}
