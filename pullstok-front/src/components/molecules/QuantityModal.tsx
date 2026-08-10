@@ -171,13 +171,8 @@ export const QuantityModal = ({
               <p className="text-sm text-muted-foreground">
                 Stock disponible:{" "}
                 <span className="font-medium text-foreground">
-                  {maxBags} u.
+                  {maxStock.toFixed(2)} kg
                 </span>
-                {weightKg && (
-                  <span className="text-muted-foreground">
-                    {" "}({maxStock.toFixed(2)} kg)
-                  </span>
-                )}
               </p>
             </>
           )}
@@ -222,11 +217,6 @@ export const QuantityModal = ({
                 <span className="font-medium text-foreground">
                   {maxStock.toFixed(2)} kg
                 </span>
-                {weightKg && (
-                  <span className="text-muted-foreground">
-                    {" "}({maxBags} bolsas)
-                  </span>
-                )}
               </p>
             </>
           )}
@@ -237,13 +227,8 @@ export const QuantityModal = ({
               <p className="text-sm text-muted-foreground">
                 Stock disponible:{" "}
                 <span className="font-medium text-foreground">
-                  {maxStock.toFixed(2)} kg
+                  {maxBags} u.
                 </span>
-                {weightKg && (
-                  <span className="text-muted-foreground">
-                    {" "}({maxBags} bolsas)
-                  </span>
-                )}
               </p>
               <p className="text-lg font-bold">
                 ${Number(product ? product.price : 0).toLocaleString("es-AR")}
