@@ -152,9 +152,9 @@ async function main() {
     const variantData: Array<{ productId: string; value: string }> =
       await db.$queryRawUnsafe(
         `SELECT pv."productId", cvo.value
-         FROM "ProductVariant_" pv
-         JOIN "CategoryVariantOption" cvo ON cvo.id = pv."optionId"
-         JOIN "CategoryVariantDefinition" cvd ON cvd.id = cvo."variantId"
+         FROM "product_variants" pv
+         JOIN "category_variant_options" cvo ON cvo.id = pv."optionId"
+         JOIN "category_variant_definitions" cvd ON cvd.id = cvo."variantId"
          WHERE pv."productId" = ANY($1::uuid[])
            AND cvd.name = 'Tamaño'
            AND pv."organizationId" = $2`,
