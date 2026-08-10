@@ -19,6 +19,7 @@ export const useCreateSale = () => {
           price: item.product.price.toString(),
           description: item.product.description || "",
           category: item.product.category || "",
+          saleMode: (item as any).saleMode || "BOLSA_CERRADA",
         })),
       };
       await createSale(saleRequest, orderId);

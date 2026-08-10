@@ -5,6 +5,8 @@ import { useCreateSale } from "./useSales";
 import { branchQty } from "./vendorCatalogHelpers";
 import type { DataItem } from "../../types";
 import type { CartItem } from "../../models/salesModel";
+import type { SaleMode } from "./useVendorCart";
+import { round2 } from "../../lib/money";
 
 interface UseVendorQuantityModalParams {
   branchId: string;
@@ -14,6 +16,8 @@ interface UseVendorQuantityModalParams {
     quantity: number,
     branchId: string,
     stock: number,
+    saleMode?: SaleMode,
+    priceKgSuelto?: number | null,
   ) => void;
 }
 
@@ -36,15 +40,22 @@ export function useVendorQuantityModal({
   const { createSale } = useCreateSale();
 
   const [qtyModal, setQtyModal] = useState<{ product: DataItem } | null>(null);
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState<number>(1);
   const [directSelling, setDirectSelling] = useState(false);
+  const [saleMode, setSaleMode] = useState<SaleMode>("BOLSA_CERRADA");
+  // POR_MONTO: vendor enters amount, we preview kg
+  const [amount, setAmount] = useState<number>(0);
 
   const releaseSearchFocus = useCallback(() => {
     searchInputRef.current?.blur();
   }, [searchInputRef]);
 
   const openQtyModal = useCallback((product: DataItem) => {
-    setQty(1);
+    // Default to POR_PESO if product is loose-eligible; else BOLSA_CERRADA.
+    const isLoose = (product.priceKgSuelto ?? 0) > 0;
+    setQty(isLoose ? 0.01 : 1);
+    setSaleMode(isLoose ? "POR_PESO" : "BOLSA_CERRADA");
+    setAmount(0);
     setQtyModal({ product });
   }, []);
 
@@ -56,11 +67,16 @@ export function useVendorQuantityModal({
   const confirmAddToCart = useCallback(() => {
     if (!qtyModal) return;
     const stock = branchQty(qtyModal.product);
-    addToCart(qtyModal.product, qty, branchId, stock);
+    const actualQty =
+      saleMode === "POR_MONTO"
+        ? round2(amount / (qtyModal.product.priceKgSuelto ?? 1))
+        : qty;
+    const priceKgSuelto = qtyModal.product.priceKgSuelto ?? null;
+    addToCart(qtyModal.product, actualQty, branchId, stock, saleMode, priceKgSuelto);
     toast.success(`"${qtyModal.product.name}" agregado al pedido`);
     setQtyModal(null);
     releaseSearchFocus();
-  }, [qtyModal, qty, addToCart, branchId, releaseSearchFocus]);
+  }, [qtyModal, qty, amount, saleMode, addToCart, branchId, releaseSearchFocus]);
 
   // ── Direct sale from showroom modal (1-tap single product sale) ──
   const handleDirectSale = useCallback(async () => {
@@ -71,6 +87,10 @@ export function useVendorQuantityModal({
       toast.error("Producto sin stock");
       return;
     }
+    const actualQty =
+      saleMode === "POR_MONTO"
+        ? round2(amount / (p.priceKgSuelto ?? 1))
+        : qty;
     setDirectSelling(true);
     try {
       const cart: CartItem[] = [
@@ -79,17 +99,25 @@ export function useVendorQuantityModal({
             _id: (p._id || p.id) as string,
             id: (p._id || p.id) as string,
             name: p.name,
-            price: Number(p.price ?? 0),
+            price: saleMode === "POR_PESO"
+              ? (p.priceKgSuelto ?? Number(p.price ?? 0))
+              : Number(p.price ?? 0),
             quantity: stock,
             description: "",
             category: "",
           },
-          quantity: qty,
-          totalPrice: Number(p.price ?? 0) * qty,
+          quantity: actualQty,
+          totalPrice:
+            saleMode === "POR_MONTO"
+              ? amount
+              : (saleMode === "POR_PESO"
+                  ? (p.priceKgSuelto ?? Number(p.price ?? 0))
+                  : Number(p.price ?? 0)) * actualQty,
+          saleMode,
         },
       ];
       await createSale({ cart });
-      toast.success(`Venta directa realizada (${qty}x "${p.name}")`);
+      toast.success(`Venta directa realizada (${actualQty}x "${p.name}")`);
       setQtyModal(null);
       releaseSearchFocus();
     } catch (err: any) {
@@ -97,13 +125,17 @@ export function useVendorQuantityModal({
     } finally {
       setDirectSelling(false);
     }
-  }, [qtyModal, qty, createSale, releaseSearchFocus]);
+  }, [qtyModal, qty, amount, saleMode, createSale, releaseSearchFocus]);
 
   return {
     qtyModal,
     qty,
     setQty,
     directSelling,
+    saleMode,
+    setSaleMode,
+    amount,
+    setAmount,
     openQtyModal,
     closeQtyModal,
     confirmAddToCart,

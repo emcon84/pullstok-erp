@@ -1,13 +1,14 @@
 import { toast } from "react-toastify";
 import { Minus, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import type { VendorCartItem } from "@/components/hooks/useVendorCart";
+import type { VendorCartItem, SaleMode } from "@/components/hooks/useVendorCart";
 
 interface VendorCartData {
   items: VendorCartItem[];
@@ -21,8 +22,8 @@ interface VendorCartStatus {
 
 interface VendorCartHandlers {
   onOpenChange: (open: boolean) => void;
-  updateQty: (productId: string, quantity: number) => void;
-  remove: (productId: string) => void;
+  updateQty: (productId: string, quantity: number, saleMode?: SaleMode) => void;
+  remove: (productId: string, saleMode?: SaleMode) => void;
   clearCart: () => void;
   saveOrder: () => void;
   confirmSale: () => void;
@@ -34,6 +35,17 @@ interface VendorCartSheetProps {
   status: VendorCartStatus;
   handlers: VendorCartHandlers;
 }
+
+const MODE_LABEL: Record<string, string> = {
+  POR_PESO: "por kg",
+  POR_MONTO: "por $",
+};
+
+const formatQty = (item: VendorCartItem): string => {
+  const mode = item.saleMode ?? "BOLSA_CERRADA";
+  if (mode === "BOLSA_CERRADA") return String(Math.round(item.quantity));
+  return item.quantity.toFixed(2);
+};
 
 export const VendorCartSheet = ({
   open,
@@ -59,10 +71,12 @@ export const VendorCartSheet = ({
           <div className="flex-1 overflow-auto -mx-6 px-6 space-y-3 mt-4 mb-2">
             {cart.items.map((item) => (
               <CartItemRow
-                key={item.productId}
+                key={`${item.productId}-${item.saleMode ?? "BOLSA_CERRADA"}`}
                 item={item}
-                onUpdateQty={(qty) => handlers.updateQty(item.productId, qty)}
-                onRemove={() => handlers.remove(item.productId)}
+                onUpdateQty={(qty) =>
+                  handlers.updateQty(item.productId, qty, item.saleMode)
+                }
+                onRemove={() => handlers.remove(item.productId, item.saleMode)}
               />
             ))}
           </div>
@@ -72,7 +86,7 @@ export const VendorCartSheet = ({
             <div className="flex items-center justify-between text-lg font-bold">
               <span>Total</span>
               <span className="tabular-nums">
-                ${cart.totalAmount.toLocaleString("es-AR")}
+                ${cart.totalAmount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex flex-col gap-2">
@@ -130,47 +144,74 @@ const CartItemRow = ({
   item: VendorCartItem;
   onUpdateQty: (qty: number) => void;
   onRemove: () => void;
-}) => (
-  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-    <div className="flex-1 min-w-0">
-      <p className="text-sm font-medium truncate">{item.name}</p>
-      <p className="text-xs text-muted-foreground">
-        ${item.price.toLocaleString("es-AR")} c/u
-      </p>
-      <p className="text-xs font-semibold">
-        ${(item.price * item.quantity).toLocaleString("es-AR")}
-      </p>
-    </div>
-    <div className="flex items-center gap-1">
+}) => {
+  const mode = item.saleMode ?? "BOLSA_CERRADA";
+  const isBolsa = mode === "BOLSA_CERRADA";
+  const isLoose = mode === "POR_PESO" || mode === "POR_MONTO";
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-medium truncate">{item.name}</p>
+          {isLoose && (
+            <Badge variant="secondary" className="text-[10px] px-1 py-0">
+              {MODE_LABEL[mode] ?? mode}
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          ${item.price.toLocaleString("es-AR")} c/u
+        </p>
+        <p className="text-xs font-semibold">
+          ${(item.price * item.quantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+        </p>
+      </div>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-7 w-7"
+          disabled={
+            isBolsa ? item.quantity <= 1 : item.quantity <= 0.01
+          }
+          onClick={() =>
+            onUpdateQty(
+              isBolsa
+                ? item.quantity - 1
+                : Math.max(0, Math.round((item.quantity - 0.01) * 100) / 100),
+            )
+          }
+        >
+          <Minus className="h-3 w-3" />
+        </Button>
+        <span className="w-10 text-center text-sm font-bold tabular-nums">
+          {formatQty(item)}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-7 w-7"
+          disabled={item.quantity >= item.stock}
+          onClick={() =>
+            onUpdateQty(
+              isBolsa
+                ? item.quantity + 1
+                : Math.round((item.quantity + 0.01) * 100) / 100,
+            )
+          }
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
       <Button
-        variant="outline"
+        variant="ghost"
         size="icon"
-        className="h-7 w-7"
-        disabled={item.quantity <= 1}
-        onClick={() => onUpdateQty(item.quantity - 1)}
+        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+        onClick={onRemove}
       >
-        <Minus className="h-3 w-3" />
-      </Button>
-      <span className="w-8 text-center text-sm font-bold tabular-nums">
-        {item.quantity}
-      </span>
-      <Button
-        variant="outline"
-        size="icon"
-        className="h-7 w-7"
-        disabled={item.quantity >= item.stock}
-        onClick={() => onUpdateQty(item.quantity + 1)}
-      >
-        <Plus className="h-3 w-3" />
+        <X className="h-4 w-4" />
       </Button>
     </div>
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-      onClick={onRemove}
-    >
-      <X className="h-4 w-4" />
-    </Button>
-  </div>
-);
+  );
+};

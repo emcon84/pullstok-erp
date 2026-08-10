@@ -4,6 +4,7 @@ export interface CartItem {
   product: ProductsProps;
   quantity: number;
   totalPrice: number;
+  saleMode?: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO";
 }
 
 export interface SaleRequest {

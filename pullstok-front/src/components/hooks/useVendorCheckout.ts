@@ -49,6 +49,7 @@ export function useVendorCheckout({
         },
         quantity: i.quantity,
         totalPrice: i.price * i.quantity,
+        saleMode: i.saleMode ?? "BOLSA_CERRADA",
       }));
       await createSale({ cart });
       clearCart();

@@ -34,6 +34,10 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     qty,
     setQty,
     directSelling,
+    saleMode,
+    setSaleMode,
+    amount,
+    setAmount,
     openQtyModal,
     closeQtyModal,
     confirmAddToCart,
@@ -252,6 +256,10 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
         setQty={setQty}
         maxStock={qtyModal ? branchQty(qtyModal.product) : 0}
         directSelling={directSelling}
+        saleMode={saleMode}
+        setSaleMode={setSaleMode}
+        amount={amount}
+        setAmount={setAmount}
         onDirectSale={handleDirectSale}
         onAddToCart={confirmAddToCart}
         onClose={closeQtyModal}
