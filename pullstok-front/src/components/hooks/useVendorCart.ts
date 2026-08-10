@@ -68,7 +68,9 @@ export function useVendorCart() {
             name: product.name,
             code: product.code || "",
             image: product.image,
-            price: mode !== "BOLSA_CERRADA"
+            price: mode === "POR_MONTO"
+              ? 1 // amount IS the total; backend computes kg from priceKgSuelto
+              : mode !== "BOLSA_CERRADA"
               ? (product.priceKgSuelto ?? Number(product.price))
               : Number(product.price),
             stock,
