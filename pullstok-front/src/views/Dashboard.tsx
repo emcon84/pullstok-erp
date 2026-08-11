@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Upload, ShoppingCart, Search, X } from "lucide-react";
+import { Plus, Upload, ShoppingCart, Search, X, Printer } from "lucide-react";
 import {
   FaShoppingCart,
   FaFileInvoice,
@@ -13,6 +13,7 @@ import { GenericModal } from "../components/molecules/GenericModal";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { StatCard } from "../components/molecules/StatCard";
 import { ProductsTable } from "../components/molecules/ProductsTable";
+import { PrintProductList } from "../components/molecules/PrintProductList";
 import { ProductDrawer } from "../components/molecules/ProductDrawer";
 import { QuickPriceModal } from "../components/molecules/QuickPriceModal";
 import { Statistics } from "./Statistics";
@@ -217,6 +218,10 @@ export const Dashboard = () => {
             <Upload className="h-4 w-4" />
             Importar CSV
           </Button>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="h-4 w-4" />
+            Imprimir listado
+          </Button>
           <Button variant="outline" onClick={addSales}>
             <ShoppingCart className="h-4 w-4" />
             Nueva venta
@@ -358,6 +363,9 @@ export const Dashboard = () => {
 
       {/* Tabla de productos / stock */}
       <ProductsTable products={filteredProducts} onEdit={openEditDrawer} onDuplicate={openDuplicateDrawer} onQuickPrice={openQuickPrice} branchMode={!!branchFilter} />
+
+      {/* Print area: only visible when printing (see @media print in index.css) */}
+      <PrintProductList products={filteredProducts} branchMode={!!branchFilter} />
 
       {/* Product Drawer (create/edit) */}
       <ProductDrawer open={drawerOpen} onClose={closeDrawer} product={drawerProduct} />
