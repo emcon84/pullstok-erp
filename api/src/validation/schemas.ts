@@ -174,12 +174,11 @@ export const updateProductSchema = createProductSchema.partial().extend({
     .multipleOf(0.01)
     .nullable()
     .optional(),
-  // priceKgSuelto es SOLO lectura: se deriva de price/weightKg/factor vía el
-  // recompute service (B-04/B-05b). z.never() rechaza cualquier intento de
-  // edición manual (A-02) — el campo no existe en el payload válido.
-  priceKgSuelto: z.never({
-    message: "priceKgSuelto no se puede editar manualmente",
-  }).optional(),
+  // priceKgSuelto editable manualmente (decisión: "manual gana, vacío = automático").
+  // Número = precio por kg fijado a mano (se marca priceKgSueltoManual=true).
+  // null = volver al cálculo automático price/weightKg×factor (flag=false).
+  // ausente = no tocar el valor almacenado ni el flag.
+  priceKgSuelto: z.coerce.number().nonnegative("El precio por kg no puede ser negativo").multipleOf(0.01).nullable().optional(),
 });
 
 // Toggle dedicado "Publicar en tienda" (WS4 — UI de Tienda/listado de

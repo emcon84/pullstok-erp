@@ -459,6 +459,13 @@ const updateProduct = async (req: Request, res: Response) => {
   try {
     const { variantOptionIds, ...data } = req.body;
 
+    // Manual per-kg price override (decisión #201): an explicit number fixes
+    // the value by hand (priceKgSueltoManual=true, recompute skips it); null
+    // returns to the automatic computation (flag=false); absent = untouched.
+    if (data.priceKgSuelto !== undefined) {
+      data.priceKgSueltoManual = data.priceKgSuelto === null ? false : true;
+    }
+
     // If categoryId is changing, clear old variant assignments
     if (data.categoryId !== undefined) {
       const existing = await prisma.product.findFirst({

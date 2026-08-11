@@ -25,11 +25,18 @@ interface QuickPriceModalProps {
 export const QuickPriceModal = ({ open, onClose, product }: QuickPriceModalProps) => {
   const queryClient = useQueryClient();
   const [price, setPrice] = useState("");
+  const [priceKgSuelto, setPriceKgSuelto] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open && product) {
       setPrice(String(Number(product.price ?? 0)));
+      // Per-kg prefill: show the current value when present; empty when
+      // absent/0 (empty = back to automatic computation on save).
+      const currentKg = product.priceKgSuelto;
+      setPriceKgSuelto(
+        currentKg != null && Number(currentKg) > 0 ? String(Number(currentKg)) : "",
+      );
     }
   }, [open, product]);
 
@@ -41,9 +48,21 @@ export const QuickPriceModal = ({ open, onClose, product }: QuickPriceModalProps
       toast.error("Ingresá un precio válido");
       return;
     }
+    let kgValue: number | null = null;
+    if (priceKgSuelto.trim() !== "") {
+      kgValue = Number(priceKgSuelto);
+      if (Number.isNaN(kgValue) || kgValue < 0) {
+        toast.error("Ingresá un precio por kg válido");
+        return;
+      }
+    }
     setSaving(true);
     try {
-      await updateProduct({ _id: id, price: value } as DataItem);
+      await updateProduct({
+        _id: id,
+        price: value,
+        priceKgSuelto: kgValue,
+      } as unknown as DataItem);
       queryClient.invalidateQueries();
       queryClient.invalidateQueries({ queryKey: ["product-facets"] });
       toast.success("Precio actualizado");
@@ -89,6 +108,31 @@ export const QuickPriceModal = ({ open, onClose, product }: QuickPriceModalProps
             }}
             autoFocus
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="quick-price-kg">Precio por kg</Label>
+          <Input
+            id="quick-price-kg"
+            aria-label="Precio por kg"
+            type="number"
+            min={0}
+            step="0.01"
+            inputMode="decimal"
+            placeholder="Automático"
+            value={priceKgSuelto}
+            onChange={(e) => setPriceKgSuelto(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleSave();
+              }
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Vacío = automático (calculado del precio/peso). Con valor = precio
+            por kg fijado a mano y gana sobre el cálculo automático.
+          </p>
         </div>
 
         <DialogFooter>

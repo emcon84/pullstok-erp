@@ -225,6 +225,10 @@ model Product {
   // La venta SIEMPRE usa el valor almacenado, nunca el factor en vivo.
   // null = producto NO elegible para venta suelta (isLooseEligible=false).
   priceKgSuelto      Float?
+  // priceKgSueltoManual: true = priceKgSuelto was set by hand (PUT with a
+  // numeric priceKgSuelto) and the recompute must NOT overwrite it. false
+  // (default) = priceKgSuelto is derived by recompute and can be overwritten.
+  priceKgSueltoManual  Boolean           @default(false)
   // Override por producto del factor org (null = usa el default de la org,
   // que nace en PricingSetting.bulkFactor = 1.20).
   bulkFactor         Float?

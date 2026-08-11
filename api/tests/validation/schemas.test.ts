@@ -718,7 +718,7 @@ describe("createSaleSchema — saleMode-aware quantity validation (B-06/B-08)", 
   });
 });
 
-describe("updateProductSchema — weightKg/bulkFactor + priceKgSuelto read-only (A-02)", () => {
+describe("updateProductSchema — weightKg/bulkFactor + priceKgSuelto manual: número = manual, null = automático", () => {
   const { updateProductSchema, createProductSchema } = require("../../src/validation/schemas");
 
   it("accepts weightKg (positive, 2dp) and bulkFactor (positive, 2dp)", () => {
@@ -750,9 +750,54 @@ describe("updateProductSchema — weightKg/bulkFactor + priceKgSuelto read-only 
     expect(updateProductSchema.safeParse({ weightKg: -1 }).success).toBe(false);
   });
 
-  it("REJECTS body.priceKgSuelto — priceKgSuelto is never hand-editable (A-02)", () => {
+  it("accepts a manual priceKgSuelto number (manual wins)", () => {
     const result = updateProductSchema.safeParse({ priceKgSuelto: 123 });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.priceKgSuelto).toBe(123);
+    }
+  });
+
+  it("accepts priceKgSuelto: null = back to automatic", () => {
+    const result = updateProductSchema.safeParse({ priceKgSuelto: null });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.priceKgSuelto).toBeNull();
+    }
+  });
+
+  it("accepts priceKgSuelto as numeric string via coerce (frontend sends numbers)", () => {
+    const result = updateProductSchema.safeParse({ priceKgSuelto: "2600" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.priceKgSuelto).toBe(2600);
+    }
+  });
+
+  it("rejects a negative priceKgSuelto", () => {
+    const result = updateProductSchema.safeParse({ priceKgSuelto: -1 });
     expect(result.success).toBe(false);
+  });
+
+  it("rejects priceKgSuelto with more than 2 decimals (multipleOf 0.01)", () => {
+    const result = updateProductSchema.safeParse({ priceKgSuelto: 1.234 });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts priceKgSuelto with exactly 2 decimals", () => {
+    const result = updateProductSchema.safeParse({ priceKgSuelto: 12.34 });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.priceKgSuelto).toBe(12.34);
+    }
+  });
+
+  it("omitting priceKgSuelto leaves nothing in the payload (absent = untouched)", () => {
+    const result = updateProductSchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.priceKgSuelto).toBeUndefined();
+    }
   });
 
   it("createProductSchema accepts optional weightKg/bulkFactor (no recompute on create — staleness rule)", () => {

@@ -53,6 +53,7 @@ interface RecomputeRow {
   weightKg: number | null;
   bulkFactor: number | null;
   priceKgSuelto?: number | null;
+  priceKgSueltoManual?: boolean;
 }
 
 /** Lee el factor org (PricingSetting) o el default si no hay fila. */
@@ -94,11 +95,13 @@ const writeRows = async (
 };
 
 /**
- * B-05a — Factor save (admin "Configuración de precios"): recomputa SOLO los
- * productos con bulkFactor IS NULL (los overrides por producto quedan
- * intactos). Corre dentro del mismo $transaction del upsert del factor.
- * Doble garantía: el selector pide bulkFactor IS NULL Y el loop saltea
- * defensivamente cualquier fila con override que llegara al set (B-05a).
+ * B-05a — Factor save (admin "Configuración de precios"): recomputes ONLY the
+ * products with bulkFactor IS NULL AND priceKgSueltoManual=false (both product
+ * overrides and hand-set per-kg prices stay intact). Runs inside the same
+ * $transaction as the factor upsert.
+ * Double guarantee: the selector filters both bulkFactor IS NULL and
+ * priceKgSueltoManual=false, and the loop defensively skips any row with an
+ * override or manual flag that somehow reaches the set (B-05a).
  *
  * `opts.preview` (dry-run de la pantalla A-01): resuelve el MISMO set pero NO
  * escribe — devuelve affected + una muestra before/after para el preview.
@@ -117,7 +120,7 @@ export const recomputeForFactorSave = async (
   opts?: { preview?: boolean; sampleSize?: number },
 ): Promise<{ affected: number; sample?: FactorSavePreviewRow[] }> => {
   const rows: Array<RecomputeRow & { name: string }> = await tx.product.findMany({
-    where: { organizationId: orgId, bulkFactor: null },
+    where: { organizationId: orgId, bulkFactor: null, priceKgSueltoManual: false },
     select: {
       id: true,
       name: true,
@@ -125,12 +128,15 @@ export const recomputeForFactorSave = async (
       weightKg: true,
       bulkFactor: true,
       priceKgSuelto: true,
+      priceKgSueltoManual: true,
     },
   });
-  // Defensive: nunca escribir una fila con override por producto en un factor
-  // save — aunque el selector ya lo excluye, esta red protege de futuros
-  // refactors del where.
-  const factorRows = rows.filter((r) => r.bulkFactor == null);
+  // Defensive: never write a row with a per-product override or a manual
+  // per-kg price during a factor save — even though the selector already
+  // excludes them, this net protects against future where refactors.
+  const factorRows = rows.filter(
+    (r) => r.bulkFactor == null && r.priceKgSueltoManual !== true,
+  );
 
   if (opts?.preview) {
     const sampleSize = opts.sampleSize ?? 10;
@@ -152,7 +158,9 @@ export const recomputeForFactorSave = async (
 
 /**
  * B-05b — Product PUT: recomputa UN producto con su factor efectivo
- * (override propio > org > default).
+ * (override propio > org > default). Respeta el flag priceKgSueltoManual:
+ * si el producto tiene un precio por kg fijado a mano, NO escribe nada y
+ * devuelve el valor almacenado (decisión: "manual gana").
  */
 export const recomputeForProduct = async (
   tx: any,
@@ -166,9 +174,16 @@ export const recomputeForProduct = async (
       weightKg: true,
       bulkFactor: true,
       organizationId: true,
+      priceKgSuelto: true,
+      priceKgSueltoManual: true,
     },
   });
   if (!product) return { affected: 0, priceKgSuelto: null };
+
+  // Manual override wins: skip the recompute and keep the stored value.
+  if (product.priceKgSueltoManual) {
+    return { affected: 0, priceKgSuelto: product.priceKgSuelto ?? null };
+  }
 
   const factor =
     typeof product.bulkFactor === "number" && product.bulkFactor > 0
@@ -193,6 +208,8 @@ export const recomputeForProduct = async (
  * bulk-price-update (productController) DESPUÉS de los writes de precio, sobre
  * el MISMO set resuelto (`where` de buildBulkPriceWhere). Recomputa con el
  * factor efectivo por fila (overrides respetados en la misma corrida).
+ * Excluye los productos con priceKgSueltoManual=true: un precio por kg fijado
+ * a mano nunca es recalculado (decisión: "manual gana").
  */
 export const recomputeForBulkPriceUpdate = async (
   tx: any,
@@ -200,8 +217,17 @@ export const recomputeForBulkPriceUpdate = async (
   orgId: string,
 ): Promise<{ affected: number }> => {
   const rows: RecomputeRow[] = await tx.product.findMany({
-    where: Object.assign({ organizationId: orgId }, where),
-    select: { id: true, price: true, weightKg: true, bulkFactor: true },
+    where: Object.assign(
+      { organizationId: orgId, priceKgSueltoManual: false },
+      where,
+    ),
+    select: {
+      id: true,
+      price: true,
+      weightKg: true,
+      bulkFactor: true,
+      priceKgSueltoManual: true,
+    },
   });
 
   const orgFactor = await readOrgBulkFactor(tx, orgId);
@@ -232,7 +258,9 @@ export const recomputeForBulkPriceUpdate = async (
 
 /**
  * B-05d — CSV import: corre fuera del ALS (callback de stream) → basePrisma +
- * organizationId explícito en TODA query (B-10).
+ * organizationId explícito en TODA query (B-10). Excluye los productos con
+ * priceKgSueltoManual=true: un precio por kg fijado a mano nunca es
+ * recalculado por la importación (decisión: "manual gana").
  */
 export const recomputeForCsvImport = async (
   client: any,
@@ -242,8 +270,18 @@ export const recomputeForCsvImport = async (
   if (productIds.length === 0) return { affected: 0 };
 
   const rows: RecomputeRow[] = await client.product.findMany({
-    where: { organizationId: orgId, id: { in: productIds } },
-    select: { id: true, price: true, weightKg: true, bulkFactor: true },
+    where: {
+      organizationId: orgId,
+      id: { in: productIds },
+      priceKgSueltoManual: false,
+    },
+    select: {
+      id: true,
+      price: true,
+      weightKg: true,
+      bulkFactor: true,
+      priceKgSueltoManual: true,
+    },
   });
 
   const orgFactor = await readOrgBulkFactor(client, orgId);

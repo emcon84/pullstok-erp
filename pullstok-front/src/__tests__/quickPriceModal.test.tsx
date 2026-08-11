@@ -27,6 +27,7 @@ const product = {
   _id: "p1",
   name: "Collar de Cuero",
   price: 1500,
+  priceKgSuelto: 1500,
   quantity: 5,
 };
 
@@ -47,20 +48,36 @@ describe("QuickPriceModal — edición rápida de precio", () => {
     updateProductMock.mockResolvedValue({ message: "ok" });
   });
 
-  it("muestra el nombre del producto y su precio actual", () => {
+  it("muestra el nombre del producto, su precio actual y el precio por kg prefilled", () => {
     renderModal({ open: true, onClose: vi.fn(), product });
 
     expect(screen.getByText("Collar de Cuero")).toBeInTheDocument();
     const input = screen.getByLabelText("Precio") as HTMLInputElement;
     expect(input.value).toBe("1500");
+    const kgInput = screen.getByLabelText("Precio por kg") as HTMLInputElement;
+    expect(kgInput.value).toBe("1500");
   });
 
-  it("solo envía _id y price al guardar", async () => {
+  it("prefill del precio por kg queda vacío cuando el producto no tiene priceKgSuelto", () => {
+    renderModal({
+      open: true,
+      onClose: vi.fn(),
+      product: { ...product, priceKgSuelto: 0 },
+    });
+
+    const kgInput = screen.getByLabelText("Precio por kg") as HTMLInputElement;
+    expect(kgInput.value).toBe("");
+  });
+
+  it("envía _id, price y priceKgSuelto null cuando el campo kg queda vacío", async () => {
     const onClose = vi.fn();
     renderModal({ open: true, onClose, product });
 
     fireEvent.change(screen.getByLabelText("Precio"), {
       target: { value: "1800" },
+    });
+    fireEvent.change(screen.getByLabelText("Precio por kg"), {
+      target: { value: "" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
 
@@ -68,7 +85,41 @@ describe("QuickPriceModal — edición rápida de precio", () => {
     const payload = updateProductMock.mock.calls[0][0];
     expect(payload._id).toBe("p1");
     expect(payload.price).toBe(1800);
+    expect(payload.priceKgSuelto).toBeNull();
     expect(payload.name).toBeUndefined();
+  });
+
+  it("envía el precio por kg como número cuando se setea (manual gana)", async () => {
+    const onClose = vi.fn();
+    renderModal({ open: true, onClose, product });
+
+    fireEvent.change(screen.getByLabelText("Precio"), {
+      target: { value: "1800" },
+    });
+    fireEvent.change(screen.getByLabelText("Precio por kg"), {
+      target: { value: "2600" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(updateProductMock).toHaveBeenCalledTimes(1));
+    const payload = updateProductMock.mock.calls[0][0];
+    expect(payload.priceKgSuelto).toBe(2600);
+    expect(payload.price).toBe(1800);
+  });
+
+  it("rechaza un precio por kg inválido sin llamar a la API", () => {
+    renderModal({ open: true, onClose: vi.fn(), product });
+
+    fireEvent.change(screen.getByLabelText("Precio"), {
+      target: { value: "1800" },
+    });
+    fireEvent.change(screen.getByLabelText("Precio por kg"), {
+      target: { value: "-5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(updateProductMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith("Ingresá un precio por kg válido");
   });
 
   it("guarda con Enter", async () => {
