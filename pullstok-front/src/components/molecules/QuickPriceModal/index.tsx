@@ -74,6 +74,7 @@ export const QuickPriceModal = ({ open, onClose, product }: QuickPriceModalProps
           <Label htmlFor="quick-price">Precio</Label>
           <Input
             id="quick-price"
+            aria-label="Precio"
             type="number"
             min={0}
             step="0.01"
