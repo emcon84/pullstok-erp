@@ -105,3 +105,53 @@ describe("authInterceptor — 403 OUTSIDE_BUSINESS_HOURS", () => {
     expect(mockClearSession).not.toHaveBeenCalled();
   });
 });
+
+describe("authInterceptor — 400 errores de validación por campo", () => {
+  it("reemplaza el message genérico por el detalle amigable del campo", async () => {
+    const err = makeError(400, {
+      message: "Datos inválidos",
+      errors: [{ campo: "weightKg", error: "El peso debe ser mayor a 0" }],
+    });
+
+    await expect(handler(err)).rejects.toBeDefined();
+
+    expect(err.response?.data.message).toBe(
+      "Peso (kg): El peso debe ser mayor a 0",
+    );
+  });
+
+  it("agrupa múltiples errores con etiquetas traducidas", async () => {
+    const err = makeError(400, {
+      message: "Datos inválidos",
+      errors: [
+        { campo: "price", error: "El precio no puede ser negativo" },
+        { campo: "quantity", error: "La cantidad no puede ser negativa" },
+      ],
+    });
+
+    await expect(handler(err)).rejects.toBeDefined();
+
+    expect(err.response?.data.message).toBe(
+      "Precio: El precio no puede ser negativo • Cantidad: La cantidad no puede ser negativa",
+    );
+  });
+
+  it("usa el nombre del campo como fallback si no tiene etiqueta", async () => {
+    const err = makeError(400, {
+      message: "Datos inválidos",
+      errors: [{ campo: "fooBar", error: "algo falló" }],
+    });
+
+    await expect(handler(err)).rejects.toBeDefined();
+
+    expect(err.response?.data.message).toBe("fooBar: algo falló");
+  });
+
+  it("no toca el message si el 400 no trae errors", async () => {
+    const err = makeError(400, { message: "otro error" });
+
+    await expect(handler(err)).rejects.toBeDefined();
+
+    expect(err.response?.data.message).toBe("otro error");
+  });
+});

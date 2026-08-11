@@ -15,12 +15,63 @@ const PLAN_LIMIT_RESOURCE_LABEL: Record<string, string> = {
   products: "productos",
 };
 
+/**
+ * Etiquetas amigables para los nombres de campo que devuelve el middleware
+ * `validate` del backend (400 "Datos inválidos"). Campos no listados usan el
+ * nombre crudo del schema como fallback.
+ */
+const FIELD_LABELS: Record<string, string> = {
+  name: "Nombre",
+  price: "Precio",
+  code: "Código",
+  barcode: "Código de barras",
+  description: "Descripción",
+  categoryId: "Categoría",
+  image: "Imagen",
+  quantity: "Cantidad",
+  publishedToStore: "Publicado en tienda",
+  variantOptionIds: "Variantes",
+  weightKg: "Peso (kg)",
+  bulkFactor: "Factor de bulto",
+  priceKgSuelto: "Precio por kg",
+  branchId: "Sucursal",
+  productId: "Producto",
+  email: "Email",
+  password: "Contraseña",
+};
+
+const formatFieldLabel = (campo: string): string =>
+  FIELD_LABELS[campo] ?? campo;
+
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status;
     const url: string = error?.config?.url ?? "";
     const data = error?.response?.data;
+
+    // 400 de validación: el middleware validate responde
+    // { message: "Datos inválidos", errors: [{campo, error}] }. Los services
+    // envuelven la respuesta en `Error(data.message)` y pierden el detalle;
+    // normalizamos acá para que el toast muestre el error real por campo.
+    if (
+      status === 400 &&
+      data &&
+      Array.isArray(data.errors) &&
+      data.errors.length > 0
+    ) {
+      const issues = data.errors.filter(
+        (e: unknown) =>
+          e &&
+          typeof (e as { campo?: unknown }).campo === "string" &&
+          typeof (e as { error?: unknown }).error === "string",
+      ) as Array<{ campo: string; error: string }>;
+      if (issues.length > 0) {
+        data.message = issues
+          .map((e) => `${formatFieldLabel(e.campo)}: ${e.error}`)
+          .join(" • ");
+      }
+    }
 
     // Un 401 en login/refresh = credenciales inválidas, NO rebotar.
     const isAuthCall =
