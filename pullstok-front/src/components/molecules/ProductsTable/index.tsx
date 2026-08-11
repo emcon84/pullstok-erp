@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Pencil,
   Trash2,
@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsRight,
+  BadgeDollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -50,13 +51,15 @@ interface ProductsTableProps {
   products: DataItem[];
   onEdit: (product: DataItem) => void;
   onDuplicate: (product: DataItem) => void;
+  onQuickPrice: (product: DataItem) => void;
   branchMode?: boolean;
 }
 
-export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: ProductsTableProps) => {
+export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, branchMode }: ProductsTableProps) => {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<"name" | "code" | "quantity" | "price">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const { deleteProduct, loading } = useDeleteProduct();
   const confirm = useConfirm();
 
@@ -115,6 +118,97 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
     });
     if (ok) deleteProduct(id);
   };
+
+  // Acceso rápido por teclado: ↑/↓ navegan los productos visibles y Enter (o
+  // Ctrl+Shift+P) abre el modal de edición rápida de precio del seleccionado.
+  // Mismo patrón de listener en fase capture que useVendorKeyboard, y lee las
+  // opciones desde un ref para no re-registrarse en cada render.
+  const keyboardOptionsRef = useRef({
+    sorted,
+    selectedIndex,
+    onQuickPrice,
+    isDialogOpen: () => document.querySelector('[role="dialog"]') !== null,
+  });
+  useEffect(() => {
+    keyboardOptionsRef.current = {
+      sorted,
+      selectedIndex,
+      onQuickPrice,
+      isDialogOpen: () => document.querySelector('[role="dialog"]') !== null,
+    };
+  }, [sorted, selectedIndex, onQuickPrice]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const o = keyboardOptionsRef.current;
+
+      // Si hay un dialog/modal abierto (confirm, drawer, quick price) el
+      // teclado no interfiere: el modal es el dueño.
+      if (o.isDialogOpen()) return;
+
+      const activeElement = document.activeElement;
+      const isTypingInInput =
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          (activeElement as HTMLElement).isContentEditable);
+
+      const isQuickPrice =
+        (e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "p" || e.key === "P");
+
+      if (isQuickPrice) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (o.sorted.length > 0) {
+          const idx = o.selectedIndex >= 0 ? o.selectedIndex : 0;
+          o.onQuickPrice(o.sorted[idx]);
+        }
+        return;
+      }
+
+      if (e.key === "ArrowDown" && o.sorted.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isTypingInInput) (document.activeElement as HTMLElement)?.blur();
+        setSelectedIndex((prev) =>
+          prev < 0 ? 0 : Math.min(o.sorted.length - 1, prev + 1),
+        );
+        return;
+      }
+
+      if (e.key === "ArrowUp" && o.sorted.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isTypingInInput) (document.activeElement as HTMLElement)?.blur();
+        setSelectedIndex((prev) => (prev <= 0 ? 0 : prev - 1));
+        return;
+      }
+
+      if (e.key === "Enter" && !isTypingInInput) {
+        if (o.selectedIndex >= 0 && o.selectedIndex < o.sorted.length) {
+          e.preventDefault();
+          e.stopPropagation();
+          o.onQuickPrice(o.sorted[o.selectedIndex]);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
+
+  // Al cambiar la lista (búsqueda/filtros) la selección se resetea y se
+  // asegura que la fila seleccionada quede visible en su página.
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [products]);
+
+  useEffect(() => {
+    if (selectedIndex < 0) return;
+    const targetPage = Math.floor(selectedIndex / PAGE_SIZE) + 1;
+    if (targetPage !== current) setPage(targetPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIndex]);
 
   return (
     <Card className="overflow-hidden p-0">
@@ -179,11 +273,15 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
             const id = p._id || p.id;
             const qty = branchQty(p);
             const src = imgSrc(p.image);
+            const isSelected = selectedIndex >= 0 && sorted[selectedIndex] === p;
 
             return (
               <TableRow
                 key={id}
-                className="relative cursor-pointer hover:bg-muted/50 sm:table-row [&>td]:!whitespace-normal [&>td]:min-w-0"
+                className={cn(
+                  "relative cursor-pointer hover:bg-muted/50 sm:table-row [&>td]:!whitespace-normal [&>td]:min-w-0",
+                  isSelected && "bg-primary/5",
+                )}
                 onClick={() => onEdit(p)}
               >
                 {/* Celda "producto". En mobile renderiza el card del diseño:
@@ -232,6 +330,15 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                           {qty <= 0 ? "Sin stock" : `${qty} ${stockUnitLabel(p)}`}
                         </Badge>
                         <div className="flex gap-0.5 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Actualizar precio rápido"
+                            onClick={(e) => { e.stopPropagation(); onQuickPrice(p); }}
+                          >
+                            <BadgeDollarSign className="h-3.5 w-3.5" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -297,6 +404,15 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                 </TableCell>
                 <TableCell className="hidden sm:table-cell sm:text-right">
                   <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      title="Actualizar precio rápido (Ctrl+Shift+P)"
+                      onClick={(e) => { e.stopPropagation(); onQuickPrice(p); }}
+                    >
+                      <BadgeDollarSign className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

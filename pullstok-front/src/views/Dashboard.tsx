@@ -14,6 +14,7 @@ import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { StatCard } from "../components/molecules/StatCard";
 import { ProductsTable } from "../components/molecules/ProductsTable";
 import { ProductDrawer } from "../components/molecules/ProductDrawer";
+import { QuickPriceModal } from "../components/molecules/QuickPriceModal";
 import { Statistics } from "./Statistics";
 import { useProducts } from "../components/hooks/useProducts";
 import { useStockSummary } from "../components/hooks/useStockSummary";
@@ -39,6 +40,7 @@ type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
 export const Dashboard = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerProduct, setDrawerProduct] = useState<DataItem | null>(null);
+  const [quickPriceProduct, setQuickPriceProduct] = useState<DataItem | null>(null);
   const [isModalSalesOpen, setIsModalSalesOpen] = useState(false);
   const [isModalUploadOpen, setIsModalUploadOpen] = useState(false);
   const [filter, setFilter] = useState("");
@@ -130,6 +132,8 @@ export const Dashboard = () => {
     });
     setDrawerOpen(true);
   };
+  const openQuickPrice = (data: DataItem) => setQuickPriceProduct(data);
+  const closeQuickPrice = () => setQuickPriceProduct(null);
   const closeDrawer = () => {
     setDrawerOpen(false);
     setDrawerProduct(null);
@@ -353,10 +357,13 @@ export const Dashboard = () => {
       />
 
       {/* Tabla de productos / stock */}
-      <ProductsTable products={filteredProducts} onEdit={openEditDrawer} onDuplicate={openDuplicateDrawer} branchMode={!!branchFilter} />
+      <ProductsTable products={filteredProducts} onEdit={openEditDrawer} onDuplicate={openDuplicateDrawer} onQuickPrice={openQuickPrice} branchMode={!!branchFilter} />
 
       {/* Product Drawer (create/edit) */}
       <ProductDrawer open={drawerOpen} onClose={closeDrawer} product={drawerProduct} />
+
+      {/* Quick price modal (solo precio, atajo Ctrl+Shift+P / Enter) */}
+      <QuickPriceModal open={!!quickPriceProduct} onClose={closeQuickPrice} product={quickPriceProduct} />
 
       <SalesDrawer
         isOpen={isModalSalesOpen}
