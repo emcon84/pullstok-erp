@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { imgSrc, branchQty } from "@/components/hooks/vendorCatalogHelpers";
+import { imgSrc, branchQty, stockUnitLabel } from "@/components/hooks/vendorCatalogHelpers";
 import type { DataItem } from "@/types";
 import type { VendorCartItem } from "@/components/hooks/useVendorCart";
 
@@ -110,7 +110,7 @@ export const ProductTable = memo(
                                 : "border-emerald-300 bg-emerald-50 text-emerald-700",
                             )}
                           >
-                            {stock <= 0 ? "Sin stock" : `${stock} u.`}
+                            {stock <= 0 ? "Sin stock" : `${stock} ${stockUnitLabel(p)}`}
                           </Badge>
                           <div className="flex gap-0.5 shrink-0 items-center">
                             <Button
@@ -180,7 +180,7 @@ export const ProductTable = memo(
                             : "border-emerald-300 bg-emerald-50 text-emerald-700",
                         )}
                       >
-                        {stock <= 0 ? "Sin stock" : `${stock} u.`}
+                        {stock <= 0 ? "Sin stock" : `${stock} ${stockUnitLabel(p)}`}
                       </Badge>
                       <Button
                         variant="ghost"

@@ -65,6 +65,11 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
       ? Number(p.stocks?.[0]?.quantity ?? 0)
       : Number(p.stocks?.[0]?.quantity ?? p.quantity);
 
+  // Mismo criterio que isLooseEligible (backend) y QuantityModal: si el
+  // producto se vende por peso (priceKgSuelto > 0), el stock se muestra en kg.
+  const stockUnitLabel = (p: DataItem) =>
+    Number(p.priceKgSuelto ?? 0) > 0 ? "kg" : "u.";
+
   const sorted = [...products].sort((a, b) => {
     const aQty = branchQty(a);
     const bQty = branchQty(b);
@@ -224,7 +229,7 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                                 : "border-emerald-300 bg-emerald-50 text-emerald-700",
                           )}
                         >
-                          {qty <= 0 ? "Sin stock" : `${qty} u.`}
+                          {qty <= 0 ? "Sin stock" : `${qty} ${stockUnitLabel(p)}`}
                         </Badge>
                         <div className="flex gap-0.5 shrink-0">
                           <Button
@@ -284,7 +289,7 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, branchMode }: Pro
                           : "border-emerald-300 bg-emerald-50 text-emerald-700",
                     )}
                   >
-                    {qty <= 0 ? "Sin stock" : `${qty} u.`}
+                    {qty <= 0 ? "Sin stock" : `${qty} ${stockUnitLabel(p)}`}
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden text-right font-medium tabular-nums sm:table-cell">

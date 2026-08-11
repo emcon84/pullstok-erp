@@ -10,6 +10,15 @@ export const imgSrc = (image?: string) => {
 export const branchQty = (p: DataItem) =>
   Number(p.stocks?.[0]?.quantity ?? 0);
 
+/**
+ * Unidad de stock para el badge: "kg" si el producto se vende por peso
+ * (priceKgSuelto > 0, derivado de price/weightKg/factor en el backend),
+ * "u." si se vende por unidad. Mismo criterio que isLooseEligible (backend)
+ * y QuantityModal (front).
+ */
+export const stockUnitLabel = (p: DataItem): string =>
+  Number(p.priceKgSuelto ?? 0) > 0 ? "kg" : "u.";
+
 // Clave de sessionStorage para restaurar el filtro del listado al volver del
 // scanner (la vista se desmonta al navegar a /scanner y el filtro es local).
 export const VENDOR_FILTER_KEY = "vendor-dashboard-filter";
