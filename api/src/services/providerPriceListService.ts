@@ -320,3 +320,183 @@ export function parseAlicanWet(text: string): ParsedPriceList {
 
   return { period: capturePeriod(text), rows };
 }
+
+// ── Matching (spec REQ-5/REQ-6, design §5) ─────────────────────────────────
+
+export type MatchState = "matched" | "unmatched" | "multi-match" | "duplicado" | "error";
+
+export interface MatchResult {
+  estado: MatchState;
+  productId?: string;
+  productIds?: string[];
+  matchName?: string | null;
+}
+
+export interface PreviewRow {
+  position: number; // idTemporal para el apply (determinista entre preview y apply)
+  nombre: string; // nombre ORIGINAL del PDF
+  unidadEmpaque: string | null;
+  marca: string | null;
+  linea: string | null;
+  sublinea: string | null;
+  precioSinIva: number | null;
+  precioConIva: number | null;
+  sugerido: number | null; // round2(conIva × 1.3334); fallback 1.21; null si nada
+  estado: MatchState;
+  productId: string | null;
+  productIds?: string[];
+  matchName?: string | null; // nombre del producto en catálogo (UX)
+}
+
+/**
+ * Índice del catálogo de UNA org, claveado por nombre/código normalizados →
+ * ids (multi-match = duplicados del catálogo). DEVIATION del design §5: no se
+ * indexa por marca (byBrand): con matcheo por igualdad EXACTA post-normalización
+ * (decisión cerrada #5) una fila jamás equivale al nombre de una marca, e
+ * indexar marcas generaría multi-match spam. El scope org se aplica en el
+ * findMany (where.organizationId) → lo que no está en la org no matchea.
+ */
+export interface CatalogIndex {
+  byName: Map<string, string[]>;
+  byCode: Map<string, string[]>;
+  names: Map<string, string>; // productId → nombre en catálogo (matchName UX)
+}
+
+type DbLike = {
+  product: {
+    findMany: (args: {
+      where: { organizationId: string };
+      select: {
+        id: true;
+        name: true;
+        code: true;
+        variantAssignments: {
+          select: {
+            option: { select: { value: true; variant: { select: { name: true } } } };
+          };
+        };
+      };
+    }) => Promise<
+      {
+        id: string;
+        name: string;
+        code: string | null;
+        variantAssignments: {
+          option: { value: string; variant: { name: string } };
+        }[];
+      }[]
+    >;
+  };
+};
+
+export async function buildCatalogIndex(
+  db: DbLike,
+  organizationId: string,
+): Promise<CatalogIndex> {
+  const products = await db.product.findMany({
+    where: { organizationId },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      variantAssignments: {
+        select: {
+          option: { select: { value: true, variant: { select: { name: true } } } },
+        },
+      },
+    },
+  });
+
+  const byName = new Map<string, string[]>();
+  const byCode = new Map<string, string[]>();
+  const names = new Map<string, string>();
+  const add = (map: Map<string, string[]>, key: string, id: string) => {
+    if (!key) return;
+    const arr = map.get(key);
+    if (arr) arr.push(id);
+    else map.set(key, [id]);
+  };
+
+  for (const p of products) {
+    names.set(p.id, p.name);
+    add(byName, normalizeName(p.name), p.id);
+    if (p.code) add(byCode, normalizeName(p.code), p.id);
+  }
+  return { byName, byCode, names };
+}
+
+function resultFor(ids: string[], index: CatalogIndex): MatchResult {
+  if (ids.length === 1) {
+    return {
+      estado: "matched",
+      productId: ids[0],
+      productIds: ids,
+      matchName: index.names.get(ids[0]) ?? null,
+    };
+  }
+  return {
+    estado: "multi-match",
+    productId: ids[0], // default = primer id
+    productIds: ids,
+    matchName: index.names.get(ids[0]) ?? null,
+  };
+}
+
+/** Match por igualdad EXACTA post-normalización; fallback por código. */
+export function matchByName(
+  nombreNormalizado: string,
+  index: CatalogIndex,
+): MatchResult {
+  const ids = index.byName.get(nombreNormalizado);
+  if (ids && ids.length > 0) return resultFor(ids, index);
+  const codeIds = index.byCode.get(nombreNormalizado);
+  if (codeIds && codeIds.length > 0) return resultFor(codeIds, index);
+  return { estado: "unmatched" };
+}
+
+/**
+ * Convierte filas parseadas en filas de preview. Reglas (REQ-5/REQ-6):
+ * - Sin precios → estado error (no importable hasta omitir/asignar).
+ * - 1 id → matched; 0 → unmatched; 2+ → multi-match (default primer id).
+ * - Mismo nombre normalizado en 2+ filas del PDF → TODAS quedan duplicado
+ *   (el apply valida a lo sumo UNA importación por grupo).
+ * - Prioridad: error > duplicado > multi-match > matched > unmatched.
+ * - El nombre ORIGINAL del PDF se conserva siempre.
+ */
+export function matchRows(rows: ParsedRow[], index: CatalogIndex): PreviewRow[] {
+  const previews: PreviewRow[] = rows.map((row, position) => {
+    const isError = row.precioSinIva === null && row.precioConIva === null;
+    const m = isError
+      ? { estado: "error" as MatchState }
+      : matchByName(normalizeName(row.nombre), index);
+    return {
+      position,
+      nombre: row.nombre,
+      unidadEmpaque: row.unidadEmpaque,
+      marca: row.marca,
+      linea: row.linea,
+      sublinea: row.sublinea,
+      precioSinIva: row.precioSinIva,
+      precioConIva: row.precioConIva,
+      sugerido: computeSuggestedPrice(row.precioConIva, row.precioSinIva),
+      estado: m.estado,
+      productId: m.productId ?? null,
+      productIds: m.productIds,
+      matchName: m.matchName ?? null,
+    };
+  });
+
+  // Grupos de duplicados del PDF (por nombre normalizado).
+  const counts = new Map<string, number>();
+  for (const p of previews) {
+    const key = normalizeName(p.nombre);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  for (const p of previews) {
+    if (p.estado === "error") continue; // error > duplicado
+    const key = normalizeName(p.nombre);
+    if ((counts.get(key) ?? 0) > 1) p.estado = "duplicado";
+  }
+
+  return previews;
+}
