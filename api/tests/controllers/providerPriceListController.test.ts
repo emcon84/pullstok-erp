@@ -9,6 +9,11 @@ import {
 } from "../../src/controllers/providerPriceListController";
 import { prisma } from "../../src/config/db";
 
+const tenantState = () =>
+  (jest.requireMock("../../src/config/tenantContext") as {
+    __state: { userId?: string; role?: string; organizationId?: string };
+  }).__state;
+
 jest.mock("../../src/config/db", () => ({
   prisma: {
     product: { findMany: jest.fn(), updateMany: jest.fn() },
@@ -17,13 +22,40 @@ jest.mock("../../src/config/db", () => ({
   basePrisma: {},
 }));
 
-jest.mock("../../src/config/tenantContext", () => ({
-  requireOrganizationId: jest.fn().mockReturnValue("org-1"),
-}));
+jest.mock("../../src/config/tenantContext", () => {
+  // Simula el ALS real (fix round 2, finding C): el contexto vive en `state`;
+  // requireOrganizationId lo lee (lanza si falta) y runWithTenant lo re-establece.
+  const state: { userId?: string; role?: string; organizationId?: string } = {
+    userId: "user-1",
+    role: "ADMIN",
+    organizationId: "org-1",
+  };
+  return {
+    __state: state,
+    requireOrganizationId: jest.fn(() => {
+      if (!state.organizationId) {
+        throw new Error("No hay contexto de organización (tenant) en este request");
+      }
+      return state.organizationId;
+    }),
+    runWithTenant: jest.fn((ctx: any, fn: () => unknown) => {
+      Object.assign(state, ctx);
+      return fn();
+    }),
+  };
+});
 
-jest.mock("pdf-parse", () => ({
-  PDFParse: jest.fn(),
-}));
+jest.mock("pdf-parse", () => {
+  // Espejo de la real: el controller hace `instanceof InvalidPDFException`
+  // (fix round 2, finding D: PDF falso → 400, no 500).
+  class InvalidPDFException extends Error {
+    constructor(message?: string) {
+      super(message ?? "Invalid PDF");
+      this.name = "InvalidPDFException";
+    }
+  }
+  return { PDFParse: jest.fn(), InvalidPDFException };
+});
 
 const mockedPrisma = prisma as unknown as {
   product: { findMany: jest.Mock; updateMany: jest.Mock };
@@ -170,6 +202,40 @@ describe("importPriceList — preview (dryRun default true)", () => {
     expect(body.layout).toBe("WET");
     expect(body.total).toBe(2);
     expect(body.rows[0].precioConIva).toBe(2571.7);
+  });
+
+  it("returns 400 when the uploaded file is not a real PDF (InvalidPDFException)", async () => {
+    const { InvalidPDFException } = jest.requireMock("pdf-parse") as {
+      InvalidPDFException: new (msg?: string) => Error;
+    };
+    (PDFParse as unknown as jest.Mock).mockImplementation(() => ({
+      getText: jest.fn().mockRejectedValue(new InvalidPDFException("Corrupt PDF")),
+    }));
+    const res = fakeRes();
+    await importPriceList(fakeReq({ query: { dryRun: "true" } }), res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect((res.json as jest.Mock).mock.calls[0][0].message).toBe(
+      "Formato de planilla no reconocido",
+    );
+  });
+
+  it("re-establishes the tenant context from req.user when multer loses the ALS context", async () => {
+    // Pérdida INTERMITENTE de contexto ALS por multer/busboy (finding C):
+    // requireOrganizationId() lanzaría. req.user se setea ANTES de multer →
+    // el controller re-establece el contexto desde ahí.
+    delete tenantState().organizationId;
+
+    const res = fakeRes();
+    await importPriceList(
+      fakeReq({
+        query: { dryRun: "true" },
+        user: { id: "user-1", role: "ADMIN", organizationId: "org-1" },
+      }),
+      res,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(tenantState().organizationId).toBe("org-1");
   });
 });
 

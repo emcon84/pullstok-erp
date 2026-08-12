@@ -16,8 +16,9 @@
 
 import fs from "fs";
 import { Request, Response } from "express";
-import { PDFParse } from "pdf-parse";
-import { requireOrganizationId } from "../config/tenantContext";
+import { InvalidPDFException, PDFParse } from "pdf-parse";
+import { runWithTenant, requireOrganizationId } from "../config/tenantContext";
+import type { AuthedRequest } from "../middlewares/authMiddleware";
 import { prisma } from "../config/db";
 import { round2 } from "../utils/money";
 import {
@@ -125,6 +126,25 @@ export async function buildPreview(
 }
 
 export const importPriceList = async (req: Request, res: Response) => {
+  // Fix round 2 (verify obs #213 finding C): multer (busboy) puede PERDER el
+  // contexto ALS de authenticateJWT durante el parseo multipart — los
+  // callbacks del stream del request corren fuera del scope de runWithTenant
+  // (fallo INTERMITENTE, race entre completar el archivo y el 'end' del
+  // request). req.user se setea ANTES de multer, así que re-establecemos el
+  // contexto de tenant desde ahí para que requireOrganizationId() y la
+  // extensión anti-fuga de Prisma funcionen aunque el ALS se haya perdido.
+  const user = (req as AuthedRequest).user;
+  if (user?.organizationId) {
+    return runWithTenant(
+      { userId: user.id, role: user.role, organizationId: user.organizationId },
+      () => importPriceListCore(req, res),
+    );
+  }
+  return importPriceListCore(req, res);
+};
+
+/** Cuerpo del preview (envuelto en el contexto restaurado por importPriceList). */
+async function importPriceListCore(req: Request, res: Response) {
   let filePath: string | null = null;
   try {
     if (!req.file) {
@@ -168,6 +188,16 @@ export const importPriceList = async (req: Request, res: Response) => {
       await fs.promises.unlink(filePath).catch(() => undefined);
     }
     if (error instanceof LayoutNotSupportedError) {
+      return res.status(400).json({ message: "Formato de planilla no reconocido" });
+    }
+    // Archivo no-PDF / PDF corrupto: pdf-parse lanza InvalidPDFException (y
+    // FormatError/PasswordException en variantes). Mismo semántica 400 que el
+    // layout no reconocido (spec REQ-1 "fallo explícito, nunca silencioso").
+    const isPdfParseError =
+      error instanceof InvalidPDFException ||
+      (typeof error?.name === "string" &&
+        /^(InvalidPDFException|FormatError|PasswordException)$/.test(error.name));
+    if (isPdfParseError) {
       return res.status(400).json({ message: "Formato de planilla no reconocido" });
     }
     console.error("Error importando planilla:", error);
@@ -401,9 +431,11 @@ export const getPriceList = async (req: Request, res: Response) => {
           productId: e.productId,
           name: e.name,
           unit: e.unit,
-          priceSinIva: e.priceSinIva,
-          priceConIva: e.priceConIva,
-          suggestedPrice: e.suggestedPrice,
+          // Prisma Decimal se serializaría a STRING en JSON; el contrato
+          // (design §6.3) y los tipos del front exigen number. Convertir acá.
+          priceSinIva: e.priceSinIva === null ? null : Number(e.priceSinIva),
+          priceConIva: e.priceConIva === null ? null : Number(e.priceConIva),
+          suggestedPrice: e.suggestedPrice === null ? null : Number(e.suggestedPrice),
           matched: e.matched,
           position: e.position,
         })),

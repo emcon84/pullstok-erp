@@ -127,6 +127,52 @@ describe("getPriceList — jerarquía ordenada con 404 cross-org", () => {
     expect(body.sections[0].entries[0].suggestedPrice).toBe(14190.04);
   });
 
+  it("serializes Prisma Decimal fields as numbers in the response (e2e round 2 finding)", async () => {
+    // Prisma Decimal → JSON.stringify lo vuelve STRING ("10642"); el contrato
+    // del design §6.3 exige number. Este fake imita a Decimal (toString numérico).
+    const dec = (value: number) => ({ toString: () => String(value) });
+    mockedPrisma.priceList.findFirst.mockResolvedValue({
+      id: "pl-1",
+      provider: "ALICAN",
+      type: "SECO",
+      period: "2026-08-10",
+      sourceFilename: "a.pdf",
+      importedAt: new Date("2026-08-10T10:00:00Z"),
+      sections: [
+        {
+          id: "sec-1",
+          brand: "SIEGER",
+          line: null,
+          subline: null,
+          position: 0,
+          entries: [
+            {
+              id: "ent-1",
+              productId: "p1",
+              name: "SIEGER Puppy Mini x 1 Kg.",
+              unit: "1 Kg.",
+              priceSinIva: dec(8795),
+              priceConIva: dec(10642),
+              suggestedPrice: dec(14190.04),
+              matched: true,
+              position: 0,
+            },
+          ],
+        },
+      ],
+    });
+    const res = fakeRes();
+    await getPriceList(fakeReq({ params: { id: "pl-1" } }), res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const entry = (res.json as jest.Mock).mock.calls[0][0].sections[0].entries[0];
+    expect(entry.priceSinIva).toBe(8795);
+    expect(entry.priceConIva).toBe(10642);
+    expect(entry.suggestedPrice).toBe(14190.04);
+    // Y el JSON final NO debe contener strings para los precios.
+    expect(JSON.parse(JSON.stringify(entry)).suggestedPrice).toBe(14190.04);
+  });
+
   it("returns 404 for a plan of another org or inexistent (findFirst with orgId)", async () => {
     mockedPrisma.priceList.findFirst.mockResolvedValue(null);
     const res = fakeRes();
