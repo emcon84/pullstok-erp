@@ -123,13 +123,16 @@ echo "✅ Migraciones aplicadas"
 # 7) REINICIAR SERVICIO (systemd)
 # ---------------------------------------------------------------------------
 step "[7/9] Reiniciando servicio systemd ($SERVICE_NAME)..."
-if sudo -n systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-    sudo -n systemctl restart "$SERVICE_NAME"
+# NO usar `systemctl is-active --quiet` como guard: sudo-rs matchea la línea
+# completa contra /etc/sudoers.d/ y el flag --quiet NO está en la regla
+# (`/usr/bin/systemctl is-active pullstok-api`) → el chequeo daba falso →
+# se caía al `start` (no-op si el servicio ya corre) → deploy "verde" con
+# bundle viejo en RAM. `restart` funciona para servicio activo o detenido.
+if sudo -n systemctl restart "$SERVICE_NAME"; then
+    echo "✅ Servicio $SERVICE_NAME reiniciado"
 else
-    warn "El servicio $SERVICE_NAME no está activo; intentando arrancarlo..."
-    sudo -n systemctl start "$SERVICE_NAME" || warn "No se pudo iniciar $SERVICE_NAME: revisar con systemctl status $SERVICE_NAME"
+    warn "No se pudo reiniciar $SERVICE_NAME (¿sudoers permite 'systemctl restart $SERVICE_NAME'?). Revisar con systemctl status $SERVICE_NAME"
 fi
-echo "✅ Servicio $SERVICE_NAME reiniciado"
 
 # ---------------------------------------------------------------------------
 # 8) RECARGAR NGINX
