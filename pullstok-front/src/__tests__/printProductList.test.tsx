@@ -49,6 +49,58 @@ describe("PrintProductList — listado de productos imprimible", () => {
     expect(screen.queryByText("5 u.")).not.toBeInTheDocument();
   });
 
+  it("divide la planilla por títulos por marca", () => {
+    const products = [
+      product({
+        name: "Proplan Adultos",
+        variantAssignments: [
+          { option: { value: "Proplan", variant: { name: "Marca" } } },
+        ],
+      }),
+      product({
+        name: "Purina Pro Plan",
+        variantAssignments: [
+          { option: { value: "Purina", variant: { name: "Marca" } } },
+        ],
+      }),
+      product({
+        name: "Kongo Snacks",
+        variantAssignments: [
+          { option: { value: "Kongo", variant: { name: "Marca" } } },
+        ],
+      }),
+    ];
+
+    render(<PrintProductList products={products} />);
+
+    const titles = screen
+      .getAllByRole("heading", { level: 2, hidden: true })
+      .map((h) => h.textContent);
+    expect(titles).toEqual(["Kongo", "Proplan", "Purina"]);
+    expect(screen.getByText("Purina Pro Plan")).toBeInTheDocument();
+    expect(screen.getByText("Proplan Adultos")).toBeInTheDocument();
+    expect(screen.getByText("Kongo Snacks")).toBeInTheDocument();
+  });
+
+  it("agrupa los productos sin marca bajo 'Sin marca'", () => {
+    const products = [
+      product({ name: "Collar Suelto" }),
+      product({
+        name: "Purina Pro",
+        variantAssignments: [
+          { option: { value: "Purina", variant: { name: "Marca" } } },
+        ],
+      }),
+    ];
+
+    render(<PrintProductList products={products} />);
+
+    const titles = screen
+      .getAllByRole("heading", { level: 2, hidden: true })
+      .map((h) => h.textContent);
+    expect(titles).toEqual(["Purina", "Sin marca"]);
+  });
+
   it("muestra la línea con el conteo de productos", () => {
     render(<PrintProductList products={[product(), product()]} />);
 

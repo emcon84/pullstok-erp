@@ -30,18 +30,52 @@ describe("PrintBulkPriceList — listado imprimible de precios actualizados", ()
     }
   });
 
-  it("muestra SOLO nombre y precio nuevo", () => {
+  it("muestra SOLO nombre y precio nuevo (con título de marca)", () => {
     const r = row({ name: "Purina Pro Plan", newPrice: 15500.5, oldPrice: 15000, categoryName: "Alimentos", brandValues: ["Purina"] });
 
     render(<PrintBulkPriceList rows={[r]} />);
 
     expect(screen.getByText("Purina Pro Plan")).toBeInTheDocument();
     expect(screen.getByText("$ 15.500,5")).toBeInTheDocument();
-    // Nada más: sin categoría, marca, % ni precio viejo
+    // La marca aparece SOLO como título de grupo (es lo pedido).
+    expect(screen.getByText("Purina")).toBeInTheDocument();
+    // Nada más: sin categoría, % ni precio viejo
     expect(screen.queryByText("Alimentos")).not.toBeInTheDocument();
-    expect(screen.queryByText("Purina")).not.toBeInTheDocument();
     expect(screen.queryByText("$ 15.000")).not.toBeInTheDocument();
     expect(screen.queryByText("10%")).not.toBeInTheDocument();
+  });
+
+  it("divide la planilla por títulos por marca", () => {
+    const rows = [
+      row({ name: "Proplan Adultos", brandValues: ["Proplan"], newPrice: 200 }),
+      row({ name: "Purina Pro Plan", brandValues: ["Purina"], newPrice: 100 }),
+      row({ name: "Kongo Snacks", brandValues: ["Kongo"], newPrice: 50 }),
+    ];
+
+    render(<PrintBulkPriceList rows={rows} />);
+
+    // Títulos por marca en orden alfabético
+    const titles = screen
+      .getAllByRole("heading", { level: 2, hidden: true })
+      .map((h) => h.textContent);
+    expect(titles).toEqual(["Kongo", "Proplan", "Purina"]);
+    expect(screen.getByText("Purina Pro Plan")).toBeInTheDocument();
+    expect(screen.getByText("Proplan Adultos")).toBeInTheDocument();
+    expect(screen.getByText("Kongo Snacks")).toBeInTheDocument();
+  });
+
+  it("agrupa los productos sin marca bajo 'Sin marca'", () => {
+    const rows = [
+      row({ name: "Producto Suelto", brandValues: [] }),
+      row({ name: "Purina Pro", brandValues: ["Purina"] }),
+    ];
+
+    render(<PrintBulkPriceList rows={rows} />);
+
+    const titles = screen
+      .getAllByRole("heading", { level: 2, hidden: true })
+      .map((h) => h.textContent);
+    expect(titles).toEqual(["Purina", "Sin marca"]);
   });
 
   it("muestra la línea con el conteo de productos", () => {
