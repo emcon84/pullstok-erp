@@ -17,6 +17,7 @@ jest.mock('../../src/config/db', () => ({
     },
     productVariant: {
       createMany: jest.fn(),
+      deleteMany: jest.fn(),
     },
     branch: {
       findFirst: jest.fn(),
@@ -44,13 +45,15 @@ const mockedPrisma = prisma as unknown as {
   category: { findFirst: jest.Mock };
   product: { create: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
   categoryVariantOption: { findMany: jest.Mock };
-  productVariant: { createMany: jest.Mock };
+  productVariant: { createMany: jest.Mock; deleteMany: jest.Mock };
   branch: { findFirst: jest.Mock };
   productStock: { findFirst: jest.Mock; updateMany: jest.Mock; create: jest.Mock };
   $transaction: jest.Mock;
 };
 
 const mockRequest = (body: any) => ({ body } as Request);
+const mockParamsRequest = (body: any, id: string) =>
+  ({ body, params: { id } } as unknown as Request);
 const mockResponse = () => {
   const res = {} as Response;
   res.status = jest.fn().mockReturnValue(res);
@@ -115,5 +118,58 @@ describe('productController.createProduct', () => {
     expect(mockedPrisma.product.create).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ message: 'La categoría indicada no existe' });
+  });
+});
+
+describe('productController.updateProduct', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('rechaza con 400 si al cambiar la categoría las variantes no pertenecen a la nueva categoría (sin borrar nada)', async () => {
+    mockedPrisma.product.findFirst.mockResolvedValue({ categoryId: 'cat-vieja' });
+    // Solo una de las dos opciones pertenece a la nueva categoría → mismatch.
+    mockedPrisma.categoryVariantOption.findMany.mockResolvedValue([{ id: 'opt-1' }]);
+
+    const req = mockParamsRequest(
+      { name: 'Martillo', categoryId: 'cat-nueva', variantOptionIds: ['opt-1', 'opt-foraneo'] },
+      'prod-1',
+    );
+    const res = mockResponse();
+
+    await productController.updateProduct(req, res);
+
+    expect(mockedPrisma.categoryVariantOption.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['opt-1', 'opt-foraneo'] }, variant: { categoryId: 'cat-nueva' } },
+    });
+    expect(mockedPrisma.productVariant.deleteMany).not.toHaveBeenCalled();
+    expect(mockedPrisma.product.updateMany).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Algunas opciones de variante no pertenecen a esta categoría',
+    });
+  });
+
+  it('acepta un cambio de categoría con variantOptionIds vacío (limpia las asignaciones, 200)', async () => {
+    mockedPrisma.product.findFirst
+      .mockResolvedValueOnce({ categoryId: 'cat-vieja' })
+      .mockResolvedValueOnce({ id: 'prod-1', name: 'Martillo', categoryId: 'cat-nueva' });
+    mockedPrisma.product.updateMany.mockResolvedValue({ count: 1 });
+
+    const req = mockParamsRequest(
+      { name: 'Martillo', categoryId: 'cat-nueva', variantOptionIds: [] },
+      'prod-1',
+    );
+    const res = mockResponse();
+
+    await productController.updateProduct(req, res);
+
+    // Se borran las asignaciones viejas (cambio de categoría) y no se insertan nuevas.
+    expect(mockedPrisma.productVariant.deleteMany).toHaveBeenCalledWith({
+      where: { productId: 'prod-1' },
+    });
+    expect(mockedPrisma.productVariant.createMany).not.toHaveBeenCalled();
+    expect(mockedPrisma.categoryVariantOption.findMany).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });

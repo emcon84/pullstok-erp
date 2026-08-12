@@ -16,7 +16,15 @@ vi.mock("@/components/hooks/useProductStock", () => ({
 }));
 
 vi.mock("@/components/molecules/CategoryTreePicker", () => ({
-  CategoryTreePicker: () => <div data-testid="category-picker" />,
+  CategoryTreePicker: ({ onChange }: { onChange?: (value: string) => void }) => (
+    <select
+      data-testid="category-picker"
+      onChange={(e) => onChange?.(e.target.value)}
+    >
+      <option value="">—</option>
+      <option value="cat-2">Cat 2</option>
+    </select>
+  ),
 }));
 
 vi.mock("@/services/onboardingService", () => ({
@@ -24,7 +32,7 @@ vi.mock("@/services/onboardingService", () => ({
 }));
 
 vi.mock("react-toastify", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }));
 
 vi.mock("@/services/productService", () => ({
@@ -35,11 +43,15 @@ import { ProductDrawer } from "@/components/molecules/ProductDrawer";
 import { useProductStock } from "@/components/hooks/useProductStock";
 import { useCreateProduct } from "@/components/hooks/useProducts";
 import { updateProduct } from "@/services/productService";
+import { getCategoryVariants } from "@/services/onboardingService";
+import { toast } from "react-toastify";
 import type { BranchStockInfo } from "@/services/productService";
 
 const mockUseProductStock = vi.mocked(useProductStock);
 const mockUseCreateProduct = vi.mocked(useCreateProduct);
 const updateProductMock = vi.mocked(updateProduct);
+const getCategoryVariantsMock = vi.mocked(getCategoryVariants);
+const toastWarnMock = vi.mocked(toast.warn);
 const mockUpdateBranchStock = vi.fn();
 
 const editProduct = {
@@ -339,5 +351,137 @@ describe("ProductDrawer — loose-sale fields (weightKg, bulkFactor, priceKgSuel
     const payload = updateProductMock.mock.calls[0][0];
     expect(payload.weightKg).toBe(7.5);
     expect(payload.bulkFactor).toBeNull(); // empty → null (org default)
+  });
+});
+
+// ── Variant option filtering against the selected category (product data-consistency) ──
+
+describe("ProductDrawer — variant options filtered against the selected category", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    setLoggedUser("ADMIN");
+    mockUseProductStock.mockReturnValue({
+      stock: stock([hq()]),
+      loading: false,
+      error: null,
+      updateBranchStock: mockUpdateBranchStock,
+      updating: false,
+    });
+    mockUseCreateProduct.mockReturnValue({
+      createProduct: vi.fn(),
+      loading: false,
+      error: null,
+      success: false,
+    });
+  });
+
+  it("drops duplicate-prefill assignments that are not in the loaded category defs (toast fires)", async () => {
+    const createProductMock = vi.fn().mockResolvedValue({ id: "p9" });
+    mockUseCreateProduct.mockReturnValue({
+      createProduct: createProductMock,
+      loading: false,
+      error: null,
+      success: false,
+    });
+    getCategoryVariantsMock.mockResolvedValue([
+      {
+        id: "def-color",
+        categoryId: "cat-1",
+        name: "Color",
+        sortOrder: 0,
+        organizationId: "org-1",
+        options: [
+          { id: "opt-keep", variantId: "def-color", value: "Rojo", sortOrder: 0, organizationId: "org-1" },
+        ],
+      },
+    ]);
+    renderDrawer({
+      open: true,
+      onClose: vi.fn(),
+      // Duplicate mode: no _id/id → isEdit false → create flow.
+      product: {
+        name: "Collar de Cuero",
+        price: 1500,
+        quantity: 5,
+        categoryId: "cat-1",
+        variantAssignments: [
+          { option: { id: "opt-keep", variantId: "def-color", value: "Rojo" } },
+          { option: { id: "opt-stale", variantId: "def-size", value: "XL" } },
+        ],
+      },
+    });
+
+    // The defs load resolves asynchronously; wait for the stale option to be
+    // dropped (toast fires) before submitting so the payload reflects the filter.
+    await waitFor(() =>
+      expect(toastWarnMock).toHaveBeenCalledWith(
+        "Se quitaron opciones de variante que no pertenecen a la categoría seleccionada",
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Crear producto" }));
+
+    await waitFor(() => expect(createProductMock).toHaveBeenCalled());
+    const payload = createProductMock.mock.calls[0][0];
+    expect(payload.variantOptionIds).toEqual(["opt-keep"]);
+  });
+
+  it("changing the category in edit mode drops the old selections from the payload", async () => {
+    updateProductMock.mockResolvedValue({ message: "ok" });
+    getCategoryVariantsMock
+      .mockResolvedValueOnce([
+        {
+          id: "def-color",
+          categoryId: "cat-1",
+          name: "Color",
+          sortOrder: 0,
+          organizationId: "org-1",
+          options: [
+            { id: "opt-a", variantId: "def-color", value: "Rojo", sortOrder: 0, organizationId: "org-1" },
+          ],
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "def-talle",
+          categoryId: "cat-2",
+          name: "Talle",
+          sortOrder: 0,
+          organizationId: "org-1",
+          options: [
+            { id: "opt-talle-m", variantId: "def-talle", value: "M", sortOrder: 0, organizationId: "org-1" },
+          ],
+        },
+      ]);
+    renderDrawer({
+      open: true,
+      onClose: vi.fn(),
+      product: {
+        ...editProduct,
+        categoryId: "cat-1",
+        variantAssignments: [
+          { option: { id: "opt-a", variantId: "def-color", value: "Rojo" } },
+        ],
+      },
+    });
+
+    fireEvent.change(screen.getByTestId("category-picker"), {
+      target: { value: "cat-2" },
+    });
+    // Wait for the cat-2 defs load to filter out the old selections before submitting.
+    await waitFor(() =>
+      expect(toastWarnMock).toHaveBeenCalledWith(
+        "Se quitaron opciones de variante que no pertenecen a la categoría seleccionada",
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar" }));
+
+    await waitFor(() => expect(updateProductMock).toHaveBeenCalled());
+    const payload = updateProductMock.mock.calls[0][0];
+    expect(payload.categoryId).toBe("cat-2");
+    expect(payload.variantOptionIds).toEqual([]);
+    expect(toastWarnMock).toHaveBeenCalledWith(
+      "Se quitaron opciones de variante que no pertenecen a la categoría seleccionada",
+    );
   });
 });

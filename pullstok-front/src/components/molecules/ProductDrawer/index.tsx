@@ -128,7 +128,42 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
     }
   };
 
-  // Reset form on open/product change
+  // Load variants when the category changes, keeping only the selections whose
+  // options still belong to the category. Stale options (left behind by a
+  // category change in edit mode, or by duplicating a product that ended up
+  // with options from another category) are dropped instead of being sent to
+  // the backend, which would reject them with a 400.
+  useEffect(() => {
+    if (categoryId) {
+      getCategoryVariants(categoryId)
+        .then((defs) => {
+          setVariants(defs);
+          const validOptionIds = new Set(
+            defs.flatMap((def) => def.options.map((opt) => opt.id)),
+          );
+          const next: Record<string, string> = {};
+          let dropped = false;
+          for (const [defId, optionId] of Object.entries(variantSelections)) {
+            if (optionId && validOptionIds.has(optionId)) next[defId] = optionId;
+            else dropped = true;
+          }
+          if (dropped) {
+            toast.warn(
+              "Se quitaron opciones de variante que no pertenecen a la categoría seleccionada",
+            );
+          }
+          setVariantSelections(next);
+        })
+        .catch(() => setVariants([]));
+    } else {
+      setVariants([]);
+      setVariantSelections({});
+    }
+  }, [categoryId, isEdit, product?.variantAssignments]);
+
+  // Reset form on open/product change. Runs AFTER the defs-loading effect so
+  // the prefill set here is not clobbered by the categoryId="" branch on the
+  // first open; the load effect then filters the prefill against the defs.
   useEffect(() => {
     if (open) {
       if (product) {
@@ -169,22 +204,6 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
       }
     }
   }, [open, product, isEdit]);
-
-  // Load variants when category changes
-  useEffect(() => {
-    if (categoryId) {
-      getCategoryVariants(categoryId)
-        .then((defs) => {
-          setVariants(defs);
-          // Only clear selections for fresh create (no product data at all)
-          if (!isEdit && !product?.variantAssignments) setVariantSelections({});
-        })
-        .catch(() => setVariants([]));
-    } else {
-      setVariants([]);
-      setVariantSelections({});
-    }
-  }, [categoryId, isEdit, product?.variantAssignments]);
 
   const handleSubmit = async () => {
     if (!name.trim()) { toast.error("El nombre es requerido"); return; }

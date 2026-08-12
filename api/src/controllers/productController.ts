@@ -517,6 +517,24 @@ const updateProduct = async (req: Request, res: Response) => {
         select: { categoryId: true },
       });
       if (existing && existing.categoryId !== data.categoryId) {
+        // Validate the incoming options against the NEW category BEFORE
+        // deleting anything: re-inserting options from another category would
+        // leave the product inconsistent (createProduct rejects them with 400,
+        // so duplicating such a product would fail). Empty array stays allowed
+        // (clears the assignments).
+        if (variantOptionIds && variantOptionIds.length > 0) {
+          const validOptions = await prisma.categoryVariantOption.findMany({
+            where: {
+              id: { in: variantOptionIds },
+              variant: { categoryId: data.categoryId },
+            },
+          });
+          if (validOptions.length !== variantOptionIds.length) {
+            return res
+              .status(400)
+              .json({ message: "Algunas opciones de variante no pertenecen a esta categoría" });
+          }
+        }
         await prisma.productVariant.deleteMany({
           where: { productId: req.params.id },
         });
