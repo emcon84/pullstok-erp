@@ -893,6 +893,19 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         message: `El lote supera el máximo de ${BULK_UPDATE_MAX} productos. Ajustá el alcance.`,
       });
     }
+    // all=true → devuelve TODAS las filas (impresión). Respeta exclusiones y
+    // overrides; el cap de 5000 ya se chequeó arriba.
+    if (req.query.all === "true") {
+      return res.status(200).json({
+        affected,
+        previousTotal,
+        newTotal,
+        page: 1,
+        pageSize: rows.length,
+        total: rows.length,
+        rows,
+      });
+    }
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
     const slice = rows.slice((page - 1) * PREVIEW_PAGE_SIZE, page * PREVIEW_PAGE_SIZE);
     res.status(200).json({

@@ -354,9 +354,14 @@ export const bulkPriceUpdate = async (
   payload: BulkPriceUpdatePayload,
   dryRun: boolean,
   page = 1,
+  all = false,
 ): Promise<BulkPricePreview | BulkPriceApplyResult> => {
   const token = localStorage.getItem("token");
-  const query = dryRun ? `?dryRun=true&page=${page}` : "";
+  const query = dryRun
+    ? all
+      ? "?dryRun=true&all=true"
+      : `?dryRun=true&page=${page}`
+    : "";
   const res = await fetch(`${API_URL}/products/bulk-price-update${query}`, {
     method: "POST",
     headers: {

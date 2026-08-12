@@ -365,7 +365,7 @@ export const Dashboard = () => {
       <ProductsTable products={filteredProducts} onEdit={openEditDrawer} onDuplicate={openDuplicateDrawer} onQuickPrice={openQuickPrice} branchMode={!!branchFilter} />
 
       {/* Print area: only visible when printing (see @media print in index.css) */}
-      <PrintProductList products={filteredProducts} branchMode={!!branchFilter} />
+      <PrintProductList products={filteredProducts} />
 
       {/* Product Drawer (create/edit) */}
       <ProductDrawer open={drawerOpen} onClose={closeDrawer} product={drawerProduct} />

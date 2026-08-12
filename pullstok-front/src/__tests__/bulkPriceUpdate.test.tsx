@@ -309,4 +309,56 @@ describe("BulkPriceUpdate — preview, exclusions and apply", () => {
       ),
     );
   });
+
+  it("prints the FULL preview set with all=true and shows the print area", async () => {
+    const allPreview = {
+      affected: 3,
+      previousTotal: 300,
+      newTotal: 330,
+      page: 1,
+      pageSize: 3,
+      total: 3,
+      rows: [
+        ...page1.rows,
+        {
+          id: "p-3",
+          name: "Producto 3",
+          categoryName: "Gatos",
+          brandValues: ["Acme"],
+          oldPrice: 0,
+          newPrice: 0,
+          delta: 0,
+          effectivePercentage: 0,
+        },
+      ],
+    };
+    mockBulkPriceUpdate.mockResolvedValueOnce(page1).mockResolvedValueOnce(allPreview);
+    const printSpy = vi.fn();
+    window.print = printSpy;
+
+    renderView();
+    await selectBrandAndPercent();
+    fireEvent.click(screen.getByRole("button", { name: /calcular preview/i }));
+    await screen.findByText("Producto 1");
+
+    fireEvent.click(screen.getByRole("button", { name: /imprimir listado/i }));
+
+    await waitFor(() =>
+      expect(mockBulkPriceUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ brandValues: ["Acme"] }),
+        true,
+        1,
+        true,
+      ),
+    );
+    // El área print se monta con el set completo (incluye la fila de la página 2).
+    expect(await screen.findByText("Producto 3")).toBeInTheDocument();
+    expect(printSpy).toHaveBeenCalled();
+  });
+
+  it("hides the print button until a preview exists", () => {
+    renderView();
+
+    expect(screen.queryByRole("button", { name: /imprimir listado/i })).not.toBeInTheDocument();
+  });
 });

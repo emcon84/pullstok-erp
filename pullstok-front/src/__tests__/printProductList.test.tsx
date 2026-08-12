@@ -27,7 +27,7 @@ describe("PrintProductList — listado de productos imprimible", () => {
     }
   });
 
-  it("muestra nombre, código, categoría, unidad de stock y precio formateado", () => {
+  it("muestra solo nombre y precio formateado", () => {
     const p = {
       _id: "p-cat",
       name: "Collar de Cuero",
@@ -41,45 +41,12 @@ describe("PrintProductList — listado de productos imprimible", () => {
     render(<PrintProductList products={[p]} />);
 
     expect(screen.getByText("Collar de Cuero")).toBeInTheDocument();
-    expect(screen.getByText("COL-01")).toBeInTheDocument();
-    expect(screen.getByText("Accesorios")).toBeInTheDocument();
-    expect(screen.getByText("5 kg")).toBeInTheDocument();
     expect(screen.getByText("$ 1.500")).toBeInTheDocument();
-  });
-
-  it("usa 'u.' como unidad cuando el producto no se vende por kg", () => {
-    const p = product({ name: "Bozal", code: "BZ-01", priceKgSuelto: 0, quantity: 3 });
-
-    render(<PrintProductList products={[p]} />);
-
-    expect(screen.getByText("3 u.")).toBeInTheDocument();
-  });
-
-  it("respeta el stock por sucursal (stocks[0].quantity) en branchMode", () => {
-    const p = product({
-      name: "Correa",
-      code: "CO-01",
-      quantity: 99,
-      stocks: [{ quantity: 7 }],
-    });
-
-    render(<PrintProductList products={[p]} branchMode />);
-
-    expect(screen.getByText("7 u.")).toBeInTheDocument();
-    expect(screen.queryByText("99 u.")).not.toBeInTheDocument();
-  });
-
-  it("sin branchMode prioriza stocks[0].quantity con fallback a quantity", () => {
-    const p = product({
-      name: "Cepillo",
-      code: "CE-01",
-      quantity: 8,
-      stocks: [{ quantity: 2 }],
-    });
-
-    render(<PrintProductList products={[p]} />);
-
-    expect(screen.getByText("2 u.")).toBeInTheDocument();
+    // Nada más: sin código, categoría ni stock
+    expect(screen.queryByText("COL-01")).not.toBeInTheDocument();
+    expect(screen.queryByText("Accesorios")).not.toBeInTheDocument();
+    expect(screen.queryByText("5 kg")).not.toBeInTheDocument();
+    expect(screen.queryByText("5 u.")).not.toBeInTheDocument();
   });
 
   it("muestra la línea con el conteo de productos", () => {

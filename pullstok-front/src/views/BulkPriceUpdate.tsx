@@ -27,11 +27,13 @@ import {
 } from "@/components/ui/table";
 import { CategoryTreePickerMulti } from "@/components/molecules/CategoryTreePickerMulti";
 import { CategoryOverridesPanel } from "@/components/molecules/CategoryOverridesPanel";
+import { PrintBulkPriceList } from "@/components/molecules/PrintBulkPriceList";
 import { recomputeRow } from "@/lib/priceOverride";
 import { getCategories } from "@/services/onboardingService";
 import {
   bulkPriceUpdate,
   BulkPricePreview,
+  BulkPricePreviewRow,
   BulkPriceUpdatePayload,
 } from "@/services/productService";
 import { API_URL } from "@/constants";
@@ -72,6 +74,7 @@ export const BulkPriceUpdate = () => {
     [],
   );
   const [preview, setPreview] = useState<BulkPricePreview | null>(null);
+  const [printRows, setPrintRows] = useState<BulkPricePreviewRow[] | null>(null);
   const [page, setPage] = useState(1);
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -198,6 +201,34 @@ export const BulkPriceUpdate = () => {
     }
     setSubmitting(false);
   };
+
+  // Imprime el listado COMPLETO del preview (all=true → server devuelve todas
+  // las filas, no la página): respeta exclusiones y overrides del payload.
+  const handlePrint = async () => {
+    const p = payload();
+    if (!p) return;
+    setSubmitting(true);
+    try {
+      const data = await bulkPriceUpdate(p, true, 1, true);
+      setPrintRows((data as BulkPricePreview).rows);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al preparar impresión";
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Una vez montado el área print (printRows no nulo), abrir el diálogo de
+  // impresión y limpiar el estado al cerrarlo (afterprint) para que un Ctrl+P
+  // posterior no reimprima un snapshot stale del preview.
+  useEffect(() => {
+    if (!printRows) return;
+    window.print();
+    const cleanup = () => setPrintRows(null);
+    window.addEventListener("afterprint", cleanup);
+    return () => window.removeEventListener("afterprint", cleanup);
+  }, [printRows]);
 
   const pct = parseFloat(percentage);
   const isNegative = !Number.isNaN(pct) && pct < 0;
@@ -339,7 +370,19 @@ export const BulkPriceUpdate = () => {
         {/* Preview full-width (una sola columna → la tabla entra sin scroll horizontal) */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Vista previa</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Vista previa</CardTitle>
+              {preview && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={submitting}
+                  onClick={handlePrint}
+                >
+                  Imprimir listado
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {preview ? (
@@ -518,6 +561,9 @@ export const BulkPriceUpdate = () => {
             Aplicar cambios
           </Button>
         </div>
+
+        {/* Print area: only visible when printing (see @media print in index.css) */}
+        {printRows && <PrintBulkPriceList rows={printRows} />}
       </div>
   );
 };
