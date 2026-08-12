@@ -20,6 +20,7 @@ import {
   Palette,
   Clock,
   Scale,
+  FileSpreadsheet,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 import type { Role } from "@/constants/rolePermissions";
@@ -46,6 +47,7 @@ export const navGroups: NavGroup[] = [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/categorias", label: "Categorías", icon: Tags, visibleRoles: ["ADMIN", "MANAGEMENT"] },
       { to: "/actualizar-precios", label: "Actualizar precios", icon: DollarSign, visibleRoles: ["ADMIN", "SUPERADMIN"] },
+      { to: "/planilla-mayorista", label: "Planilla mayorista", icon: FileSpreadsheet, visibleRoles: ["ADMIN", "SUPERADMIN"] },
     ],
   },
   {

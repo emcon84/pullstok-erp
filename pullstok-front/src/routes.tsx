@@ -114,6 +114,10 @@ const PricingSettings = lazy(() =>
   })),
 );
 
+const PriceListImport = lazy(() =>
+  import("./views/PriceListImport").then((m) => ({ default: m.PriceListImport })),
+);
+
 const AppRoutes = () => (
   <Router>
     <Routes>
@@ -257,6 +261,7 @@ const AppRoutes = () => (
         <Route path="/sucursales" element={<BranchesPage />} />
         <Route path="/scanner" element={<StockScannerPage />} />
         <Route path="/actualizar-precios" element={<BulkPriceUpdate />} />
+        <Route path="/planilla-mayorista" element={<PriceListImport />} />
         <Route path="/ajustes" element={<BrandingSettings />} />
         <Route path="/ajustes/horarios" element={<BusinessHoursSettings />} />
         <Route path="/configuracion-precios" element={<PricingSettings />} />
