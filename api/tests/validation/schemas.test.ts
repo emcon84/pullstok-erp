@@ -969,6 +969,19 @@ describe("applyPriceListSchema — decisiones del preview (position como idTempo
     });
     expect(result.success).toBe(true);
   });
+
+  it("accepts an import decision without productId (planilla-only row)", () => {
+    const result = applyPriceListSchema.safeParse({
+      ...validBody,
+      rows: [
+        { position: 0, accion: "import", nombre: "Producto Sin Match x 3 Kg.", precioSinIva: 1000, precioConIva: 1210 },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.rows[0].productId).toBeUndefined();
+    }
+  });
 });
 
 describe("adjustPriceListSchema — ajuste masivo de sugeridos", () => {

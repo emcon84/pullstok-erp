@@ -116,7 +116,7 @@ describe("PriceListImport — wizard de importación", () => {
     expect(mockImport).not.toHaveBeenCalled();
   });
 
-  it("muestra el preview con los badges de estado y los defaults (matched import, error omit)", async () => {
+  it("muestra el preview con los badges de estado y los defaults (importAll ON: matched y sin matchear import, error omit)", async () => {
     render(<PriceListImport />);
     await uploadPdf();
 
@@ -124,11 +124,13 @@ describe("PriceListImport — wizard de importación", () => {
     expect(screen.getByText("Error")).toBeInTheDocument();
     expect(screen.getByText("Sin matchear")).toBeInTheDocument();
 
-    // Default: matched → import; error/unmatched → omit.
+    // Default con "Importar todas las filas" ON: matched → import,
+    // error → omit, sin matchear → import.
     const checkboxes = screen.getAllByRole("checkbox");
-    expect(checkboxes[0]).toBeChecked(); // matched → import
-    expect(checkboxes[1]).not.toBeChecked(); // error → omit
-    expect(checkboxes[2]).not.toBeChecked(); // unmatched → omit
+    expect(checkboxes[0]).toBeChecked(); // importar todas (default ON)
+    expect(checkboxes[1]).toBeChecked(); // matched → import
+    expect(checkboxes[2]).not.toBeChecked(); // error → omit
+    expect(checkboxes[3]).toBeChecked(); // sin matchear → import
   });
 
   it("toggle a una fila matched a omit y envía el payload correcto al aplicar", async () => {
@@ -136,8 +138,8 @@ describe("PriceListImport — wizard de importación", () => {
     await uploadPdf();
 
     const checkboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(checkboxes[0]); // desmarcar la fila matched
-    fireEvent.click(checkboxes[2]); // marcar la fila sin matchear (queda 1 import)
+    fireEvent.click(checkboxes[1]); // desmarcar la fila matched
+    // la fila sin matchear ya viene import por default (importAll ON)
 
     fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
     await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
@@ -158,6 +160,50 @@ describe("PriceListImport — wizard de importación", () => {
       accion: "import",
       nombre: "Producto Sin Match x 3 Kg.",
     });
+  });
+
+  it("con 'Importar todas las filas' ON (default), el payload incluye las filas sin matchear como import SIN productId y omite las de error", async () => {
+    render(<PriceListImport />);
+    await uploadPdf();
+
+    fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
+    await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
+
+    const payload = mockApply.mock.calls[0][0];
+    // Sin matchear → import, sin productId (planilla-only).
+    expect(payload.rows[2]).toMatchObject({
+      position: 2,
+      accion: "import",
+      nombre: "Producto Sin Match x 3 Kg.",
+    });
+    expect(payload.rows[2].productId).toBeUndefined();
+    // Error → omit.
+    expect(payload.rows[1]).toMatchObject({
+      position: 1,
+      accion: "omit",
+      nombre: "GOOSTER Sin Precio x 15 Kg.",
+    });
+    // Matcheada conserva el link.
+    expect(payload.rows[0]).toMatchObject({ accion: "import", productId: "p-1" });
+  });
+
+  it("desmarcar 'Importar todas las filas' restaura el default anterior (sin matchear omitidas)", async () => {
+    render(<PriceListImport />);
+    await uploadPdf();
+
+    const importAll = screen.getByLabelText("Importar todas las filas");
+    expect(importAll).toBeChecked();
+    fireEvent.click(importAll);
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes[0]).not.toBeChecked(); // importar todas OFF
+    expect(checkboxes[3]).not.toBeChecked(); // sin matchear → omit (default anterior)
+
+    fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
+    await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
+
+    const payload = mockApply.mock.calls[0][0];
+    expect(payload.rows[2]).toMatchObject({ position: 2, accion: "omit" });
   });
 
   it("asigna un producto manualmente a una fila sin matchear y la marca para importar", async () => {

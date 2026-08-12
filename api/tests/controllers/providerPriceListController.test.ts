@@ -386,14 +386,59 @@ describe("applyPriceList — transacción idempotente (precios del proveedor int
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  it("returns 400 when an import row has no productId", async () => {
+  it("imports a planilla-only row (import without productId): entry productId null, matched false, no suggestedPrice update", async () => {
+    const tx = txMock();
+    tx.product.findMany.mockResolvedValue([]);
+    mockedPrisma.$transaction.mockImplementation(
+      async (fn: (t: unknown) => unknown) => fn(tx),
+    );
     const res = fakeRes();
     const body = {
       ...applyBody,
-      rows: [{ ...applyBody.rows[0], productId: undefined }],
+      rows: [
+        { ...applyBody.rows[0], productId: undefined, nombre: "Producto Sin Match x 3 Kg." },
+      ],
     };
     await applyPriceList(fakeReq({ body }), res);
-    expect(res.status).toHaveBeenCalledWith(400);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const entryData = tx.priceListEntry.create.mock.calls[0][0].data;
+    expect(entryData).toMatchObject({
+      name: "Producto Sin Match x 3 Kg.",
+      productId: null,
+      matched: false,
+      priceSinIva: 8795,
+      priceConIva: 10642,
+    });
+    // Planilla-only: suggestedPrice se calcula en la entrada, pero NO se
+    // escribe en ningún Product.
+    expect(tx.product.updateMany).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      priceListId: "pl-1",
+      imported: 1,
+      omitted: 0,
+      suggestedUpdated: 0,
+    });
+  });
+
+  it("allows two planilla-only rows with the same normalized name (both imported, no 400)", async () => {
+    const tx = txMock();
+    tx.product.findMany.mockResolvedValue([]);
+    mockedPrisma.$transaction.mockImplementation(
+      async (fn: (t: unknown) => unknown) => fn(tx),
+    );
+    const res = fakeRes();
+    const body = {
+      ...applyBody,
+      rows: [
+        { ...applyBody.rows[0], productId: undefined, position: 0, nombre: "DUP x 1 Kg." },
+        { ...applyBody.rows[0], productId: undefined, position: 1, nombre: "dup x 1 kg" },
+      ],
+    };
+    await applyPriceList(fakeReq({ body }), res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(tx.priceListEntry.create).toHaveBeenCalledTimes(2);
+    expect(tx.product.updateMany).not.toHaveBeenCalled();
   });
 
   it("returns 400 when an import row has no prices (error row cannot be imported)", async () => {

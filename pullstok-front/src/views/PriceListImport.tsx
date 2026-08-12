@@ -138,6 +138,33 @@ const ProductAssign = ({
 };
 
 /**
+ * Decisiones default tras el preview. Con importAll ON → toda fila con precios
+ * entra como planilla-only (import sin productId salvo que esté matcheada);
+ * con OFF → comportamiento anterior (solo matched/multi-match por default).
+ */
+const buildDefaults = (rows: PreviewRow[], importAll: boolean): Record<number, Decision> => {
+  const defaults: Record<number, Decision> = {};
+  for (const row of rows) {
+    if (importAll) {
+      const hasMatch = row.estado === "matched" || row.estado === "multi-match";
+      defaults[row.position] = {
+        accion: row.estado === "error" ? "omit" : "import",
+        productId: hasMatch ? (row.productId ?? undefined) : undefined,
+      };
+    } else {
+      defaults[row.position] = {
+        accion:
+          row.estado === "matched" || row.estado === "multi-match"
+            ? "import"
+            : "omit",
+        productId: row.productId ?? undefined,
+      };
+    }
+  }
+  return defaults;
+};
+
+/**
  * Wizard de importación de planillas de precios Alican
  * (sdd/alican-wholesale-price-list): 1) subir PDF (check client-side ≤10MB) →
  * 2) preview con badges de estados + decisión por fila (toggle import/omit +
@@ -148,6 +175,7 @@ export const PriceListImport = () => {
   const navigate = useNavigate();
   const [preview, setPreview] = useState<PriceListPreview | null>(null);
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
+  const [importAll, setImportAll] = useState(true);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,17 +197,7 @@ export const PriceListImport = () => {
     try {
       const result = await importPriceList(selected, true);
       setPreview(result);
-      const defaults: Record<number, Decision> = {};
-      for (const row of result.rows) {
-        defaults[row.position] = {
-          accion:
-            row.estado === "matched" || row.estado === "multi-match"
-              ? "import"
-              : "omit",
-          productId: row.productId ?? undefined,
-        };
-      }
-      setDecisions(defaults);
+      setDecisions(buildDefaults(result.rows, importAll));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al procesar la planilla");
     } finally {
@@ -202,6 +220,12 @@ export const PriceListImport = () => {
       ...prev,
       [position]: { accion: "import", productId },
     }));
+  };
+
+  const toggleImportAll = (checked: boolean | "indeterminate") => {
+    const next = checked === true;
+    setImportAll(next);
+    if (preview) setDecisions(buildDefaults(preview.rows, next));
   };
 
   const counts = useMemo(() => {
@@ -295,6 +319,17 @@ export const PriceListImport = () => {
               {preview.period ? `vigencia ${preview.period}` : "sin vigencia"} ·{" "}
               {preview.total} filas
             </CardTitle>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="importar-todas"
+                checked={importAll}
+                onCheckedChange={toggleImportAll}
+                aria-label="Importar todas las filas"
+              />
+              <Label htmlFor="importar-todas" className="text-sm font-normal text-muted-foreground">
+                Importar todas las filas
+              </Label>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>

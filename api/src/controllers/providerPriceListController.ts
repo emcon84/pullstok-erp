@@ -245,15 +245,14 @@ async function applyPriceListCore(
     if (r.precioSinIva == null && r.precioConIva == null) {
       throw new ApplyPriceListError(`La fila "${r.nombre}" no tiene precios para importar`);
     }
-    if (!r.productId) {
-      throw new ApplyPriceListError(
-        `La fila "${r.nombre}" necesita un producto asignado para importarse`,
-      );
-    }
   }
-  // A lo sumo UNA fila importada por grupo duplicado del PDF (mismo nombre normalizado).
+  // A lo sumo UNA fila importada por grupo duplicado del PDF (mismo nombre
+  // normalizado) ENTRE filas LINKED a producto: protege el doble-write del
+  // suggestedPrice. Las filas planilla-only (sin productId) no compiten —
+  // cada una es una entrada independiente aunque repitan nombre normalizado.
   const groupCounts = new Map<string, number>();
   for (const r of imports) {
+    if (!r.productId) continue;
     const key = normalizeName(r.nombre);
     groupCounts.set(key, (groupCounts.get(key) ?? 0) + 1);
   }
@@ -270,7 +269,9 @@ async function applyPriceListCore(
   return prisma.$transaction(async (tx) => {
     // Anti-fuga (REQ-12): los productId deben existir en la org. El cliente tx
     // hereda la extensión tenant → el findMany ya scopea por organizationId.
-    const productIds = [...new Set(imports.map((r) => r.productId!).filter(Boolean))];
+    const productIds = [
+      ...new Set(imports.map((r) => r.productId).filter((id): id is string => Boolean(id))),
+    ];
     if (productIds.length > 0) {
       const found = await tx.product.findMany({
         where: { id: { in: productIds } },
@@ -317,13 +318,13 @@ async function applyPriceListCore(
         await tx.priceListEntry.create({
           data: {
             sectionId: sec.id,
-            productId: r.productId!,
+            productId: r.productId ?? null,
             name: r.nombre,
             unit: r.unidadEmpaque ?? null,
             priceSinIva: r.precioSinIva ?? null,
             priceConIva: r.precioConIva ?? null,
             suggestedPrice: sugerido,
-            matched: true,
+            matched: !!r.productId,
             position: entryPosition++,
           },
         });
