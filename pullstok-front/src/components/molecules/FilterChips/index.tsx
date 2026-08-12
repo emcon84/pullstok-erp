@@ -17,6 +17,29 @@ export interface FilterChipsProps {
   quickVariants?: { name: string; values: string[] }[];
 }
 
+// ── Filter helpers ──
+// La coma separa términos ALTERNATIVOS (OR) — permite multi-marca ("Purina,
+// Proplan"). Cada término puede tener espacios (AND de palabras, ej "cat chow").
+
+const splitTerms = (filter: string): string[] =>
+  filter
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+
+const hasTerm = (filter: string, value: string): boolean =>
+  splitTerms(filter).some(
+    (t) => t.toLowerCase() === value.toLowerCase(),
+  );
+
+const toggleTerm = (filter: string, value: string): string => {
+  const terms = splitTerms(filter);
+  const next = terms.some((t) => t.toLowerCase() === value.toLowerCase())
+    ? terms.filter((t) => t.toLowerCase() !== value.toLowerCase())
+    : [...terms, value];
+  return next.join(", ");
+};
+
 // ── ScrollRow ──
 
 const ScrollRow = ({
@@ -77,18 +100,21 @@ export const FilterChips = ({
     return cats.sort();
   }, [products, quickCategoriesProp]);
 
-  // Group variants by type when a category is selected. When the caller
-  // supplies complete facets, use them directly; otherwise derive from the
-  // loaded products as before.
+  // Group variants by type. When the caller supplies complete facets, use them
+  // directly; otherwise derive from the loaded products. Sin categoría se
+  // muestran SOLO las marcas (Marca) para permitir multi-marca desde las pills;
+  // con categoría se muestran todas las variantes de esa categoría como antes.
   const quickVariants = useMemo(() => {
     if (quickVariantsProp !== undefined) return quickVariantsProp;
-    if (!categoryFilter || !products) return [];
-    const filtered = products.filter((p) => {
-      const catName = (p as any).category?.name || p.category || "";
-      return String(catName)
-        .toLowerCase()
-        .includes(categoryFilter.toLowerCase());
-    });
+    if (!products) return [];
+    const filtered = categoryFilter
+      ? products.filter((p) => {
+          const catName = (p as any).category?.name || p.category || "";
+          return String(catName)
+            .toLowerCase()
+            .includes(categoryFilter.toLowerCase());
+        })
+      : products;
     const groups: Record<string, Set<string>> = {};
     for (const p of filtered) {
       const assignments = (p as any).variantAssignments as any[] | undefined;
@@ -97,6 +123,7 @@ export const FilterChips = ({
           const variantName = a.option?.variant?.name;
           const optionValue = a.option?.value;
           if (variantName && optionValue) {
+            if (!categoryFilter && variantName !== "Marca") continue;
             if (!groups[variantName]) groups[variantName] = new Set();
             groups[variantName].add(optionValue);
           }
@@ -108,7 +135,7 @@ export const FilterChips = ({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [categoryFilter, products, quickVariantsProp]);
 
-  const hasFilters = !!(categoryFilter || filter);
+  const hasFilters = !!(categoryFilter || splitTerms(filter).length > 0);
 
   return (
     <div className="space-y-2">
@@ -127,33 +154,21 @@ export const FilterChips = ({
               </button>
             </Badge>
           )}
-          {filter
-            .split(/\s+/)
-            .filter((w) => w.length > 0)
-            .map((word) => (
-              <Badge
-                key={word}
-                variant="secondary"
-                className="gap-1 pr-1 text-xs uppercase"
+          {splitTerms(filter).map((term) => (
+            <Badge
+              key={term}
+              variant="secondary"
+              className="gap-1 pr-1 text-xs uppercase"
+            >
+              {term}
+              <button
+                onClick={() => onFilterChange(toggleTerm(filter, term))}
+                className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
               >
-                {word}
-                <button
-                  onClick={() => {
-                    const words = filter
-                      .split(/\s+/)
-                      .filter(
-                        (w) =>
-                          w.length > 0 &&
-                          w.toLowerCase() !== word.toLowerCase(),
-                      );
-                    onFilterChange(words.join(" "));
-                  }}
-                  className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
           <button
             onClick={onClear}
             className="text-xs text-muted-foreground hover:text-foreground underline ml-1"
@@ -191,29 +206,13 @@ export const FilterChips = ({
               </span>
               <ScrollRow className="gap-1.5">
                 {group.values.map((v) => {
-                  const isActive = filter
-                    .toLowerCase()
-                    .includes(v.toLowerCase());
+                  const isActive = hasTerm(filter, v);
                   return (
                     <Badge
                       key={v}
                       variant={isActive ? "secondary" : "outline"}
                       className="shrink-0 cursor-pointer px-2.5 py-1 text-xs font-medium whitespace-nowrap uppercase"
-                      onClick={() =>
-                        onFilterChange(
-                          isActive
-                            ? filter
-                                .replace(
-                                  new RegExp(
-                                    `\\s?${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
-                                    "i",
-                                  ),
-                                  "",
-                                )
-                                .trim()
-                            : `${filter} ${v}`.trim(),
-                        )
-                      }
+                      onClick={() => onFilterChange(toggleTerm(filter, v))}
                     >
                       {v}
                     </Badge>

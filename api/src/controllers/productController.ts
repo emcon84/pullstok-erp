@@ -251,6 +251,76 @@ export const downloadTemplateCsv = async (req: Request, res: Response) => {
 };
 
 // Get all products with optional filters (scopeado por org vía extension)
+/**
+ * Where de búsqueda por texto (GET /products?name=...).
+ *
+ * Semántica:
+ * - La COMA separa términos ALTERNATIVOS (OR) — multi-marca: "Purina, Proplan"
+ *   matchea productos de cualquiera de las dos (nombre, código o variante).
+ * - Dentro de cada término, los ESPACIOS son AND de palabras: "cat chow carne"
+ *   matchea "CAT CHOW ADULTOS CARNE X 15 KG" aunque las palabras estén separadas.
+ *
+ * Sin comas el resultado es byte-for-byte el comportamiento original.
+ */
+export function buildProductSearchWhere(searchTerm: string): any {
+  const variantMatch = (w: string) => ({
+    variantAssignments: {
+      some: {
+        option: {
+          value: { contains: w, mode: "insensitive" as const },
+        },
+      },
+    },
+  });
+  const termWhere = (term: string) => {
+    const termWords = term.split(/\s+/).filter(w => w.length > 0);
+    return termWords.length > 1
+      ? {
+          AND: termWords.map(w => ({
+            OR: [
+              { name: { contains: w, mode: "insensitive" } },
+              { code: { contains: w, mode: "insensitive" } },
+              variantMatch(w),
+            ],
+          })),
+        }
+      : {
+          OR: [
+            { name: { contains: term, mode: "insensitive" } },
+            { code: { contains: term, mode: "insensitive" } },
+            variantMatch(term),
+          ],
+        };
+  };
+
+  const terms = searchTerm
+    .split(",")
+    .map(t => t.trim())
+    .filter(t => t.length > 0);
+  if (terms.length > 1) {
+    return { OR: terms.map(termWhere) };
+  }
+  const words = searchTerm.split(/\s+/).filter(w => w.length > 0);
+  if (words.length > 1) {
+    return {
+      AND: words.map(w => ({
+        OR: [
+          { name: { contains: w, mode: "insensitive" } },
+          { code: { contains: w, mode: "insensitive" } },
+          variantMatch(w),
+        ],
+      })),
+    };
+  }
+  return {
+    OR: [
+      { name: { contains: searchTerm, mode: "insensitive" } },
+      { code: { contains: searchTerm, mode: "insensitive" } },
+      variantMatch(searchTerm),
+    ],
+  };
+}
+
 const getProducts = async (req: Request, res: Response) => {
   try {
     const { name, category, minPrice, maxPrice, description, branchId } = req.query;
@@ -259,33 +329,7 @@ const getProducts = async (req: Request, res: Response) => {
 
     if (name) {
       const searchTerm = name as string;
-      // Split into words and search each — "Cat chow carne" matches
-      // "CAT CHOW ADULTOS CARNE X 15 KG" even with words in between.
-      const words = searchTerm.split(/\s+/).filter(w => w.length > 0);
-      const variantMatch = (w: string) => ({
-        variantAssignments: {
-          some: {
-            option: {
-              value: { contains: w, mode: "insensitive" as const },
-            },
-          },
-        },
-      });
-      if (words.length > 1) {
-        where.AND = words.map(w => ({
-          OR: [
-            { name: { contains: w, mode: "insensitive" } },
-            { code: { contains: w, mode: "insensitive" } },
-            variantMatch(w),
-          ],
-        }));
-      } else {
-        where.OR = [
-          { name: { contains: searchTerm, mode: "insensitive" } },
-          { code: { contains: searchTerm, mode: "insensitive" } },
-          variantMatch(searchTerm),
-        ];
-      }
+      Object.assign(where, buildProductSearchWhere(searchTerm));
     }
     if (category) {
       where.category = { name: { equals: category as string, mode: "insensitive" } };

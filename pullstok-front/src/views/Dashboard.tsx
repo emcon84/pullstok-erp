@@ -35,6 +35,10 @@ import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
 import { VendorDashboard } from "./VendorDashboard";
 import { FilterChips } from "../components/molecules/FilterChips";
+import {
+  parseFilterTerms,
+  matchesProductFilter,
+} from "@/lib/productFilter";
 
 type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
 
@@ -158,7 +162,8 @@ export const Dashboard = () => {
 
   // ── Products already filtered by branch filter ──
 
-  const filterWords = filter.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+  // "Purina, Proplan" → OR entre marcas; espacios dentro de un término → AND.
+  const filterTerms = useMemo(() => parseFilterTerms(filter), [filter]);
   const filteredProducts = useMemo(() => {
     let list = products;
     if (categoryFilter) {
@@ -167,15 +172,9 @@ export const Dashboard = () => {
         return String(cat).toLowerCase().includes(categoryFilter.toLowerCase());
       });
     }
-    if (filterWords.length === 0) return list;
-    return list.filter((product) => {
-      const variantValues = (product as any).variantAssignments
-        ?.map((pv: any) => pv.option?.value ?? "")
-        .join(" ");
-      const haystack = `${product.name} ${product.code || ""} ${variantValues || ""}`.toLowerCase();
-      return filterWords.every(w => haystack.includes(w));
-    });
-  }, [products, filterWords, categoryFilter]);
+    if (filterTerms.length === 0) return list;
+    return list.filter((product) => matchesProductFilter(product, filterTerms));
+  }, [products, filterTerms, categoryFilter]);
 
   if (productsLoading) {
     return (
