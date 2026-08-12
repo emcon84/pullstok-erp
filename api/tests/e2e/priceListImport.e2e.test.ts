@@ -83,6 +83,17 @@ describe("E2E: importación de planillas Alican (SECO real)", () => {
     organizationId = orgId;
     adminToken = token;
 
+    // Categoría obligatoria (createProductSchema exige categoryId). Fix round 2
+    // (finding B): antes se creaba el producto sin categoría → 400 → productId
+    // undefined → TODAS las filas "unmatched".
+    const catRes = await request(app)
+      .post("/api/categories/single")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "E2E Price List" });
+    expect(catRes.status).toBe(201);
+    const categoryId = catRes.body.id;
+    expect(categoryId).toBeTruthy();
+
     // Producto del catálogo cuyo nombre matchea EXACTAMENTE la primera fila
     // del fixture tras normalización ("sieger puppy mini x 1kg").
     const pRes = await request(app)
@@ -92,8 +103,11 @@ describe("E2E: importación de planillas Alican (SECO real)", () => {
         name: "SIEGER Puppy Mini x 1 Kg.",
         price: 9999,
         quantity: 10,
+        categoryId,
       });
+    expect(pRes.status).toBe(201);
     productId = pRes.body.id;
+    expect(productId).toBeTruthy();
 
     // Segunda org para el 404 cross-org.
     const org2 = await createOrgWithAdmin(
@@ -247,8 +261,10 @@ describe("E2E: importación de planillas Alican (SECO real)", () => {
       });
     expect(applyRes.status).toBe(200);
 
-    // La misma planilla se actualizó (mismo id) sin duplicar entradas.
-    expect(applyRes.body.priceListId).toBe(priceListId);
+    // Idempotencia (design D1/D2): el re-import BORRA y RECREA la planilla del
+    // mismo (org, type, period) → el id PUEDE cambiar. Lo que NO puede pasar
+    // es que queden 2 planillas o 2 entradas para el mismo período.
+    expect(applyRes.body.priceListId).toBeTruthy();
 
     const listRes = await request(app)
       .get("/api/price-lists")
@@ -256,8 +272,9 @@ describe("E2E: importación de planillas Alican (SECO real)", () => {
     const items = listRes.body.items.filter((i: any) => i.period === "2026-08-10");
     expect(items).toHaveLength(1);
 
+    // La planilla recreada (id nuevo) tiene UNA sola entry: sin duplicados.
     const detailRes = await request(app)
-      .get(`/api/price-lists/${priceListId}`)
+      .get(`/api/price-lists/${applyRes.body.priceListId}`)
       .set("Authorization", `Bearer ${adminToken}`);
     const entries = detailRes.body.sections.flatMap((s: any) => s.entries);
     expect(entries).toHaveLength(1);
