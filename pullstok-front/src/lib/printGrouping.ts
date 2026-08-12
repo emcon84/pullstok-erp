@@ -54,3 +54,35 @@ export function productBrandOf(product: unknown): string {
     )?.option?.value ?? ""
   );
 }
+
+// ---------------------------------------------------------------------------
+// Jerarquía DEL PDF para la planilla mayorista (sdd/alican-wholesale-price-list)
+// ---------------------------------------------------------------------------
+
+export interface PdfHierarchySection<T> {
+  id: string;
+  brand: string | null;
+  line: string | null;
+  subline: string | null;
+  position: number;
+  entries: T[];
+}
+
+/**
+ * Normaliza la jerarquía del PDF para impresión/render: ordena secciones por
+ * position y entradas por position, y descarta secciones sin entradas. La API
+ * (GET /price-lists/:id) YA devuelve la jerarquía agrupada en orden; este
+ * helper garantiza el orden y limpia secciones vacías sin reinventar el
+ * agrupamiento (decisión del design: no reagrupar en el front).
+ */
+export function groupByPdfHierarchy<T extends { position: number }>(
+  sections: PdfHierarchySection<T>[],
+): PdfHierarchySection<T>[] {
+  return [...sections]
+    .map((s) => ({
+      ...s,
+      entries: [...s.entries].sort((a, b) => a.position - b.position),
+    }))
+    .sort((a, b) => a.position - b.position)
+    .filter((s) => s.entries.length > 0);
+}

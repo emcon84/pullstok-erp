@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { groupByBrand, productBrandOf } from "@/lib/printGrouping";
+import { groupByBrand, productBrandOf, groupByPdfHierarchy } from "@/lib/printGrouping";
 
 interface Item {
   id: string;
@@ -69,5 +69,54 @@ describe("groupByBrand — agrupación de listados imprimibles", () => {
     const withoutBrand = { variantAssignments: [] };
     expect(productBrandOf(withoutBrand)).toBe("");
     expect(productBrandOf({})).toBe("");
+  });
+});
+
+describe("groupByPdfHierarchy — jerarquía del PDF para la planilla mayorista", () => {
+  const section = (
+    id: string,
+    position: number,
+    entries: { position: number; name: string }[],
+    brand: string | null = "SIEGER",
+  ) => ({ id, brand, line: null, subline: null, position, entries });
+
+  it("ordena secciones por position y entradas por position", () => {
+    const sections = [
+      section("s2", 1, [
+        { position: 1, name: "B" },
+        { position: 0, name: "A" },
+      ]),
+      section("s1", 0, [{ position: 0, name: "X" }]),
+    ];
+    const result = groupByPdfHierarchy(sections);
+    expect(result.map((s) => s.id)).toEqual(["s1", "s2"]);
+    expect(result[1].entries.map((e) => e.name)).toEqual(["A", "B"]);
+  });
+
+  it("descarta secciones sin entradas", () => {
+    const sections = [
+      section("s-vacia", 0, []),
+      section("s-ok", 1, [{ position: 0, name: "A" }]),
+    ];
+    const result = groupByPdfHierarchy(sections);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("s-ok");
+  });
+
+  it("conserva la jerarquía brand/line/subline de cada sección", () => {
+    const sections = [
+      {
+        id: "s1",
+        brand: "SIEGER",
+        line: "SUPER PREMIUM PARA PERROS",
+        subline: "SIEGER PUPPY",
+        position: 0,
+        entries: [{ position: 0, name: "A" }],
+      },
+    ];
+    const [s] = groupByPdfHierarchy(sections);
+    expect(s.brand).toBe("SIEGER");
+    expect(s.line).toBe("SUPER PREMIUM PARA PERROS");
+    expect(s.subline).toBe("SIEGER PUPPY");
   });
 });

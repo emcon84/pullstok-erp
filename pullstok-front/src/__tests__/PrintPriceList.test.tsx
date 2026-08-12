@@ -1,0 +1,107 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { PrintPriceList } from "@/components/molecules/PrintPriceList";
+import type { PriceListDetail } from "@/services/priceLists";
+
+const mockBranding = vi.hoisted(() => ({
+  displayName: "Mi Negocio",
+  logoUrl: "https://cdn.example.com/logo.png" as string | null,
+}));
+
+vi.mock("@/contexts/BrandingContext", () => ({
+  useBrandingContext: () => ({ branding: mockBranding, isLoading: false }),
+}));
+
+const plan: PriceListDetail = {
+  id: "pl-1",
+  provider: "ALICAN",
+  type: "SECO",
+  period: "2026-08-10",
+  sourceFilename: "planilla.pdf",
+  importedAt: "2026-08-10T10:00:00Z",
+  sections: [
+    {
+      id: "sec-1",
+      brand: "SIEGER",
+      line: "SUPER PREMIUM PARA PERROS",
+      subline: "SIEGER PUPPY",
+      position: 0,
+      entries: [
+        {
+          id: "e1",
+          productId: "p1",
+          name: "SIEGER Puppy Mini x 1 Kg.",
+          unit: "1 Kg.",
+          priceSinIva: 8795,
+          priceConIva: 10642,
+          suggestedPrice: 14190.04,
+          matched: true,
+          position: 0,
+        },
+        {
+          id: "e2",
+          productId: "p2",
+          name: "SIEGER Puppy Mini x 3 Kg.",
+          unit: "3 Kg.",
+          priceSinIva: 21133,
+          priceConIva: 25571,
+          suggestedPrice: null,
+          matched: true,
+          position: 1,
+        },
+      ],
+    },
+  ],
+};
+
+describe("PrintPriceList — área imprimible de la planilla mayorista", () => {
+  beforeEach(() => {
+    mockBranding.displayName = "Mi Negocio";
+    mockBranding.logoUrl = "https://cdn.example.com/logo.png";
+  });
+
+  it("renderiza la jerarquía del PDF (marca · línea · sublínea) y las filas", () => {
+    render(<PrintPriceList plan={plan} />);
+    expect(
+      screen.getByText("SIEGER · SUPER PREMIUM PARA PERROS · SIEGER PUPPY"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("SIEGER Puppy Mini x 1 Kg.")).toBeInTheDocument();
+    expect(screen.getByText("SIEGER Puppy Mini x 3 Kg.")).toBeInTheDocument();
+  });
+
+  it("muestra 2 columnas: Precio (Con IVA) y Sugerido, con '—' cuando no hay sugerido", () => {
+    render(<PrintPriceList plan={plan} />);
+    expect(screen.getByText("Precio")).toBeInTheDocument();
+    expect(screen.getByText("Sugerido")).toBeInTheDocument();
+    expect(screen.getByText("$ 10.642,00")).toBeInTheDocument(); // Con IVA del proveedor
+    expect(screen.getByText("$ 14.190,04")).toBeInTheDocument(); // sugerido
+    // e2 no tiene sugerido → "—".
+    const filaSinSugerido = screen.getByText("SIEGER Puppy Mini x 3 Kg.").closest("tr");
+    expect(filaSinSugerido).toHaveTextContent("—");
+  });
+
+  it("muestra el logo cuando logoUrl existe", () => {
+    render(<PrintPriceList plan={plan} />);
+    const logo = screen.getByTestId("print-logo") as HTMLImageElement;
+    expect(logo.src).toContain("cdn.example.com");
+  });
+
+  it("cae al displayName cuando la imagen no carga (fallback)", () => {
+    render(<PrintPriceList plan={plan} />);
+    fireEvent.error(screen.getByTestId("print-logo"));
+    expect(screen.queryByTestId("print-logo")).not.toBeInTheDocument();
+    expect(screen.getByText("Mi Negocio")).toBeInTheDocument();
+  });
+
+  it("usa displayName como título cuando no hay logo", () => {
+    mockBranding.logoUrl = null;
+    render(<PrintPriceList plan={plan} />);
+    expect(screen.getByText("Mi Negocio")).toBeInTheDocument();
+    expect(screen.queryByTestId("print-logo")).not.toBeInTheDocument();
+  });
+
+  it("muestra el período de vigencia de la planilla", () => {
+    render(<PrintPriceList plan={plan} />);
+    expect(screen.getByText(/vigencia 2026-08-10/)).toBeInTheDocument();
+  });
+});
