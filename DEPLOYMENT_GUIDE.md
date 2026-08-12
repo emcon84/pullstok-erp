@@ -205,3 +205,22 @@ sudo -u postgres psql -d pullstok
 **El front no le pega a la API:** `VITE_API_URL` se hornea en build time — si lo cambiás, hay que volver a correr `pnpm --filter ./pullstok-front build` (o `pnpm -r build`), no alcanza con reiniciar nginx.
 
 **Error de permisos en schema `public` al migrar:** ver el paso 2 (`ALTER SCHEMA public OWNER TO pullstok_user`) — PostgreSQL 17 cambió los privilegios default sobre `public`.
+
+## E2E tests (solo VPS) y planillas Alican (sdd/alican-wholesale-price-list)
+
+Los e2e requieren Postgres real con el seed de SUPERADMIN (`SEED_SUPERADMIN_EMAIL` /
+`SEED_SUPERADMIN_PASSWORD`, ver `api/SEED_INSTRUCTIONS.md`). Corren en el VPS:
+
+```bash
+cd /var/www/pullstok/api
+NODE_OPTIONS=--experimental-vm-modules pnpm jest tests/e2e/priceListImport.e2e.test.ts
+```
+
+`pdf-parse` (pdfjs ESM) necesita `--experimental-vm-modules` bajo jest — tanto para
+los tests de integración del parser (locales) como para este e2e. La migración
+`20260812000000_add_suggested_price_and_price_lists` (columna `suggested_price` +
+tablas `price_lists` / `price_list_sections` / `price_list_entries`) se aplica con
+el deploy estándar (`pnpm prisma migrate deploy`). El índice único de `price_lists`
+es PARCIAL (`WHERE period IS NOT NULL`): una planilla por (org, type, period), y
+los `period` NULL no bloquean imports nuevos. El fixture PDF y su extracción `.txt`
+están en `api/tests/fixtures/pdfs/` (README con origen y cómo regenerar el `.txt`).
