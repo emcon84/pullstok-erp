@@ -4,9 +4,10 @@ import productController, {
   downloadTemplateCsv,
   getProductByCode,
 } from "../controllers/productController";
+import providerPriceListController from "../controllers/providerPriceListController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
 import { checkBusinessHours } from "../middlewares/checkBusinessHours";
-import { upload } from "../middlewares/uploadMiddleware";
+import { upload, uploadPdf, handleUploadError } from "../middlewares/uploadMiddleware";
 import { validate } from "../middlewares/validate";
 import {
   checkProductLimit,
@@ -19,6 +20,7 @@ import {
   publishProductSchema,
   bulkPriceUpdateSchema,
   updateBranchStockSchema,
+  applyPriceListSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -106,6 +108,28 @@ router.post(
   requireRole("ADMIN"),
   validate(bulkPriceUpdateSchema),
   productController.bulkPriceUpdate,
+);
+
+// Import de planillas de precios Alican (sdd/alican-wholesale-price-list) — ADMIN only.
+// ?dryRun=true (default) → preview; ?dryRun=false → apply con decisiones default (D10).
+router.post(
+  "/import-price-list",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN"),
+  uploadPdf.single("file"),
+  handleUploadError,
+  providerPriceListController.importPriceList,
+);
+// Apply del preview en 2 pasos (decisión humana): payload con el echo de las
+// filas del preview + decisiones por fila. Transaccional e idempotente.
+router.post(
+  "/import-price-list/apply",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN"),
+  validate(applyPriceListSchema),
+  providerPriceListController.applyPriceList,
 );
 
 export default router;

@@ -611,3 +611,89 @@ export const updateBusinessHoursSchema = z
       });
     }
   });
+
+// ---------- Import de planillas de precios Alican (sdd/alican-wholesale-price-list) ----------
+
+/**
+ * Decisión por fila del preview. `position` es el idTemporal (D6): determinista
+ * entre preview y apply (mismo PDF → mismos índices), sin estado server-side.
+ *
+ * El payload lleva ademas el ECHO de los datos de la fila generados por el
+ * server en el preview (nombre, jerarquía, precios): el apply es stateless y
+ * no re-parsea el PDF, así que persiste exactamente lo que el preview devolvió.
+ * suggestedPrice NO se envía: el server SIEMPRE lo recalcula con round2
+ * (nunca confía en valores del cliente).
+ */
+const decisionSchema = z.object({
+  position: z.number().int().min(0),
+  accion: z.enum(["import", "omit"]),
+  productId: z.string().uuid("Producto inválido").optional(), // asignación manual / default del match
+  nombre: z.string().min(1, "Nombre requerido"),
+  marca: z.string().nullable().optional(),
+  linea: z.string().nullable().optional(),
+  sublinea: z.string().nullable().optional(),
+  unidadEmpaque: z.string().nullable().optional(),
+  precioSinIva: z.coerce.number().nullable().optional(),
+  precioConIva: z.coerce.number().nullable().optional(),
+});
+
+export const applyPriceListSchema = z
+  .object({
+    layout: z.enum(["SECO", "WET"]),
+    period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Período inválido (YYYY-MM-DD)").nullable().optional(),
+    sourceFilename: z.string().min(1, "sourceFilename requerido"),
+    rows: z.array(decisionSchema).min(1, "Debe enviar al menos una decisión"),
+  })
+  .strip()
+  .superRefine((data, ctx) => {
+    const seen = new Set<number>();
+    data.rows.forEach((r) => {
+      if (seen.has(r.position)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["rows"],
+          message: `Posición duplicada: ${r.position}`,
+        });
+      }
+      seen.add(r.position);
+    });
+  });
+
+/** Override de precio sugerido por entrada (edición por fila). */
+const entryOverrideSchema = z.object({
+  entryId: z.string().uuid("Entrada inválida"),
+  suggestedPrice: z.coerce.number().nonnegative("El precio no puede ser negativo"),
+});
+
+/**
+ * Ajuste masivo de sugeridos de UNA planilla (REQ-11, patrón dryRun de
+ * bulkPriceUpdate): % sobre el suggestedPrice ACTUAL de cada entrada (−100..500),
+ * exclusiones por fila y overrides puntuales por entryId (max 500, sin duplicados).
+ */
+export const adjustPriceListSchema = z
+  .object({
+    percentage: z.coerce
+      .number()
+      .min(-100, "Mínimo -100%")
+      .max(500, "Máximo 500%")
+      .optional(),
+    excludeEntryIds: z.array(z.string().uuid("Entrada inválida")).default([]),
+    entryOverrides: z
+      .array(entryOverrideSchema)
+      .max(500, "Máximo 500 overrides por corrida")
+      .default([]),
+  })
+  .strip()
+  .superRefine((data, ctx) => {
+    const seen = new Set<string>();
+    data.entryOverrides.forEach(({ entryId }) => {
+      if (seen.has(entryId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["entryOverrides"],
+          message: `Entrada duplicada: ${entryId}`,
+        });
+      }
+      seen.add(entryId);
+    });
+  });
