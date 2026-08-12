@@ -53,7 +53,7 @@ describe("groupByBrand — agrupación de listados imprimibles", () => {
 
   it("devuelve [] para items vacíos", () => {
     expect(
-      groupByBrand([], (i) => i.brand, (a, b) => a.name.localeCompare(b.name)),
+      groupByBrand<Item>([], (i) => i.brand, (a, b) => a.name.localeCompare(b.name)),
     ).toEqual([]);
   });
 

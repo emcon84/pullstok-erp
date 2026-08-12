@@ -39,15 +39,17 @@ export function groupByBrand<T>(
 
 /**
  * Marca de un DataItem (dashboard): primer option.value de la variante "Marca".
- * Devuelve "" si el producto no tiene marca asignada.
+ * Devuelve "" si el producto no tiene marca asignada. Acepta unknown para ser
+ * compatible con cualquier callback de groupByBrand (contravariance estricta).
  */
-export function productBrandOf(product: {
-  variantAssignments?: {
-    option?: { value?: string; variant?: { name?: string } };
-  }[];
-}): string {
+export function productBrandOf(product: unknown): string {
+  const p = product as {
+    variantAssignments?: {
+      option?: { value?: string; variant?: { name?: string } };
+    }[];
+  };
   return (
-    product.variantAssignments?.find(
+    p.variantAssignments?.find(
       (a) => a.option?.variant?.name === "Marca",
     )?.option?.value ?? ""
   );
