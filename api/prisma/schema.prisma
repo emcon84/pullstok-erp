@@ -34,6 +34,13 @@ enum Plan {
   PREMIUM
 }
 
+// Tipo de layout de la planilla de precios del proveedor Alican
+// (sdd/alican-wholesale-price-list).
+enum PriceListType {
+  SECO
+  WET
+}
+
 // El tenant: cada negocio que compra el ERP es una Organization.
 model Organization {
   id                    String      @id @default(uuid())
@@ -70,6 +77,7 @@ model Organization {
   productStocks         ProductStock[]
   businessHours         BusinessHourSetting?
   pricingSetting        PricingSetting?
+  priceLists            PriceList[]
 
   @@map("organizations")
 }
@@ -244,6 +252,12 @@ model Product {
   saleItems          SaleItem[]
   variantAssignments ProductVariant[]
   stocks             ProductStock[]
+  // Precio mayorista sugerido (import Alican, sdd/alican-wholesale-price-list):
+  // init = round2(Con IVA × 1.3334) al importar; ajustable masivamente después.
+  // Decimal nullable; product.price NUNCA se toca (el precio del proveedor es
+  // solo informativo).
+  suggestedPrice     Decimal?           @db.Decimal(12, 2)
+  priceListEntries   PriceListEntry[]
 
   @@index([organizationId])
   @@index([categoryId])
@@ -695,4 +709,70 @@ model PricingSetting {
   updatedAt      DateTime     @updatedAt
 
   @@map("pricing_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Planillas de precios de proveedor (sdd/alican-wholesale-price-list)
+// ---------------------------------------------------------------------------
+
+// Una planilla importada del PDF Alican (SECO/WET). Idempotencia (D1/D2):
+// una planilla por (org, type, period); re-importar el MISMO período borra y
+// recrea la misma fila (cascade a sections/entries). El índice único ES
+// parcial (WHERE period IS NOT NULL) — ver la migración: period null (PDF sin
+// vigencia) crea fila nueva en cada import (Postgres trata NULLs como
+// distintos).
+model PriceList {
+  id             String             @id @default(uuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  provider       String             @default("ALICAN")
+  type           PriceListType
+  // Vigencia del PDF normalizada a YYYY-MM-DD; null si el header no la trae.
+  period         String?
+  sourceFilename String             // nombre ORIGINAL del PDF (metadata)
+  importedAt     DateTime           @default(now())
+  sections       PriceListSection[]
+
+  @@unique([organizationId, type, period])
+  @@index([organizationId, importedAt])
+  @@map("price_lists")
+}
+
+// Sección de la jerarquía DEL PDF (marca → línea → sublínea), no las
+// categorías del sistema. Sin organizationId propio (patrón Message, D4): se
+// scopea vía su PriceList (resuelto siempre con findFirst + organizationId).
+model PriceListSection {
+  id          String           @id @default(uuid())
+  priceListId String
+  priceList   PriceList        @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  brand       String?          // marca DEL PDF (no la variante del sistema)
+  line        String?          // ej. "SUPER PREMIUM PARA PERROS" (sin prefijo "LÍNEA")
+  subline     String?          // ej. "SIEGER PUPPY"
+  position    Int              // orden de aparición en el PDF
+  entries     PriceListEntry[]
+
+  @@index([priceListId, position])
+  @@map("price_list_sections")
+}
+
+// Fila de producto de la planilla. productId null = la fila no se matcheó
+// (las filas omitidas en el preview NO se persisten). priceConIva es SOLO
+// informativo (nunca toca product.price). suggestedPrice se persiste acá Y en
+// Product.suggestedPrice para los productos matcheados.
+model PriceListEntry {
+  id             String            @id @default(uuid())
+  sectionId      String
+  section        PriceListSection  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  productId      String?
+  product        Product?          @relation(fields: [productId], references: [id])
+  name           String            // nombre ORIGINAL del PDF
+  unit           String?           // unidad de empaque ("1 Kg.", "12 pouches x 100 gr")
+  priceSinIva    Decimal?          @db.Decimal(12, 2)
+  priceConIva    Decimal?          @db.Decimal(12, 2) // informativo; NUNCA toca product.price
+  suggestedPrice Decimal?          @db.Decimal(12, 2)
+  matched        Boolean           @default(false)
+  position       Int               // orden dentro de la sección
+
+  @@index([sectionId, position])
+  @@map("price_list_entries")
 }
