@@ -19,6 +19,7 @@ import { Request, Response } from "express";
 import { PDFParse } from "pdf-parse";
 import { requireOrganizationId } from "../config/tenantContext";
 import { prisma } from "../config/db";
+import { round2 } from "../utils/money";
 import {
   buildCatalogIndex,
   computeSuggestedPrice,
@@ -321,5 +322,199 @@ async function applyPriceListCore(
   });
 }
 
-const providerPriceListController = { importPriceList, applyPriceList };
-export default providerPriceListController;
+// ── Listado / detalle (REQ-9) ──────────────────────────────────────────────
+
+/**
+ * GET /price-lists — planillas de la org por importedAt desc, con
+ * sectionsCount y entriesCount agregados.
+ */
+export const listPriceLists = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const lists = await prisma.priceList.findMany({
+      where: { organizationId },
+      orderBy: { importedAt: "desc" },
+      select: {
+        id: true,
+        provider: true,
+        type: true,
+        period: true,
+        sourceFilename: true,
+        importedAt: true,
+        _count: { select: { sections: true } },
+        sections: { select: { _count: { select: { entries: true } } } },
+      },
+    });
+    const items = lists.map((l) => ({
+      id: l.id,
+      provider: l.provider,
+      type: l.type,
+      period: l.period,
+      sourceFilename: l.sourceFilename,
+      importedAt: l.importedAt,
+      sectionsCount: l._count.sections,
+      entriesCount: l.sections.reduce((s, sec) => s + sec._count.entries, 0),
+    }));
+    return res.status(200).json({ items });
+  } catch (error: any) {
+    console.error("Error listando planillas:", error);
+    return res.status(500).json({ message: "Error al listar las planillas" });
+  }
+};
+
+/**
+ * GET /price-lists/:id — jerarquía del PDF (sections por position, entries por
+ * position). 404 si la planilla no existe o pertenece a otra org (findFirst
+ * con organizationId — anti-fuga REQ-12).
+ */
+export const getPriceList = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const { id } = req.params;
+    const pl = await prisma.priceList.findFirst({
+      where: { id, organizationId },
+      include: {
+        sections: {
+          orderBy: { position: "asc" },
+          include: { entries: { orderBy: { position: "asc" } } },
+        },
+      },
+    });
+    if (!pl) {
+      return res.status(404).json({ message: "Planilla no encontrada" });
+    }
+    return res.status(200).json({
+      id: pl.id,
+      provider: pl.provider,
+      type: pl.type,
+      period: pl.period,
+      sourceFilename: pl.sourceFilename,
+      importedAt: pl.importedAt,
+      sections: pl.sections.map((s) => ({
+        id: s.id,
+        brand: s.brand,
+        line: s.line,
+        subline: s.subline,
+        position: s.position,
+        entries: s.entries.map((e) => ({
+          id: e.id,
+          productId: e.productId,
+          name: e.name,
+          unit: e.unit,
+          priceSinIva: e.priceSinIva,
+          priceConIva: e.priceConIva,
+          suggestedPrice: e.suggestedPrice,
+          matched: e.matched,
+          position: e.position,
+        })),
+      })),
+    });
+  } catch (error: any) {
+    console.error("Error obteniendo planilla:", error);
+    return res.status(500).json({ message: "Error al obtener la planilla" });
+  }
+};
+
+// ── Ajuste masivo de sugeridos (REQ-11, D7) ────────────────────────────────
+
+interface AdjustRow {
+  entryId: string;
+  name: string;
+  productId: string | null;
+  suggestedPrice: number;
+  newSuggestedPrice: number;
+  delta: number;
+}
+
+/**
+ * POST /price-lists/:id/adjust (?dryRun) — patrón dryRun de bulkPriceUpdate:
+ * el % se aplica server-side sobre el suggestedPrice ACTUAL de cada entrada de
+ * la planilla (excluidas fuera; overrides por entryId). El apply escribe
+ * PriceListEntry.suggestedPrice Y Product.suggestedPrice (solo entradas con
+ * productId). Los precios del proveedor (priceSinIva/priceConIva) NO se tocan.
+ * Comportamiento compuesto en re-runs (10% + 10% ≠ 21%), igual que bulkPriceUpdate.
+ */
+export const adjustPriceList = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const { id } = req.params;
+    const { percentage, excludeEntryIds = [], entryOverrides = [] } = req.body as {
+      percentage?: number;
+      excludeEntryIds?: string[];
+      entryOverrides?: { entryId: string; suggestedPrice: number }[];
+    };
+    const dryRun = req.query.dryRun === "true";
+
+    const pl = await prisma.priceList.findFirst({
+      where: { id, organizationId },
+      select: { id: true },
+    });
+    if (!pl) {
+      return res.status(404).json({ message: "Planilla no encontrada" });
+    }
+
+    const entries = await prisma.priceListEntry.findMany({
+      where: { section: { priceListId: id } },
+      select: { id: true, productId: true, name: true, suggestedPrice: true },
+    });
+
+    const excluded = new Set(excludeEntryIds);
+    const overrideByEntry = new Map(
+      entryOverrides.map((o) => [o.entryId, o.suggestedPrice]),
+    );
+    const pct = percentage ?? 0;
+
+    const rows: AdjustRow[] = entries
+      .filter((e) => !excluded.has(e.id))
+      .map((e) => {
+        const current = Number(e.suggestedPrice ?? 0);
+        const next = overrideByEntry.has(e.id)
+          ? round2(overrideByEntry.get(e.id)!)
+          : round2(current * (1 + pct / 100));
+        return {
+          entryId: e.id,
+          name: e.name,
+          productId: e.productId,
+          suggestedPrice: current,
+          newSuggestedPrice: next,
+          delta: round2(next - current),
+        };
+      });
+
+    const affected = rows.length;
+    const previousTotal = round2(rows.reduce((s, r) => s + r.suggestedPrice, 0));
+    const newTotal = round2(rows.reduce((s, r) => s + r.newSuggestedPrice, 0));
+
+    if (!dryRun) {
+      await prisma.$transaction(async (tx) => {
+        for (const r of rows) {
+          await tx.priceListEntry.updateMany({
+            where: { id: r.entryId },
+            data: { suggestedPrice: r.newSuggestedPrice },
+          });
+          if (r.productId) {
+            await tx.product.updateMany({
+              where: { id: r.productId },
+              data: { suggestedPrice: r.newSuggestedPrice },
+            });
+          }
+        }
+      });
+      return res.status(200).json({ affected, previousTotal, newTotal });
+    }
+
+    return res.status(200).json({ affected, previousTotal, newTotal, rows });
+  } catch (error: any) {
+    console.error("Error ajustando planilla:", error);
+    return res.status(500).json({ message: "Error al ajustar la planilla" });
+  }
+};
+
+const priceListController = {
+  importPriceList,
+  applyPriceList,
+  listPriceLists,
+  getPriceList,
+  adjustPriceList,
+};
+export default priceListController;
