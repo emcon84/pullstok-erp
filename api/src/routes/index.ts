@@ -25,6 +25,7 @@ import businessHoursRoutes from "./businessHoursRoutes";
 import pricingRoutes from "./pricingRoutes";
 import priceListRoutes from "./priceListRoutes";
 import providerRoutes from "./providerRoutes";
+import priceKgTypeRoutes from "./priceKgTypeRoutes";
 
 const router = Router();
 
@@ -58,5 +59,6 @@ router.use("/business-hours", businessHoursRoutes);
 router.use("/pricing-settings", pricingRoutes);
 router.use("/price-lists", priceListRoutes);
 router.use("/providers", providerRoutes);
+router.use("/price-kg-types", priceKgTypeRoutes);
 
 export default router;

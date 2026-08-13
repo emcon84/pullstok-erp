@@ -995,6 +995,136 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
 };
 
 /**
+ * Matchea el `name` de un producto contra los synonyms de un tipo de "Precios
+ * por kilo": true si el name CONTIENE cualquier synonym (case-insensitive,
+ * substring). Los synonyms vacíos/whitespace se ignoran (nunca matchean).
+ * Helper PURO y testeable.
+ */
+export const matchNameSynonyms = (name: string, synonyms: string[]): boolean => {
+  const lower = name.toLowerCase();
+  return synonyms.some((syn) => {
+    const s = syn.trim();
+    if (s.length === 0) return false;
+    return lower.includes(s.toLowerCase());
+  });
+};
+
+/**
+ * POST /products/bulk-kg-price-update — fija priceKgSuelto manual por marca +
+ * tipo. Dado brandValues (variante "Marca") + typeId + priceKg, matchea los
+ * productos por marca y luego en JS por synonyms del tipo (case-insensitive,
+ * substring) y setea priceKgSuelto=priceKg + priceKgSueltoManual=true.
+ * NUNCA toca product.price ni llama a recomputeForBulkPriceUpdate (el punto es
+ * fijar manual, no derivar). dryRun=true → preview; apply → re-resuelve el set
+ * DENTRO de $transaction (autoritativo). Cap BULK_UPDATE_MAX en ambos.
+ */
+export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
+  try {
+    const { brandValues, typeId, priceKg } = req.body as {
+      brandValues: string[];
+      typeId: string;
+      priceKg: number;
+    };
+    const dryRun = req.query.dryRun === "true";
+    const organizationId = requireOrganizationId();
+    const newPriceKg = Math.round(priceKg * 100) / 100;
+
+    const type = await prisma.priceKgType.findFirst({
+      where: { id: typeId },
+      select: { id: true, name: true, synonyms: true },
+    });
+    if (!type) {
+      return res.status(404).json({ message: "Tipo no encontrado" });
+    }
+
+    // Fallback: si el tipo no tiene synonyms, se matchea por su name.
+    const synonyms = type.synonyms.length > 0 ? type.synonyms : [type.name];
+
+    // Where de marca (solo marca, sin categoría/proveedor).
+    const where = buildBulkPriceWhere(brandValues, [], []);
+
+    const products = await prisma.product.findMany({
+      where,
+      select: { id: true, name: true, priceKgSuelto: true },
+    });
+
+    const matched = products.filter((p) => matchNameSynonyms(p.name, synonyms));
+
+    if (matched.length > BULK_UPDATE_MAX) {
+      return res.status(400).json({
+        message: `El lote supera el máximo de ${BULK_UPDATE_MAX} productos. Ajustá el alcance.`,
+      });
+    }
+
+    if (!dryRun) {
+      // Apply: re-resuelve el set DENTRO del $transaction (autoritativo — nunca
+      // confía en el preview). El `tx` de Prisma NO lleva el scope automático
+      // de la extensión (patrón de priceLooseService), así que organizationId
+      // se pasa explícito en toda query para no filtrar cross-tenant.
+      const result = await prisma.$transaction(async (tx) => {
+        const typeTx = await tx.priceKgType.findFirst({
+          where: { id: typeId, organizationId },
+          select: { id: true, name: true, synonyms: true },
+        });
+        if (!typeTx) {
+          return { notFound: true as const, overCap: false, affected: 0 };
+        }
+        const synonymsTx = typeTx.synonyms.length > 0 ? typeTx.synonyms : [typeTx.name];
+        const rowsTx = await tx.product.findMany({
+          where: { ...buildBulkPriceWhere(brandValues, [], []), organizationId },
+          select: { id: true, name: true },
+        });
+        const idsTx = rowsTx
+          .filter((p) => matchNameSynonyms(p.name, synonymsTx))
+          .map((p) => p.id);
+        if (idsTx.length > BULK_UPDATE_MAX) {
+          return { notFound: false as const, overCap: true, affected: idsTx.length };
+        }
+        if (idsTx.length === 0) {
+          return { notFound: false as const, overCap: false, affected: 0 };
+        }
+        await tx.product.updateMany({
+          where: { id: { in: idsTx }, organizationId },
+          data: { priceKgSuelto: newPriceKg, priceKgSueltoManual: true },
+        });
+        return { notFound: false as const, overCap: false, affected: idsTx.length };
+      });
+
+      if (result.notFound) {
+        return res.status(404).json({ message: "Tipo no encontrado" });
+      }
+      if (result.overCap) {
+        return res.status(400).json({
+          message: `El lote supera el máximo de ${BULK_UPDATE_MAX} productos. Ajustá el alcance.`,
+        });
+      }
+      if (result.affected === 0) {
+        return res.status(400).json({
+          message: "No hay productos que coincidan con la marca y el tipo seleccionados",
+        });
+      }
+      return res.status(200).json({ affected: result.affected });
+    }
+
+    // Preview (dryRun): filas completas (el cap de 5000 ya las limita).
+    if (matched.length === 0) {
+      return res.status(400).json({
+        message: "No hay productos que coincidan con la marca y el tipo seleccionados",
+      });
+    }
+    const rows = matched.map((p) => ({
+      id: p.id,
+      name: p.name,
+      currentPriceKg: p.priceKgSuelto,
+      newPriceKg,
+    }));
+    return res.status(200).json({ affected: rows.length, rows });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
  * GET /products/:id/stock — stock del producto en todas las sucursales ACTIVAS
  * de la org (spec A1). Respuesta autocontenida (design D5): no depende de
  * GET /branches (que es ADMIN/MANAGEMENT-only), cualquier rol autenticado la
@@ -1128,6 +1258,7 @@ export default {
   publishProduct,
   deleteProduct,
   bulkPriceUpdate,
+  bulkKgPriceUpdate,
   getProductStock,
   updateBranchStock,
   getStockSummary,

@@ -47,6 +47,7 @@ export const navGroups: NavGroup[] = [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/categorias", label: "Categorías", icon: Tags, visibleRoles: ["ADMIN", "MANAGEMENT"] },
       { to: "/actualizar-precios", label: "Actualizar precios", icon: DollarSign, visibleRoles: ["ADMIN", "SUPERADMIN"] },
+      { to: "/precios-por-kilo", label: "Precios por kilo", icon: Scale, visibleRoles: ["ADMIN", "SUPERADMIN"] },
       { to: "/planilla-mayorista", label: "Planilla mayorista", icon: FileSpreadsheet, visibleRoles: ["ADMIN", "SUPERADMIN"] },
     ],
   },

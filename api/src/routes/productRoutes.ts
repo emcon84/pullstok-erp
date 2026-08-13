@@ -19,6 +19,7 @@ import {
   bulkProductsSchema,
   publishProductSchema,
   bulkPriceUpdateSchema,
+  bulkKgPriceUpdateSchema,
   updateBranchStockSchema,
   applyPriceListSchema,
 } from "../validation/schemas";
@@ -108,6 +109,19 @@ router.post(
   requireRole("ADMIN"),
   validate(bulkPriceUpdateSchema),
   productController.bulkPriceUpdate,
+);
+
+// Bulk kg price update (precios por kilo) — ADMIN only. Registrado junto al
+// bulk-price-update existente, DESPUÉS de las rutas paramétricas /:id para no
+// chocar con ellas (una literal "bulk-kg-price-update" la matchearía /:id).
+// ?dryRun=true → preview; sin flag → apply.
+router.post(
+  "/bulk-kg-price-update",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN"),
+  validate(bulkKgPriceUpdateSchema),
+  productController.bulkKgPriceUpdate,
 );
 
 // Import de planillas de precios Alican (sdd/alican-wholesale-price-list) — ADMIN only.

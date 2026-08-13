@@ -97,6 +97,9 @@ const StockScannerPage = lazy(() =>
 const BulkPriceUpdate = lazy(() =>
   import("./views/BulkPriceUpdate").then((m) => ({ default: m.BulkPriceUpdate })),
 );
+const PriceKgUpdate = lazy(() =>
+  import("./views/PriceKgUpdate").then((m) => ({ default: m.PriceKgUpdate })),
+);
 
 const BrandingSettings = lazy(() =>
   import("./views/BrandingSettings").then((m) => ({ default: m.BrandingSettings })),
@@ -265,6 +268,7 @@ const AppRoutes = () => (
         <Route path="/sucursales" element={<BranchesPage />} />
         <Route path="/scanner" element={<StockScannerPage />} />
         <Route path="/actualizar-precios" element={<BulkPriceUpdate />} />
+        <Route path="/precios-por-kilo" element={<PriceKgUpdate />} />
         <Route path="/planilla-mayorista" element={<PriceListImport />} />
         <Route path="/planilla-mayorista/:id" element={<PriceListDetail />} />
         <Route path="/ajustes" element={<BrandingSettings />} />

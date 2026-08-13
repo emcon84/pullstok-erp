@@ -525,6 +525,70 @@ export const bulkPriceUpdateSchema = z
     });
   });
 
+// ---------- Precios por kilo (PriceKgType) ----------
+// Tipos de "Precios por kilo" (etapas de vida: Adulto, Cachorro, Kitten, ...).
+// Cada tipo tiene `name` + `synonyms` (palabras que matchean el name del
+// producto, case-insensitive). `synonyms` opcional en create (default []) y
+// opcional en update (ausente = no tocar).
+
+const priceKgTypeSynonymSchema = z
+  .string()
+  .trim()
+  .min(1, "El sinónimo no puede estar vacío")
+  .max(60, "Máximo 60 caracteres");
+
+export const createPriceKgTypeSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "El nombre es requerido")
+      .max(60, "Máximo 60 caracteres"),
+    synonyms: z
+      .array(priceKgTypeSynonymSchema)
+      .max(50, "Máximo 50 sinónimos")
+      .default([]),
+  })
+  .strip();
+
+export const updatePriceKgTypeSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "El nombre es requerido")
+      .max(60, "Máximo 60 caracteres")
+      .optional(),
+    synonyms: z
+      .array(priceKgTypeSynonymSchema)
+      .max(50, "Máximo 50 sinónimos")
+      .optional(),
+  })
+  .strip();
+
+// Propagación masiva de precio por kilo (POST /products/bulk-kg-price-update):
+// brandValues (marca, variante "Marca") + typeId + priceKg fija priceKgSuelto
+// en los productos que matcheen marca + tipo (tipo inferido por synonyms).
+export const bulkKgPriceUpdateSchema = z
+  .object({
+    brandValues: z.array(z.string().trim().min(1, "La marca no puede estar vacía")),
+    typeId: z.string().uuid("Tipo inválido"),
+    priceKg: z.coerce
+      .number()
+      .positive("El precio por kg debe ser mayor a 0")
+      .multipleOf(0.01, "El precio admite hasta 2 decimales"),
+  })
+  .strip()
+  .superRefine((data, ctx) => {
+    if (data.brandValues.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["brandValues"],
+        message: "Seleccioná al menos una marca",
+      });
+    }
+  });
+
 // ---------- Branding de la app (ERP) ----------
 // Configuración de branding del ERP, 1:1 con Organization.
 // Mismo patrón que updateStoreSettingsSchema: hex regex, URL nullable, strip.

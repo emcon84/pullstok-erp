@@ -59,6 +59,7 @@ model Organization {
   users                 User[]
   products              Product[]
   providers             Provider[]
+  priceKgTypes          PriceKgType[]
   categories            Category[]
   variantDefs           CategoryVariantDefinition[]
   variantOptions        CategoryVariantOption[]
@@ -237,6 +238,28 @@ model Provider {
   @@unique([organizationId, name])
   @@index([organizationId])
   @@map("providers")
+}
+
+// Tipos de "Precios por kilo" (etapas de vida del alimento: Adulto, Cachorro,
+// Kitten, Senior, etc.). Tenant-scoped (organizationId) y en TENANT_MODELS
+// (db.ts) → scope org automático anti-fuga. `synonyms` son palabras que
+// matchean (case-insensitive, substring) el `name` del producto para inferir
+// su tipo en la propagación masiva de priceKgSuelto (POST /products/
+// bulk-kg-price-update). La unicidad (org, name) es case-insensitive a nivel DB:
+// la migración materializa la @@unique como índice funcional LOWER (mismo
+// patrón intencional que providers y price_lists).
+model PriceKgType {
+  id             String       @id @default(uuid())
+  name           String
+  synonyms       String[]
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("price_kg_types")
 }
 
 model Product {

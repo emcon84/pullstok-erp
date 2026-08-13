@@ -18,6 +18,7 @@ const TENANT_MODELS = new Set([
   "Branch",
   "Product",
   "Provider",
+  "PriceKgType",
   "ProductStock",
   "Category",
   "CategoryVariantDefinition",

@@ -379,3 +379,58 @@ export const bulkPriceUpdate = async (
   }
   return res.json();
 };
+
+// ---------------------------------------------------------------------------
+// Bulk price-per-kilo update (sdd/price-kg)
+// ---------------------------------------------------------------------------
+
+/** Payload compartido por preview (dryRun) y apply de la propagación por kilo. */
+export interface BulkKgPricePayload {
+  brandValues: string[];
+  typeId: string;
+  priceKg: number;
+}
+
+/** Fila del preview: producto con su precio por kilo actual y el nuevo. */
+export interface BulkKgPricePreviewRow {
+  id: string;
+  name: string;
+  currentPriceKg: number | null;
+  newPriceKg: number;
+}
+
+/** Respuesta del preview (dryRun). */
+export interface BulkKgPricePreview {
+  affected: number;
+  rows: BulkKgPricePreviewRow[];
+}
+
+/** Respuesta del apply. */
+export interface BulkKgPriceApplyResult {
+  affected: number;
+}
+
+/**
+ * POST /products/bulk-kg-price-update — preview (dryRun=true) o apply. Plain
+ * fetch + token de localStorage (mismo patrón que bulkPriceUpdate).
+ */
+export const bulkKgPriceUpdate = async (
+  payload: BulkKgPricePayload,
+  dryRun: boolean,
+): Promise<BulkKgPricePreview | BulkKgPriceApplyResult> => {
+  const token = localStorage.getItem("token");
+  const query = dryRun ? "?dryRun=true" : "";
+  const res = await fetch(`${API_URL}/products/bulk-kg-price-update${query}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "bulk kg price update failed");
+  }
+  return res.json();
+};
