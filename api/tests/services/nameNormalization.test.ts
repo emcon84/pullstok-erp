@@ -110,3 +110,31 @@ describe("normalizeName — pack-format normalization (fix: bolsa x)", () => {
     expect(normalizeName("AGILITY x ADULTOS")).toBe("agility x adultos");
   });
 });
+
+describe("normalizeName — WET EO y unidades pegadas (dry-run 082026 WET)", () => {
+  it("normalizes EO positioned AFTER the quantity (catálogo '340 GR EO' ≡ planilla 'x 340 gr. EO')", () => {
+    expect(normalizeName("AGILITY CACHORRO 340 GR EO")).toBe(
+      normalizeName("Agility Cachorro x 340 gr. EO"),
+    );
+  });
+  it("collapses the duplicated EO in the WET planilla (catálogo 'WET EO 340 GR' ≡ planilla 'WET EO x 340 gr. EO')", () => {
+    expect(normalizeName("KATZE ADULT URINARY WET EO 340 GR")).toBe(
+      normalizeName("Katze Adult Urinary WET EO x 340 gr. EO"),
+    );
+  });
+  it("keeps a SINGLE EO intact (no false removal)", () => {
+    expect(normalizeName("7 VIDAS CARNE 90 GR EO")).toBe("7 vidas carne 90g eo");
+  });
+  it("normalizes a unit glued to the digit with no space (100gr ≡ 100 gr)", () => {
+    expect(normalizeName("SIEGER PERRO ADULTO WET SALMON Y POLLO 100 GR")).toBe(
+      normalizeName("Sieger Perro Adulto WET Salmon y Pollo x 100gr."),
+    );
+    expect(normalizeName("SIEGER PERRO ADULTO WET SALMON Y POLLO 340 GR EO")).toBe(
+      normalizeName("Sieger Perro Adulto WET Salmon y Pollo x 340gr. EO"),
+    );
+  });
+  it("does NOT strip eo from inside a word (gea / recovery keep their letters)", () => {
+    expect(normalizeName("SIEGER RECOVERY x 100 gr.")).toBe("sieger recovery 100g");
+    expect(normalizeName("AGILITY GEA x 340 gr.")).toBe("agility gea 340g");
+  });
+});

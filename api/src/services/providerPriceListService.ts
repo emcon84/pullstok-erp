@@ -125,6 +125,7 @@ export function normalizeName(raw: string): string {
     .replace(/(\d)[,.](\d)/g, "$1.$2") // comma-decimal quantities: "1,5" → "1.5"
     .replace(/\b(kilos?|kgs?|kilogramos?)\b/g, "kg")
     .replace(/\b(grs?|gramos?)\b/g, "g")
+    .replace(/(\d)(grs?|gramos?)\b/g, "$1g") // pegada al dígito: "100gr" → "100g"
     .replace(/\b(litros?|lts?)\b/g, "l")
     .replace(/\b(unidades?|unids?)\b/g, "un")
     .replace(/(\d)\s+(kg|g|l|ml|un)\b/g, "$1$2") // "1 kg" → "1kg"
@@ -132,9 +133,16 @@ export function normalizeName(raw: string): string {
     .replace(/\bx\s+(?=\d)/g, "") // standalone pack "x" before a quantity: "x 1.5" → "1.5"
     .replace(/[()[\]{}]/g, " ") // parentheses → space
     .replace(/[—-]/g, " ") // hyphens/dashes → space
+    .replace(/\.(?=\s|$)/g, "") // residual dot before space/end: "340g. eo" → "340g eo"
     .replace(/\s+/g, " ")
     .trim()
-    .replace(/\.+$/, ""); // trailing dots
+    .replace(/\.+$/, "") // trailing dots
+    // "EO" (envase original) duplicado en la planilla WET: "WET EO x 340 gr. EO"
+    // → deja UNA sola ocurrencia, igual que el catálogo ("WET EO 340 GR").
+    // Elimina SOLO el último "eo" cuando hay 2+; un único "eo" intacto.
+    // (puede dejar un espacio residual al final del string → trim final)
+    .replace(/^(.*\beo\b.*)\beo\b$/, "$1")
+    .trim();
 }
 
 /** Best-effort pack expression at the end of a product name ("x 1 Kg." → "1 Kg."). */
