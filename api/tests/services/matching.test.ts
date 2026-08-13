@@ -57,8 +57,8 @@ describe("buildCatalogIndex — org-scoped, normalized keys → product ids", ()
       product("p3", "AGILITY Adultos - bolsa x 15 Kg."),
     ]);
     const index = await buildCatalogIndex({ product: { findMany } } as any, "org-1");
-    expect(index.byName.get("sieger puppy mini x 1kg")).toEqual(["p1", "p2"]);
-    expect(index.byName.get("agility adultos bolsa x 15kg")).toEqual(["p3"]);
+    expect(index.byName.get("sieger puppy mini 1kg")).toEqual(["p1", "p2"]);
+    expect(index.byName.get("agility adultos 15kg")).toEqual(["p3"]);
     expect(index.names.get("p1")).toBe("SIEGER Puppy Mini x 1 Kg.");
   });
 
@@ -74,8 +74,8 @@ describe("buildCatalogIndex — org-scoped, normalized keys → product ids", ()
 describe("matchByName — exact post-normalization equality", () => {
   const index: CatalogIndex = {
     byName: new Map([
-      ["sieger puppy mini x 1kg", ["p1"]],
-      ["sieger kitten x 1kg", ["p2", "p3"]],
+      ["sieger puppy mini 1kg", ["p1"]],
+      ["sieger kitten 1kg", ["p2", "p3"]],
     ]),
     byCode: new Map([["ali 8795", ["p9"]]]),
     names: new Map([
@@ -87,7 +87,7 @@ describe("matchByName — exact post-normalization equality", () => {
   };
 
   it("returns matched with the productId when exactly one catalog product matches", () => {
-    expect(matchByName("sieger puppy mini x 1kg", index)).toEqual({
+    expect(matchByName("sieger puppy mini 1kg", index)).toEqual({
       estado: "matched",
       productId: "p1",
       productIds: ["p1"],
@@ -96,13 +96,13 @@ describe("matchByName — exact post-normalization equality", () => {
   });
 
   it("returns unmatched when nothing matches", () => {
-    expect(matchByName("gooster cachorros x 15 kg", index)).toEqual({
+    expect(matchByName("gooster cachorros 15kg", index)).toEqual({
       estado: "unmatched",
     });
   });
 
   it("returns multi-match with the default first id when the catalog has duplicates", () => {
-    const result = matchByName("sieger kitten x 1kg", index);
+    const result = matchByName("sieger kitten 1kg", index);
     expect(result.estado).toBe("multi-match");
     expect(result.productIds).toEqual(["p2", "p3"]);
     expect(result.productId).toBe("p2"); // default = primer id
@@ -117,9 +117,9 @@ describe("matchByName — exact post-normalization equality", () => {
 describe("matchRows — preview rows with states, duplicates and priority", () => {
   const index: CatalogIndex = {
     byName: new Map([
-      ["sieger puppy mini x 1kg", ["p1"]],
-      ["duplicado x 1kg", ["p5"]],
-      ["otro x 1kg", ["p6", "p7"]],
+      ["sieger puppy mini 1kg", ["p1"]],
+      ["duplicado 1kg", ["p5"]],
+      ["otro 1kg", ["p6", "p7"]],
     ]),
     byCode: new Map(),
     names: new Map([

@@ -111,7 +111,10 @@ export function normalizePrice(raw: string): number | null {
 
 /**
  * Name normalization for EXACT post-normalization matching (spec REQ-4).
- * "SIEGER Puppy Mini x 1 Kg." ≡ "sieger puppy mini x 1kg".
+ * "SIEGER Puppy Mini x 1 Kg." ≡ "sieger puppy mini 1kg". Pack-format words
+ * ("bolsa", "sobre", "lata", ...) and a standalone pack "x" before a quantity
+ * are dropped so the same product with a different pack wording still matches
+ * ("SIEGER Ultra Vita Plus - bolsa x 1,5 Kg." ≡ "SIEGER ULTRA VITA PLUS 1.5 KG").
  */
 export function normalizeName(raw: string): string {
   return raw
@@ -124,7 +127,9 @@ export function normalizeName(raw: string): string {
     .replace(/\b(grs?|gramos?)\b/g, "g")
     .replace(/\b(litros?|lts?)\b/g, "l")
     .replace(/\b(unidades?|unids?)\b/g, "un")
-    .replace(/(\d)\s+(kg|g|l|ml|un)\b/g, "$1$2") // "x 1 kg" → "x 1kg"
+    .replace(/(\d)\s+(kg|g|l|ml|un)\b/g, "$1$2") // "1 kg" → "1kg"
+    .replace(/\b(?:bolsas?|sobres?|latas?|envases?|paquetes?|sachets?|tarros?|bidones?|presentaciones?)\b\s*x?(?!\w)\s*/g, " ") // pack words: "bolsa x 1,5" → "1.5"
+    .replace(/\bx\s+(?=\d)/g, "") // standalone pack "x" before a quantity: "x 1.5" → "1.5"
     .replace(/[()[\]{}]/g, " ") // parentheses → space
     .replace(/[—-]/g, " ") // hyphens/dashes → space
     .replace(/\s+/g, " ")
