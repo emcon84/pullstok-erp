@@ -71,18 +71,20 @@ describe("PriceKgUpdate — tipos y propagación por kilo", () => {
     renderView();
 
     expect(await screen.findByText("Acme")).toBeInTheDocument();
-    expect(await screen.findByRole("option", { name: "Adulto" })).toBeInTheDocument();
-    expect(screen.getAllByText("Adulto").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Cachorro").length).toBeGreaterThanOrEqual(1);
+    // La lista de tipos (sección A) muestra los nombres cargados.
+    expect(await screen.findByText("Adulto")).toBeInTheDocument();
+    expect(screen.getByText("Cachorro")).toBeInTheDocument();
+    // El selector de tipo (sección B) es un combobox Radix presente en el DOM.
+    expect(screen.getByRole("combobox", { name: /tipo/i })).toBeInTheDocument();
   });
 
   it("muestra la vista previa al calcular", async () => {
     renderView();
 
     fireEvent.click(await screen.findByText("Acme"));
-    fireEvent.change(screen.getByLabelText(/tipo/i), {
-      target: { value: "t-1" },
-    });
+    // Abrir el combobox de tipo y elegir "Adulto" (Radix Select).
+    fireEvent.click(screen.getByRole("combobox", { name: /tipo/i }));
+    fireEvent.click(await screen.findByRole("option", { name: "Adulto" }));
     fireEvent.change(screen.getByLabelText(/precio por kilo/i), {
       target: { value: "2500" },
     });
@@ -110,7 +112,7 @@ describe("PriceKgUpdate — tipos y propagación por kilo", () => {
     });
 
     renderView();
-    await screen.findByRole("option", { name: "Adulto" });
+    await screen.findByText("Adulto");
 
     fireEvent.change(screen.getByLabelText(/nombre/i), {
       target: { value: "Senior" },

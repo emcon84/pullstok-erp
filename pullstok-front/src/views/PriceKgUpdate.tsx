@@ -24,6 +24,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   listPriceKgTypes,
   createPriceKgType,
   updatePriceKgType,
@@ -367,24 +374,24 @@ export const PriceKgUpdate = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="kg-type">Tipo</Label>
-              <select
-                id="kg-type"
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              <Select
                 value={typeId}
-                onChange={(e) => {
-                  setTypeId(e.target.value);
+                onValueChange={(value) => {
+                  setTypeId(value);
                   setPreview(null);
                 }}
               >
-                <option value="" disabled>
-                  Seleccionar tipo
-                </option>
-                {types.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="kg-type" className="w-full">
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {types.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="kg-price">Precio por kilo</Label>
