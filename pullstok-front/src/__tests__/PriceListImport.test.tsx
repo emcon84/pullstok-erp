@@ -88,6 +88,13 @@ const uploadPdf = async () => {
   );
 };
 
+/** Abre el diálogo de confirmación y confirma la importación. */
+const confirmImport = async () => {
+  fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirmar importación" }));
+  await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
+};
+
 describe("PriceListImport — wizard de importación", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -97,6 +104,8 @@ describe("PriceListImport — wizard de importación", () => {
       imported: 1,
       omitted: 2,
       suggestedUpdated: 1,
+      priceUpdated: 1,
+      productsCreated: 1,
     });
     mockSearch.mockResolvedValue([
       { id: "p-9", name: "GOOSTER Sin Precio x 15 Kg." },
@@ -116,7 +125,7 @@ describe("PriceListImport — wizard de importación", () => {
     expect(mockImport).not.toHaveBeenCalled();
   });
 
-  it("muestra el preview con los badges de estado y los defaults (importAll ON: matched y sin matchear import, error omit)", async () => {
+  it("muestra el preview con los badges de estado y los defaults (importAll ON: matched y sin matchear import, error omit; aplicar precios default ON)", async () => {
     render(<PriceListImport />);
     await uploadPdf();
 
@@ -125,12 +134,13 @@ describe("PriceListImport — wizard de importación", () => {
     expect(screen.getByText("Sin matchear")).toBeInTheDocument();
 
     // Default con "Importar todas las filas" ON: matched → import,
-    // error → omit, sin matchear → import.
+    // error → omit, sin matchear → import. "Aplicar precios" default ON.
     const checkboxes = screen.getAllByRole("checkbox");
     expect(checkboxes[0]).toBeChecked(); // importar todas (default ON)
-    expect(checkboxes[1]).toBeChecked(); // matched → import
-    expect(checkboxes[2]).not.toBeChecked(); // error → omit
-    expect(checkboxes[3]).toBeChecked(); // sin matchear → import
+    expect(checkboxes[1]).toBeChecked(); // aplicar precios al catálogo (default ON)
+    expect(checkboxes[2]).toBeChecked(); // matched → import
+    expect(checkboxes[3]).not.toBeChecked(); // error → omit
+    expect(checkboxes[4]).toBeChecked(); // sin matchear → import
   });
 
   it("toggle a una fila matched a omit y envía el payload correcto al aplicar", async () => {
@@ -138,16 +148,16 @@ describe("PriceListImport — wizard de importación", () => {
     await uploadPdf();
 
     const checkboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(checkboxes[1]); // desmarcar la fila matched
+    fireEvent.click(checkboxes[2]); // desmarcar la fila matched
     // la fila sin matchear ya viene import por default (importAll ON)
 
-    fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
-    await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
+    await confirmImport();
 
     const payload = mockApply.mock.calls[0][0];
     expect(payload.layout).toBe("SECO");
     expect(payload.period).toBe("2026-08-10");
     expect(payload.sourceFilename).toBe("planilla.pdf");
+    expect(payload.applyPrices).toBe(true); // default ON
     expect(payload.rows).toHaveLength(3);
     expect(payload.rows[0]).toMatchObject({
       position: 0,
@@ -166,11 +176,10 @@ describe("PriceListImport — wizard de importación", () => {
     render(<PriceListImport />);
     await uploadPdf();
 
-    fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
-    await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
+    await confirmImport();
 
     const payload = mockApply.mock.calls[0][0];
-    // Sin matchear → import, sin productId (planilla-only).
+    // Sin matchear → import, sin productId (se creará con "aplicar precios" ON).
     expect(payload.rows[2]).toMatchObject({
       position: 2,
       accion: "import",
@@ -197,13 +206,50 @@ describe("PriceListImport — wizard de importación", () => {
 
     const checkboxes = screen.getAllByRole("checkbox");
     expect(checkboxes[0]).not.toBeChecked(); // importar todas OFF
-    expect(checkboxes[3]).not.toBeChecked(); // sin matchear → omit (default anterior)
+    expect(checkboxes[4]).not.toBeChecked(); // sin matchear → omit (default anterior)
 
-    fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
-    await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
+    await confirmImport();
 
     const payload = mockApply.mock.calls[0][0];
     expect(payload.rows[2]).toMatchObject({ position: 2, accion: "omit" });
+  });
+
+  it("desmarcar 'Aplicar precios al catálogo' envía applyPrices=false y no muestra el preview de creación", async () => {
+    render(<PriceListImport />);
+    await uploadPdf();
+
+    const aplicarPrecios = screen.getByLabelText("Aplicar precios al catálogo");
+    expect(aplicarPrecios).toBeChecked();
+    fireEvent.click(aplicarPrecios);
+
+    // Sin preview de creación en el resumen.
+    expect(screen.queryByText(/productos a crear/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
+    expect(await screen.findByRole("heading", { name: /Confirmar importación/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("crear-productos")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar importación" }));
+    await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
+
+    expect(mockApply.mock.calls[0][0].applyPrices).toBe(false);
+  });
+
+  it("muestra el preview de creación (conteos + nombres) antes de confirmar", async () => {
+    render(<PriceListImport />);
+    await uploadPdf();
+
+    // Resumen: 1 precio a actualizar (matched) · 1 producto a crear (sin match).
+    // Los números viven dentro de <strong> → matcher por subcadena del párrafo.
+    expect(screen.getByText((c) => c.includes("precios a actualizar"))).toBeInTheDocument();
+    expect(screen.getByText((c) => c.includes("productos a crear"))).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
+    expect(await screen.findByRole("heading", { name: /Confirmar importación/ })).toBeInTheDocument();
+
+    // El diálogo lista el nombre del producto que se va a crear.
+    const crear = screen.getByTestId("crear-productos");
+    expect(within(crear).getByText("Producto Sin Match x 3 Kg.")).toBeInTheDocument();
   });
 
   it("asigna un producto manualmente a una fila sin matchear y la marca para importar", async () => {
@@ -220,8 +266,7 @@ describe("PriceListImport — wizard de importación", () => {
     fireEvent.click(within(resultados).getByText("GOOSTER Sin Precio x 15 Kg."));
 
     // La fila sin matchear ahora tiene producto asignado → entra al apply.
-    fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
-    await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
+    await confirmImport();
 
     const payload = mockApply.mock.calls[0][0];
     const manual = payload.rows.find(
@@ -254,7 +299,7 @@ describe("PriceListImport — wizard de importación", () => {
   it("navega al detalle tras importar con éxito", async () => {
     render(<PriceListImport />);
     await uploadPdf();
-    fireEvent.click(screen.getByRole("button", { name: "Importar planilla" }));
+    await confirmImport();
     await waitFor(() =>
       expect(mockNavigate).toHaveBeenCalledWith("/planilla-mayorista/pl-1"),
     );

@@ -55,6 +55,10 @@ export interface ApplyPriceListPayload {
   layout: PriceListLayout;
   period: string | null;
   sourceFilename: string;
+  /** Check "Aplicar precios al catálogo" (default ON en la UI): con true, el
+   * precio Con IVA de cada fila va a product.price y las filas sin match se
+   * crean automáticamente. */
+  applyPrices?: boolean;
   rows: ApplyDecision[];
 }
 
@@ -63,6 +67,10 @@ export interface ApplyResult {
   imported: number;
   omitted: number;
   suggestedUpdated: number;
+  /** Productos vinculados cuyo product.price se actualizó al Con IVA. */
+  priceUpdated: number;
+  /** Productos creados automáticamente (filas sin match con precio). */
+  productsCreated: number;
 }
 
 export interface PriceListSummary {

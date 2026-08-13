@@ -8,6 +8,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -176,8 +186,10 @@ export const PriceListImport = () => {
   const [preview, setPreview] = useState<PriceListPreview | null>(null);
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
   const [importAll, setImportAll] = useState(true);
+  const [applyPrices, setApplyPrices] = useState(true);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleFile = async (selected: File | null) => {
@@ -228,6 +240,10 @@ export const PriceListImport = () => {
     if (preview) setDecisions(buildDefaults(preview.rows, next));
   };
 
+  const toggleApplyPrices = (checked: boolean | "indeterminate") => {
+    setApplyPrices(checked === true);
+  };
+
   const counts = useMemo(() => {
     const rows = preview?.rows ?? [];
     return {
@@ -241,6 +257,26 @@ export const PriceListImport = () => {
     };
   }, [preview, decisions]);
 
+  /**
+   * Plan de aplicación de precios (espejo del server, buildPriceApplyPlan):
+   * cuántos productos vinculados se van a actualizar (productId + Con IVA) y
+   * cuáles se van a crear (sin productId + Con IVA). Solo informativo para el
+   * preview de confirmación; el apply re-deriva server-side (autoritativo).
+   */
+  const applyPlan = useMemo(() => {
+    const rows = preview?.rows ?? [];
+    let updates = 0;
+    const creates: { nombre: string }[] = [];
+    for (const row of rows) {
+      const decision = decisions[row.position] ?? { accion: "omit" };
+      if (decision.accion !== "import") continue;
+      if (row.precioConIva == null) continue; // sin Con IVA no aplica ni se crea
+      if (decision.productId ?? row.productId) updates++;
+      else creates.push({ nombre: row.nombre });
+    }
+    return { updates, creates };
+  }, [preview, decisions]);
+
   const importar = async () => {
     if (!preview) return;
     setSubmitting(true);
@@ -250,6 +286,7 @@ export const PriceListImport = () => {
         layout: preview.layout,
         period: preview.period,
         sourceFilename: preview.sourceFilename,
+        applyPrices,
         rows: preview.rows.map((row) => ({
           position: row.position,
           accion: decisions[row.position]?.accion ?? "omit",
@@ -265,9 +302,18 @@ export const PriceListImport = () => {
         })),
       };
       const result = await applyPriceList(payload);
-      toast.success(
-        `Planilla importada: ${result.imported} productos, ${result.omitted} omitidos`,
-      );
+      const detail = [
+        `${result.imported} productos importados`,
+        `${result.omitted} omitidos`,
+      ];
+      if (applyPrices) {
+        detail.push(
+          `${result.priceUpdated} precios actualizados`,
+          `${result.productsCreated} productos creados`,
+        );
+      }
+      toast.success(`Planilla importada: ${detail.join(" · ")}`);
+      setDialogOpen(false);
       navigate(`/planilla-mayorista/${result.priceListId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al aplicar la planilla");
@@ -319,16 +365,29 @@ export const PriceListImport = () => {
               {preview.period ? `vigencia ${preview.period}` : "sin vigencia"} ·{" "}
               {preview.total} filas
             </CardTitle>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="importar-todas"
-                checked={importAll}
-                onCheckedChange={toggleImportAll}
-                aria-label="Importar todas las filas"
-              />
-              <Label htmlFor="importar-todas" className="text-sm font-normal text-muted-foreground">
-                Importar todas las filas
-              </Label>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="importar-todas"
+                  checked={importAll}
+                  onCheckedChange={toggleImportAll}
+                  aria-label="Importar todas las filas"
+                />
+                <Label htmlFor="importar-todas" className="text-sm font-normal text-muted-foreground">
+                  Importar todas las filas
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="aplicar-precios"
+                  checked={applyPrices}
+                  onCheckedChange={toggleApplyPrices}
+                  aria-label="Aplicar precios al catálogo"
+                />
+                <Label htmlFor="aplicar-precios" className="text-sm font-normal text-muted-foreground">
+                  Aplicar precios al catálogo
+                </Label>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -407,12 +466,66 @@ export const PriceListImport = () => {
               <strong>{counts.omitidos}</strong> omitidos ·{" "}
               <strong>{counts.errores}</strong> con error
             </p>
-            <Button onClick={importar} disabled={submitting || counts.importados === 0}>
+            {applyPrices && (
+              <p className="text-sm">
+                <strong>{applyPlan.updates}</strong> precios a actualizar ·{" "}
+                <strong>{applyPlan.creates.length}</strong> productos a crear
+              </p>
+            )}
+            <Button
+              onClick={() => setDialogOpen(true)}
+              disabled={submitting || counts.importados === 0}
+            >
               {submitting ? "Importando…" : "Importar planilla"}
             </Button>
           </CardContent>
         </Card>
       )}
+
+      {/* Confirmación antes de tocar el catálogo: nada se aplica sin confirmar. */}
+      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar importación</AlertDialogTitle>
+            <AlertDialogDescription>
+              <p>
+                Se importan <strong>{counts.importados}</strong> filas y se
+                omiten <strong>{counts.omitidos}</strong>.
+              </p>
+              {applyPrices && (
+                <div className="mt-2 space-y-1">
+                  <p>
+                    Se actualizará el precio (Con IVA) de{" "}
+                    <strong>{applyPlan.updates}</strong> productos.
+                  </p>
+                  {applyPlan.creates.length > 0 && (
+                    <div>
+                      <p>
+                        Se crearán <strong>{applyPlan.creates.length}</strong>{" "}
+                        productos nuevos:
+                      </p>
+                      <ul
+                        className="mt-1 max-h-40 list-disc space-y-0.5 overflow-auto pl-5 text-sm"
+                        data-testid="crear-productos"
+                      >
+                        {applyPlan.creates.map((c) => (
+                          <li key={c.nombre}>{c.nombre}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={importar} disabled={submitting}>
+              {submitting ? "Importando…" : "Confirmar importación"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
