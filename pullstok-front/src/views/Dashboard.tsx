@@ -9,6 +9,13 @@ import {
 } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { GenericModal } from "../components/molecules/GenericModal";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { StatCard } from "../components/molecules/StatCard";
@@ -50,6 +57,7 @@ export const Dashboard = () => {
   const [isModalUploadOpen, setIsModalUploadOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [providerFilter, setProviderFilter] = useState("");
   const [selectedStat, setSelectedStat] = useState<StatType>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -172,9 +180,29 @@ export const Dashboard = () => {
         return String(cat).toLowerCase().includes(categoryFilter.toLowerCase());
       });
     }
+    if (providerFilter) {
+      list = list.filter((p) => {
+        const name = (p as any).provider?.name || "";
+        return String(name).toLowerCase() === providerFilter.toLowerCase();
+      });
+    }
     if (filterTerms.length === 0) return list;
     return list.filter((product) => matchesProductFilter(product, filterTerms));
-  }, [products, filterTerms, categoryFilter]);
+  }, [products, filterTerms, categoryFilter, providerFilter]);
+
+  // Proveedores disponibles en el catálogo cargado (para el select de filtro).
+  const availableProviders = useMemo(() => {
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const p of products) {
+      const name = (p as any).provider?.name;
+      if (name && typeof name === "string" && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        names.push(name);
+      }
+    }
+    return names.sort((a, b) => a.localeCompare(b, "es"));
+  }, [products]);
 
   if (productsLoading) {
     return (
@@ -350,6 +378,28 @@ export const Dashboard = () => {
         />
       </div>
 
+      {/* Filtro por proveedor */}
+      {availableProviders.length > 0 && (
+        <div className="max-w-xs">
+          <Select
+            value={providerFilter || "all"}
+            onValueChange={(v) => setProviderFilter(v === "all" ? "" : v)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Todos los proveedores" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los proveedores</SelectItem>
+              {availableProviders.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* ── Filter chips ── */}
       <FilterChips
         products={products}
@@ -357,7 +407,7 @@ export const Dashboard = () => {
         categoryFilter={categoryFilter}
         onFilterChange={setFilter}
         onCategoryChange={setCategoryFilter}
-        onClear={() => { setFilter(""); setCategoryFilter(""); }}
+        onClear={() => { setFilter(""); setCategoryFilter(""); setProviderFilter(""); }}
       />
 
       {/* Tabla de productos / stock */}
