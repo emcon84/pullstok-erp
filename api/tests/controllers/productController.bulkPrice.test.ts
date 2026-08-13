@@ -150,6 +150,28 @@ describe("buildBulkPriceWhere — brand + optional category/exclude filters", ()
   });
 });
 
+describe("buildBulkPriceWhere — providerIds (sdd/alican-wholesale-price-list/providers)", () => {
+  it("adds providerId in-filter when providerIds is non-empty (AND with the brand filter)", () => {
+    const where = buildBulkPriceWhere(["Acme"], [], [], ["prov-1", "prov-2"]);
+    expect(where.providerId).toEqual({ in: ["prov-1", "prov-2"] });
+    // El filtro de marcas sigue presente: se combina como AND.
+    expect(where.variantAssignments).toBeDefined();
+  });
+
+  it("omits providerId when providerIds is empty/omitted (back-compat)", () => {
+    const where = buildBulkPriceWhere(["Acme"], [], []);
+    expect(where.providerId).toBeUndefined();
+    expect(buildBulkPriceWhere(["Acme"], [], [], []).providerId).toBeUndefined();
+  });
+
+  it("combines providerIds with category and exclude filters as AND", () => {
+    const where = buildBulkPriceWhere(["Acme"], ["cat-1"], ["p-1"], ["prov-1"]);
+    expect(where.providerId).toEqual({ in: ["prov-1"] });
+    expect(where.categoryId).toEqual({ in: ["cat-1"] });
+    expect(where.id).toEqual({ notIn: ["p-1"] });
+  });
+});
+
 describe("BULK_UPDATE_MAX module constant", () => {
   it("caps the affected set at 5000 products (exceeding → HTTP 400)", () => {
     expect(BULK_UPDATE_MAX).toBe(5000);

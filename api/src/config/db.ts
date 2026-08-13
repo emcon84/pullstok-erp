@@ -17,6 +17,7 @@ const basePrisma = new PrismaClient({ adapter });
 const TENANT_MODELS = new Set([
   "Branch",
   "Product",
+  "Provider",
   "ProductStock",
   "Category",
   "CategoryVariantDefinition",

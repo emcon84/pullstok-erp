@@ -114,6 +114,11 @@ const txMock = () => ({
     findMany: jest.fn().mockResolvedValue([]),
   },
   productVariant: { create: jest.fn().mockResolvedValue({ id: "pv-1" }) },
+  // Proveedor de la planilla (sdd/alican-wholesale-price-list/providers).
+  provider: {
+    findFirst: jest.fn().mockResolvedValue(null),
+    create: jest.fn().mockResolvedValue({ id: "prov-1" }),
+  },
   branch: { findFirst: jest.fn().mockResolvedValue(null) },
   productStock: {
     findFirst: jest.fn().mockResolvedValue(null),
@@ -707,6 +712,144 @@ describe("applyPriceList — aplicar precios al catálogo (applyPrices=true)", (
       priceUpdated: 1,
       productsCreated: 0,
     });
+  });
+});
+
+describe("applyPriceList — proveedor de la planilla (providerName)", () => {
+  const applyBody = {
+    layout: "SECO" as const,
+    period: "2026-08-10",
+    sourceFilename: "planilla.pdf",
+    applyPrices: true,
+    providerName: "ALICAN",
+    rows: [
+      {
+        position: 0,
+        accion: "import" as const,
+        productId: uuid,
+        nombre: "SIEGER Puppy Mini x 1 Kg.",
+        marca: "SIEGER",
+        linea: "SUPER PREMIUM PARA PERROS",
+        sublinea: "SIEGER PUPPY",
+        unidadEmpaque: "1 Kg.",
+        precioSinIva: 8795,
+        precioConIva: 10642,
+      },
+      {
+        position: 1,
+        accion: "import" as const,
+        nombre: "GOOSTER Adultos x 15 Kg.",
+        marca: "SIEGER",
+        precioSinIva: 20000,
+        precioConIva: 24200,
+      },
+    ],
+  };
+
+  const setupTx = (providerFind: { id: string } | null) => {
+    const tx = txMock();
+    tx.product.findMany
+      .mockResolvedValueOnce([{ id: uuid }]) // anti-fuga: el matched está en la org
+      .mockResolvedValueOnce([]); // índice de existentes: nada aún
+    tx.provider.findFirst.mockResolvedValue(providerFind);
+    tx.provider.create.mockResolvedValue({ id: "prov-1" });
+    tx.product.create.mockResolvedValue({ id: "new-1" });
+    mockedPrisma.$transaction.mockImplementation(async (fn: (t: unknown) => unknown) => fn(tx));
+    return tx;
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("crea el proveedor (no existe) y asigna providerId a los matcheados y a los creados", async () => {
+    const tx = setupTx(null);
+    const res = fakeRes();
+    await applyPriceList(fakeReq({ body: applyBody }), res);
+
+    // Proveedor creado con el nombre exacto (trimmed) scopeado a la org.
+    expect(tx.provider.create).toHaveBeenCalledWith({
+      data: { name: "ALICAN", organizationId: "org-1" },
+    });
+    // Producto matcheado: updateMany con suggestedPrice + price + providerId.
+    const matchedUpdate = tx.product.updateMany.mock.calls.find((c) => c[0].where.id === uuid);
+    expect(matchedUpdate[0].data).toEqual({
+      suggestedPrice: 14190.04,
+      price: 10642,
+      providerId: "prov-1",
+    });
+    // Producto creado: providerId en el create.
+    expect(tx.product.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ providerId: "prov-1", name: "GOOSTER Adultos x 15 Kg." }),
+      }),
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("reutiliza un proveedor existente por nombre (case-insensitive) sin crear otro", async () => {
+    const tx = setupTx({ id: "prov-existente" });
+    const res = fakeRes();
+    await applyPriceList(
+      fakeReq({ body: { ...applyBody, providerName: "  alican " } }),
+      res,
+    );
+
+    expect(tx.provider.findFirst).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        name: { equals: "alican", mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    expect(tx.provider.create).not.toHaveBeenCalled();
+    const matchedUpdate = tx.product.updateMany.mock.calls.find((c) => c[0].where.id === uuid);
+    expect(matchedUpdate[0].data.providerId).toBe("prov-existente");
+  });
+
+  it("sin providerName NO resuelve proveedor ni toca providerId (back-compat)", async () => {
+    const tx = setupTx(null);
+    const res = fakeRes();
+    const body = { ...applyBody, providerName: undefined };
+    await applyPriceList(fakeReq({ body }), res);
+
+    expect(tx.provider.findFirst).not.toHaveBeenCalled();
+    expect(tx.provider.create).not.toHaveBeenCalled();
+    const matchedUpdate = tx.product.updateMany.mock.calls.find((c) => c[0].where.id === uuid);
+    expect(matchedUpdate[0].data.providerId).toBeUndefined();
+    expect(tx.product.create).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        data: expect.objectContaining({ providerId: expect.any(String) }),
+      }),
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("filas planilla-only (sin productId) no resuelven el proveedor ni tocan producto", async () => {
+    const tx = txMock();
+    tx.product.findMany.mockResolvedValue([]); // sin productId → no anti-fuga ni índice
+    mockedPrisma.$transaction.mockImplementation(async (fn: (t: unknown) => unknown) => fn(tx));
+
+    const res = fakeRes();
+    const body = {
+      ...applyBody,
+      rows: [
+        {
+          position: 0,
+          accion: "import" as const,
+          nombre: "GOOSTER Adultos x 15 Kg.",
+          precioSinIva: 20000,
+          precioConIva: null,
+        },
+      ],
+    };
+    await applyPriceList(fakeReq({ body }), res);
+
+    expect(tx.provider.findFirst).not.toHaveBeenCalled();
+    expect(tx.provider.create).not.toHaveBeenCalled();
+    expect(tx.product.create).not.toHaveBeenCalled();
+    expect(tx.product.updateMany).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });
 

@@ -24,6 +24,7 @@ import backupRoutes from "./backupRoutes";
 import businessHoursRoutes from "./businessHoursRoutes";
 import pricingRoutes from "./pricingRoutes";
 import priceListRoutes from "./priceListRoutes";
+import providerRoutes from "./providerRoutes";
 
 const router = Router();
 
@@ -56,5 +57,6 @@ router.use("/backups", backupRoutes);
 router.use("/business-hours", businessHoursRoutes);
 router.use("/pricing-settings", pricingRoutes);
 router.use("/price-lists", priceListRoutes);
+router.use("/providers", providerRoutes);
 
 export default router;

@@ -258,6 +258,7 @@ export const applyPriceList = async (req: Request, res: Response) => {
       period: string | null;
       sourceFilename: string;
       applyPrices?: boolean;
+      providerName?: string;
       rows: ApplyDecision[];
     };
     const result = await applyPriceListCore(organizationId, body);
@@ -321,6 +322,7 @@ async function applyPriceListCore(
     period: string | null;
     sourceFilename: string;
     applyPrices?: boolean;
+    providerName?: string;
     rows: ApplyDecision[];
   },
 ): Promise<{
@@ -331,7 +333,7 @@ async function applyPriceListCore(
   priceUpdated: number;
   productsCreated: number;
 }> {
-  const { layout, period, sourceFilename, applyPrices = false, rows } = body;
+  const { layout, period, sourceFilename, applyPrices = false, providerName, rows } = body;
   const imports = rows.filter((r) => r.accion === "import");
 
   if (imports.length === 0) {
@@ -396,6 +398,37 @@ async function applyPriceListCore(
       },
     });
 
+    // ── Proveedor de la planilla (sdd/alican-wholesale-price-list/providers) ──
+    // Si el payload trae providerName (ya validado no-vacío por Zod), se crea o
+    // reutiliza el Provider de la org por nombre case-insensitive (findFirst, no
+    // findUnique — bloqueado por la extensión multi-tenant). Se asigna providerId
+    // a TODOS los productos tocados: los matcheados/reutilizados (updateMany) y
+    // los creados (create). Las filas planilla-only (sin productId) NO tocan
+    // producto → no justifican resolver el proveedor. Sin providerName → null
+    // (back-compat total: nada cambia respecto al comportamiento original).
+    const touchesProducts =
+      imports.some((r) => r.productId) ||
+      (applyPrices && imports.some((r) => r.precioConIva != null));
+    let providerId: string | null = null;
+    const providerNameTrimmed = providerName?.trim();
+    if (providerNameTrimmed && touchesProducts) {
+      const existing = await tx.provider.findFirst({
+        where: {
+          organizationId,
+          name: { equals: providerNameTrimmed, mode: "insensitive" },
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        providerId = existing.id;
+      } else {
+        const provider = await tx.provider.create({
+          data: { name: providerNameTrimmed, organizationId },
+        });
+        providerId = provider.id;
+      }
+    }
+
     // ── Aplicar precios: crear los no matcheados (applyPrices ON) ──────────
     // Position → productId resuelto (existente, reutilizado o recién creado).
     const resolveByPosition = new Map<number, string>();
@@ -439,6 +472,7 @@ async function applyPriceListCore(
             categoryId: null,
             organizationId,
             suggestedPrice: computeSuggestedPrice(r.precioConIva, r.precioSinIva ?? null),
+            ...(providerId ? { providerId } : {}),
           },
         });
         const optionId = r.marca ? brandIndex.get(normalizeName(r.marca)) : undefined;
@@ -497,13 +531,14 @@ async function applyPriceListCore(
       if (!productId || seenProducts.has(productId)) continue;
       if (createdIds.has(productId)) continue; // ya queda con price+sugerido
       seenProducts.add(productId);
-      const data: { suggestedPrice: number | null; price?: number } = {
+      const data: { suggestedPrice: number | null; price?: number; providerId?: string } = {
         suggestedPrice: computeSuggestedPrice(r.precioConIva ?? null, r.precioSinIva ?? null),
       };
       if (applyPrices && r.precioConIva != null) {
         data.price = round2(r.precioConIva);
         priceUpdated++;
       }
+      if (providerId) data.providerId = providerId;
       await tx.product.updateMany({
         where: { id: productId },
         data,

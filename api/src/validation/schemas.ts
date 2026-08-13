@@ -470,6 +470,11 @@ export const bulkPriceUpdateSchema = z
       .optional(),
     categoryIds: z.array(z.string().uuid("Categoría inválida")).default([]),
     excludeProductIds: z.array(z.string().uuid("Producto inválido")).default([]),
+    // Filtro por proveedor (sdd/alican-wholesale-price-list/providers): OPCIONAL.
+    // Cuando viene, el where incluye providerId IN (…) COMBINADO con el filtro
+    // de marcas como AND (marcas Y proveedor; si solo mandás providerIds y
+    // brandValues trae una marca, es AND). Vacío/ausente → sin filtro (back-compat).
+    providerIds: z.array(z.string().uuid("Proveedor inválido")).default([]),
     // Overrides por categoría/producto (sdd/bulk-price-overrides): % propio por
     // nodo de categoría y por fila de producto. Precedencia product > category
     // > global (percentage). 0% = incluido pero sin cambio; exclusión =
@@ -648,6 +653,12 @@ export const applyPriceListSchema = z
     // original (no tocan product.price ni crean productos). El wizard SIEMPRE
     // envía el valor explícito (default ON en la UI).
     applyPrices: z.boolean().optional(),
+    // Proveedor de la planilla (sdd/alican-wholesale-price-list/providers):
+    // OPCIONAL y back-compat — sin él, providerId queda null y todo sigue igual.
+    // El server crea o reutiliza el Provider de la org por nombre
+    // case-insensitive y asigna providerId a todos los productos tocados.
+    // trim+min(1): vacío o solo espacios → 400 (validación explícita del server).
+    providerName: z.string().trim().min(1, "El proveedor no puede estar vacío").optional(),
     rows: z.array(decisionSchema).min(1, "Debe enviar al menos una decisión"),
   })
   .strip()

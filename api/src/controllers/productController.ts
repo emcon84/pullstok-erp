@@ -347,6 +347,7 @@ const getProducts = async (req: Request, res: Response) => {
     }
     const include = {
       category: { select: { id: true, name: true } },
+      provider: { select: { id: true, name: true } },
       variantAssignments: {
         include: {
           option: {
@@ -479,6 +480,7 @@ const getProductById = async (req: Request, res: Response) => {
       where: { id: req.params.id },
       include: {
         category: { select: { id: true, name: true } },
+        provider: { select: { id: true, name: true } },
         variantAssignments: {
           include: {
             option: {
@@ -582,6 +584,7 @@ const updateProduct = async (req: Request, res: Response) => {
       where: { id: req.params.id },
       include: {
         category: { select: { id: true, name: true } },
+        provider: { select: { id: true, name: true } },
         variantAssignments: {
           include: {
             option: {
@@ -732,7 +735,9 @@ export async function resolveCategoryScope(
 /**
  * Where común de preview y apply: brand (some option.value in brandValues sobre
  * variant "Marca") AND categoryId in expanded (solo si hay expansión) AND id
- * notIn excludeProductIds (solo si hay exclusiones). SIN filtro
+ * notIn excludeProductIds (solo si hay exclusiones) AND providerId in
+ * providerIds (solo si hay proveedores — sdd/alican-wholesale-price-list/providers:
+ * el filtro de marcas y el de proveedores se combinan como AND). SIN filtro
  * publishedToStore: aplica a TODOS los productos matcheados, incluidos no
  * publicados (comportamiento confirmado).
  */
@@ -740,6 +745,7 @@ export function buildBulkPriceWhere(
   brandValues: string[],
   expanded: string[],
   excludeProductIds: string[],
+  providerIds: string[] = [],
 ) {
   const where: any = {
     variantAssignments: {
@@ -753,6 +759,7 @@ export function buildBulkPriceWhere(
   };
   if (expanded.length > 0) where.categoryId = { in: expanded };
   if (excludeProductIds.length > 0) where.id = { notIn: excludeProductIds };
+  if (providerIds.length > 0) where.providerId = { in: providerIds };
   return where;
 }
 
@@ -801,6 +808,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       percentage,
       categoryIds = [],
       excludeProductIds = [],
+      providerIds = [],
       categoryPercentages = [],
       productPercentages = [],
     } = req.body as {
@@ -808,6 +816,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       percentage?: number;
       categoryIds?: string[];
       excludeProductIds?: string[];
+      providerIds?: string[];
       categoryPercentages?: { categoryId: string; percentage: number }[];
       productPercentages?: { productId: string; percentage: number }[];
     };
@@ -817,7 +826,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
     const globalPct = percentage ?? 0;
 
     const expanded = await resolveCategoryScope(prisma, categoryIds);
-    const where = buildBulkPriceWhere(brandValues, expanded, excludeProductIds);
+    const where = buildBulkPriceWhere(brandValues, expanded, excludeProductIds, providerIds);
 
     // Overrides: mapa de ancestros (para heredar override de categoría al
     // subtree) + maps de % por categoría/producto. Preview Y apply resuelven
@@ -887,7 +896,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       const result = await prisma.$transaction(async (tx) => {
         const expandedTx = await resolveCategoryScope(tx, categoryIds);
         const rowsTx = await tx.product.findMany({
-          where: buildBulkPriceWhere(brandValues, expandedTx, excludeProductIds),
+          where: buildBulkPriceWhere(brandValues, expandedTx, excludeProductIds, providerIds),
           select: { id: true, price: true, categoryId: true },
         });
         if (rowsTx.length === 0) {
@@ -922,7 +931,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         // B-05c: recompute priceKgSuelto for the SAME resolved set after
         // the price writes, inside the same $transaction. Overrides (per-product
         // bulkFactor) are resolved per row by the service.
-        const recomputeWhere = buildBulkPriceWhere(brandValues, expandedTx, excludeProductIds);
+        const recomputeWhere = buildBulkPriceWhere(brandValues, expandedTx, excludeProductIds, providerIds);
         await recomputeForBulkPriceUpdate(tx, recomputeWhere, organizationId);
 
         const prevTotal =

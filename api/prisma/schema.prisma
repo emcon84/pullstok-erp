@@ -58,6 +58,7 @@ model Organization {
   taxCondition          String?
   users                 User[]
   products              Product[]
+  providers             Provider[]
   categories            Category[]
   variantDefs           CategoryVariantDefinition[]
   variantOptions        CategoryVariantOption[]
@@ -216,6 +217,28 @@ model ProductVariant {
   @@map("product_variants")
 }
 
+// Un proveedor de la organización (ej. "ALICAN"). Tenant-scoped (organizationId)
+// y en TENANT_MODELS (db.ts) → scope org automático anti-fuga. Los productos
+// tocados por una planilla de precios (sdd/alican-wholesale-price-list/providers)
+// quedan asociados al proveedor elegido al importar, para filtrar por proveedor
+// en la actualización masiva de precios. El código SIEMPRE resuelve por nombre
+// con findFirst case-insensitive y crea si no existe (nunca findUnique —
+// bloqueado por la extensión multi-tenant). La unicidad (org, name) es
+// case-insensitive a nivel DB: la migración materializa la @@unique de abajo
+// como índice funcional LOWER (misma desviación intencional que el índice
+// parcial de price_lists).
+model Provider {
+  id             String       @id @default(uuid())
+  name           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  products       Product[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("providers")
+}
+
 model Product {
   id                 String            @id @default(uuid())
   name               String
@@ -258,11 +281,19 @@ model Product {
   // solo informativo).
   suggestedPrice     Decimal?           @db.Decimal(12, 2)
   priceListEntries   PriceListEntry[]
+  // Proveedor que abastece el producto (sdd/alican-wholesale-price-list/providers).
+  // null = sin proveedor (productos legacy). onDelete SetNull: borrar un
+  // proveedor NO borra productos, solo les deja el providerId null (mismo
+  // criterio que products.categoryId). El import de una planilla lo asigna a
+  // todos los productos tocados (matcheados + creados).
+  providerId         String?
+  provider           Provider?          @relation(fields: [providerId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([categoryId])
   @@index([organizationId, code])
   @@index([organizationId, barcode])
+  @@index([organizationId, providerId])
   @@map("products")
 }
 

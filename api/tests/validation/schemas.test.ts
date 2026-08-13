@@ -511,6 +511,56 @@ describe("bulkPriceUpdateSchema — selectors (categoryIds/excludeProductIds + s
   });
 });
 
+describe("bulkPriceUpdateSchema — providerIds (sdd/alican-wholesale-price-list/providers)", () => {
+  const validBrandValues = ["Acme"];
+  const providerA = "00000000-0000-4000-8000-0000000000aa";
+  const providerB = "00000000-0000-4000-8000-0000000000bb";
+
+  it("accepts an optional array of provider uuids", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      providerIds: [providerA, providerB],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.providerIds).toEqual([providerA, providerB]);
+    }
+  });
+
+  it("omitting providerIds defaults it to an empty array (no provider filter, back-compat)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.providerIds).toEqual([]);
+    }
+  });
+
+  it("accepts an explicit empty providerIds array", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      providerIds: [],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.providerIds).toEqual([]);
+    }
+  });
+
+  it("rejects a non-uuid value inside providerIds", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      providerIds: ["not-a-uuid"],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("bulkPriceUpdateSchema — per-category/product override arrays", () => {
   const catA = "00000000-0000-4000-8000-0000000000aa";
   const catB = "00000000-0000-4000-8000-0000000000bb";
@@ -1000,6 +1050,20 @@ describe("applyPriceListSchema — decisiones del preview (position como idTempo
     expect(
       applyPriceListSchema.safeParse({ ...validBody, applyPrices: 1 }).success,
     ).toBe(false);
+  });
+
+  it("accepts providerName (sdd/alican-wholesale-price-list/providers) and trims it", () => {
+    const result = applyPriceListSchema.safeParse({ ...validBody, providerName: "  ALICAN  " });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.providerName).toBe("ALICAN");
+    }
+    expect(applyPriceListSchema.safeParse(validBody).success).toBe(true); // sin campo → ok
+  });
+
+  it("rejects an empty / whitespace-only providerName", () => {
+    expect(applyPriceListSchema.safeParse({ ...validBody, providerName: "" }).success).toBe(false);
+    expect(applyPriceListSchema.safeParse({ ...validBody, providerName: "   " }).success).toBe(false);
   });
 });
 
