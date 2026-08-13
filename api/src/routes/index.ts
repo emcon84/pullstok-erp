@@ -26,6 +26,7 @@ import pricingRoutes from "./pricingRoutes";
 import priceListRoutes from "./priceListRoutes";
 import providerRoutes from "./providerRoutes";
 import priceKgTypeRoutes from "./priceKgTypeRoutes";
+import priceKgBrandRoutes from "./priceKgBrandRoutes";
 
 const router = Router();
 
@@ -60,5 +61,6 @@ router.use("/pricing-settings", pricingRoutes);
 router.use("/price-lists", priceListRoutes);
 router.use("/providers", providerRoutes);
 router.use("/price-kg-types", priceKgTypeRoutes);
+router.use("/price-kg-brands", priceKgBrandRoutes);
 
 export default router;

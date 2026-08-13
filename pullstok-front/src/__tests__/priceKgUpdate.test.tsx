@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
-const { mockFetch } = vi.hoisted(() => ({ mockFetch: vi.fn() }));
-
-vi.stubGlobal("fetch", mockFetch);
-
 vi.mock("react-toastify", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
@@ -20,8 +16,20 @@ vi.mock("@/services/priceKgTypes", async (importOriginal) => {
   };
 });
 
+vi.mock("@/services/priceKgBrands", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/priceKgBrands")>();
+  return {
+    ...actual,
+    listPriceKgBrands: vi.fn(),
+    createPriceKgBrand: vi.fn(),
+    updatePriceKgBrand: vi.fn(),
+    deletePriceKgBrand: vi.fn(),
+  };
+});
+
 vi.mock("@/services/productService", () => ({
   bulkKgPriceUpdate: vi.fn(),
+  listPriceKgProducts: vi.fn(),
 }));
 
 import { PriceKgUpdate } from "@/views/PriceKgUpdate";
@@ -29,15 +37,17 @@ import {
   listPriceKgTypes,
   createPriceKgType,
 } from "@/services/priceKgTypes";
+import { listPriceKgBrands } from "@/services/priceKgBrands";
 import { bulkKgPriceUpdate } from "@/services/productService";
 
 const mockListPriceKgTypes = vi.mocked(listPriceKgTypes);
 const mockCreatePriceKgType = vi.mocked(createPriceKgType);
+const mockListPriceKgBrands = vi.mocked(listPriceKgBrands);
 const mockBulkKgPriceUpdate = vi.mocked(bulkKgPriceUpdate);
 
 const brands = [
-  { id: "b-1", value: "Acme" },
-  { id: "b-2", value: "Zap" },
+  { id: "brand-1", name: "Acme", keywords: ["ACME"] },
+  { id: "brand-2", name: "Zap", keywords: ["ZAP"] },
 ];
 
 const types = [
@@ -71,13 +81,13 @@ function renderView() {
   return render(<PriceKgUpdate />);
 }
 
-describe("PriceKgUpdate — tipos y propagación por kilo", () => {
+describe("PriceKgUpdate — tipos, marcas y propagación por kilo", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     localStorage.setItem("token", "test-token");
-    mockFetch.mockResolvedValue({ ok: true, json: async () => brands });
     mockListPriceKgTypes.mockResolvedValue(types);
+    mockListPriceKgBrands.mockResolvedValue(brands);
     mockBulkKgPriceUpdate.mockResolvedValue(preview);
   });
 
@@ -88,10 +98,14 @@ describe("PriceKgUpdate — tipos y propagación por kilo", () => {
     expect(await screen.findByText("Adulto")).toBeInTheDocument();
     expect(screen.getByText("Cachorro")).toBeInTheDocument();
 
-    // El selector de tipo (sección B) es un combobox Radix presente en el DOM.
+    // La lista de marcas (sección B) muestra los nombres cargados.
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
+    expect(screen.getByText("Zap")).toBeInTheDocument();
+
+    // El selector de tipo (sección C) es un combobox Radix presente en el DOM.
     expect(screen.getByRole("combobox", { name: /tipo/i })).toBeInTheDocument();
 
-    // El selector de marca (sección B) es un combobox Radix que lista las marcas.
+    // El selector de marca (sección C) es un combobox Radix que lista las marcas.
     fireEvent.click(screen.getByRole("combobox", { name: /marca/i }));
     expect(await screen.findByRole("option", { name: "Acme" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Zap" })).toBeInTheDocument();
@@ -100,6 +114,7 @@ describe("PriceKgUpdate — tipos y propagación por kilo", () => {
   it("agrega múltiples entries y calcula preview", async () => {
     renderView();
     await screen.findByText("Adulto");
+    await screen.findByText("Acme");
 
     // Seleccionar marca "Acme" (Radix Select, patrón storeSettingsForm).
     fireEvent.click(screen.getByRole("combobox", { name: /marca/i }));
@@ -129,7 +144,7 @@ describe("PriceKgUpdate — tipos y propagación por kilo", () => {
     expect(screen.getByText("Afectados")).toBeInTheDocument();
     expect(mockBulkKgPriceUpdate).toHaveBeenCalledWith(
       {
-        brandValues: ["Acme"],
+        brandId: "brand-1",
         entries: [
           { typeId: "t-1", priceKg: 2500 },
           { typeId: "t-2", priceKg: 3000 },
@@ -156,7 +171,7 @@ describe("PriceKgUpdate — tipos y propagación por kilo", () => {
     renderView();
     await screen.findByText("Adulto");
 
-    fireEvent.change(screen.getByLabelText(/nombre/i), {
+    fireEvent.change(screen.getByLabelText("Nombre", { selector: "#type-name" }), {
       target: { value: "Senior" },
     });
     fireEvent.change(screen.getByLabelText(/sinónimos/i), {

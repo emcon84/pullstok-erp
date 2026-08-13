@@ -101,9 +101,10 @@ describe("updatePriceKgTypeSchema", () => {
 describe("bulkKgPriceUpdateSchema", () => {
   const validTypeId = "00000000-0000-4000-8000-000000000001";
   const validTypeId2 = "00000000-0000-4000-8000-000000000002";
+  const validBrandId = "00000000-0000-4000-8000-000000000003";
 
   const validPayload = (overrides: Record<string, unknown> = {}) => ({
-    brandValues: ["Acme"],
+    brandId: validBrandId,
     entries: [{ typeId: validTypeId, priceKg: 5500 }],
     ...overrides,
   });
@@ -134,12 +135,14 @@ describe("bulkKgPriceUpdateSchema", () => {
     }
   });
 
-  it("rejects an empty brandValues array (needs at least one brand)", () => {
-    const result = bulkKgPriceUpdateSchema.safeParse(validPayload({ brandValues: [] }));
+  it("rejects a non-uuid brandId", () => {
+    const result = bulkKgPriceUpdateSchema.safeParse(
+      validPayload({ brandId: "not-a-uuid" }),
+    );
     expect(result.success).toBe(false);
   });
 
-  it("rejects a missing brandValues field", () => {
+  it("rejects a missing brandId field", () => {
     const result = bulkKgPriceUpdateSchema.safeParse({
       entries: [{ typeId: validTypeId, priceKg: 5500 }],
     });
@@ -152,7 +155,7 @@ describe("bulkKgPriceUpdateSchema", () => {
   });
 
   it("rejects a missing entries field", () => {
-    const result = bulkKgPriceUpdateSchema.safeParse({ brandValues: ["Acme"] });
+    const result = bulkKgPriceUpdateSchema.safeParse({ brandId: validBrandId });
     expect(result.success).toBe(false);
   });
 

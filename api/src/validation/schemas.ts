@@ -566,16 +566,56 @@ export const updatePriceKgTypeSchema = z
   })
   .strip();
 
+// ---------- Precios por kilo (PriceKgBrand) ----------
+// Marcas de "Precios por kilo" (líneas/sabores editables: MAXXIUM CORDERO,
+// OLD PRINCE PREMIUM, MASTER RP, ...). Cada marca tiene `name` + `keywords`
+// (palabras que matchean el name del producto con semántica AND,
+// case-insensitive). `keywords` opcional en create (default []) y opcional en
+// update (ausente = no tocar).
+
+const priceKgBrandKeywordSchema = z
+  .string()
+  .trim()
+  .min(1, "La palabra clave no puede estar vacía")
+  .max(60, "Máximo 60 caracteres");
+
+export const createPriceKgBrandSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "El nombre es requerido")
+      .max(60, "Máximo 60 caracteres"),
+    keywords: z
+      .array(priceKgBrandKeywordSchema)
+      .max(50, "Máximo 50 palabras clave")
+      .default([]),
+  })
+  .strip();
+
+export const updatePriceKgBrandSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "El nombre es requerido")
+      .max(60, "Máximo 60 caracteres")
+      .optional(),
+    keywords: z
+      .array(priceKgBrandKeywordSchema)
+      .max(50, "Máximo 50 palabras clave")
+      .optional(),
+  })
+  .strip();
+
 // Propagación masiva de precio por kilo (POST /products/bulk-kg-price-update):
-// brandValues (marca, variante "Marca") + entries [{ typeId, priceKg }] fijan
-// priceKgSuelto en los productos que matcheen marca + tipo (tipo inferido por
-// synonyms). El front manda UNA marca (array por consistencia con
-// buildBulkPriceWhere) y MÚLTIPLES pares tipo→precio.
+// brandId (marca editable de PriceKgBrand, matcheada por keywords sobre el name
+// del producto) + entries [{ typeId, priceKg }] fijan priceKgSuelto en los
+// productos que matcheen marca (AND de keywords) + tipo (OR de synonyms). El
+// front manda UNA marca y MÚLTIPLES pares tipo→precio.
 export const bulkKgPriceUpdateSchema = z
   .object({
-    brandValues: z
-      .array(z.string().trim().min(1, "La marca no puede estar vacía"))
-      .min(1, "Seleccioná al menos una marca"),
+    brandId: z.string().uuid("Marca inválida"),
     entries: z
       .array(
         z.object({
@@ -590,13 +630,6 @@ export const bulkKgPriceUpdateSchema = z
   })
   .strip()
   .superRefine((data, ctx) => {
-    if (data.brandValues.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["brandValues"],
-        message: "Seleccioná al menos una marca",
-      });
-    }
     const seen = new Set<string>();
     for (const entry of data.entries) {
       if (seen.has(entry.typeId)) {

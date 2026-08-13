@@ -392,7 +392,7 @@ export interface BulkKgPriceEntry {
 
 /** Payload compartido por preview (dryRun) y apply de la propagación por kilo. */
 export interface BulkKgPricePayload {
-  brandValues: string[];
+  brandId: string;
   entries: BulkKgPriceEntry[];
 }
 
@@ -440,4 +440,25 @@ export const bulkKgPriceUpdate = async (
     throw new Error(data.message || "bulk kg price update failed");
   }
   return res.json();
+};
+
+/** Un producto del listado imprimible de precios por kilo. */
+export interface PriceKgListItem {
+  id: string;
+  name: string;
+  priceKgSuelto: number | null;
+}
+
+/**
+ * GET /products/price-kg-list — catálogo completo de la org (nombre + precio
+ * por kilo actual) para imprimir la planilla. Sin paginación.
+ */
+export const listPriceKgProducts = async (): Promise<PriceKgListItem[]> => {
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${API_URL}/products/price-kg-list`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.items ?? [];
 };

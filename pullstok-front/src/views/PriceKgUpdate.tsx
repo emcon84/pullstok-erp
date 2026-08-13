@@ -39,16 +39,20 @@ import {
   type PriceKgType,
 } from "@/services/priceKgTypes";
 import {
+  listPriceKgBrands,
+  createPriceKgBrand,
+  updatePriceKgBrand,
+  deletePriceKgBrand,
+  parseKeywords,
+  type PriceKgBrand,
+} from "@/services/priceKgBrands";
+import {
   bulkKgPriceUpdate,
+  listPriceKgProducts,
   type BulkKgPricePreview,
   type BulkKgPricePayload,
+  type PriceKgListItem,
 } from "@/services/productService";
-import { API_URL } from "@/constants";
-
-interface BrandOption {
-  id: string;
-  value: string;
-}
 
 const formatPrice = (n: number) =>
   `$${n.toLocaleString("es-AR", {
@@ -57,9 +61,9 @@ const formatPrice = (n: number) =>
   })}`;
 
 /**
- * Precios por kilo (sdd/price-kg): gestión de tipos (etapas de vida) + propagación
- * de precio por kilo sobre productos (marca + tipo + precio). Versión simplificada
- * de BulkPriceUpdate (sin categorías, proveedores, % ni paginación).
+ * Precios por kilo (sdd/price-kg): gestión de tipos (etapas de vida) + gestión
+ * de marcas (líneas/sabores editables con keywords) + propagación de precio por
+ * kilo sobre productos (marca + tipo + precio) + impresión de la planilla.
  */
 export const PriceKgUpdate = () => {
   // --- Gestión de tipos ---
@@ -69,26 +73,28 @@ export const PriceKgUpdate = () => {
   const [typeSynonyms, setTypeSynonyms] = useState("");
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
   const [savingType, setSavingType] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteTypeId, setDeleteTypeId] = useState<string | null>(null);
+
+  // --- Gestión de marcas ---
+  const [brands, setBrands] = useState<PriceKgBrand[]>([]);
+  const [loadingBrands, setLoadingBrands] = useState(true);
+  const [brandName, setBrandName] = useState("");
+  const [brandKeywords, setBrandKeywords] = useState("");
+  const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
+  const [savingBrand, setSavingBrand] = useState(false);
+  const [deleteBrandId, setDeleteBrandId] = useState<string | null>(null);
 
   // --- Propagación por kilo ---
-  const [brands, setBrands] = useState<BrandOption[]>([]);
-  const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedBrandId, setSelectedBrandId] = useState("");
   const [entries, setEntries] = useState<{ typeId: string; priceKg: string }[]>([
     { typeId: "", priceKg: "" },
   ]);
   const [preview, setPreview] = useState<BulkKgPricePreview | null>(null);
-  const [loadingBrands, setLoadingBrands] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const headers = () => {
-    const token = localStorage.getItem("token");
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-  };
+  // --- Impresión de la planilla ---
+  const [printRows, setPrintRows] = useState<PriceKgListItem[] | null>(null);
 
   const loadTypes = useCallback(async () => {
     try {
@@ -101,36 +107,30 @@ export const PriceKgUpdate = () => {
     }
   }, []);
 
-  useEffect(() => {
-    loadTypes();
-  }, [loadTypes]);
-
-  // Load brands (Marca variant options), dedupe + sort (same as BulkPriceUpdate).
-  useEffect(() => {
-    fetch(`${API_URL}/categories/variant-options?def=Marca`, {
-      headers: headers(),
-    })
-      .then((res) => res.json())
-      .then((data: BrandOption[]) => {
-        const seen = new Set<string>();
-        const unique = data.filter((b) => {
-          if (seen.has(b.value)) return false;
-          seen.add(b.value);
-          return true;
-        });
-        setBrands(unique.sort((a, b) => a.value.localeCompare(b.value)));
-      })
-      .catch(() => setBrands([]))
-      .finally(() => setLoadingBrands(false));
+  const loadBrands = useCallback(async () => {
+    try {
+      const data = await listPriceKgBrands();
+      setBrands(data);
+    } catch {
+      setBrands([]);
+    } finally {
+      setLoadingBrands(false);
+    }
   }, []);
 
-  const startEdit = (t: PriceKgType) => {
+  useEffect(() => {
+    loadTypes();
+    loadBrands();
+  }, [loadTypes, loadBrands]);
+
+  // --- Tipos: handlers ---
+  const startEditType = (t: PriceKgType) => {
     setEditingTypeId(t.id);
     setTypeName(t.name);
     setTypeSynonyms(t.synonyms.join(", "));
   };
 
-  const resetForm = () => {
+  const resetTypeForm = () => {
     setEditingTypeId(null);
     setTypeName("");
     setTypeSynonyms("");
@@ -149,7 +149,7 @@ export const PriceKgUpdate = () => {
         await createPriceKgType({ name, synonyms });
         toast.success("Tipo creado");
       }
-      resetForm();
+      resetTypeForm();
       await loadTypes();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error al guardar el tipo";
@@ -159,12 +159,12 @@ export const PriceKgUpdate = () => {
   };
 
   const handleDeleteType = async () => {
-    if (!deleteTargetId) return;
+    if (!deleteTypeId) return;
     setSavingType(true);
     try {
-      await deletePriceKgType(deleteTargetId);
+      await deletePriceKgType(deleteTypeId);
       toast.success("Tipo eliminado");
-      setDeleteTargetId(null);
+      setDeleteTypeId(null);
       await loadTypes();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error al eliminar el tipo";
@@ -173,6 +173,57 @@ export const PriceKgUpdate = () => {
     setSavingType(false);
   };
 
+  // --- Marcas: handlers ---
+  const startEditBrand = (b: PriceKgBrand) => {
+    setEditingBrandId(b.id);
+    setBrandName(b.name);
+    setBrandKeywords(b.keywords.join(", "));
+  };
+
+  const resetBrandForm = () => {
+    setEditingBrandId(null);
+    setBrandName("");
+    setBrandKeywords("");
+  };
+
+  const handleSaveBrand = async () => {
+    const name = brandName.trim();
+    if (!name) return;
+    setSavingBrand(true);
+    try {
+      const keywords = parseKeywords(brandKeywords);
+      if (editingBrandId) {
+        await updatePriceKgBrand(editingBrandId, { name, keywords });
+        toast.success("Marca actualizada");
+      } else {
+        await createPriceKgBrand({ name, keywords });
+        toast.success("Marca creada");
+      }
+      resetBrandForm();
+      await loadBrands();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al guardar la marca";
+      toast.error(message);
+    }
+    setSavingBrand(false);
+  };
+
+  const handleDeleteBrand = async () => {
+    if (!deleteBrandId) return;
+    setSavingBrand(true);
+    try {
+      await deletePriceKgBrand(deleteBrandId);
+      toast.success("Marca eliminada");
+      setDeleteBrandId(null);
+      await loadBrands();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al eliminar la marca";
+      toast.error(message);
+    }
+    setSavingBrand(false);
+  };
+
+  // --- Propagación: handlers ---
   const updateEntry = (
     index: number,
     patch: Partial<{ typeId: string; priceKg: string }>,
@@ -209,11 +260,11 @@ export const PriceKgUpdate = () => {
   });
 
   const previewEnabled =
-    selectedBrand !== "" && validEntries.length > 0 && !hasIncompleteRows;
+    selectedBrandId !== "" && validEntries.length > 0 && !hasIncompleteRows;
 
   const buildPayload = (): BulkKgPricePayload | null => {
     if (!previewEnabled) return null;
-    return { brandValues: [selectedBrand], entries: validEntries };
+    return { brandId: selectedBrandId, entries: validEntries };
   };
 
   const handlePreview = async () => {
@@ -246,12 +297,40 @@ export const PriceKgUpdate = () => {
     setSubmitting(false);
   };
 
-  const applyDisabled =
-    !preview || preview.affected === 0 || submitting;
+  const applyDisabled = !preview || preview.affected === 0 || submitting;
+
+  // --- Impresión ---
+  const handlePrint = async () => {
+    setSubmitting(true);
+    try {
+      const items = await listPriceKgProducts();
+      setPrintRows(items);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al preparar impresión";
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Una vez montado el área print (printRows no nulo), abrir el diálogo de
+  // impresión y limpiar el estado al cerrarlo (afterprint).
+  useEffect(() => {
+    if (!printRows) return;
+    window.print();
+    const cleanup = () => setPrintRows(null);
+    window.addEventListener("afterprint", cleanup);
+    return () => window.removeEventListener("afterprint", cleanup);
+  }, [printRows]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <h1 className="text-2xl font-bold">Precios por kilo</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Precios por kilo</h1>
+        <Button variant="outline" size="sm" disabled={submitting} onClick={handlePrint}>
+          Imprimir planilla
+        </Button>
+      </div>
 
       {/* Sección A — Gestión de tipos */}
       <Card>
@@ -284,14 +363,14 @@ export const PriceKgUpdate = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => startEdit(t)}
+                      onClick={() => startEditType(t)}
                     >
                       Editar
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setDeleteTargetId(t.id)}
+                      onClick={() => setDeleteTypeId(t.id)}
                     >
                       Eliminar
                     </Button>
@@ -330,16 +409,16 @@ export const PriceKgUpdate = () => {
               {editingTypeId ? "Guardar cambios" : "Agregar tipo"}
             </Button>
             {editingTypeId && (
-              <Button variant="outline" onClick={resetForm}>
+              <Button variant="outline" onClick={resetTypeForm}>
                 Cancelar
               </Button>
             )}
           </div>
 
           <AlertDialog
-            open={deleteTargetId !== null}
+            open={deleteTypeId !== null}
             onOpenChange={(open) => {
-              if (!open) setDeleteTargetId(null);
+              if (!open) setDeleteTypeId(null);
             }}
           >
             <AlertDialogContent>
@@ -361,7 +440,117 @@ export const PriceKgUpdate = () => {
         </CardContent>
       </Card>
 
-      {/* Sección B — Propagar precio por kilo */}
+      {/* Sección B — Gestión de marcas */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Marcas (líneas / sabores)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {loadingBrands ? (
+            <p className="text-sm text-muted-foreground">Cargando marcas...</p>
+          ) : brands.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No hay marcas todavía. Creá la primera con el formulario de abajo.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {brands.map((b) => (
+                <li
+                  key={b.id}
+                  className="flex items-center justify-between gap-2 rounded-md border p-3"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{b.name}</span>
+                    {b.keywords.map((k) => (
+                      <Badge key={k} variant="outline">
+                        {k}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => startEditBrand(b)}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeleteBrandId(b.id)}
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="brand-name">Nombre</Label>
+              <Input
+                id="brand-name"
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
+                placeholder="Ej: MAXXIUM CORDERO"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="brand-keywords">
+                Palabras clave (separadas por coma)
+              </Label>
+              <Input
+                id="brand-keywords"
+                value={brandKeywords}
+                onChange={(e) => setBrandKeywords(e.target.value)}
+                placeholder="Ej: MAXXIUM, CORDERO"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              disabled={!brandName.trim() || savingBrand}
+              onClick={handleSaveBrand}
+            >
+              {editingBrandId ? "Guardar cambios" : "Agregar marca"}
+            </Button>
+            {editingBrandId && (
+              <Button variant="outline" onClick={resetBrandForm}>
+                Cancelar
+              </Button>
+            )}
+          </div>
+
+          <AlertDialog
+            open={deleteBrandId !== null}
+            onOpenChange={(open) => {
+              if (!open) setDeleteBrandId(null);
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Eliminar marca</AlertDialogTitle>
+                <AlertDialogDescription>
+                  ¿Seguro que querés eliminar esta marca? Esta acción no se puede
+                  deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteBrand}>
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
+
+      {/* Sección C — Propagar precio por kilo */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
@@ -375,13 +564,13 @@ export const PriceKgUpdate = () => {
               <p className="text-sm text-muted-foreground">Cargando marcas...</p>
             ) : brands.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No se encontraron marcas.
+                No hay marcas. Creá una en la sección de arriba.
               </p>
             ) : (
               <Select
-                value={selectedBrand}
+                value={selectedBrandId}
                 onValueChange={(value) => {
-                  setSelectedBrand(value);
+                  setSelectedBrandId(value);
                   setPreview(null);
                 }}
               >
@@ -390,8 +579,8 @@ export const PriceKgUpdate = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {brands.map((b) => (
-                    <SelectItem key={b.id} value={b.value}>
-                      {b.value}
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -535,6 +724,40 @@ export const PriceKgUpdate = () => {
           </AlertDialog>
         </CardContent>
       </Card>
+
+      {/* Print area: only visible when printing (see @media print in index.css) */}
+      {printRows && (
+        <div className="print-area hidden print:block" aria-hidden="true">
+          <div className="mb-4">
+            <h1 className="text-lg font-bold">Planilla de precios por kilo</h1>
+            <p className="text-sm text-muted-foreground">
+              {new Date().toLocaleDateString("es-AR")} · {printRows.length} productos
+            </p>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Producto</TableHead>
+                <TableHead className="text-right">Precio por kilo actual</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {printRows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="font-medium leading-tight">
+                    {row.name}
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {row.priceKgSuelto === null
+                      ? "—"
+                      : formatPrice(row.priceKgSuelto)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 };

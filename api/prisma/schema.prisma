@@ -60,6 +60,7 @@ model Organization {
   products              Product[]
   providers             Provider[]
   priceKgTypes          PriceKgType[]
+  priceKgBrands         PriceKgBrand[]
   categories            Category[]
   variantDefs           CategoryVariantDefinition[]
   variantOptions        CategoryVariantOption[]
@@ -260,6 +261,29 @@ model PriceKgType {
   @@unique([organizationId, name])
   @@index([organizationId])
   @@map("price_kg_types")
+}
+
+// Marcas de "Precios por kilo" (líneas/sabores editables por el usuario:
+// MAXXIUM CORDERO, OLD PRINCE PREMIUM, MASTER RP, ...). Tenant-scoped
+// (organizationId) y en TENANT_MODELS (db.ts) → scope org automático
+// anti-fuga. A diferencia de PriceKgType (que infiere el TIPO de vida), la
+// marca se matchea por `keywords` (AND case-insensitive sobre el name del
+// producto) para poder subdividir marcas que NO existen como variante "Marca".
+// La unicidad (org, name) es case-insensitive a nivel DB: la migración
+// materializa la @@unique como índice funcional LOWER (mismo patrón que
+// price_kg_types y providers).
+model PriceKgBrand {
+  id             String       @id @default(uuid())
+  name           String
+  keywords       String[]
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("price_kg_brands")
 }
 
 model Product {

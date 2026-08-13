@@ -1010,24 +1010,50 @@ export const matchNameSynonyms = (name: string, synonyms: string[]): boolean => 
 };
 
 /**
+ * Matchea el `name` de un producto contra las keywords de una marca de "Precios
+ * por kilo": true si el name CONTIENE TODAS las keywords (semántica AND,
+ * case-insensitive, substring). Las keywords vacías/whitespace se ignoran; si
+ * no queda ninguna keyword válida devuelve false (el fallback a brand.name lo
+ * decide el llamador). Helper PURO y testeable.
+ */
+export const matchBrandKeywords = (name: string, keywords: string[]): boolean => {
+  const lower = name.toLowerCase();
+  const ks = keywords.map((k) => k.trim()).filter((k) => k.length > 0);
+  if (ks.length === 0) return false;
+  return ks.every((k) => lower.includes(k.toLowerCase()));
+};
+
+/**
  * POST /products/bulk-kg-price-update — fija priceKgSuelto manual por marca +
- * tipo. Dado brandValues (variante "Marca", UNA marca) + entries [{ typeId,
- * priceKg }], matchea los productos por marca y luego en JS por synonyms del
- * tipo (case-insensitive, substring) y setea priceKgSuelto=priceKg +
- * priceKgSueltoManual=true. Las entries se procesan EN ORDEN: un producto que
- * ya matcheó una entry anterior no se reasigna (la primera gana). NUNCA toca
- * product.price ni llama a recomputeForBulkPriceUpdate (el punto es fijar
- * manual, no derivar). dryRun=true → preview; apply → re-resuelve el set DENTRO
- * de $transaction (autoritativo). Cap BULK_UPDATE_MAX en ambos.
+ * tipo. Dado brandId (marca editable PriceKgBrand) + entries [{ typeId,
+ * priceKg }], matchea los productos por marca (keywords AND sobre el name) y
+ * luego en JS por synonyms del tipo (case-insensitive, substring) y setea
+ * priceKgSuelto=priceKg + priceKgSueltoManual=true. Las entries se procesan EN
+ * ORDEN: un producto que ya matcheó una entry anterior no se reasigna (la
+ * primera gana). NUNCA toca product.price ni llama a recomputeForBulkPriceUpdate
+ * (el punto es fijar manual, no derivar). dryRun=true → preview; apply →
+ * re-resuelve el set DENTRO de $transaction (autoritativo). Cap BULK_UPDATE_MAX
+ * en ambos.
  */
 export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
   try {
-    const { brandValues, entries } = req.body as {
-      brandValues: string[];
+    const { brandId, entries } = req.body as {
+      brandId: string;
       entries: { typeId: string; priceKg: number }[];
     };
     const dryRun = req.query.dryRun === "true";
     const organizationId = requireOrganizationId();
+
+    // Resuelve la marca (una sola): si no existe → 404.
+    const brand = await prisma.priceKgBrand.findFirst({
+      where: { id: brandId },
+      select: { id: true, name: true, keywords: true },
+    });
+    if (!brand) {
+      return res.status(404).json({ message: "Marca no encontrada" });
+    }
+    // Fallback: sin keywords se matchea por el name de la marca.
+    const keywords = brand.keywords.length > 0 ? brand.keywords : [brand.name];
 
     // Resuelve TODOS los tipos de una vez (findMany por ids). Si falta
     // CUALQUIERA → 404 (determinista, no se procesa nada).
@@ -1041,10 +1067,10 @@ export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Tipo no encontrado" });
     }
 
-    // Productos de la marca (una sola query, solo marca, sin categoría/proveedor).
-    const where = buildBulkPriceWhere(brandValues, [], []);
+    // Todos los productos de la org (la extensión inyecta organizationId): el
+    // matcheo de marca se hace en JS por keywords sobre el name (ya no por
+    // variante "Marca").
     const products = await prisma.product.findMany({
-      where,
       select: { id: true, name: true, priceKgSuelto: true },
     });
 
@@ -1067,7 +1093,7 @@ export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
       const newPriceKg = Math.round(entry.priceKg * 100) / 100;
       for (const p of products) {
         if (assignedIds.has(p.id)) continue;
-        if (matchNameSynonyms(p.name, synonyms)) {
+        if (matchBrandKeywords(p.name, keywords) && matchNameSynonyms(p.name, synonyms)) {
           assignedIds.add(p.id);
           rows.push({
             id: p.id,
@@ -1095,17 +1121,26 @@ export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
       // de la extensión (patrón de priceLooseService), así que organizationId
       // se pasa explícito en toda query para no filtrar cross-tenant.
       const result = await prisma.$transaction(async (tx) => {
+        const brandTx = await tx.priceKgBrand.findFirst({
+          where: { id: brandId, organizationId },
+          select: { id: true, name: true, keywords: true },
+        });
+        if (!brandTx) {
+          return { notFoundBrand: true as const, notFoundType: false, overCap: false, affected: 0 };
+        }
+        const keywordsTx = brandTx.keywords.length > 0 ? brandTx.keywords : [brandTx.name];
+
         const typesTx = await tx.priceKgType.findMany({
           where: { id: { in: typeIds }, organizationId },
           select: { id: true, name: true, synonyms: true },
         });
         const typeByIdTx = new Map(typesTx.map((t) => [t.id, t]));
         if (entries.some((e) => !typeByIdTx.has(e.typeId))) {
-          return { notFound: true as const, overCap: false, affected: 0 };
+          return { notFoundBrand: false as const, notFoundType: true, overCap: false, affected: 0 };
         }
 
         const productsTx = await tx.product.findMany({
-          where: { ...buildBulkPriceWhere(brandValues, [], []), organizationId },
+          where: { organizationId },
           select: { id: true, name: true },
         });
 
@@ -1118,7 +1153,12 @@ export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
           const synonymsTx = type.synonyms.length > 0 ? type.synonyms : [type.name];
           const newPriceKg = Math.round(entry.priceKg * 100) / 100;
           const idsTx = productsTx
-            .filter((p) => !assignedTx.has(p.id) && matchNameSynonyms(p.name, synonymsTx))
+            .filter(
+              (p) =>
+                !assignedTx.has(p.id) &&
+                matchBrandKeywords(p.name, keywordsTx) &&
+                matchNameSynonyms(p.name, synonymsTx),
+            )
             .map((p) => p.id);
           idsTx.forEach((id) => assignedTx.add(id));
           total += idsTx.length;
@@ -1126,10 +1166,10 @@ export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
         }
 
         if (total > BULK_UPDATE_MAX) {
-          return { notFound: false as const, overCap: true, affected: total };
+          return { notFoundBrand: false as const, notFoundType: false, overCap: true, affected: total };
         }
         if (total === 0) {
-          return { notFound: false as const, overCap: false, affected: 0 };
+          return { notFoundBrand: false as const, notFoundType: false, overCap: false, affected: 0 };
         }
         // Recién acá se emiten los writes: el cap y el 0-match se resuelven
         // ANTES de tocar la DB (nada se escribe si excede o no matchea).
@@ -1139,10 +1179,13 @@ export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
             data: { priceKgSuelto: u.newPriceKg, priceKgSueltoManual: true },
           });
         }
-        return { notFound: false as const, overCap: false, affected: total };
+        return { notFoundBrand: false as const, notFoundType: false, overCap: false, affected: total };
       });
 
-      if (result.notFound) {
+      if (result.notFoundBrand) {
+        return res.status(404).json({ message: "Marca no encontrada" });
+      }
+      if (result.notFoundType) {
         return res.status(404).json({ message: "Tipo no encontrado" });
       }
       if (result.overCap) {
@@ -1294,6 +1337,26 @@ export const getStockSummary = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * GET /products/price-kg-list — listado completo del catálogo de la org para
+ * IMPRIMIR la planilla de precios por kilo (nombre + priceKgSuelto actual).
+ * Sin paginación (catálogo completo). Cualquier rol autenticado (mismo criterio
+ * que GET /products). Usa prisma (scope de tenant vía requireOrganizationId).
+ */
+export const getPriceKgList = async (_req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const items = await prisma.product.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, priceKgSuelto: true },
+    });
+    res.status(200).json({ items });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export default {
   createProduct,
   bulkUploadProducts,
@@ -1308,4 +1371,5 @@ export default {
   getProductStock,
   updateBranchStock,
   getStockSummary,
+  getPriceKgList,
 };

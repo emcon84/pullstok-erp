@@ -3,6 +3,7 @@ import productController, {
   uploadProductsCsv,
   downloadTemplateCsv,
   getProductByCode,
+  getPriceKgList,
 } from "../controllers/productController";
 import providerPriceListController from "../controllers/providerPriceListController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
@@ -70,6 +71,16 @@ router.get(
   authenticateJWT,
   checkBusinessHours,
   productController.getProductFilterFacets,
+);
+
+// Listado imprimible de precios por kilo (catálogo completo de la org, sin
+// paginación). Registrado ANTES de "/:id" (una literal "price-kg-list" la
+// matchearía).
+router.get(
+  "/price-kg-list",
+  authenticateJWT,
+  checkBusinessHours,
+  getPriceKgList,
 );
 
 router.get("/:id", authenticateJWT, checkBusinessHours, productController.getProductById);
