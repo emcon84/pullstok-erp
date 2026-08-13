@@ -152,7 +152,10 @@ export const BulkPriceUpdate = () => {
   };
 
   const payload = useCallback((): BulkPriceUpdatePayload | null => {
-    if (selectedBrands.length === 0) return null;
+    // Al menos un filtro de alcance (marcas, proveedores o categorías) para no
+    // barrer toda la org por error — mismo criterio que el superRefine del
+    // bulkPriceUpdateSchema del backend.
+    if (selectedBrands.length === 0 && selectedProviderIds.length === 0 && categoryIds.length === 0) return null;
     const trimmed = percentage.trim();
     // Global opcional: vacío/NaN → undefined (server resuelve 0). Los overrides
     // propios por categoría/producto siguen aplicándose con prioridad.
@@ -412,7 +415,12 @@ export const BulkPriceUpdate = () => {
               <Button
                 className="w-full"
                 size="lg"
-                disabled={selectedBrands.length === 0 || submitting}
+                disabled={
+                  (selectedBrands.length === 0 &&
+                    selectedProviderIds.length === 0 &&
+                    categoryIds.length === 0) ||
+                  submitting
+                }
                 onClick={() => handlePreview(1)}
               >
                 {submitting ? "Calculando..." : "Calcular preview"}
@@ -593,7 +601,8 @@ export const BulkPriceUpdate = () => {
               </>
             ) : (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                Seleccioná marcas y porcentaje para calcular la vista previa.
+                Seleccioná marcas, proveedor o categoría y el porcentaje para
+                calcular la vista previa.
               </p>
             )}
           </CardContent>

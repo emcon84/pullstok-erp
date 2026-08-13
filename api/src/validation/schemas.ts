@@ -459,7 +459,11 @@ const productOverrideSchema = z.object({
 
 export const bulkPriceUpdateSchema = z
   .object({
-    brandValues: z.array(z.string().min(1)).min(1, "Seleccioná al menos una marca"),
+    // brandValues es OPCIONAL: se puede filtrar SOLO por proveedor (providerIds)
+    // o por categoría (categoryIds) sin elegir marca. El superRefine de abajo
+    // exige que venga al menos UN filtro de alcance (marcas, proveedores o
+    // categorías) para no barrer toda la org por error.
+    brandValues: z.array(z.string().min(1)).default([]),
     // percentage (global) es OPCIONAL: si no viene, el server resuelve 0 como
     // default efectivo (productos sin override no cambian). Sirve para correr
     // con SOLO overrides por categoría/producto sin default global.
@@ -490,6 +494,13 @@ export const bulkPriceUpdateSchema = z
   })
   .strip()
   .superRefine((data, ctx) => {
+    if (data.brandValues.length === 0 && data.providerIds.length === 0 && data.categoryIds.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["brandValues"],
+        message: "Seleccioná al menos una marca, un proveedor o una categoría",
+      });
+    }
     const seenCategories = new Set<string>();
     data.categoryPercentages.forEach(({ categoryId }) => {
       if (seenCategories.has(categoryId)) {

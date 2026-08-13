@@ -747,16 +747,17 @@ export function buildBulkPriceWhere(
   excludeProductIds: string[],
   providerIds: string[] = [],
 ) {
-  const where: any = {
-    variantAssignments: {
+  const where: any = {};
+  if (brandValues.length > 0) {
+    where.variantAssignments = {
       some: {
         option: {
           value: { in: brandValues },
           variant: { name: "Marca" },
         },
       },
-    },
-  };
+    };
+  }
   if (expanded.length > 0) where.categoryId = { in: expanded };
   if (excludeProductIds.length > 0) where.id = { notIn: excludeProductIds };
   if (providerIds.length > 0) where.providerId = { in: providerIds };

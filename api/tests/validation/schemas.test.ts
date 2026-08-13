@@ -403,12 +403,34 @@ describe("bulkPriceUpdateSchema — selectors (categoryIds/excludeProductIds + s
     }
   });
 
-  it("rejects an empty brandValues array (at least one brand required)", () => {
+  it("rejects empty brandValues without any scope filter (brands/providers/categories)", () => {
     const result = bulkPriceUpdateSchema.safeParse({
       brandValues: [],
       percentage: 10,
     });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts empty brandValues when providerIds is present (provider-only scope)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: [],
+      providerIds: [crypto.randomUUID()],
+      percentage: 10,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.brandValues).toEqual([]);
+      expect(result.data.providerIds).toHaveLength(1);
+    }
+  });
+
+  it("accepts empty brandValues when categoryIds is present (category-only scope)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: [],
+      categoryIds: [crypto.randomUUID()],
+      percentage: 10,
+    });
+    expect(result.success).toBe(true);
   });
 
   it("rejects percentage below -100", () => {
