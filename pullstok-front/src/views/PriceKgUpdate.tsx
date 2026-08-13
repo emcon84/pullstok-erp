@@ -41,6 +41,7 @@ import {
 import {
   bulkKgPriceUpdate,
   type BulkKgPricePreview,
+  type BulkKgPricePayload,
 } from "@/services/productService";
 import { API_URL } from "@/constants";
 
@@ -72,9 +73,10 @@ export const PriceKgUpdate = () => {
 
   // --- Propagación por kilo ---
   const [brands, setBrands] = useState<BrandOption[]>([]);
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
-  const [typeId, setTypeId] = useState("");
-  const [priceKg, setPriceKg] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [entries, setEntries] = useState<{ typeId: string; priceKg: string }[]>([
+    { typeId: "", priceKg: "" },
+  ]);
   const [preview, setPreview] = useState<BulkKgPricePreview | null>(null);
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -171,34 +173,55 @@ export const PriceKgUpdate = () => {
     setSavingType(false);
   };
 
-  const toggleBrand = (value: string) => {
-    setSelectedBrands((prev) =>
-      prev.includes(value) ? prev.filter((b) => b !== value) : [...prev, value],
-    );
+  const updateEntry = (
+    index: number,
+    patch: Partial<{ typeId: string; priceKg: string }>,
+  ) => {
+    setEntries((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
     setPreview(null);
   };
 
-  const priceKgNum = parseFloat(priceKg);
-  const previewEnabled =
-    selectedBrands.length > 0 &&
-    typeId !== "" &&
-    !Number.isNaN(priceKgNum) &&
-    priceKgNum > 0;
+  const addEntry = () => {
+    setEntries((prev) => [...prev, { typeId: "", priceKg: "" }]);
+    setPreview(null);
+  };
 
-  const payload = useCallback(
-    () => ({
-      brandValues: selectedBrands,
-      typeId,
-      priceKg: priceKgNum,
-    }),
-    [selectedBrands, typeId, priceKgNum],
-  );
+  const removeEntry = (index: number) => {
+    setEntries((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length === 0 ? [{ typeId: "", priceKg: "" }] : next;
+    });
+    setPreview(null);
+  };
+
+  const validEntries = entries
+    .map((e) => ({ typeId: e.typeId, priceKg: parseFloat(e.priceKg) }))
+    .filter((e) => e.typeId !== "" && !Number.isNaN(e.priceKg) && e.priceKg > 0);
+
+  // Una fila está "incompleta" si le falta tipo o precio, o si el precio no es
+  // válido (> 0). Frena el preview para no mandar un payload a medias.
+  const hasIncompleteRows = entries.some((e) => {
+    const typeSet = e.typeId !== "";
+    const price = parseFloat(e.priceKg);
+    const priceSet = e.priceKg.trim() !== "" && !Number.isNaN(price);
+    if (typeSet && priceSet) return price <= 0;
+    return typeSet || priceSet;
+  });
+
+  const previewEnabled =
+    selectedBrand !== "" && validEntries.length > 0 && !hasIncompleteRows;
+
+  const buildPayload = (): BulkKgPricePayload | null => {
+    if (!previewEnabled) return null;
+    return { brandValues: [selectedBrand], entries: validEntries };
+  };
 
   const handlePreview = async () => {
-    if (!previewEnabled) return;
+    const payload = buildPayload();
+    if (!payload) return;
     setSubmitting(true);
     try {
-      const data = await bulkKgPriceUpdate(payload(), true);
+      const data = await bulkKgPriceUpdate(payload, true);
       setPreview(data as BulkKgPricePreview);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error al obtener preview";
@@ -208,13 +231,14 @@ export const PriceKgUpdate = () => {
   };
 
   const handleApply = async () => {
+    const payload = buildPayload();
+    if (!payload) return;
     setSubmitting(true);
     try {
-      const result = await bulkKgPriceUpdate(payload(), false);
+      const result = await bulkKgPriceUpdate(payload, false);
       toast.success(`${result.affected} productos actualizados`);
       setPreview(null);
-      setSelectedBrands([]);
-      setPriceKg("");
+      setEntries([{ typeId: "", priceKg: "" }]);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error al aplicar";
       toast.error(message);
@@ -346,7 +370,7 @@ export const PriceKgUpdate = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Marcas</Label>
+            <Label htmlFor="kg-brand">Marca</Label>
             {loadingBrands ? (
               <p className="text-sm text-muted-foreground">Cargando marcas...</p>
             ) : brands.length === 0 ? (
@@ -354,60 +378,79 @@ export const PriceKgUpdate = () => {
                 No se encontraron marcas.
               </p>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {brands.map((b) => (
-                  <Badge
-                    key={b.id}
-                    variant={
-                      selectedBrands.includes(b.value) ? "default" : "outline"
-                    }
-                    className="cursor-pointer uppercase transition-opacity hover:opacity-80"
-                    onClick={() => toggleBrand(b.value)}
-                  >
-                    {b.value}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="kg-type">Tipo</Label>
               <Select
-                value={typeId}
+                value={selectedBrand}
                 onValueChange={(value) => {
-                  setTypeId(value);
+                  setSelectedBrand(value);
                   setPreview(null);
                 }}
               >
-                <SelectTrigger id="kg-type" className="w-full">
-                  <SelectValue placeholder="Seleccionar tipo" />
+                <SelectTrigger id="kg-brand" className="w-full">
+                  <SelectValue placeholder="Seleccionar marca" />
                 </SelectTrigger>
                 <SelectContent>
-                  {types.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}
+                  {brands.map((b) => (
+                    <SelectItem key={b.id} value={b.value}>
+                      {b.value}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="kg-price">Precio por kilo</Label>
-              <Input
-                id="kg-price"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Ej: 2500"
-                value={priceKg}
-                onChange={(e) => {
-                  setPriceKg(e.target.value);
-                  setPreview(null);
-                }}
-              />
-            </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {entries.map((entry, index) => (
+              <div
+                key={index}
+                className="grid gap-3 sm:grid-cols-[1fr_140px_auto] sm:items-end"
+              >
+                <div className="space-y-1.5">
+                  <Label htmlFor={`kg-entry-type-${index}`}>Tipo</Label>
+                  <Select
+                    value={entry.typeId}
+                    onValueChange={(value) => updateEntry(index, { typeId: value })}
+                  >
+                    <SelectTrigger id={`kg-entry-type-${index}`} className="w-full">
+                      <SelectValue placeholder="Seleccionar tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {types.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`kg-entry-price-${index}`}>Precio por kilo</Label>
+                  <Input
+                    id={`kg-entry-price-${index}`}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Ej: 2500"
+                    value={entry.priceKg}
+                    onChange={(e) => updateEntry(index, { priceKg: e.target.value })}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="sm:mb-0.5"
+                  aria-label="Quitar tipo"
+                  onClick={() => removeEntry(index)}
+                >
+                  X
+                </Button>
+              </div>
+            ))}
+
+            <Button type="button" variant="outline" size="sm" onClick={addEntry}>
+              Agregar otro tipo
+            </Button>
           </div>
 
           <Button
@@ -431,6 +474,7 @@ export const PriceKgUpdate = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Producto</TableHead>
+                      <TableHead>Tipo</TableHead>
                       <TableHead>Precio/kg actual</TableHead>
                       <TableHead className="text-right">Precio/kg nuevo</TableHead>
                     </TableRow>
@@ -439,6 +483,7 @@ export const PriceKgUpdate = () => {
                     {preview.rows.map((row) => (
                       <TableRow key={row.id}>
                         <TableCell className="font-medium">{row.name}</TableCell>
+                        <TableCell>{row.typeName}</TableCell>
                         <TableCell>
                           {row.currentPriceKg === null
                             ? "—"
@@ -474,9 +519,9 @@ export const PriceKgUpdate = () => {
                 </AlertDialogTitle>
                 {preview && (
                   <AlertDialogDescription>
-                    {preview.affected} productos se actualizarán a{" "}
-                    {formatPrice(priceKgNum)} por kilo. El conteo final puede
-                    diferir si el catálogo cambió desde la vista previa.
+                    {preview.affected} productos se actualizarán al precio por
+                    kilo de su tipo. El conteo final puede diferir si el
+                    catálogo cambió desde la vista previa.
                   </AlertDialogDescription>
                 )}
               </AlertDialogHeader>

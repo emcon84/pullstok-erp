@@ -1011,46 +1011,79 @@ export const matchNameSynonyms = (name: string, synonyms: string[]): boolean => 
 
 /**
  * POST /products/bulk-kg-price-update — fija priceKgSuelto manual por marca +
- * tipo. Dado brandValues (variante "Marca") + typeId + priceKg, matchea los
- * productos por marca y luego en JS por synonyms del tipo (case-insensitive,
- * substring) y setea priceKgSuelto=priceKg + priceKgSueltoManual=true.
- * NUNCA toca product.price ni llama a recomputeForBulkPriceUpdate (el punto es
- * fijar manual, no derivar). dryRun=true → preview; apply → re-resuelve el set
- * DENTRO de $transaction (autoritativo). Cap BULK_UPDATE_MAX en ambos.
+ * tipo. Dado brandValues (variante "Marca", UNA marca) + entries [{ typeId,
+ * priceKg }], matchea los productos por marca y luego en JS por synonyms del
+ * tipo (case-insensitive, substring) y setea priceKgSuelto=priceKg +
+ * priceKgSueltoManual=true. Las entries se procesan EN ORDEN: un producto que
+ * ya matcheó una entry anterior no se reasigna (la primera gana). NUNCA toca
+ * product.price ni llama a recomputeForBulkPriceUpdate (el punto es fijar
+ * manual, no derivar). dryRun=true → preview; apply → re-resuelve el set DENTRO
+ * de $transaction (autoritativo). Cap BULK_UPDATE_MAX en ambos.
  */
 export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
   try {
-    const { brandValues, typeId, priceKg } = req.body as {
+    const { brandValues, entries } = req.body as {
       brandValues: string[];
-      typeId: string;
-      priceKg: number;
+      entries: { typeId: string; priceKg: number }[];
     };
     const dryRun = req.query.dryRun === "true";
     const organizationId = requireOrganizationId();
-    const newPriceKg = Math.round(priceKg * 100) / 100;
 
-    const type = await prisma.priceKgType.findFirst({
-      where: { id: typeId },
+    // Resuelve TODOS los tipos de una vez (findMany por ids). Si falta
+    // CUALQUIERA → 404 (determinista, no se procesa nada).
+    const typeIds = entries.map((e) => e.typeId);
+    const types = await prisma.priceKgType.findMany({
+      where: { id: { in: typeIds } },
       select: { id: true, name: true, synonyms: true },
     });
-    if (!type) {
+    const typeById = new Map(types.map((t) => [t.id, t]));
+    if (entries.some((e) => !typeById.has(e.typeId))) {
       return res.status(404).json({ message: "Tipo no encontrado" });
     }
 
-    // Fallback: si el tipo no tiene synonyms, se matchea por su name.
-    const synonyms = type.synonyms.length > 0 ? type.synonyms : [type.name];
-
-    // Where de marca (solo marca, sin categoría/proveedor).
+    // Productos de la marca (una sola query, solo marca, sin categoría/proveedor).
     const where = buildBulkPriceWhere(brandValues, [], []);
-
     const products = await prisma.product.findMany({
       where,
       select: { id: true, name: true, priceKgSuelto: true },
     });
 
-    const matched = products.filter((p) => matchNameSynonyms(p.name, synonyms));
+    // Procesa las entries en orden: la primera entry que matchea un producto
+    // "se lo queda" (no se reasigna). Precio redondeado a 2 decimales por entry.
+    const assignedIds = new Set<string>();
+    const rows: {
+      id: string;
+      name: string;
+      typeId: string;
+      typeName: string;
+      currentPriceKg: number | null;
+      newPriceKg: number;
+    }[] = [];
 
-    if (matched.length > BULK_UPDATE_MAX) {
+    for (const entry of entries) {
+      const type = typeById.get(entry.typeId)!;
+      // Fallback: si el tipo no tiene synonyms, se matchea por su name.
+      const synonyms = type.synonyms.length > 0 ? type.synonyms : [type.name];
+      const newPriceKg = Math.round(entry.priceKg * 100) / 100;
+      for (const p of products) {
+        if (assignedIds.has(p.id)) continue;
+        if (matchNameSynonyms(p.name, synonyms)) {
+          assignedIds.add(p.id);
+          rows.push({
+            id: p.id,
+            name: p.name,
+            typeId: type.id,
+            typeName: type.name,
+            currentPriceKg: p.priceKgSuelto,
+            newPriceKg,
+          });
+        }
+      }
+    }
+
+    const affected = rows.length;
+
+    if (affected > BULK_UPDATE_MAX) {
       return res.status(400).json({
         message: `El lote supera el máximo de ${BULK_UPDATE_MAX} productos. Ajustá el alcance.`,
       });
@@ -1062,32 +1095,51 @@ export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
       // de la extensión (patrón de priceLooseService), así que organizationId
       // se pasa explícito en toda query para no filtrar cross-tenant.
       const result = await prisma.$transaction(async (tx) => {
-        const typeTx = await tx.priceKgType.findFirst({
-          where: { id: typeId, organizationId },
+        const typesTx = await tx.priceKgType.findMany({
+          where: { id: { in: typeIds }, organizationId },
           select: { id: true, name: true, synonyms: true },
         });
-        if (!typeTx) {
+        const typeByIdTx = new Map(typesTx.map((t) => [t.id, t]));
+        if (entries.some((e) => !typeByIdTx.has(e.typeId))) {
           return { notFound: true as const, overCap: false, affected: 0 };
         }
-        const synonymsTx = typeTx.synonyms.length > 0 ? typeTx.synonyms : [typeTx.name];
-        const rowsTx = await tx.product.findMany({
+
+        const productsTx = await tx.product.findMany({
           where: { ...buildBulkPriceWhere(brandValues, [], []), organizationId },
           select: { id: true, name: true },
         });
-        const idsTx = rowsTx
-          .filter((p) => matchNameSynonyms(p.name, synonymsTx))
-          .map((p) => p.id);
-        if (idsTx.length > BULK_UPDATE_MAX) {
-          return { notFound: false as const, overCap: true, affected: idsTx.length };
+
+        const assignedTx = new Set<string>();
+        const updates: { ids: string[]; newPriceKg: number }[] = [];
+        let total = 0;
+
+        for (const entry of entries) {
+          const type = typeByIdTx.get(entry.typeId)!;
+          const synonymsTx = type.synonyms.length > 0 ? type.synonyms : [type.name];
+          const newPriceKg = Math.round(entry.priceKg * 100) / 100;
+          const idsTx = productsTx
+            .filter((p) => !assignedTx.has(p.id) && matchNameSynonyms(p.name, synonymsTx))
+            .map((p) => p.id);
+          idsTx.forEach((id) => assignedTx.add(id));
+          total += idsTx.length;
+          if (idsTx.length > 0) updates.push({ ids: idsTx, newPriceKg });
         }
-        if (idsTx.length === 0) {
+
+        if (total > BULK_UPDATE_MAX) {
+          return { notFound: false as const, overCap: true, affected: total };
+        }
+        if (total === 0) {
           return { notFound: false as const, overCap: false, affected: 0 };
         }
-        await tx.product.updateMany({
-          where: { id: { in: idsTx }, organizationId },
-          data: { priceKgSuelto: newPriceKg, priceKgSueltoManual: true },
-        });
-        return { notFound: false as const, overCap: false, affected: idsTx.length };
+        // Recién acá se emiten los writes: el cap y el 0-match se resuelven
+        // ANTES de tocar la DB (nada se escribe si excede o no matchea).
+        for (const u of updates) {
+          await tx.product.updateMany({
+            where: { id: { in: u.ids }, organizationId },
+            data: { priceKgSuelto: u.newPriceKg, priceKgSueltoManual: true },
+          });
+        }
+        return { notFound: false as const, overCap: false, affected: total };
       });
 
       if (result.notFound) {
@@ -1107,18 +1159,12 @@ export const bulkKgPriceUpdate = async (req: Request, res: Response) => {
     }
 
     // Preview (dryRun): filas completas (el cap de 5000 ya las limita).
-    if (matched.length === 0) {
+    if (affected === 0) {
       return res.status(400).json({
         message: "No hay productos que coincidan con la marca y el tipo seleccionados",
       });
     }
-    const rows = matched.map((p) => ({
-      id: p.id,
-      name: p.name,
-      currentPriceKg: p.priceKgSuelto,
-      newPriceKg,
-    }));
-    return res.status(200).json({ affected: rows.length, rows });
+    return res.status(200).json({ affected, rows });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

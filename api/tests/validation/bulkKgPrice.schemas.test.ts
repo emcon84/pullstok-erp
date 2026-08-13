@@ -100,88 +100,104 @@ describe("updatePriceKgTypeSchema", () => {
 
 describe("bulkKgPriceUpdateSchema", () => {
   const validTypeId = "00000000-0000-4000-8000-000000000001";
+  const validTypeId2 = "00000000-0000-4000-8000-000000000002";
+
+  const validPayload = (overrides: Record<string, unknown> = {}) => ({
+    brandValues: ["Acme"],
+    entries: [{ typeId: validTypeId, priceKg: 5500 }],
+    ...overrides,
+  });
 
   it("accepts a valid payload", () => {
-    const result = bulkKgPriceUpdateSchema.safeParse({
-      brandValues: ["Acme"],
-      typeId: validTypeId,
-      priceKg: 5500,
-    });
+    expect(bulkKgPriceUpdateSchema.safeParse(validPayload()).success).toBe(true);
+  });
+
+  it("accepts multiple entries", () => {
+    const result = bulkKgPriceUpdateSchema.safeParse(
+      validPayload({
+        entries: [
+          { typeId: validTypeId, priceKg: 5500 },
+          { typeId: validTypeId2, priceKg: 3000 },
+        ],
+      }),
+    );
     expect(result.success).toBe(true);
   });
 
   it("coerces priceKg from a numeric string", () => {
-    const result = bulkKgPriceUpdateSchema.safeParse({
-      brandValues: ["Acme"],
-      typeId: validTypeId,
-      priceKg: "5500.50",
-    });
+    const result = bulkKgPriceUpdateSchema.safeParse(
+      validPayload({ entries: [{ typeId: validTypeId, priceKg: "5500.50" }] }),
+    );
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.priceKg).toBe(5500.5);
+      expect(result.data.entries[0].priceKg).toBe(5500.5);
     }
   });
 
   it("rejects an empty brandValues array (needs at least one brand)", () => {
-    const result = bulkKgPriceUpdateSchema.safeParse({
-      brandValues: [],
-      typeId: validTypeId,
-      priceKg: 5500,
-    });
+    const result = bulkKgPriceUpdateSchema.safeParse(validPayload({ brandValues: [] }));
     expect(result.success).toBe(false);
   });
 
   it("rejects a missing brandValues field", () => {
     const result = bulkKgPriceUpdateSchema.safeParse({
-      typeId: validTypeId,
-      priceKg: 5500,
+      entries: [{ typeId: validTypeId, priceKg: 5500 }],
     });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty entries array", () => {
+    const result = bulkKgPriceUpdateSchema.safeParse(validPayload({ entries: [] }));
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a missing entries field", () => {
+    const result = bulkKgPriceUpdateSchema.safeParse({ brandValues: ["Acme"] });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a duplicate typeId in entries", () => {
+    const result = bulkKgPriceUpdateSchema.safeParse(
+      validPayload({
+        entries: [
+          { typeId: validTypeId, priceKg: 5500 },
+          { typeId: validTypeId, priceKg: 3000 },
+        ],
+      }),
+    );
     expect(result.success).toBe(false);
   });
 
   it("rejects a negative priceKg", () => {
-    const result = bulkKgPriceUpdateSchema.safeParse({
-      brandValues: ["Acme"],
-      typeId: validTypeId,
-      priceKg: -1,
-    });
+    const result = bulkKgPriceUpdateSchema.safeParse(
+      validPayload({ entries: [{ typeId: validTypeId, priceKg: -1 }] }),
+    );
     expect(result.success).toBe(false);
   });
 
   it("rejects a zero priceKg (must be positive)", () => {
-    const result = bulkKgPriceUpdateSchema.safeParse({
-      brandValues: ["Acme"],
-      typeId: validTypeId,
-      priceKg: 0,
-    });
+    const result = bulkKgPriceUpdateSchema.safeParse(
+      validPayload({ entries: [{ typeId: validTypeId, priceKg: 0 }] }),
+    );
     expect(result.success).toBe(false);
   });
 
   it("rejects priceKg with more than 2 decimals", () => {
-    const result = bulkKgPriceUpdateSchema.safeParse({
-      brandValues: ["Acme"],
-      typeId: validTypeId,
-      priceKg: 5500.567,
-    });
+    const result = bulkKgPriceUpdateSchema.safeParse(
+      validPayload({ entries: [{ typeId: validTypeId, priceKg: 5500.567 }] }),
+    );
     expect(result.success).toBe(false);
   });
 
   it("rejects a non-uuid typeId", () => {
-    const result = bulkKgPriceUpdateSchema.safeParse({
-      brandValues: ["Acme"],
-      typeId: "not-a-uuid",
-      priceKg: 5500,
-    });
+    const result = bulkKgPriceUpdateSchema.safeParse(
+      validPayload({ entries: [{ typeId: "not-a-uuid", priceKg: 5500 }] }),
+    );
     expect(result.success).toBe(false);
   });
 
   it("strips unknown fields", () => {
-    const result = bulkKgPriceUpdateSchema.safeParse({
-      brandValues: ["Acme"],
-      typeId: validTypeId,
-      priceKg: 5500,
-      extra: "nope",
-    });
+    const result = bulkKgPriceUpdateSchema.safeParse(validPayload({ extra: "nope" }));
     expect(result.success).toBe(true);
     if (result.success) {
       expect((result.data as any).extra).toBeUndefined();

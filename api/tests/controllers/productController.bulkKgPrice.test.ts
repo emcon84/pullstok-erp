@@ -7,7 +7,7 @@ import { prisma } from "../../src/config/db";
 jest.mock("../../src/config/db", () => ({
   prisma: {
     product: { findMany: jest.fn() },
-    priceKgType: { findFirst: jest.fn() },
+    priceKgType: { findMany: jest.fn() },
     $transaction: jest.fn(),
   },
   basePrisma: {},
@@ -71,12 +71,12 @@ describe("matchNameSynonyms — case-insensitive substring match", () => {
 describe("bulkKgPriceUpdate — preview (dryRun) and authoritative apply", () => {
   const mockedPrisma = prisma as unknown as {
     product: { findMany: jest.Mock };
-    priceKgType: { findFirst: jest.Mock };
+    priceKgType: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
 
   const mockTx = {
-    priceKgType: { findFirst: jest.fn() },
+    priceKgType: { findMany: jest.fn() },
     product: { findMany: jest.fn(), updateMany: jest.fn() },
   };
 
@@ -88,7 +88,8 @@ describe("bulkKgPriceUpdate — preview (dryRun) and authoritative apply", () =>
     return res;
   };
 
-  const type = { id: "type-adulto", name: "Adulto", synonyms: ["ADULTO", "ADULTOS"] };
+  const typeAdulto = { id: "type-adulto", name: "Adulto", synonyms: ["ADULTO", "ADULTOS"] };
+  const typeKitten = { id: "type-kitten", name: "Kitten", synonyms: ["KITTEN"] };
 
   const makeProduct = (i: number, name = `ALIMENTO ADULTO ${i}`) => ({
     id: `p-${i}`,
@@ -98,26 +99,34 @@ describe("bulkKgPriceUpdate — preview (dryRun) and authoritative apply", () =>
 
   const previewReq = (body: any = {}) =>
     ({
-      body: { brandValues: ["Acme"], typeId: "type-adulto", priceKg: 5500, ...body },
+      body: {
+        brandValues: ["Acme"],
+        entries: [{ typeId: "type-adulto", priceKg: 5500 }],
+        ...body,
+      },
       query: { dryRun: "true" },
     } as unknown as Request);
 
   const applyReq = (body: any = {}) =>
     ({
-      body: { brandValues: ["Acme"], typeId: "type-adulto", priceKg: 5500, ...body },
+      body: {
+        brandValues: ["Acme"],
+        entries: [{ typeId: "type-adulto", priceKg: 5500 }],
+        ...body,
+      },
       query: {},
     } as unknown as Request);
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedPrisma.priceKgType.findFirst.mockResolvedValue(type);
+    mockedPrisma.priceKgType.findMany.mockResolvedValue([typeAdulto]);
     mockedPrisma.$transaction.mockImplementation(
       async (cb: (tx: any) => unknown) => cb(mockTx),
     );
   });
 
   describe("preview (dryRun)", () => {
-    it("returns matched rows with current/new price per kg", async () => {
+    it("returns matched rows with typeId/typeName/current/new price per kg", async () => {
       mockedPrisma.product.findMany.mockResolvedValue([
         makeProduct(1),
         makeProduct(2, "SIEGER KITTEN"),
@@ -134,18 +143,71 @@ describe("bulkKgPriceUpdate — preview (dryRun) and authoritative apply", () =>
       expect(json.rows[0]).toEqual({
         id: "p-1",
         name: "ALIMENTO ADULTO 1",
+        typeId: "type-adulto",
+        typeName: "Adulto",
         currentPriceKg: 5000,
         newPriceKg: 5500,
       });
       expect(json.rows.find((r: any) => r.id === "p-2")).toBeUndefined();
     });
 
-    it("rounds newPriceKg to 2 decimals", async () => {
+    it("groups two entries by type and resolves the type per row", async () => {
+      mockedPrisma.priceKgType.findMany.mockResolvedValue([typeAdulto, typeKitten]);
+      mockedPrisma.product.findMany.mockResolvedValue([
+        makeProduct(1, "ALIMENTO ADULTO 1"),
+        makeProduct(2, "SIEGER KITTEN"),
+      ]);
+      const res = mockResponse();
+
+      await bulkKgPriceUpdate(
+        previewReq({
+          entries: [
+            { typeId: "type-adulto", priceKg: 5500 },
+            { typeId: "type-kitten", priceKg: 3000 },
+          ],
+        }),
+        res,
+      );
+
+      const json = res.json.mock.calls[0][0];
+      expect(json.affected).toBe(2);
+      const adulto = json.rows.find((r: any) => r.id === "p-1");
+      const kitten = json.rows.find((r: any) => r.id === "p-2");
+      expect(adulto).toMatchObject({ typeId: "type-adulto", typeName: "Adulto", newPriceKg: 5500 });
+      expect(kitten).toMatchObject({ typeId: "type-kitten", typeName: "Kitten", newPriceKg: 3000 });
+    });
+
+    it("first entry wins when a product matches two overlapping types", async () => {
+      mockedPrisma.priceKgType.findMany.mockResolvedValue([
+        { id: "type-adulto", name: "Adulto", synonyms: ["ADULTO"] },
+        { id: "type-adultos", name: "Adultos", synonyms: ["ADULTOS"] },
+      ]);
+      // "ALIMENTO ADULTOS 1" contains both ADULTO (substring of ADULTOS) and
+      // ADULTOS: the FIRST entry (type-adulto) must claim it.
+      mockedPrisma.product.findMany.mockResolvedValue([makeProduct(1, "ALIMENTO ADULTOS 1")]);
+      const res = mockResponse();
+
+      await bulkKgPriceUpdate(
+        previewReq({
+          entries: [
+            { typeId: "type-adulto", priceKg: 1000 },
+            { typeId: "type-adultos", priceKg: 2000 },
+          ],
+        }),
+        res,
+      );
+
+      const json = res.json.mock.calls[0][0];
+      expect(json.affected).toBe(1);
+      expect(json.rows[0]).toMatchObject({ id: "p-1", typeId: "type-adulto", newPriceKg: 1000 });
+    });
+
+    it("rounds newPriceKg to 2 decimals per entry", async () => {
       mockedPrisma.product.findMany.mockResolvedValue([makeProduct(1)]);
       const res = mockResponse();
 
       await bulkKgPriceUpdate(
-        previewReq({ priceKg: 5500.567 }),
+        previewReq({ entries: [{ typeId: "type-adulto", priceKg: 5500.567 }] }),
         res,
       );
 
@@ -154,11 +216,9 @@ describe("bulkKgPriceUpdate — preview (dryRun) and authoritative apply", () =>
     });
 
     it("falls back to type.name when synonyms is empty", async () => {
-      mockedPrisma.priceKgType.findFirst.mockResolvedValue({
-        id: "t-senior",
-        name: "Senior",
-        synonyms: [],
-      });
+      mockedPrisma.priceKgType.findMany.mockResolvedValue([
+        { id: "t-senior", name: "Senior", synonyms: [] },
+      ]);
       mockedPrisma.product.findMany.mockResolvedValue([
         makeProduct(1, "ALIMENTO SENIOR 15KG"),
         makeProduct(2, "ALIMENTO ADULTO"),
@@ -166,27 +226,35 @@ describe("bulkKgPriceUpdate — preview (dryRun) and authoritative apply", () =>
       const res = mockResponse();
 
       await bulkKgPriceUpdate(
-        previewReq({ typeId: "t-senior" }),
+        previewReq({ entries: [{ typeId: "t-senior", priceKg: 5500 }] }),
         res,
       );
 
       const json = res.json.mock.calls[0][0];
       expect(json.affected).toBe(1);
-      expect(json.rows[0].id).toBe("p-1");
+      expect(json.rows[0]).toMatchObject({ id: "p-1", typeName: "Senior" });
     });
 
-    it("returns 404 when the type does not exist", async () => {
-      mockedPrisma.priceKgType.findFirst.mockResolvedValue(null);
+    it("returns 404 when any type does not exist", async () => {
+      mockedPrisma.priceKgType.findMany.mockResolvedValue([typeAdulto]);
       const res = mockResponse();
 
-      await bulkKgPriceUpdate(previewReq(), res);
+      await bulkKgPriceUpdate(
+        previewReq({
+          entries: [
+            { typeId: "type-adulto", priceKg: 5500 },
+            { typeId: "type-missing", priceKg: 3000 },
+          ],
+        }),
+        res,
+      );
 
       expect(res.status).toHaveBeenCalledWith(404);
     });
 
-    it("returns 400 when no product matches the brand + type", async () => {
+    it("returns 400 when no product matches the brand + types", async () => {
       mockedPrisma.product.findMany.mockResolvedValue([
-        makeProduct(1, "SIEGER KITTEN"),
+        makeProduct(1, "SIEGER SENIOR"),
       ]);
       const res = mockResponse();
 
@@ -209,7 +277,7 @@ describe("bulkKgPriceUpdate — preview (dryRun) and authoritative apply", () =>
 
   describe("apply (authoritative $transaction)", () => {
     beforeEach(() => {
-      mockTx.priceKgType.findFirst.mockResolvedValue(type);
+      mockTx.priceKgType.findMany.mockResolvedValue([typeAdulto]);
     });
 
     it("re-resolves the set in-tx and updates priceKgSuelto + manual flag", async () => {
@@ -224,8 +292,8 @@ describe("bulkKgPriceUpdate — preview (dryRun) and authoritative apply", () =>
       await bulkKgPriceUpdate(applyReq(), res);
 
       expect(mockedPrisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
-      expect(mockTx.priceKgType.findFirst).toHaveBeenCalledWith({
-        where: { id: "type-adulto", organizationId: "org-1" },
+      expect(mockTx.priceKgType.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["type-adulto"] }, organizationId: "org-1" },
         select: { id: true, name: true, synonyms: true },
       });
       expect(mockTx.product.updateMany).toHaveBeenCalledWith({
@@ -233,6 +301,39 @@ describe("bulkKgPriceUpdate — preview (dryRun) and authoritative apply", () =>
         data: { priceKgSuelto: 5500, priceKgSueltoManual: true },
       });
       expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json.mock.calls[0][0]).toEqual({ affected: 2 });
+    });
+
+    it("updates each entry with its own price (updateMany per entry)", async () => {
+      mockedPrisma.priceKgType.findMany.mockResolvedValue([typeAdulto, typeKitten]);
+      mockTx.priceKgType.findMany.mockResolvedValue([typeAdulto, typeKitten]);
+      mockedPrisma.product.findMany.mockResolvedValue([]);
+      mockTx.product.findMany.mockResolvedValue([
+        { id: "p-1", name: "ALIMENTO ADULTO 1" },
+        { id: "p-2", name: "SIEGER KITTEN" },
+      ]);
+      mockTx.product.updateMany.mockResolvedValue({ count: 1 });
+      const res = mockResponse();
+
+      await bulkKgPriceUpdate(
+        applyReq({
+          entries: [
+            { typeId: "type-adulto", priceKg: 5500 },
+            { typeId: "type-kitten", priceKg: 3000 },
+          ],
+        }),
+        res,
+      );
+
+      expect(mockTx.product.updateMany).toHaveBeenCalledTimes(2);
+      expect(mockTx.product.updateMany).toHaveBeenNthCalledWith(1, {
+        where: { id: { in: ["p-1"] }, organizationId: "org-1" },
+        data: { priceKgSuelto: 5500, priceKgSueltoManual: true },
+      });
+      expect(mockTx.product.updateMany).toHaveBeenNthCalledWith(2, {
+        where: { id: { in: ["p-2"] }, organizationId: "org-1" },
+        data: { priceKgSuelto: 3000, priceKgSueltoManual: true },
+      });
       expect(res.json.mock.calls[0][0]).toEqual({ affected: 2 });
     });
 
@@ -262,9 +363,9 @@ describe("bulkKgPriceUpdate — preview (dryRun) and authoritative apply", () =>
       expect(mockTx.product.updateMany).not.toHaveBeenCalled();
     });
 
-    it("returns 404 when the type is gone at apply time", async () => {
+    it("returns 404 when a type is gone at apply time", async () => {
       mockedPrisma.product.findMany.mockResolvedValue([makeProduct(1)]);
-      mockTx.priceKgType.findFirst.mockResolvedValue(null);
+      mockTx.priceKgType.findMany.mockResolvedValue([]);
       const res = mockResponse();
 
       await bulkKgPriceUpdate(applyReq(), res);

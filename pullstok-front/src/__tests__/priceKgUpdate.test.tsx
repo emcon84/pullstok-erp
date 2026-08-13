@@ -48,8 +48,22 @@ const types = [
 const preview = {
   affected: 2,
   rows: [
-    { id: "p-1", name: "Producto 1", currentPriceKg: 1000, newPriceKg: 2500 },
-    { id: "p-2", name: "Producto 2", currentPriceKg: null, newPriceKg: 2500 },
+    {
+      id: "p-1",
+      name: "Producto 1",
+      typeId: "t-1",
+      typeName: "Adulto",
+      currentPriceKg: 1000,
+      newPriceKg: 2500,
+    },
+    {
+      id: "p-2",
+      name: "Producto 2",
+      typeId: "t-2",
+      typeName: "Cachorro",
+      currentPriceKg: null,
+      newPriceKg: 3000,
+    },
   ],
 };
 
@@ -70,36 +84,64 @@ describe("PriceKgUpdate — tipos y propagación por kilo", () => {
   it("carga y muestra marcas y tipos al montar", async () => {
     renderView();
 
-    expect(await screen.findByText("Acme")).toBeInTheDocument();
     // La lista de tipos (sección A) muestra los nombres cargados.
     expect(await screen.findByText("Adulto")).toBeInTheDocument();
     expect(screen.getByText("Cachorro")).toBeInTheDocument();
+
     // El selector de tipo (sección B) es un combobox Radix presente en el DOM.
     expect(screen.getByRole("combobox", { name: /tipo/i })).toBeInTheDocument();
+
+    // El selector de marca (sección B) es un combobox Radix que lista las marcas.
+    fireEvent.click(screen.getByRole("combobox", { name: /marca/i }));
+    expect(await screen.findByRole("option", { name: "Acme" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Zap" })).toBeInTheDocument();
   });
 
-  it("muestra la vista previa al calcular", async () => {
+  it("agrega múltiples entries y calcula preview", async () => {
     renderView();
+    await screen.findByText("Adulto");
 
-    fireEvent.click(await screen.findByText("Acme"));
-    // Abrir el combobox de tipo y elegir "Adulto" (Radix Select).
-    fireEvent.click(screen.getByRole("combobox", { name: /tipo/i }));
+    // Seleccionar marca "Acme" (Radix Select, patrón storeSettingsForm).
+    fireEvent.click(screen.getByRole("combobox", { name: /marca/i }));
+    fireEvent.click(await screen.findByRole("option", { name: "Acme" }));
+
+    // Primera fila: tipo "Adulto" + precio 2500.
+    fireEvent.click(screen.getAllByRole("combobox", { name: /tipo/i })[0]);
     fireEvent.click(await screen.findByRole("option", { name: "Adulto" }));
-    fireEvent.change(screen.getByLabelText(/precio por kilo/i), {
+    fireEvent.change(screen.getAllByLabelText(/precio por kilo/i)[0], {
       target: { value: "2500" },
+    });
+
+    // Agregar una segunda fila.
+    fireEvent.click(screen.getByRole("button", { name: /agregar otro tipo/i }));
+
+    // Segunda fila: tipo "Cachorro" + precio 3000.
+    fireEvent.click(screen.getAllByRole("combobox", { name: /tipo/i })[1]);
+    fireEvent.click(await screen.findByRole("option", { name: "Cachorro" }));
+    fireEvent.change(screen.getAllByLabelText(/precio por kilo/i)[1], {
+      target: { value: "3000" },
     });
 
     fireEvent.click(screen.getByRole("button", { name: /calcular preview/i }));
 
     expect(await screen.findByText("Producto 1")).toBeInTheDocument();
     expect(screen.getByText("Producto 2")).toBeInTheDocument();
-    expect(screen.getAllByText("$2.500,00")).toHaveLength(2);
     expect(screen.getByText("Afectados")).toBeInTheDocument();
+    expect(mockBulkKgPriceUpdate).toHaveBeenCalledWith(
+      {
+        brandValues: ["Acme"],
+        entries: [
+          { typeId: "t-1", priceKg: 2500 },
+          { typeId: "t-2", priceKg: 3000 },
+        ],
+      },
+      true,
+    );
   });
 
   it("deshabilita el botón Aplicar sin preview", async () => {
     renderView();
-    await screen.findByText("Acme");
+    await screen.findByText("Adulto");
 
     expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
   });

@@ -384,17 +384,24 @@ export const bulkPriceUpdate = async (
 // Bulk price-per-kilo update (sdd/price-kg)
 // ---------------------------------------------------------------------------
 
-/** Payload compartido por preview (dryRun) y apply de la propagación por kilo. */
-export interface BulkKgPricePayload {
-  brandValues: string[];
+/** Un par tipo→precio de la propagación por kilo (el front manda UNA marca + N pares). */
+export interface BulkKgPriceEntry {
   typeId: string;
   priceKg: number;
 }
 
-/** Fila del preview: producto con su precio por kilo actual y el nuevo. */
+/** Payload compartido por preview (dryRun) y apply de la propagación por kilo. */
+export interface BulkKgPricePayload {
+  brandValues: string[];
+  entries: BulkKgPriceEntry[];
+}
+
+/** Fila del preview: producto con su tipo resuelto y su precio por kilo actual/nuevo. */
 export interface BulkKgPricePreviewRow {
   id: string;
   name: string;
+  typeId: string;
+  typeName: string;
   currentPriceKg: number | null;
   newPriceKg: number;
 }

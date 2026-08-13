@@ -567,16 +567,26 @@ export const updatePriceKgTypeSchema = z
   .strip();
 
 // Propagación masiva de precio por kilo (POST /products/bulk-kg-price-update):
-// brandValues (marca, variante "Marca") + typeId + priceKg fija priceKgSuelto
-// en los productos que matcheen marca + tipo (tipo inferido por synonyms).
+// brandValues (marca, variante "Marca") + entries [{ typeId, priceKg }] fijan
+// priceKgSuelto en los productos que matcheen marca + tipo (tipo inferido por
+// synonyms). El front manda UNA marca (array por consistencia con
+// buildBulkPriceWhere) y MÚLTIPLES pares tipo→precio.
 export const bulkKgPriceUpdateSchema = z
   .object({
-    brandValues: z.array(z.string().trim().min(1, "La marca no puede estar vacía")),
-    typeId: z.string().uuid("Tipo inválido"),
-    priceKg: z.coerce
-      .number()
-      .positive("El precio por kg debe ser mayor a 0")
-      .multipleOf(0.01, "El precio admite hasta 2 decimales"),
+    brandValues: z
+      .array(z.string().trim().min(1, "La marca no puede estar vacía"))
+      .min(1, "Seleccioná al menos una marca"),
+    entries: z
+      .array(
+        z.object({
+          typeId: z.string().uuid("Tipo inválido"),
+          priceKg: z.coerce
+            .number()
+            .positive("El precio por kg debe ser mayor a 0")
+            .multipleOf(0.01, "El precio admite hasta 2 decimales"),
+        }),
+      )
+      .min(1, "Agregá al menos un tipo con precio"),
   })
   .strip()
   .superRefine((data, ctx) => {
@@ -586,6 +596,18 @@ export const bulkKgPriceUpdateSchema = z
         path: ["brandValues"],
         message: "Seleccioná al menos una marca",
       });
+    }
+    const seen = new Set<string>();
+    for (const entry of data.entries) {
+      if (seen.has(entry.typeId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["entries"],
+          message: "Tipo duplicado en la lista",
+        });
+        break;
+      }
+      seen.add(entry.typeId);
     }
   });
 
