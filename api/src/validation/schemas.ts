@@ -613,34 +613,45 @@ export const updatePriceKgBrandSchema = z
 // del producto) + entries [{ typeId, priceKg }] fijan priceKgSuelto en los
 // productos que matcheen marca (AND de keywords) + tipo (OR de synonyms). El
 // front manda UNA marca y MÚLTIPLES pares tipo→precio.
-export const bulkKgPriceUpdateSchema = z
+// ── REMOVIDO (sdd/price-kg-plan): la propagación a productos se reemplazó por
+// el editor de planilla (marca × tipo → precio). Ver savePriceKgPlanSchema.
+
+// ---------- Planilla de precios por kilo (PriceKgPrice) ----------
+// Editor de planilla: guarda TODAS las celdas de la matriz marca (filas) ×
+// tipo (columnas) → precio por kilo. priceKg null = borrar la celda; number =
+// upsert. Se rechazan pares (brandId, typeId) duplicados: a lo sumo una celda
+// por par en la org.
+export const savePriceKgPlanSchema = z
   .object({
-    brandId: z.string().uuid("Marca inválida"),
     entries: z
       .array(
         z.object({
+          brandId: z.string().uuid("Marca inválida"),
           typeId: z.string().uuid("Tipo inválido"),
           priceKg: z.coerce
             .number()
             .positive("El precio por kg debe ser mayor a 0")
-            .multipleOf(0.01, "El precio admite hasta 2 decimales"),
+            .multipleOf(0.01, "El precio admite hasta 2 decimales")
+            .nullable(),
         }),
       )
-      .min(1, "Agregá al menos un tipo con precio"),
+      .min(1, "Debe enviar al menos una celda")
+      .max(1000, "Máximo 1000 celdas por guardado"),
   })
   .strip()
   .superRefine((data, ctx) => {
     const seen = new Set<string>();
     for (const entry of data.entries) {
-      if (seen.has(entry.typeId)) {
+      const key = `${entry.brandId}:${entry.typeId}`;
+      if (seen.has(key)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["entries"],
-          message: "Tipo duplicado en la lista",
+          message: "Marca y tipo duplicados en la lista",
         });
         break;
       }
-      seen.add(entry.typeId);
+      seen.add(key);
     }
   });
 

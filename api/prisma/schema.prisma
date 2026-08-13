@@ -61,6 +61,7 @@ model Organization {
   providers             Provider[]
   priceKgTypes          PriceKgType[]
   priceKgBrands         PriceKgBrand[]
+  priceKgPrices         PriceKgPrice[]
   categories            Category[]
   variantDefs           CategoryVariantDefinition[]
   variantOptions        CategoryVariantOption[]
@@ -243,20 +244,21 @@ model Provider {
 
 // Tipos de "Precios por kilo" (etapas de vida del alimento: Adulto, Cachorro,
 // Kitten, Senior, etc.). Tenant-scoped (organizationId) y en TENANT_MODELS
-// (db.ts) → scope org automático anti-fuga. `synonyms` son palabras que
-// matchean (case-insensitive, substring) el `name` del producto para inferir
-// su tipo en la propagación masiva de priceKgSuelto (POST /products/
-// bulk-kg-price-update). La unicidad (org, name) es case-insensitive a nivel DB:
-// la migración materializa la @@unique como índice funcional LOWER (mismo
-// patrón intencional que providers y price_lists).
+// (db.ts) → scope org automático anti-fuga. `synonyms` se mantiene por
+// compatibilidad con el CRUD; ya no se usa para matchear nombres de producto
+// (la planilla editora usa el tipo como columna de la matriz, no propaga a
+// productos). La unicidad (org, name) es case-insensitive a nivel DB: la
+// migración materializa la @@unique como índice funcional LOWER (mismo patrón
+// intencional que providers y price_lists).
 model PriceKgType {
-  id             String       @id @default(uuid())
+  id             String         @id @default(uuid())
   name           String
   synonyms       String[]
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  priceKgPrices  PriceKgPrice[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -266,24 +268,47 @@ model PriceKgType {
 // Marcas de "Precios por kilo" (líneas/sabores editables por el usuario:
 // MAXXIUM CORDERO, OLD PRINCE PREMIUM, MASTER RP, ...). Tenant-scoped
 // (organizationId) y en TENANT_MODELS (db.ts) → scope org automático
-// anti-fuga. A diferencia de PriceKgType (que infiere el TIPO de vida), la
-// marca se matchea por `keywords` (AND case-insensitive sobre el name del
-// producto) para poder subdividir marcas que NO existen como variante "Marca".
-// La unicidad (org, name) es case-insensitive a nivel DB: la migración
-// materializa la @@unique como índice funcional LOWER (mismo patrón que
-// price_kg_types y providers).
+// anti-fuga. `keywords` se mantiene por compatibilidad con el CRUD; ya no se
+// usa para matchear nombres de producto (la planilla editora usa la marca como
+// fila de la matriz, no propaga a productos). La unicidad (org, name) es
+// case-insensitive a nivel DB: la migración materializa la @@unique como
+// índice funcional LOWER (mismo patrón que price_kg_types y providers).
 model PriceKgBrand {
-  id             String       @id @default(uuid())
+  id             String         @id @default(uuid())
   name           String
   keywords       String[]
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  priceKgPrices  PriceKgPrice[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("price_kg_brands")
+}
+
+// Celda de la planilla "Precios por kilo": un precio por kilo para un par
+// (marca × tipo). La planilla es una matriz marca (filas) × tipo (columnas) →
+// precio. Tenant-scoped (organizationId) y en TENANT_MODELS (db.ts) → scope
+// org automático anti-fuga. La unicidad es (organizationId, brandId, typeId):
+// a lo sumo una celda por par marca+tipo en la org. No matchea nombres de
+// producto: la venta suelta es un tema aparte y no se toca desde acá.
+model PriceKgPrice {
+  id             String       @id @default(uuid())
+  brandId        String
+  brand          PriceKgBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  typeId         String
+  type           PriceKgType  @relation(fields: [typeId], references: [id], onDelete: Cascade)
+  priceKg        Float
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  @@unique([organizationId, name])
+  @@unique([organizationId, brandId, typeId])
   @@index([organizationId])
-  @@map("price_kg_brands")
+  @@map("price_kg_prices")
 }
 
 model Product {

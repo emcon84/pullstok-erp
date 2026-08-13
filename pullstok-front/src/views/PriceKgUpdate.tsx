@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,13 +24,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   listPriceKgTypes,
   createPriceKgType,
   updatePriceKgType,
@@ -47,12 +40,10 @@ import {
   type PriceKgBrand,
 } from "@/services/priceKgBrands";
 import {
-  bulkKgPriceUpdate,
-  listPriceKgProducts,
-  type BulkKgPricePreview,
-  type BulkKgPricePayload,
-  type PriceKgListItem,
-} from "@/services/productService";
+  getPriceKgPlan,
+  savePriceKgPlan,
+  type PriceKgPlanEntry,
+} from "@/services/priceKgPlan";
 
 const formatPrice = (n: number) =>
   `$${n.toLocaleString("es-AR", {
@@ -60,10 +51,13 @@ const formatPrice = (n: number) =>
     maximumFractionDigits: 2,
   })}`;
 
+const cellKey = (brandId: string, typeId: string) => `${brandId}:${typeId}`;
+
 /**
- * Precios por kilo (sdd/price-kg): gestión de tipos (etapas de vida) + gestión
- * de marcas (líneas/sabores editables con keywords) + propagación de precio por
- * kilo sobre productos (marca + tipo + precio) + impresión de la planilla.
+ * Precios por kilo (sdd/price-kg-plan): gestión de tipos (etapas de vida) +
+ * gestión de marcas (líneas/sabores editables) + editor de planilla. La
+ * planilla es una matriz marca (filas) × tipo (columnas) → precio por kilo,
+ * persistente e imprimible. NO se tocan productos ni se matchean nombres.
  */
 export const PriceKgUpdate = () => {
   // --- Gestión de tipos ---
@@ -84,17 +78,14 @@ export const PriceKgUpdate = () => {
   const [savingBrand, setSavingBrand] = useState(false);
   const [deleteBrandId, setDeleteBrandId] = useState<string | null>(null);
 
-  // --- Propagación por kilo ---
-  const [selectedBrandId, setSelectedBrandId] = useState("");
-  const [entries, setEntries] = useState<{ typeId: string; priceKg: string }[]>([
-    { typeId: "", priceKg: "" },
-  ]);
-  const [preview, setPreview] = useState<BulkKgPricePreview | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-
-  // --- Impresión de la planilla ---
-  const [printRows, setPrintRows] = useState<PriceKgListItem[] | null>(null);
+  // --- Planilla (matriz marca × tipo → precio) ---
+  const [cells, setCells] = useState<Record<string, string>>({});
+  const [loadingPlan, setLoadingPlan] = useState(true);
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  // Snapshot del estado cargado de la DB: permite detectar borrados (celda con
+  // valor previo que el usuario deja vacía) y si hubo cambios antes de guardar.
+  const baselineRef = useRef<Record<string, string>>({});
 
   const loadTypes = useCallback(async () => {
     try {
@@ -118,10 +109,28 @@ export const PriceKgUpdate = () => {
     }
   }, []);
 
+  const loadPlan = useCallback(async () => {
+    try {
+      const data = await getPriceKgPlan();
+      const map: Record<string, string> = {};
+      for (const c of data) {
+        map[cellKey(c.brandId, c.typeId)] = String(c.priceKg);
+      }
+      setCells(map);
+      baselineRef.current = { ...map };
+    } catch {
+      setCells({});
+      baselineRef.current = {};
+    } finally {
+      setLoadingPlan(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadTypes();
     loadBrands();
-  }, [loadTypes, loadBrands]);
+    loadPlan();
+  }, [loadTypes, loadBrands, loadPlan]);
 
   // --- Tipos: handlers ---
   const startEditType = (t: PriceKgType) => {
@@ -166,6 +175,7 @@ export const PriceKgUpdate = () => {
       toast.success("Tipo eliminado");
       setDeleteTypeId(null);
       await loadTypes();
+      await loadPlan();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error al eliminar el tipo";
       toast.error(message);
@@ -216,6 +226,7 @@ export const PriceKgUpdate = () => {
       toast.success("Marca eliminada");
       setDeleteBrandId(null);
       await loadBrands();
+      await loadPlan();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error al eliminar la marca";
       toast.error(message);
@@ -223,111 +234,94 @@ export const PriceKgUpdate = () => {
     setSavingBrand(false);
   };
 
-  // --- Propagación: handlers ---
-  const updateEntry = (
-    index: number,
-    patch: Partial<{ typeId: string; priceKg: string }>,
-  ) => {
-    setEntries((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
-    setPreview(null);
-  };
-
-  const addEntry = () => {
-    setEntries((prev) => [...prev, { typeId: "", priceKg: "" }]);
-    setPreview(null);
-  };
-
-  const removeEntry = (index: number) => {
-    setEntries((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      return next.length === 0 ? [{ typeId: "", priceKg: "" }] : next;
+  // --- Planilla: handlers ---
+  const setCell = (brandId: string, typeId: string, value: string) => {
+    setCells((prev) => {
+      const key = cellKey(brandId, typeId);
+      const next = { ...prev };
+      if (value === "") delete next[key];
+      else next[key] = value;
+      return next;
     });
-    setPreview(null);
   };
 
-  const validEntries = entries
-    .map((e) => ({ typeId: e.typeId, priceKg: parseFloat(e.priceKg) }))
-    .filter((e) => e.typeId !== "" && !Number.isNaN(e.priceKg) && e.priceKg > 0);
-
-  // Una fila está "incompleta" si le falta tipo o precio, o si el precio no es
-  // válido (> 0). Frena el preview para no mandar un payload a medias.
-  const hasIncompleteRows = entries.some((e) => {
-    const typeSet = e.typeId !== "";
-    const price = parseFloat(e.priceKg);
-    const priceSet = e.priceKg.trim() !== "" && !Number.isNaN(price);
-    if (typeSet && priceSet) return price <= 0;
-    return typeSet || priceSet;
-  });
-
-  const previewEnabled =
-    selectedBrandId !== "" && validEntries.length > 0 && !hasIncompleteRows;
-
-  const buildPayload = (): BulkKgPricePayload | null => {
-    if (!previewEnabled) return null;
-    return { brandId: selectedBrandId, entries: validEntries };
+  // Arma las entries a guardar: celdas NO vacías con precio > 0 → number;
+  // celdas que quedaron vacías pero tenían valor previo → null (borrar).
+  const buildEntries = (
+    map: Record<string, string>,
+    baseline: Record<string, string>,
+  ): PriceKgPlanEntry[] => {
+    const entries: PriceKgPlanEntry[] = [];
+    for (const brand of brands) {
+      for (const type of types) {
+        const key = cellKey(brand.id, type.id);
+        const raw = (map[key] ?? "").trim();
+        if (raw === "") {
+          if (baseline[key] !== undefined) {
+            entries.push({ brandId: brand.id, typeId: type.id, priceKg: null });
+          }
+        } else {
+          const price = parseFloat(raw);
+          if (!Number.isNaN(price) && price > 0) {
+            entries.push({ brandId: brand.id, typeId: type.id, priceKg: price });
+          }
+        }
+      }
+    }
+    return entries;
   };
 
-  const handlePreview = async () => {
-    const payload = buildPayload();
-    if (!payload) return;
-    setSubmitting(true);
+  const handleSavePlan = async () => {
+    const current = buildEntries(cells, baselineRef.current);
+    const baseline = buildEntries(baselineRef.current, baselineRef.current);
+    if (JSON.stringify(current) === JSON.stringify(baseline)) {
+      toast.info("No hay cambios para guardar");
+      return;
+    }
+    setSavingPlan(true);
     try {
-      const data = await bulkKgPriceUpdate(payload, true);
-      setPreview(data as BulkKgPricePreview);
+      await savePriceKgPlan(current);
+      toast.success("Planilla guardada");
+      await loadPlan();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Error al obtener preview";
+      const message = error instanceof Error ? error.message : "Error al guardar la planilla";
       toast.error(message);
     }
-    setSubmitting(false);
+    setSavingPlan(false);
   };
 
-  const handleApply = async () => {
-    const payload = buildPayload();
-    if (!payload) return;
-    setSubmitting(true);
-    try {
-      const result = await bulkKgPriceUpdate(payload, false);
-      toast.success(`${result.affected} productos actualizados`);
-      setPreview(null);
-      setEntries([{ typeId: "", priceKg: "" }]);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Error al aplicar";
-      toast.error(message);
-    }
-    setSubmitting(false);
-  };
+  // Celdas con precio cargado (valor no vacío y > 0), incluyendo ediciones sin
+  // guardar, para el indicador.
+  const loadedCount = Object.values(cells).filter((v) => {
+    const p = parseFloat(v);
+    return v.trim() !== "" && !Number.isNaN(p) && p > 0;
+  }).length;
 
-  const applyDisabled = !preview || preview.affected === 0 || submitting;
+  const matrixReady = !loadingTypes && !loadingBrands && !loadingPlan;
 
   // --- Impresión ---
-  const handlePrint = async () => {
-    setSubmitting(true);
-    try {
-      const items = await listPriceKgProducts();
-      setPrintRows(items);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Error al preparar impresión";
-      toast.error(message);
-    } finally {
-      setSubmitting(false);
-    }
+  const handlePrint = () => {
+    setPrinting(true);
   };
 
-  // Una vez montado el área print (printRows no nulo), abrir el diálogo de
-  // impresión y limpiar el estado al cerrarlo (afterprint).
   useEffect(() => {
-    if (!printRows) return;
+    if (!printing) return;
     window.print();
-    const cleanup = () => setPrintRows(null);
+    const cleanup = () => setPrinting(false);
     window.addEventListener("afterprint", cleanup);
     return () => window.removeEventListener("afterprint", cleanup);
-  }, [printRows]);
+  }, [printing]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Precios por kilo</h1>
-        <Button variant="outline" size="sm" disabled={submitting} onClick={handlePrint}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!matrixReady || brands.length === 0 || types.length === 0}
+          onClick={handlePrint}
+        >
           Imprimir planilla
         </Button>
       </div>
@@ -550,208 +544,110 @@ export const PriceKgUpdate = () => {
         </CardContent>
       </Card>
 
-      {/* Sección C — Propagar precio por kilo */}
+      {/* Sección C — Planilla de precios por kilo */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            Propagar precio por kilo
-          </CardTitle>
+          <CardTitle className="text-base">Planilla de precios por kilo</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {loadedCount} {loadedCount === 1 ? "celda" : "celdas"} con precio cargadas
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="kg-brand">Marca</Label>
-            {loadingBrands ? (
-              <p className="text-sm text-muted-foreground">Cargando marcas...</p>
-            ) : brands.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No hay marcas. Creá una en la sección de arriba.
-              </p>
-            ) : (
-              <Select
-                value={selectedBrandId}
-                onValueChange={(value) => {
-                  setSelectedBrandId(value);
-                  setPreview(null);
-                }}
-              >
-                <SelectTrigger id="kg-brand" className="w-full">
-                  <SelectValue placeholder="Seleccionar marca" />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            {entries.map((entry, index) => (
-              <div
-                key={index}
-                className="grid gap-3 sm:grid-cols-[1fr_140px_auto] sm:items-end"
-              >
-                <div className="space-y-1.5">
-                  <Label htmlFor={`kg-entry-type-${index}`}>Tipo</Label>
-                  <Select
-                    value={entry.typeId}
-                    onValueChange={(value) => updateEntry(index, { typeId: value })}
-                  >
-                    <SelectTrigger id={`kg-entry-type-${index}`} className="w-full">
-                      <SelectValue placeholder="Seleccionar tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {types.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor={`kg-entry-price-${index}`}>Precio por kilo</Label>
-                  <Input
-                    id={`kg-entry-price-${index}`}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Ej: 2500"
-                    value={entry.priceKg}
-                    onChange={(e) => updateEntry(index, { priceKg: e.target.value })}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="sm:mb-0.5"
-                  aria-label="Quitar tipo"
-                  onClick={() => removeEntry(index)}
-                >
-                  X
-                </Button>
-              </div>
-            ))}
-
-            <Button type="button" variant="outline" size="sm" onClick={addEntry}>
-              Agregar otro tipo
-            </Button>
-          </div>
-
-          <Button
-            className="w-full"
-            size="lg"
-            disabled={!previewEnabled || submitting}
-            onClick={handlePreview}
-          >
-            {submitting ? "Calculando..." : "Calcular preview"}
-          </Button>
-
-          {preview && (
-            <>
-              <div className="rounded-md bg-muted p-3">
-                <p className="text-xs text-muted-foreground">Afectados</p>
-                <p className="text-lg font-bold">{preview.affected}</p>
-              </div>
-
-              <div className="max-h-[320px] overflow-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Producto</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Precio/kg actual</TableHead>
-                      <TableHead className="text-right">Precio/kg nuevo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {preview.rows.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell className="font-medium">{row.name}</TableCell>
-                        <TableCell>{row.typeName}</TableCell>
-                        <TableCell>
-                          {row.currentPriceKg === null
-                            ? "—"
-                            : formatPrice(row.currentPriceKg)}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatPrice(row.newPriceKg)}
-                        </TableCell>
-                      </TableRow>
+          {!matrixReady ? (
+            <p className="text-sm text-muted-foreground">Cargando planilla...</p>
+          ) : brands.length === 0 || types.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Creá al menos una marca y un tipo para completar la planilla.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[160px]">Marca</TableHead>
+                    {types.map((t) => (
+                      <TableHead key={t.id} className="text-right">
+                        {t.name}
+                      </TableHead>
                     ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-            </>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {brands.map((b) => (
+                    <TableRow key={b.id}>
+                      <TableCell className="whitespace-nowrap font-medium">
+                        {b.name}
+                      </TableCell>
+                      {types.map((t) => (
+                        <TableCell key={t.id} className="p-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="w-24 text-right"
+                            aria-label={`${b.name} ${t.name}`}
+                            value={cells[cellKey(b.id, t.id)] ?? ""}
+                            onChange={(e) => setCell(b.id, t.id, e.target.value)}
+                          />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
 
           <div className="flex justify-end">
             <Button
-              size="sm"
-              disabled={applyDisabled}
-              onClick={() => setDialogOpen(true)}
+              disabled={
+                savingPlan ||
+                !matrixReady ||
+                brands.length === 0 ||
+                types.length === 0
+              }
+              onClick={handleSavePlan}
             >
-              Aplicar
+              {savingPlan ? "Guardando..." : "Guardar planilla"}
             </Button>
           </div>
-
-          <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  Confirmar propagación de precio por kilo
-                </AlertDialogTitle>
-                {preview && (
-                  <AlertDialogDescription>
-                    {preview.affected} productos se actualizarán al precio por
-                    kilo de su tipo. El conteo final puede diferir si el
-                    catálogo cambió desde la vista previa.
-                  </AlertDialogDescription>
-                )}
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleApply}>
-                  Aplicar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </CardContent>
       </Card>
 
-      {/* Print area: only visible when printing (see @media print in index.css) */}
-      {printRows && (
+      {/* Print area: solo visible al imprimir (ver @media print en index.css) */}
+      {printing && (
         <div className="print-area hidden print:block" aria-hidden="true">
           <div className="mb-4">
             <h1 className="text-lg font-bold">Planilla de precios por kilo</h1>
             <p className="text-sm text-muted-foreground">
-              {new Date().toLocaleDateString("es-AR")} · {printRows.length} productos
+              {new Date().toLocaleDateString("es-AR")} · {loadedCount} celdas
             </p>
           </div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Producto</TableHead>
-                <TableHead className="text-right">Precio por kilo actual</TableHead>
+                <TableHead>Marca</TableHead>
+                {types.map((t) => (
+                  <TableHead key={t.id} className="text-right">
+                    {t.name}
+                  </TableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {printRows.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="font-medium leading-tight">
-                    {row.name}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {row.priceKgSuelto === null
-                      ? "—"
-                      : formatPrice(row.priceKgSuelto)}
-                  </TableCell>
+              {brands.map((b) => (
+                <TableRow key={b.id}>
+                  <TableCell className="font-medium">{b.name}</TableCell>
+                  {types.map((t) => {
+                    const raw = (cells[cellKey(b.id, t.id)] ?? "").trim();
+                    const price = parseFloat(raw);
+                    const valid = raw !== "" && !Number.isNaN(price) && price > 0;
+                    return (
+                      <TableCell key={t.id} className="text-right tabular-nums">
+                        {valid ? formatPrice(price) : "—"}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))}
             </TableBody>
