@@ -642,6 +642,12 @@ export const applyPriceListSchema = z
     layout: z.enum(["SECO", "WET"]),
     period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Período inválido (YYYY-MM-DD)").nullable().optional(),
     sourceFilename: z.string().min(1, "sourceFilename requerido"),
+    // Check "Aplicar precios al catálogo" (sdd/alican-wholesale-price-list/apply-prices).
+    // Default false cuando el campo está AUSENTE → back-compat total: los
+    // callers existentes (y el flujo ?dryRun=false) conservan el comportamiento
+    // original (no tocan product.price ni crean productos). El wizard SIEMPRE
+    // envía el valor explícito (default ON en la UI).
+    applyPrices: z.boolean().optional(),
     rows: z.array(decisionSchema).min(1, "Debe enviar al menos una decisión"),
   })
   .strip()

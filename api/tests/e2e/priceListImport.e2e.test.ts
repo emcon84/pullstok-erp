@@ -287,6 +287,65 @@ describe("E2E: importación de planillas Alican (SECO real)", () => {
     expect(res.status).toBe(404);
   });
 
+  /**
+   * apply-prices (sdd/alican-wholesale-price-list/apply-prices). Corrido AL
+   * FINAL del flujo a propósito: crea un producto nuevo en la org, y un re-
+   * preview posterior lo matchearía (rompería los asserts de idempotencia).
+   * Con applyPrices=true: el matcheado actualiza product.price al Con IVA y el
+   * no matcheado se crea automáticamente (name + price Con IVA, sin categoría).
+   */
+  it("apply con applyPrices=true: actualiza product.price del matcheado y crea el no matcheado", async () => {
+    const previewRes = await request(app)
+      .post("/api/products/import-price-list?dryRun=true")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .attach("file", fixturePath);
+    expect(previewRes.status).toBe(200);
+
+    const rows = previewRes.body.rows as any[];
+    const matched = rows.find((r: any) => r.estado === "matched");
+    const unmatched = rows.find((r: any) => r.estado === "unmatched");
+    expect(matched).toBeDefined();
+    expect(unmatched).toBeDefined();
+
+    const decisions = [matched, unmatched].map((r: any) => ({
+      position: r.position,
+      accion: "import",
+      productId: r.productId ?? undefined,
+      nombre: r.nombre,
+      marca: r.marca,
+      linea: r.linea,
+      sublinea: r.sublinea,
+      unidadEmpaque: r.unidadEmpaque,
+      precioSinIva: r.precioSinIva,
+      precioConIva: r.precioConIva,
+    }));
+
+    const applyRes = await request(app)
+      .post("/api/products/import-price-list/apply")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        layout: previewRes.body.layout,
+        period: previewRes.body.period,
+        sourceFilename: previewRes.body.sourceFilename,
+        applyPrices: true,
+        rows: decisions,
+      });
+
+    expect(applyRes.status).toBe(200);
+    expect(applyRes.body.priceUpdated).toBe(1);
+    expect(applyRes.body.productsCreated).toBe(1);
+
+    const product = await basePrisma.product.findFirst({ where: { id: productId } });
+    expect(Number(product?.price)).toBe(10642); // Con IVA directo, sin markup
+
+    const createdProduct = await basePrisma.product.findFirst({
+      where: { organizationId, name: unmatched.nombre },
+    });
+    expect(createdProduct).toBeTruthy();
+    expect(Number(createdProduct?.price)).toBe(unmatched.precioConIva);
+    expect(createdProduct?.categoryId).toBeNull();
+  });
+
   it("rechaza un layout no reconocido con 400", async () => {
     const res = await request(app)
       .post("/api/products/import-price-list?dryRun=true")

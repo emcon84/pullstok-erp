@@ -5,13 +5,20 @@
  * parseAlicanSeco|Wet → capturePeriod → buildCatalogIndex(org) → matchRows →
  * fs.unlink del temporal (D5) → 200 con rows + estados + sugerido. Con
  * ?dryRun=false aplica decisiones DEFAULT (D10: matched/multi-match[0] se
- * importan; el resto se omite).
+ * importan; el resto se omite) SIN aplicar precios (applyPrices false).
  *
  * applyPriceList: transacción idempotente (D1/D2) — findFirst PriceList
  * (org, type, period) → deleteMany (recrear) → create PriceList + sections
  * (jerarquía del PDF) + entries → updateMany Product.suggestedPrice UNA vez
- * por producto. product.price NUNCA se toca (invariante). Fila omitida: no se
- * persiste ni toca nada.
+ * por producto. Fila omitida: no se persiste ni toca nada.
+ *
+ * applyPrices=true (check "Aplicar precios al catálogo", default ON en la UI,
+ * sdd/alican-wholesale-price-list/apply-prices): el precio Con IVA de cada fila
+ * va a product.price de los productos vinculados, y las filas sin match se
+ * CREAN (name = fila, price = Con IVA, sin categoría, marca asociada si existe
+ * una equivalente como variante "Marca"). Filas con precioConIva null: no
+ * aplican precio ni se crean. applyPrices ausente/false = comportamiento
+ * ORIGINAL (product.price NUNCA se toca, nada se crea).
  */
 
 import fs from "fs";
@@ -86,6 +93,44 @@ export function buildSections(rows: ApplyDecision[]): SectionGroup[] {
     current.entries.push(r);
   }
   return sections;
+}
+
+/**
+ * Plan de aplicación de precios (sdd/alican-wholesale-price-list/apply-prices).
+ * Puro y determinista: dado el payload de decisiones, cuántos productos se van
+ * a ACTUALIZAR (filas con productId y precio Con IVA) y cuáles se van a CREAR
+ * (filas sin productId con precio Con IVA). Las filas con precioConIva null NO
+ * pueden aplicar precio ni crearse (se mantienen planilla-only, decisión 5).
+ * El front lo usa para el preview de confirmación; el apply lo re-deriva
+ * server-side (autoritativo).
+ */
+export function buildPriceApplyPlan(rows: ApplyDecision[]): {
+  priceUpdates: number;
+  creates: { name: string; marca: string | null }[];
+} {
+  const creates: { name: string; marca: string | null }[] = [];
+  let priceUpdates = 0;
+  for (const r of rows) {
+    if (r.accion !== "import") continue;
+    if (r.precioConIva == null) continue; // sin precio no se aplica ni se crea
+    if (r.productId) priceUpdates++;
+    else creates.push({ name: r.nombre, marca: r.marca ?? null });
+  }
+  return { priceUpdates, creates };
+}
+
+/**
+ * Índice de marcas del sistema → optionId de la variante "Marca". Puro:
+ * recibe las opciones ya scopeadas a la org y normaliza los valores con
+ * normalizeName (mismo criterio que el matcheo del catálogo).
+ */
+export function buildBrandOptionIndex(options: { id: string; value: string }[]): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const o of options) {
+    const key = normalizeName(o.value);
+    if (key && !index.has(key)) index.set(key, o.id); // primer match gana
+  }
+  return index;
 }
 
 /** Decisiones default para ?dryRun=false (D10). */
@@ -212,6 +257,7 @@ export const applyPriceList = async (req: Request, res: Response) => {
       layout: Layout;
       period: string | null;
       sourceFilename: string;
+      applyPrices?: boolean;
       rows: ApplyDecision[];
     };
     const result = await applyPriceListCore(organizationId, body);
@@ -225,17 +271,67 @@ export const applyPriceList = async (req: Request, res: Response) => {
   }
 };
 
-/** Núcleo transaccional del apply (compartido por /apply y ?dryRun=false). */
+/**
+ * Espejo de syncHqStock (stockService) inline en el tx del apply: crea/actualiza
+ * el ProductStock(HQ) y refleja Product.quantity. No se reutiliza syncHqStock
+ * porque éste abre su PROPIO $transaction y no se puede anidar dentro del
+ * transaction interactivo del apply.
+ */
+async function syncHqStockInline(
+  tx: any,
+  organizationId: string,
+  productId: string,
+): Promise<void> {
+  const hq = await tx.branch.findFirst({
+    where: { organizationId, isHeadquarters: true },
+    select: { id: true },
+  });
+  if (!hq) return;
+  const existing = await tx.productStock.findFirst({
+    where: { productId, branchId: hq.id, organizationId },
+  });
+  if (existing) {
+    await tx.productStock.updateMany({
+      where: { productId, branchId: hq.id, organizationId },
+      data: { quantity: 0 },
+    });
+  } else {
+    await tx.productStock.create({
+      data: { productId, branchId: hq.id, quantity: 0, organizationId },
+    });
+  }
+}
+
+/**
+ * Núcleo transaccional del apply (compartido por /apply y ?dryRun=false).
+ *
+ * Con applyPrices=true (check "Aplicar precios al catálogo", default ON en la
+ * UI): el precio Con IVA de cada fila importada va a product.price de los
+ * productos vinculados, y las filas sin match se CREAN automáticamente (name =
+ * nombre de la fila, price = Con IVA, sin categoría) con la marca de la fila
+ * asociada SI existe una marca equivalente (variante "Marca") en el sistema.
+ * Filas con precioConIva null: no aplican precio ni se crean (planilla-only).
+ * Con applyPrices=false (ausente): comportamiento ORIGINAL — solo
+ * suggestedPrice, NUNCA product.price, NUNCA crea productos.
+ */
 async function applyPriceListCore(
   organizationId: string,
   body: {
     layout: Layout;
     period: string | null;
     sourceFilename: string;
+    applyPrices?: boolean;
     rows: ApplyDecision[];
   },
-): Promise<{ priceListId: string; imported: number; omitted: number; suggestedUpdated: number }> {
-  const { layout, period, sourceFilename, rows } = body;
+): Promise<{
+  priceListId: string;
+  imported: number;
+  omitted: number;
+  suggestedUpdated: number;
+  priceUpdated: number;
+  productsCreated: number;
+}> {
+  const { layout, period, sourceFilename, applyPrices = false, rows } = body;
   const imports = rows.filter((r) => r.accion === "import");
 
   if (imports.length === 0) {
@@ -300,6 +396,64 @@ async function applyPriceListCore(
       },
     });
 
+    // ── Aplicar precios: crear los no matcheados (applyPrices ON) ──────────
+    // Position → productId resuelto (existente, reutilizado o recién creado).
+    const resolveByPosition = new Map<number, string>();
+    const createdIds = new Set<string>();
+    let brandIndex = new Map<string, string>();
+    let existingByName = new Map<string, string>();
+
+    if (applyPrices) {
+      // Marcas del sistema = variante "Marca" (mismo criterio que bulkPriceUpdate).
+      const brandDefs = await tx.categoryVariantDefinition.findMany({
+        where: { organizationId, name: "Marca" },
+        select: { options: { select: { id: true, value: true } } },
+      });
+      brandIndex = buildBrandOptionIndex(brandDefs.flatMap((d) => d.options));
+
+      // Índice de productos existentes por nombre normalizado: si una fila sin
+      // match apunta a un producto ya creado (re-import de un período previo o
+      // payload stale), se REUTILIZA en vez de duplicar el catálogo.
+      const existingProducts = await tx.product.findMany({
+        where: { organizationId },
+        select: { id: true, name: true },
+      });
+      for (const p of existingProducts) {
+        const key = normalizeName(p.name);
+        if (key && !existingByName.has(key)) existingByName.set(key, p.id);
+      }
+
+      for (const r of imports) {
+        if (r.productId || r.precioConIva == null) continue;
+        const key = normalizeName(r.nombre);
+        const reusedId = existingByName.get(key);
+        if (reusedId) {
+          resolveByPosition.set(r.position, reusedId);
+          continue;
+        }
+        const product = await tx.product.create({
+          data: {
+            name: r.nombre,
+            price: round2(r.precioConIva),
+            quantity: 0,
+            categoryId: null,
+            organizationId,
+            suggestedPrice: computeSuggestedPrice(r.precioConIva, r.precioSinIva ?? null),
+          },
+        });
+        const optionId = r.marca ? brandIndex.get(normalizeName(r.marca)) : undefined;
+        if (optionId) {
+          await tx.productVariant.create({
+            data: { productId: product.id, optionId, organizationId },
+          });
+        }
+        await syncHqStockInline(tx, organizationId, product.id);
+        existingByName.set(key, product.id);
+        resolveByPosition.set(r.position, product.id);
+        createdIds.add(product.id);
+      }
+    }
+
     const sections = buildSections(imports);
     let sectionPosition = 0;
     for (const section of sections) {
@@ -314,33 +468,45 @@ async function applyPriceListCore(
       });
       let entryPosition = 0;
       for (const r of section.entries) {
+        const productId = r.productId ?? resolveByPosition.get(r.position) ?? null;
         const sugerido = computeSuggestedPrice(r.precioConIva ?? null, r.precioSinIva ?? null);
         await tx.priceListEntry.create({
           data: {
             sectionId: sec.id,
-            productId: r.productId ?? null,
+            productId,
             name: r.nombre,
             unit: r.unidadEmpaque ?? null,
             priceSinIva: r.precioSinIva ?? null,
             priceConIva: r.precioConIva ?? null,
             suggestedPrice: sugerido,
-            matched: !!r.productId,
+            matched: !!productId,
             position: entryPosition++,
           },
         });
       }
     }
 
-    // suggestedPrice: UNA escritura por producto (aunque haya N filas con el
-    // mismo producto) — NUNCA toca product.price (invariante).
+    // suggestedPrice (+ price con applyPrices) — UNA escritura por producto.
+    // Los productos RECIÉN creados ya llevan price y suggestedPrice en el
+    // create → se omiten acá. product.price solo se toca con applyPrices ON y
+    // precio Con IVA presente (decisión 5: fila sin Con IVA no aplica precio).
     const seenProducts = new Set<string>();
+    let priceUpdated = 0;
     for (const r of imports) {
-      if (!r.productId || seenProducts.has(r.productId)) continue;
-      seenProducts.add(r.productId);
-      const sugerido = computeSuggestedPrice(r.precioConIva ?? null, r.precioSinIva ?? null);
+      const productId = r.productId ?? resolveByPosition.get(r.position);
+      if (!productId || seenProducts.has(productId)) continue;
+      if (createdIds.has(productId)) continue; // ya queda con price+sugerido
+      seenProducts.add(productId);
+      const data: { suggestedPrice: number | null; price?: number } = {
+        suggestedPrice: computeSuggestedPrice(r.precioConIva ?? null, r.precioSinIva ?? null),
+      };
+      if (applyPrices && r.precioConIva != null) {
+        data.price = round2(r.precioConIva);
+        priceUpdated++;
+      }
       await tx.product.updateMany({
-        where: { id: r.productId },
-        data: { suggestedPrice: sugerido },
+        where: { id: productId },
+        data,
       });
     }
 
@@ -348,7 +514,9 @@ async function applyPriceListCore(
       priceListId: created.id,
       imported: imports.length,
       omitted: rows.length - imports.length,
-      suggestedUpdated: seenProducts.size,
+      suggestedUpdated: seenProducts.size + createdIds.size,
+      priceUpdated,
+      productsCreated: createdIds.size,
     };
   });
 }

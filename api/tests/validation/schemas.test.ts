@@ -982,6 +982,25 @@ describe("applyPriceListSchema — decisiones del preview (position como idTempo
       expect(result.data.rows[0].productId).toBeUndefined();
     }
   });
+
+  it("accepts applyPrices as boolean (default undefined cuando se omite)", () => {
+    expect(applyPriceListSchema.safeParse({ ...validBody, applyPrices: true }).success).toBe(true);
+    expect(applyPriceListSchema.safeParse({ ...validBody, applyPrices: false }).success).toBe(true);
+    const withoutFlag = applyPriceListSchema.safeParse(validBody);
+    expect(withoutFlag.success).toBe(true);
+    if (withoutFlag.success) {
+      expect(withoutFlag.data.applyPrices).toBeUndefined();
+    }
+  });
+
+  it("rejects a non-boolean applyPrices", () => {
+    expect(
+      applyPriceListSchema.safeParse({ ...validBody, applyPrices: "yes" }).success,
+    ).toBe(false);
+    expect(
+      applyPriceListSchema.safeParse({ ...validBody, applyPrices: 1 }).success,
+    ).toBe(false);
+  });
 });
 
 describe("adjustPriceListSchema — ajuste masivo de sugeridos", () => {
