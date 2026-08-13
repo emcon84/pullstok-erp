@@ -16,6 +16,10 @@ export interface DataItem {
   // todavía puedan traerlo como string de display.
   categoryId?: string;
   category?: string;
+  // Proveedor asociado (sdd/alican-wholesale-price-list/providers): id + objeto
+  // desnormalizado { id, name } que trae la API en el include de productos.
+  providerId?: string;
+  provider?: { id?: string; name: string } | null;
   price: number | string;
   quantity: number | string;
 }

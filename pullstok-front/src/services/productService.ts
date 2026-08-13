@@ -308,6 +308,9 @@ export interface BulkPriceUpdatePayload {
   brandValues: string[];
   categoryIds: string[];
   excludeProductIds: string[];
+  /** Filtro por proveedor (sdd/alican-wholesale-price-list/providers):
+   * OPCIONAL. Se combina con el filtro de marcas como AND. */
+  providerIds?: string[];
   /** Global opcional: sin valor el server resuelve 0 para productos sin override. */
   percentage?: number;
   categoryPercentages: CategoryPriceOverride[];

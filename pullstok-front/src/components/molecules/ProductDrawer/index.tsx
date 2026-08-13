@@ -293,6 +293,16 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
             <CategoryTreePicker value={categoryId} onChange={setCategoryId} />
           </div>
 
+          {/* Proveedor — solo lectura (sdd/alican-wholesale-price-list/providers):
+              se asigna al importar una planilla; la edición del vínculo no es
+              parte del flujo (el import lo reasigna en cada corrida). */}
+          {isEdit && product?.provider?.name && (
+            <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3">
+              <Label className="text-xs text-muted-foreground">Proveedor</Label>
+              <p className="text-sm font-medium">{product.provider.name}</p>
+            </div>
+          )}
+
           {/* Precio + Cantidad (Cantidad solo en alta; en edición el stock es por sucursal) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className={`space-y-1.5 ${isEdit ? "sm:col-span-2" : ""}`}>

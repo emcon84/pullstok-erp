@@ -30,6 +30,7 @@ import { CategoryOverridesPanel } from "@/components/molecules/CategoryOverrides
 import { PrintBulkPriceList } from "@/components/molecules/PrintBulkPriceList";
 import { recomputeRow } from "@/lib/priceOverride";
 import { getCategories } from "@/services/onboardingService";
+import { listProviders, type Provider } from "@/services/providers";
 import {
   bulkPriceUpdate,
   BulkPricePreview,
@@ -61,6 +62,10 @@ const formatPrice = (n: number) =>
 export const BulkPriceUpdate = () => {
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  // Proveedores de la org (sdd/alican-wholesale-price-list/providers): filtro
+  // opcional que se combina con el de marcas como AND.
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [percentage, setPercentage] = useState("");
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
@@ -117,6 +122,13 @@ export const BulkPriceUpdate = () => {
       .catch(() => setCategories([]));
   }, []);
 
+  // Load providers for the optional provider filter (org-scoped).
+  useEffect(() => {
+    listProviders()
+      .then(setProviders)
+      .catch(() => setProviders([]));
+  }, []);
+
   // Any scope change invalidates preview, previous exclusions and category overrides.
   const scopeChanged = () => {
     setPreview(null);
@@ -128,6 +140,13 @@ export const BulkPriceUpdate = () => {
   const toggleBrand = (value: string) => {
     setSelectedBrands((prev) =>
       prev.includes(value) ? prev.filter((b) => b !== value) : [...prev, value],
+    );
+    scopeChanged();
+  };
+
+  const toggleProvider = (id: string) => {
+    setSelectedProviderIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
     );
     scopeChanged();
   };
@@ -150,12 +169,14 @@ export const BulkPriceUpdate = () => {
       brandValues: selectedBrands,
       categoryIds,
       excludeProductIds: [...excludedIds],
+      providerIds: selectedProviderIds,
       percentage: pct,
       categoryPercentages,
       productPercentages,
     };
   }, [
     selectedBrands,
+    selectedProviderIds,
     categoryIds,
     excludedIds,
     percentage,
@@ -295,6 +316,39 @@ export const BulkPriceUpdate = () => {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Proveedores (opcional)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {providers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No se encontraron proveedores. Se filtran todos.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {providers.map((p) => (
+                    <Badge
+                      key={p.id}
+                      variant={
+                        selectedProviderIds.includes(p.id)
+                          ? "default"
+                          : "outline"
+                      }
+                      className="cursor-pointer transition-opacity hover:opacity-80"
+                      onClick={() => toggleProvider(p.id)}
+                    >
+                      {p.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                Combina con el filtro de marcas como Y (marcas y proveedor).
+              </p>
             </CardContent>
           </Card>
 

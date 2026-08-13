@@ -59,6 +59,10 @@ export interface ApplyPriceListPayload {
    * precio Con IVA de cada fila va a product.price y las filas sin match se
    * crean automáticamente. */
   applyPrices?: boolean;
+  /** Proveedor de la planilla (opcional, back-compat): el server crea o
+   * reutiliza el Provider de la org por nombre case-insensitive y asigna
+   * providerId a todos los productos tocados (matcheados + creados). */
+  providerName?: string;
   rows: ApplyDecision[];
 }
 

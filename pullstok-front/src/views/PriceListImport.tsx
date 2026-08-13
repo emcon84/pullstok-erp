@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { NativeSelect } from "@/components/ui/native-select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,8 +35,12 @@ import {
   type PreviewRow,
   type ProductSearchHit,
 } from "@/services/priceLists";
+import { listProviders, type Provider } from "@/services/providers";
 
 const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB (mismo límite que el server)
+
+/** Valor especial del selector: escribir un proveedor nuevo (ej. "ALICAN"). */
+const NEW_PROVIDER = "__new__";
 
 const formatPrice = (n: number | null) =>
   n === null
@@ -187,10 +192,20 @@ export const PriceListImport = () => {
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
   const [importAll, setImportAll] = useState(true);
   const [applyPrices, setApplyPrices] = useState(true);
+  // Proveedor de la planilla (sdd/alican-wholesale-price-list/providers):
+  // nombre seleccionado de los existentes o texto para crear uno nuevo.
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [providerName, setProviderName] = useState("");
+  const [providerCustom, setProviderCustom] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Proveedores existentes de la org para el selector del paso 1.
+  useEffect(() => {
+    listProviders().then(setProviders).catch(() => setProviders([]));
+  }, []);
 
   const handleFile = async (selected: File | null) => {
     setError(null);
@@ -287,6 +302,7 @@ export const PriceListImport = () => {
         period: preview.period,
         sourceFilename: preview.sourceFilename,
         applyPrices,
+        ...(providerName.trim() ? { providerName: providerName.trim() } : {}),
         rows: preview.rows.map((row) => ({
           position: row.position,
           accion: decisions[row.position]?.accion ?? "omit",
@@ -346,6 +362,41 @@ export const PriceListImport = () => {
               accept="application/pdf,.pdf"
               onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
             />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="proveedor">Proveedor (opcional)</Label>
+            <NativeSelect
+              id="proveedor"
+              value={providerCustom ? NEW_PROVIDER : providerName}
+              onValueChange={(v) => {
+                if (v === NEW_PROVIDER) {
+                  setProviderCustom(true);
+                  setProviderName("");
+                } else {
+                  setProviderCustom(false);
+                  setProviderName(v);
+                }
+              }}
+              placeholder="Elegí un proveedor"
+              options={[
+                { value: "", label: "—" },
+                ...providers.map((p) => ({ value: p.name, label: p.name })),
+                { value: NEW_PROVIDER, label: "Crear proveedor nuevo…" },
+              ]}
+            />
+            {providerCustom && (
+              <Input
+                value={providerName}
+                onChange={(e) => setProviderName(e.target.value)}
+                placeholder="Ej: ALICAN"
+                aria-label="Nombre del nuevo proveedor"
+              />
+            )}
+            <p className="text-xs text-muted-foreground">
+              Los productos tocados por esta planilla (matcheados y creados)
+              quedarán asociados a este proveedor.
+            </p>
           </div>
           {loading && <p className="text-sm text-muted-foreground">Procesando planilla…</p>}
           {error && (
