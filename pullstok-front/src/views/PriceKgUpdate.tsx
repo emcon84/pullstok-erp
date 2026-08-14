@@ -176,7 +176,6 @@ export const PriceKgUpdate = () => {
   const [cells, setCells] = useState<Record<string, string>>({});
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [savingPlan, setSavingPlan] = useState(false);
-  const [printing, setPrinting] = useState(false);
   // Snapshot del estado cargado de la DB: permite detectar borrados (celda con
   // valor previo que el usuario deja vacía) y si hubo cambios antes de guardar.
   const baselineRef = useRef<Record<string, string>>({});
@@ -456,17 +455,17 @@ export const PriceKgUpdate = () => {
   const matrixReady = !loadingTypes && !loadingBrands && !loadingPlan;
 
   // --- Impresión ---
+  // El print area vive SIEMPRE en el DOM con `hidden print:block` (ver
+  // @media print en index.css) y el botón solo dispara window.print(). NO usar
+  // estado + afterprint: al CANCELAR el diálogo afterprint no se dispara en
+  // varios navegadores y `printing` quedaba en true → el botón moría.
+  const printTitle =
+    activeSpecies === "PERRO"
+      ? "Precios por kilo suelto — Perro"
+      : "Precios por kilo suelto — Gato";
   const handlePrint = () => {
-    setPrinting(true);
-  };
-
-  useEffect(() => {
-    if (!printing) return;
     window.print();
-    const cleanup = () => setPrinting(false);
-    window.addEventListener("afterprint", cleanup);
-    return () => window.removeEventListener("afterprint", cleanup);
-  }, [printing]);
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -867,16 +866,16 @@ export const PriceKgUpdate = () => {
         </CardContent>
       </Card>
 
-      {/* Print area: solo visible al imprimir (ver @media print en index.css) */}
-      {printing && (
-        <div className="print-area hidden print:block" aria-hidden="true">
-          <div className="mb-4">
-            <h1 className="text-lg font-bold">Planilla de precios por kilo</h1>
-            <p className="text-sm text-muted-foreground">
-              {speciesLabel} · {new Date().toLocaleDateString("es-AR")} ·{" "}
-              {loadedCount} celdas
-            </p>
-          </div>
+      {/* Print area: siempre en el DOM, oculto en pantalla y visible solo al
+          imprimir (ver @media print en index.css). Sin estado: el botón solo
+          llama window.print() y el navegador decide cuándo muestra esto. */}
+      <div className="print-area hidden print:block" aria-hidden="true">
+        <div className="mb-4">
+          <h1 className="text-lg font-bold">{printTitle}</h1>
+          <p className="text-sm text-muted-foreground">
+            {new Date().toLocaleDateString("es-AR")} · {loadedCount} celdas
+          </p>
+        </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -907,7 +906,6 @@ export const PriceKgUpdate = () => {
             </TableBody>
           </Table>
         </div>
-      )}
     </div>
   );
 };
