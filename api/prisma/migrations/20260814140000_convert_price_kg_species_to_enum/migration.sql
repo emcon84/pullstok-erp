@@ -6,15 +6,28 @@
 -- cualquier UPDATE de species falla con `type "public.Species" does not exist`.
 -- Los valores existentes ('PERRO'/'GATO'/'AMBOS') ya son válidos en el enum,
 -- así que el USING castea sin pérdida.
+--
+-- Ojo con el DEFAULT: el default existente es el literal TEXT 'PERRO' y Postgres
+-- no lo castea solo al cambiar el tipo de la columna (P3018/42804) — por eso
+-- primero se dropea, se altera el tipo y se re-agrega como enum.
 
 -- CreateEnum
 CREATE TYPE "Species" AS ENUM ('PERRO', 'GATO', 'AMBOS');
 
--- AlterTable
+-- AlterTable (drop default → alter type → restore default)
+ALTER TABLE "price_kg_types" ALTER COLUMN "species" DROP DEFAULT;
 ALTER TABLE "price_kg_types" ALTER COLUMN "species" TYPE "Species" USING "species"::"Species";
+ALTER TABLE "price_kg_types" ALTER COLUMN "species" SET DEFAULT 'PERRO'::"Species";
+
+ALTER TABLE "price_kg_brands" ALTER COLUMN "species" DROP DEFAULT;
 ALTER TABLE "price_kg_brands" ALTER COLUMN "species" TYPE "Species" USING "species"::"Species";
+ALTER TABLE "price_kg_brands" ALTER COLUMN "species" SET DEFAULT 'PERRO'::"Species";
 
 -- Down (reversible: sin datos críticos)
+-- ALTER TABLE "price_kg_brands" ALTER COLUMN "species" DROP DEFAULT;
 -- ALTER TABLE "price_kg_brands" ALTER COLUMN "species" TYPE TEXT USING "species"::TEXT;
+-- ALTER TABLE "price_kg_brands" ALTER COLUMN "species" SET DEFAULT 'PERRO';
+-- ALTER TABLE "price_kg_types" ALTER COLUMN "species" DROP DEFAULT;
 -- ALTER TABLE "price_kg_types" ALTER COLUMN "species" TYPE TEXT USING "species"::TEXT;
+-- ALTER TABLE "price_kg_types" ALTER COLUMN "species" SET DEFAULT 'PERRO';
 -- DROP TYPE "Species";
