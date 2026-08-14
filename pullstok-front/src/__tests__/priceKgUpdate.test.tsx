@@ -48,7 +48,7 @@ const mockGetPriceKgPlan = vi.mocked(getPriceKgPlan);
 const mockSavePriceKgPlan = vi.mocked(savePriceKgPlan);
 
 const brands: PriceKgBrand[] = [
-  { id: "brand-1", name: "Acme", keywords: ["ACME"], species: "PERRO" },
+  { id: "brand-1", name: "Acme", keywords: ["ACME"], species: "AMBOS" },
   { id: "brand-2", name: "Zap", keywords: ["ZAP"], species: "PERRO" },
 ];
 
@@ -74,7 +74,7 @@ describe("PriceKgUpdate — tipos, marcas y planilla por kilo", () => {
 
   it("carga marcas y tipos y muestra la matriz con celdas precargadas", async () => {
     mockGetPriceKgPlan.mockResolvedValue([
-      { id: "c1", brandId: "brand-1", typeId: "t-1", priceKg: 2500 },
+      { id: "c1", brandId: "brand-1", typeId: "t-1", priceKg: 2500, species: "PERRO" },
     ]);
 
     renderView();
@@ -106,8 +106,8 @@ describe("PriceKgUpdate — tipos, marcas y planilla por kilo", () => {
 
   it("guarda la planilla con celdas con precio y celdas vacías → null", async () => {
     mockGetPriceKgPlan.mockResolvedValue([
-      { id: "c1", brandId: "brand-1", typeId: "t-1", priceKg: 2500 },
-      { id: "c2", brandId: "brand-2", typeId: "t-1", priceKg: 5000 },
+      { id: "c1", brandId: "brand-1", typeId: "t-1", priceKg: 2500, species: "PERRO" },
+      { id: "c2", brandId: "brand-2", typeId: "t-1", priceKg: 5000, species: "PERRO" },
     ]);
 
     renderView();
@@ -125,9 +125,9 @@ describe("PriceKgUpdate — tipos, marcas y planilla por kilo", () => {
 
     await waitFor(() =>
       expect(mockSavePriceKgPlan).toHaveBeenCalledWith([
-        { brandId: "brand-1", typeId: "t-1", priceKg: null },
-        { brandId: "brand-2", typeId: "t-1", priceKg: 5000 },
-        { brandId: "brand-2", typeId: "t-2", priceKg: 3000 },
+        { species: "PERRO", brandId: "brand-1", typeId: "t-1", priceKg: null },
+        { species: "PERRO", brandId: "brand-2", typeId: "t-1", priceKg: 5000 },
+        { species: "PERRO", brandId: "brand-2", typeId: "t-2", priceKg: 3000 },
       ]),
     );
   });
@@ -187,5 +187,27 @@ describe("PriceKgUpdate — tipos, marcas y planilla por kilo", () => {
     // Planilla activa = Perros (default): el tipo PERRO aparece, el GATO no.
     expect(await screen.findByLabelText("Acme Cachorro")).toBeInTheDocument();
     expect(screen.queryByLabelText("Acme Kitten")).not.toBeInTheDocument();
+  });
+
+  it("muestra precios distintos por especie para la misma marca×tipo (bug AMBOS)", async () => {
+    // Bug reportado: una marca y un tipo AMBOS (Acme × Adulto) tenían UNA sola
+    // celda compartida, así que editar Gatos pisaba el precio de Perros. Con la
+    // celda única por (marca, tipo, especie) cada planilla muestra su propio
+    // valor: 2500 en Perros, 9000 en Gatos.
+    mockGetPriceKgPlan.mockResolvedValue([
+      { id: "c1", brandId: "brand-1", typeId: "t-1", priceKg: 2500, species: "PERRO" },
+      { id: "c2", brandId: "brand-1", typeId: "t-1", priceKg: 9000, species: "GATO" },
+    ]);
+
+    renderView();
+
+    // Planilla Perros activa (default): "Acme Adulto" vale 2500.
+    const perroAdulto = await screen.findByLabelText("Acme Adulto");
+    expect(perroAdulto).toHaveValue(2500);
+
+    // Cambio a la planilla de Gatos: la misma marca×tipo muestra el precio GATO.
+    fireEvent.click(screen.getByRole("button", { name: /gatos/i }));
+    const gatoAdulto = await screen.findByLabelText("Acme Adulto");
+    expect(gatoAdulto).toHaveValue(9000);
   });
 });

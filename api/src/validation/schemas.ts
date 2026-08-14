@@ -627,9 +627,11 @@ export const updatePriceKgBrandSchema = z
 
 // ---------- Planilla de precios por kilo (PriceKgPrice) ----------
 // Editor de planilla: guarda TODAS las celdas de la matriz marca (filas) ×
-// tipo (columnas) → precio por kilo. priceKg null = borrar la celda; number =
-// upsert. Se rechazan pares (brandId, typeId) duplicados: a lo sumo una celda
-// por par en la org.
+// tipo (columnas) → precio por kilo, una por especie (la planilla se edita por
+// Perros/Gatos y una marca/tipo AMBOS puede tener precios distintos por
+// especie). priceKg null = borrar la celda; number = upsert. Se rechazan pares
+// (brandId, typeId, species) duplicados: a lo sumo una celda por par+especie
+// en la org.
 export const savePriceKgPlanSchema = z
   .object({
     entries: z
@@ -637,6 +639,7 @@ export const savePriceKgPlanSchema = z
         z.object({
           brandId: z.string().uuid("Marca inválida"),
           typeId: z.string().uuid("Tipo inválido"),
+          species: priceKgSpeciesSchema,
           priceKg: z.coerce
             .number()
             .positive("El precio por kg debe ser mayor a 0")
@@ -651,12 +654,12 @@ export const savePriceKgPlanSchema = z
   .superRefine((data, ctx) => {
     const seen = new Set<string>();
     for (const entry of data.entries) {
-      const key = `${entry.brandId}:${entry.typeId}`;
+      const key = `${entry.brandId}:${entry.typeId}:${entry.species}`;
       if (seen.has(key)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["entries"],
-          message: "Marca y tipo duplicados en la lista",
+          message: "Marca, tipo y especie duplicados en la lista",
         });
         break;
       }

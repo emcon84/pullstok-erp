@@ -308,24 +308,31 @@ model PriceKgBrand {
 }
 
 // Celda de la planilla "Precios por kilo": un precio por kilo para un par
-// (marca × tipo). La planilla es una matriz marca (filas) × tipo (columnas) →
-// precio. Tenant-scoped (organizationId) y en TENANT_MODELS (db.ts) → scope
-// org automático anti-fuga. La unicidad es (organizationId, brandId, typeId):
-// a lo sumo una celda por par marca+tipo en la org. No matchea nombres de
-// producto: la venta suelta es un tema aparte y no se toca desde acá.
+// (marca × tipo) POR especie. La planilla es una matriz marca (filas) × tipo
+// (columnas) → precio y se edita por especie (Perros/Gatos), así que cada
+// planilla maneja precios individuales: Agility+Adulto Perro ≠ Agility+Adulto
+// Gato (una marca y un tipo AMBOS pueden tener precios distintos por especie).
+// Tenant-scoped (organizationId) y en TENANT_MODELS (db.ts) → scope org
+// automático anti-fuga. La unicidad es (organizationId, brandId, typeId,
+// species): a lo sumo una celda por par marca+tipo por especie en la org. No
+// matchea nombres de producto: la venta suelta es un tema aparte y no se toca
+// desde acá.
 model PriceKgPrice {
   id             String       @id @default(uuid())
   brandId        String
   brand          PriceKgBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
   typeId         String
   type           PriceKgType  @relation(fields: [typeId], references: [id], onDelete: Cascade)
+  // Especie de la planilla a la que pertenece la celda (PERRO/GATO). Default
+  // PERRO: las 140 celdas legacy caen en la planilla de perros sin migrar.
+  species        Species      @default(PERRO)
   priceKg        Float
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  @@unique([organizationId, brandId, typeId])
+  @@unique([organizationId, brandId, typeId, species])
   @@index([organizationId])
   @@map("price_kg_prices")
 }

@@ -1,4 +1,5 @@
 import { API_URL } from "../constants";
+import type { PriceKgSpecies } from "./priceKgTypes";
 
 /**
  * Cliente API de la planilla de precios por kilo (sdd/price-kg-plan).
@@ -10,6 +11,7 @@ export interface PriceKgPrice {
   id: string;
   brandId: string;
   typeId: string;
+  species: PriceKgSpecies;
   priceKg: number;
 }
 
@@ -17,10 +19,14 @@ export interface PriceKgPrice {
 export interface PriceKgPlanEntry {
   brandId: string;
   typeId: string;
+  species: PriceKgSpecies;
   priceKg: number | null;
 }
 
-/** GET /price-kg-plan — celdas de la org (marca × tipo → precio). */
+/**
+ * GET /price-kg-plan — celdas de la org (marca × tipo × especie → precio).
+ * Devuelve celdas de TODAS las especies (la vista filtra por planilla activa).
+ */
 export const getPriceKgPlan = async (): Promise<PriceKgPrice[]> => {
   const token = localStorage.getItem("token");
   const res = await fetch(`${API_URL}/price-kg-plan`, {
@@ -31,7 +37,7 @@ export const getPriceKgPlan = async (): Promise<PriceKgPrice[]> => {
   return data.items ?? [];
 };
 
-/** PUT /price-kg-plan — guarda TODAS las celdas (upsert + borrado). */
+/** PUT /price-kg-plan — guarda las celdas de la planilla activa (upsert + borrado). */
 export const savePriceKgPlan = async (
   entries: PriceKgPlanEntry[],
 ): Promise<{ saved: number }> => {

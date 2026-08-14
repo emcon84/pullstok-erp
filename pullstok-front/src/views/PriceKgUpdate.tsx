@@ -59,7 +59,10 @@ const formatPrice = (n: number) =>
     maximumFractionDigits: 2,
   })}`;
 
-const cellKey = (brandId: string, typeId: string) => `${brandId}:${typeId}`;
+// Key de la matriz de celdas: especie primero (una marca/tipo AMBOS tiene una
+// celda distinta por planilla). Sin species, editar Gatos pisaría Perros.
+const cellKey = (species: PriceKgSpecies, brandId: string, typeId: string) =>
+  `${species}:${brandId}:${typeId}`;
 
 // --- Especie (Perro/Gato): mapeo species ↔ checks + componente compartido ---
 // La planilla se edita por especie (matriz Perros vs Gatos), así que cada tipo
@@ -205,7 +208,7 @@ export const PriceKgUpdate = () => {
       const data = await getPriceKgPlan();
       const map: Record<string, string> = {};
       for (const c of data) {
-        map[cellKey(c.brandId, c.typeId)] = String(c.priceKg);
+        map[cellKey(c.species, c.brandId, c.typeId)] = String(c.priceKg);
       }
       setCells(map);
       baselineRef.current = { ...map };
@@ -373,7 +376,7 @@ export const PriceKgUpdate = () => {
   // --- Planilla: handlers ---
   const setCell = (brandId: string, typeId: string, value: string) => {
     setCells((prev) => {
-      const key = cellKey(brandId, typeId);
+      const key = cellKey(activeSpecies, brandId, typeId);
       const next = { ...prev };
       if (value === "") delete next[key];
       else next[key] = value;
@@ -383,8 +386,9 @@ export const PriceKgUpdate = () => {
 
   // Arma las entries a guardar: celdas NO vacías con precio > 0 → number;
   // celdas que quedaron vacías pero tenían valor previo → null (borrar). Opera
-  // SOLO sobre las marcas/tipos VISIBLES de la planilla activa: al guardar no
-  // se tocan celdas de la otra especie. El baseline sigue siendo el global.
+  // SOLO sobre la planilla activa (visibleBrands × visibleTypes) y arma entries
+  // con species = activeSpecies: las celdas de la otra especie no se tocan. El
+  // baseline sigue siendo el global (mapa con todas las especies).
   const buildEntries = (
     map: Record<string, string>,
     baseline: Record<string, string>,
@@ -392,16 +396,26 @@ export const PriceKgUpdate = () => {
     const entries: PriceKgPlanEntry[] = [];
     for (const brand of visibleBrands) {
       for (const type of visibleTypes) {
-        const key = cellKey(brand.id, type.id);
+        const key = cellKey(activeSpecies, brand.id, type.id);
         const raw = (map[key] ?? "").trim();
         if (raw === "") {
           if (baseline[key] !== undefined) {
-            entries.push({ brandId: brand.id, typeId: type.id, priceKg: null });
+            entries.push({
+              species: activeSpecies,
+              brandId: brand.id,
+              typeId: type.id,
+              priceKg: null,
+            });
           }
         } else {
           const price = parseFloat(raw);
           if (!Number.isNaN(price) && price > 0) {
-            entries.push({ brandId: brand.id, typeId: type.id, priceKg: price });
+            entries.push({
+              species: activeSpecies,
+              brandId: brand.id,
+              typeId: type.id,
+              priceKg: price,
+            });
           }
         }
       }
@@ -433,7 +447,7 @@ export const PriceKgUpdate = () => {
   let loadedCount = 0;
   for (const brand of visibleBrands) {
     for (const type of visibleTypes) {
-      const raw = (cells[cellKey(brand.id, type.id)] ?? "").trim();
+      const raw = (cells[cellKey(activeSpecies, brand.id, type.id)] ?? "").trim();
       const p = parseFloat(raw);
       if (raw !== "" && !Number.isNaN(p) && p > 0) loadedCount++;
     }
@@ -825,7 +839,7 @@ export const PriceKgUpdate = () => {
                             min="0"
                             className="h-8 w-20 px-2 text-right text-sm"
                             aria-label={`${b.name} ${t.name}`}
-                            value={cells[cellKey(b.id, t.id)] ?? ""}
+                            value={cells[cellKey(activeSpecies, b.id, t.id)] ?? ""}
                             onChange={(e) => setCell(b.id, t.id, e.target.value)}
                           />
                         </TableCell>
@@ -879,7 +893,7 @@ export const PriceKgUpdate = () => {
                 <TableRow key={b.id}>
                   <TableCell className="font-medium">{b.name}</TableCell>
                   {visibleTypes.map((t) => {
-                    const raw = (cells[cellKey(b.id, t.id)] ?? "").trim();
+                    const raw = (cells[cellKey(activeSpecies, b.id, t.id)] ?? "").trim();
                     const price = parseFloat(raw);
                     const valid = raw !== "" && !Number.isNaN(price) && price > 0;
                     return (
