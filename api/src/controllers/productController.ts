@@ -262,6 +262,20 @@ export const downloadTemplateCsv = async (req: Request, res: Response) => {
  *
  * Sin comas el resultado es byte-for-byte el comportamiento original.
  */
+// Sinónimos de RAZA (razas pequeñas vs medianas/grandes). Mantener las listas
+// EXACTAMENTE iguales al frontend (pullstok-front/src/lib/productFilter.ts).
+const SMALL_BREED_PHRASES = [
+  "sm", "razas pequeñas", "razas pequenas", "raza pequeña", "raza pequena",
+  "razas peq", "raza peq", "small breed", "razas chicas", "razas mini",
+  "talla pequeña", "talla pequena",
+];
+const LARGE_BREED_PHRASES = [
+  "lg", "m&g", "razas m&g", "razas medianas o grandes", "razas medianas y grandes",
+  "razas medianas", "razas grandes", "raza mediana", "raza grande", "large breed",
+];
+const SMALL_REMOVE = ["razas", "raza", "pequeña", "pequeñas", "pequena", "pequenas", "peq", "chicas", "mini", "talla", "small", "breed"];
+const LARGE_REMOVE = ["razas", "raza", "mediana", "medianas", "grande", "grandes", "m&g", "o", "y", "talla", "large", "breed"];
+
 export function buildProductSearchWhere(searchTerm: string): any {
   const variantMatch = (w: string) => ({
     variantAssignments: {
@@ -272,18 +286,60 @@ export function buildProductSearchWhere(searchTerm: string): any {
       },
     },
   });
+
+  // Detección de raza dentro de un término. Devuelve las palabras "regulares"
+  // (AND) y los tokens de búsqueda de raza (OR). Con breedTokens vacío el
+  // resultado es el comportamiento original.
+  const extractBreed = (words: string[]): { regular: string[]; breedTokens: string[] } => {
+    const term = words.join(" ");
+    const smallActive = SMALL_BREED_PHRASES.some(p => term.includes(p));
+    const largeActive = LARGE_BREED_PHRASES.some(p => term.includes(p));
+    let regular = words;
+    let breedTokens: string[] = [];
+    if (smallActive) {
+      regular = regular.filter(w => !SMALL_REMOVE.includes(w));
+      breedTokens = breedTokens.concat(SMALL_BREED_PHRASES);
+    }
+    if (largeActive) {
+      regular = regular.filter(w => !LARGE_REMOVE.includes(w));
+      breedTokens = breedTokens.concat(LARGE_BREED_PHRASES);
+    }
+    return { regular, breedTokens };
+  };
+
+  // AND de palabras dentro de un término, integrando los tokens de raza.
+  const buildAndWhere = (words: string[]) => {
+    const { regular, breedTokens } = extractBreed(words);
+    const regularWhere = regular.map(w => ({
+      OR: [
+        { name: { contains: w, mode: "insensitive" } },
+        { code: { contains: w, mode: "insensitive" } },
+        variantMatch(w),
+      ],
+    }));
+    if (breedTokens.length === 0) {
+      return { AND: regularWhere };
+    }
+    return {
+      AND: [
+        ...regularWhere,
+        {
+          OR: breedTokens.map(t => ({
+            OR: [
+              { name: { contains: t, mode: "insensitive" } },
+              { code: { contains: t, mode: "insensitive" } },
+              variantMatch(t),
+            ],
+          })),
+        },
+      ],
+    };
+  };
+
   const termWhere = (term: string) => {
     const termWords = term.split(/\s+/).filter(w => w.length > 0);
     return termWords.length > 1
-      ? {
-          AND: termWords.map(w => ({
-            OR: [
-              { name: { contains: w, mode: "insensitive" } },
-              { code: { contains: w, mode: "insensitive" } },
-              variantMatch(w),
-            ],
-          })),
-        }
+      ? buildAndWhere(termWords)
       : {
           OR: [
             { name: { contains: term, mode: "insensitive" } },
@@ -302,15 +358,7 @@ export function buildProductSearchWhere(searchTerm: string): any {
   }
   const words = searchTerm.split(/\s+/).filter(w => w.length > 0);
   if (words.length > 1) {
-    return {
-      AND: words.map(w => ({
-        OR: [
-          { name: { contains: w, mode: "insensitive" } },
-          { code: { contains: w, mode: "insensitive" } },
-          variantMatch(w),
-        ],
-      })),
-    };
+    return buildAndWhere(words);
   }
   return {
     OR: [
