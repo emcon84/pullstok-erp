@@ -578,13 +578,16 @@ export const PriceKgUpdate = () => {
               Creá al menos una marca y un tipo para completar la planilla.
             </p>
           ) : (
-            <div className="max-h-[65vh] overflow-auto rounded-md border">
-              <Table>
+            <div className="max-h-[60vh] overflow-auto rounded-md border">
+              {/* <table> cruda (sin el wrapper Table que rompe el sticky): el
+                  contenedor de arriba es el scroll container, así el thead
+                  sticky top-0 se pega al scrollear vertical. */}
+              <table className="w-full caption-bottom text-sm">
                 <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0] shadow-border">
                   <TableRow>
-                    <TableHead className="min-w-[160px]">Marca</TableHead>
+                    <TableHead className="min-w-[150px]">Marca</TableHead>
                     {types.map((t) => (
-                      <TableHead key={t.id} className="text-right">
+                      <TableHead key={t.id} className="px-2 text-right text-xs">
                         {t.name}
                       </TableHead>
                     ))}
@@ -593,16 +596,16 @@ export const PriceKgUpdate = () => {
                 <TableBody>
                   {brands.map((b) => (
                     <TableRow key={b.id}>
-                      <TableCell className="whitespace-nowrap font-medium">
+                      <TableCell className="whitespace-nowrap p-2 font-medium">
                         {b.name}
                       </TableCell>
                       {types.map((t) => (
-                        <TableCell key={t.id} className="p-2">
+                        <TableCell key={t.id} className="p-1.5">
                           <Input
                             type="number"
                             step="0.01"
                             min="0"
-                            className="w-24 text-right"
+                            className="h-8 w-20 px-2 text-right text-sm"
                             aria-label={`${b.name} ${t.name}`}
                             value={cells[cellKey(b.id, t.id)] ?? ""}
                             onChange={(e) => setCell(b.id, t.id, e.target.value)}
@@ -612,7 +615,7 @@ export const PriceKgUpdate = () => {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </table>
             </div>
           )}
 
