@@ -21,6 +21,7 @@ import {
   Clock,
   Scale,
   FileSpreadsheet,
+  Search,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 import type { Role } from "@/constants/rolePermissions";
@@ -48,6 +49,7 @@ export const navGroups: NavGroup[] = [
       { to: "/categorias", label: "Categorías", icon: Tags, visibleRoles: ["ADMIN", "MANAGEMENT"] },
       { to: "/actualizar-precios", label: "Actualizar precios", icon: DollarSign, visibleRoles: ["ADMIN", "SUPERADMIN"] },
       { to: "/precios-por-kilo", label: "Precios por kilo", icon: Scale, visibleRoles: ["ADMIN", "SUPERADMIN"] },
+      { to: "/consultar-precios", label: "Consultar precios", icon: Search, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"] },
       { to: "/planilla-mayorista", label: "Planilla mayorista", icon: FileSpreadsheet, visibleRoles: ["ADMIN", "SUPERADMIN"] },
     ],
   },
