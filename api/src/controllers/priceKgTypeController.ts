@@ -17,7 +17,7 @@ export const listPriceKgTypes = async (_req: Request, res: Response) => {
     const types = await prisma.priceKgType.findMany({
       where: { organizationId },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, synonyms: true },
+      select: { id: true, name: true, synonyms: true, species: true },
     });
     return res.status(200).json({ items: types });
   } catch (error: any) {
@@ -58,7 +58,7 @@ export const updatePriceKgType = async (req: Request, res: Response) => {
 
     const updated = await prisma.priceKgType.findFirst({
       where: { id: req.params.id },
-      select: { id: true, name: true, synonyms: true },
+      select: { id: true, name: true, synonyms: true, species: true },
     });
     return res.status(200).json(updated);
   } catch (error: any) {

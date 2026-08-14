@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,6 +37,7 @@ import {
   deletePriceKgType,
   parseSynonyms,
   type PriceKgType,
+  type PriceKgSpecies,
 } from "@/services/priceKgTypes";
 import {
   listPriceKgBrands,
@@ -59,18 +61,98 @@ const formatPrice = (n: number) =>
 
 const cellKey = (brandId: string, typeId: string) => `${brandId}:${typeId}`;
 
+// --- Especie (Perro/Gato): mapeo species ↔ checks + componente compartido ---
+// La planilla se edita por especie (matriz Perros vs Gatos), así que cada tipo
+// y marca declara su especie (PERRO | GATO | AMBOS). Un item "AMBOS" aparece
+// en ambas matrices y sus dos checks van tildados.
+
+type SpeciesChecksState = { perro: boolean; gato: boolean };
+
+const speciesToChecks = (s: PriceKgSpecies): SpeciesChecksState => {
+  switch (s) {
+    case "GATO":
+      return { perro: false, gato: true };
+    case "AMBOS":
+      return { perro: true, gato: true };
+    default:
+      return { perro: true, gato: false };
+  }
+};
+
+const checksToSpecies = (c: SpeciesChecksState): PriceKgSpecies =>
+  c.perro && c.gato ? "AMBOS" : c.gato ? "GATO" : "PERRO";
+
+/**
+ * Dos checks chicos "Perro"/"Gato" para la especie de un tipo/marca. Guard:
+ * nunca permite dejar ambos destildados — si destildás el último, revierte y
+ * avisa vía onReject (regla del diseño). Se usa en los items de las listas y
+ * en los formularios de crear/editar.
+ */
+const SpeciesChecks = ({
+  name,
+  checks,
+  onChange,
+  onReject,
+}: {
+  name: string;
+  checks: SpeciesChecksState;
+  onChange: (checks: SpeciesChecksState) => void;
+  onReject?: () => void;
+}) => {
+  const toggle = (which: keyof SpeciesChecksState, checked: boolean) => {
+    const next: SpeciesChecksState = { ...checks, [which]: checked };
+    if (!next.perro && !next.gato) {
+      onReject?.();
+      return;
+    }
+    onChange(next);
+  };
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5">
+        <Checkbox
+          id={`${name}-perro`}
+          checked={checks.perro}
+          onCheckedChange={(c) => toggle("perro", c === true)}
+        />
+        <Label htmlFor={`${name}-perro`} className="text-xs font-normal">
+          Perro
+        </Label>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Checkbox
+          id={`${name}-gato`}
+          checked={checks.gato}
+          onCheckedChange={(c) => toggle("gato", c === true)}
+        />
+        <Label htmlFor={`${name}-gato`} className="text-xs font-normal">
+          Gato
+        </Label>
+      </div>
+    </div>
+  );
+};
+
 /**
  * Precios por kilo (sdd/price-kg-plan): gestión de tipos (etapas de vida) +
  * gestión de marcas (líneas/sabores editables) + editor de planilla. La
  * planilla es una matriz marca (filas) × tipo (columnas) → precio por kilo,
- * persistente e imprimible. NO se tocan productos ni se matchean nombres.
+ * persistente e imprimible. Se edita por especie (Perros/Gatos): cada tipo y
+ * marca declara su especie y la matriz solo muestra los que aplican a la
+ * planilla activa. NO se tocan productos ni se matchean nombres.
  */
 export const PriceKgUpdate = () => {
+  // --- Especie de la planilla activa ---
+  const [activeSpecies, setActiveSpecies] = useState<"PERRO" | "GATO">("PERRO");
+
   // --- Gestión de tipos ---
   const [types, setTypes] = useState<PriceKgType[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(true);
   const [typeName, setTypeName] = useState("");
   const [typeSynonyms, setTypeSynonyms] = useState("");
+  const [typeChecks, setTypeChecks] = useState<SpeciesChecksState>(
+    speciesToChecks("PERRO"),
+  );
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
   const [savingType, setSavingType] = useState(false);
   const [deleteTypeId, setDeleteTypeId] = useState<string | null>(null);
@@ -80,6 +162,9 @@ export const PriceKgUpdate = () => {
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [brandName, setBrandName] = useState("");
   const [brandKeywords, setBrandKeywords] = useState("");
+  const [brandChecks, setBrandChecks] = useState<SpeciesChecksState>(
+    speciesToChecks("PERRO"),
+  );
   const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
   const [savingBrand, setSavingBrand] = useState(false);
   const [deleteBrandId, setDeleteBrandId] = useState<string | null>(null);
@@ -138,17 +223,30 @@ export const PriceKgUpdate = () => {
     loadPlan();
   }, [loadTypes, loadBrands, loadPlan]);
 
+  // Tipos y marcas que aplican a la planilla activa (species === AMBOS aparece
+  // en ambas). SOLO afecta la sección C (matriz + impresión + conteo): los
+  // acordeones A y B muestran TODO sin filtrar. La API ya ordena por sortOrder.
+  const visibleTypes = types.filter(
+    (t) => t.species === activeSpecies || t.species === "AMBOS",
+  );
+  const visibleBrands = brands.filter(
+    (b) => b.species === activeSpecies || b.species === "AMBOS",
+  );
+  const speciesLabel = activeSpecies === "PERRO" ? "Perros" : "Gatos";
+
   // --- Tipos: handlers ---
   const startEditType = (t: PriceKgType) => {
     setEditingTypeId(t.id);
     setTypeName(t.name);
     setTypeSynonyms(t.synonyms.join(", "));
+    setTypeChecks(speciesToChecks(t.species));
   };
 
   const resetTypeForm = () => {
     setEditingTypeId(null);
     setTypeName("");
     setTypeSynonyms("");
+    setTypeChecks(speciesToChecks("PERRO"));
   };
 
   const handleSaveType = async () => {
@@ -157,11 +255,12 @@ export const PriceKgUpdate = () => {
     setSavingType(true);
     try {
       const synonyms = parseSynonyms(typeSynonyms);
+      const species = checksToSpecies(typeChecks);
       if (editingTypeId) {
-        await updatePriceKgType(editingTypeId, { name, synonyms });
+        await updatePriceKgType(editingTypeId, { name, synonyms, species });
         toast.success("Tipo actualizado");
       } else {
-        await createPriceKgType({ name, synonyms });
+        await createPriceKgType({ name, synonyms, species });
         toast.success("Tipo creado");
       }
       resetTypeForm();
@@ -171,6 +270,20 @@ export const PriceKgUpdate = () => {
       toast.error(message);
     }
     setSavingType(false);
+  };
+
+  const handleTypeSpeciesChange = async (
+    t: PriceKgType,
+    checks: SpeciesChecksState,
+  ) => {
+    try {
+      await updatePriceKgType(t.id, { species: checksToSpecies(checks) });
+      toast.success("Tipo actualizado");
+      await loadTypes();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al actualizar el tipo";
+      toast.error(message);
+    }
   };
 
   const handleDeleteType = async () => {
@@ -194,12 +307,14 @@ export const PriceKgUpdate = () => {
     setEditingBrandId(b.id);
     setBrandName(b.name);
     setBrandKeywords(b.keywords.join(", "));
+    setBrandChecks(speciesToChecks(b.species));
   };
 
   const resetBrandForm = () => {
     setEditingBrandId(null);
     setBrandName("");
     setBrandKeywords("");
+    setBrandChecks(speciesToChecks("PERRO"));
   };
 
   const handleSaveBrand = async () => {
@@ -208,11 +323,12 @@ export const PriceKgUpdate = () => {
     setSavingBrand(true);
     try {
       const keywords = parseKeywords(brandKeywords);
+      const species = checksToSpecies(brandChecks);
       if (editingBrandId) {
-        await updatePriceKgBrand(editingBrandId, { name, keywords });
+        await updatePriceKgBrand(editingBrandId, { name, keywords, species });
         toast.success("Marca actualizada");
       } else {
-        await createPriceKgBrand({ name, keywords });
+        await createPriceKgBrand({ name, keywords, species });
         toast.success("Marca creada");
       }
       resetBrandForm();
@@ -222,6 +338,20 @@ export const PriceKgUpdate = () => {
       toast.error(message);
     }
     setSavingBrand(false);
+  };
+
+  const handleBrandSpeciesChange = async (
+    b: PriceKgBrand,
+    checks: SpeciesChecksState,
+  ) => {
+    try {
+      await updatePriceKgBrand(b.id, { species: checksToSpecies(checks) });
+      toast.success("Marca actualizada");
+      await loadBrands();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al actualizar la marca";
+      toast.error(message);
+    }
   };
 
   const handleDeleteBrand = async () => {
@@ -252,14 +382,16 @@ export const PriceKgUpdate = () => {
   };
 
   // Arma las entries a guardar: celdas NO vacías con precio > 0 → number;
-  // celdas que quedaron vacías pero tenían valor previo → null (borrar).
+  // celdas que quedaron vacías pero tenían valor previo → null (borrar). Opera
+  // SOLO sobre las marcas/tipos VISIBLES de la planilla activa: al guardar no
+  // se tocan celdas de la otra especie. El baseline sigue siendo el global.
   const buildEntries = (
     map: Record<string, string>,
     baseline: Record<string, string>,
   ): PriceKgPlanEntry[] => {
     const entries: PriceKgPlanEntry[] = [];
-    for (const brand of brands) {
-      for (const type of types) {
+    for (const brand of visibleBrands) {
+      for (const type of visibleTypes) {
         const key = cellKey(brand.id, type.id);
         const raw = (map[key] ?? "").trim();
         if (raw === "") {
@@ -296,12 +428,16 @@ export const PriceKgUpdate = () => {
     setSavingPlan(false);
   };
 
-  // Celdas con precio cargado (valor no vacío y > 0), incluyendo ediciones sin
-  // guardar, para el indicador.
-  const loadedCount = Object.values(cells).filter((v) => {
-    const p = parseFloat(v);
-    return v.trim() !== "" && !Number.isNaN(p) && p > 0;
-  }).length;
+  // Celdas VISIBLES con precio cargado (valor no vacío y > 0), incluyendo
+  // ediciones sin guardar, para el indicador de la planilla activa.
+  let loadedCount = 0;
+  for (const brand of visibleBrands) {
+    for (const type of visibleTypes) {
+      const raw = (cells[cellKey(brand.id, type.id)] ?? "").trim();
+      const p = parseFloat(raw);
+      if (raw !== "" && !Number.isNaN(p) && p > 0) loadedCount++;
+    }
+  }
 
   const matrixReady = !loadingTypes && !loadingBrands && !loadingPlan;
 
@@ -325,7 +461,11 @@ export const PriceKgUpdate = () => {
         <Button
           variant="outline"
           size="sm"
-          disabled={!matrixReady || brands.length === 0 || types.length === 0}
+          disabled={
+            !matrixReady ||
+            visibleBrands.length === 0 ||
+            visibleTypes.length === 0
+          }
           onClick={handlePrint}
         >
           Imprimir planilla
@@ -361,6 +501,16 @@ export const PriceKgUpdate = () => {
                               {s}
                             </Badge>
                           ))}
+                          <SpeciesChecks
+                            name={`type-${t.id}`}
+                            checks={speciesToChecks(t.species)}
+                            onChange={(checks) => handleTypeSpeciesChange(t, checks)}
+                            onReject={() =>
+                              toast.info(
+                                "Debe quedar al menos una especie seleccionada",
+                              )
+                            }
+                          />
                         </div>
                         <div className="flex shrink-0 gap-2">
                           <Button
@@ -404,6 +554,18 @@ export const PriceKgUpdate = () => {
                         placeholder="Ej: Adulto, Adult, Maduro"
                       />
                     </div>
+                  </div>
+
+                  <div className="mt-4 space-y-1.5">
+                    <Label>Especie</Label>
+                    <SpeciesChecks
+                      name="type-form"
+                      checks={typeChecks}
+                      onChange={setTypeChecks}
+                      onReject={() =>
+                        toast.info("Debe quedar al menos una especie seleccionada")
+                      }
+                    />
                   </div>
 
                   <div className="mt-4 flex gap-2">
@@ -478,6 +640,16 @@ export const PriceKgUpdate = () => {
                               {k}
                             </Badge>
                           ))}
+                          <SpeciesChecks
+                            name={`brand-${b.id}`}
+                            checks={speciesToChecks(b.species)}
+                            onChange={(checks) => handleBrandSpeciesChange(b, checks)}
+                            onReject={() =>
+                              toast.info(
+                                "Debe quedar al menos una especie seleccionada",
+                              )
+                            }
+                          />
                         </div>
                         <div className="flex shrink-0 gap-2">
                           <Button
@@ -523,6 +695,18 @@ export const PriceKgUpdate = () => {
                         placeholder="Ej: MAXXIUM, CORDERO"
                       />
                     </div>
+                  </div>
+
+                  <div className="mt-4 space-y-1.5">
+                    <Label>Especie</Label>
+                    <SpeciesChecks
+                      name="brand-form"
+                      checks={brandChecks}
+                      onChange={setBrandChecks}
+                      onReject={() =>
+                        toast.info("Debe quedar al menos una especie seleccionada")
+                      }
+                    />
                   </div>
 
                   <div className="mt-4 flex gap-2">
@@ -571,10 +755,33 @@ export const PriceKgUpdate = () => {
       {/* Sección C — Planilla de precios por kilo */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Planilla de precios por kilo</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            {loadedCount} {loadedCount === 1 ? "celda" : "celdas"} con precio cargadas
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-base">
+                Planilla de precios por kilo
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {loadedCount} {loadedCount === 1 ? "celda" : "celdas"} con precio cargadas
+              </p>
+            </div>
+            {/* Selector de planilla activa: solo filtra la matriz (sección C). */}
+            <div className="flex items-center gap-1 rounded-md border bg-muted p-1">
+              <Button
+                size="sm"
+                variant={activeSpecies === "PERRO" ? "default" : "ghost"}
+                onClick={() => setActiveSpecies("PERRO")}
+              >
+                Perros
+              </Button>
+              <Button
+                size="sm"
+                variant={activeSpecies === "GATO" ? "default" : "ghost"}
+                onClick={() => setActiveSpecies("GATO")}
+              >
+                Gatos
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {!matrixReady ? (
@@ -582,6 +789,11 @@ export const PriceKgUpdate = () => {
           ) : brands.length === 0 || types.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Creá al menos una marca y un tipo para completar la planilla.
+            </p>
+          ) : visibleBrands.length === 0 || visibleTypes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No hay marcas o tipos para la planilla de{" "}
+              {speciesLabel.toLowerCase()}.
             </p>
           ) : (
             <div className="max-h-[60vh] overflow-auto rounded-md border">
@@ -592,7 +804,7 @@ export const PriceKgUpdate = () => {
                 <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0] shadow-border">
                   <TableRow>
                     <TableHead className="min-w-[150px]">Marca</TableHead>
-                    {types.map((t) => (
+                    {visibleTypes.map((t) => (
                       <TableHead key={t.id} className="px-2 text-right text-xs">
                         {t.name}
                       </TableHead>
@@ -600,12 +812,12 @@ export const PriceKgUpdate = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {brands.map((b) => (
+                  {visibleBrands.map((b) => (
                     <TableRow key={b.id}>
                       <TableCell className="whitespace-nowrap p-2 font-medium">
                         {b.name}
                       </TableCell>
-                      {types.map((t) => (
+                      {visibleTypes.map((t) => (
                         <TableCell key={t.id} className="p-1.5">
                           <Input
                             type="number"
@@ -630,8 +842,8 @@ export const PriceKgUpdate = () => {
               disabled={
                 savingPlan ||
                 !matrixReady ||
-                brands.length === 0 ||
-                types.length === 0
+                visibleBrands.length === 0 ||
+                visibleTypes.length === 0
               }
               onClick={handleSavePlan}
             >
@@ -647,14 +859,15 @@ export const PriceKgUpdate = () => {
           <div className="mb-4">
             <h1 className="text-lg font-bold">Planilla de precios por kilo</h1>
             <p className="text-sm text-muted-foreground">
-              {new Date().toLocaleDateString("es-AR")} · {loadedCount} celdas
+              {speciesLabel} · {new Date().toLocaleDateString("es-AR")} ·{" "}
+              {loadedCount} celdas
             </p>
           </div>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Marca</TableHead>
-                {types.map((t) => (
+                {visibleTypes.map((t) => (
                   <TableHead key={t.id} className="text-right">
                     {t.name}
                   </TableHead>
@@ -662,10 +875,10 @@ export const PriceKgUpdate = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {brands.map((b) => (
+              {visibleBrands.map((b) => (
                 <TableRow key={b.id}>
                   <TableCell className="font-medium">{b.name}</TableCell>
-                  {types.map((t) => {
+                  {visibleTypes.map((t) => {
                     const raw = (cells[cellKey(b.id, t.id)] ?? "").trim();
                     const price = parseFloat(raw);
                     const valid = raw !== "" && !Number.isNaN(price) && price > 0;

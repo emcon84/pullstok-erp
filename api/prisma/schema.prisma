@@ -242,6 +242,15 @@ model Provider {
   @@map("providers")
 }
 
+// Especie a la que aplica un tipo/marca de "Precios por kilo" (sdd/price-kg-plan).
+// PERRO | GATO | AMBOS (aplica a ambas planillas). La planilla se edita por
+// especie (matriz Perros vs Gatos), por eso cada tipo/marca declara su especie.
+enum Species {
+  PERRO
+  GATO
+  AMBOS
+}
+
 // Tipos de "Precios por kilo" (etapas de vida del alimento: Adulto, Cachorro,
 // Kitten, Senior, etc.). Tenant-scoped (organizationId) y en TENANT_MODELS
 // (db.ts) → scope org automático anti-fuga. `synonyms` se mantiene por
@@ -258,6 +267,9 @@ model PriceKgType {
   // nuevos caen al final; se asigna 10, 20, 30... para dejar espacio entre
   // inserciones. listPriceKgTypes ordena por sortOrder asc, name asc.
   sortOrder      Int            @default(1000)
+  // Especie de la planilla a la que aplica (PERRO/GATO/AMBOS). Default PERRO:
+  // los registros legacy caen en la planilla de perros sin datos que migrar.
+  species        Species        @default(PERRO)
   organizationId String
   organization   Organization   @relation(fields: [organizationId], references: [id])
   createdAt      DateTime       @default(now())
@@ -281,6 +293,9 @@ model PriceKgBrand {
   id             String         @id @default(uuid())
   name           String
   keywords       String[]
+  // Especie de la planilla a la que aplica (PERRO/GATO/AMBOS). Default PERRO:
+  // las marcas legacy caen en la planilla de perros sin datos que migrar.
+  species        Species        @default(PERRO)
   organizationId String
   organization   Organization   @relation(fields: [organizationId], references: [id])
   createdAt      DateTime       @default(now())

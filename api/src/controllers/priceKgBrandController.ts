@@ -18,7 +18,7 @@ export const listPriceKgBrands = async (_req: Request, res: Response) => {
     const brands = await prisma.priceKgBrand.findMany({
       where: { organizationId },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, keywords: true },
+      select: { id: true, name: true, keywords: true, species: true },
     });
     return res.status(200).json({ items: brands });
   } catch (error: any) {
@@ -59,7 +59,7 @@ export const updatePriceKgBrand = async (req: Request, res: Response) => {
 
     const updated = await prisma.priceKgBrand.findFirst({
       where: { id: req.params.id },
-      select: { id: true, name: true, keywords: true },
+      select: { id: true, name: true, keywords: true, species: true },
     });
     return res.status(200).json(updated);
   } catch (error: any) {

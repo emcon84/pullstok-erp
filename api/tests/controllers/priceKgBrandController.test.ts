@@ -51,8 +51,8 @@ describe("PriceKgBrand Controller", () => {
   describe("listPriceKgBrands", () => {
     it("lists brands ordered by name asc with id/name/keywords", async () => {
       const items = [
-        { id: "b1", name: "MAXXIUM CORDERO", keywords: ["MAXXIUM", "CORDERO"] },
-        { id: "b2", name: "OLD PRINCE PREMIUM", keywords: ["OLD PRINCE", "PREMIUM"] },
+        { id: "b1", name: "MAXXIUM CORDERO", keywords: ["MAXXIUM", "CORDERO"], species: "PERRO" },
+        { id: "b2", name: "MIMAS GATO", keywords: ["MIMAS"], species: "GATO" },
       ];
       mockedPrisma.priceKgBrand.findMany.mockResolvedValue(items);
 
@@ -63,7 +63,7 @@ describe("PriceKgBrand Controller", () => {
       expect(mockedPrisma.priceKgBrand.findMany).toHaveBeenCalledWith({
         where: { organizationId: "org-1" },
         orderBy: { name: "asc" },
-        select: { id: true, name: true, keywords: true },
+        select: { id: true, name: true, keywords: true, species: true },
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ items });
@@ -82,7 +82,7 @@ describe("PriceKgBrand Controller", () => {
 
   describe("createPriceKgBrand", () => {
     it("creates a brand with explicit organizationId and returns 201", async () => {
-      const body = { name: "MAXXIUM CORDERO", keywords: ["MAXXIUM", "CORDERO"] };
+      const body = { name: "MAXXIUM CORDERO", keywords: ["MAXXIUM", "CORDERO"], species: "PERRO" };
       const created = { id: "b1", ...body, organizationId: "org-1" };
       mockedPrisma.priceKgBrand.create.mockResolvedValue(created);
 
@@ -91,7 +91,12 @@ describe("PriceKgBrand Controller", () => {
       await createPriceKgBrand(req, res);
 
       expect(mockedPrisma.priceKgBrand.create).toHaveBeenCalledWith({
-        data: { name: "MAXXIUM CORDERO", keywords: ["MAXXIUM", "CORDERO"], organizationId: "org-1" },
+        data: {
+          name: "MAXXIUM CORDERO",
+          keywords: ["MAXXIUM", "CORDERO"],
+          species: "PERRO",
+          organizationId: "org-1",
+        },
       });
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(created);
@@ -102,7 +107,7 @@ describe("PriceKgBrand Controller", () => {
         new Error("Unique constraint failed"),
       );
 
-      const req = mockRequest({}, { name: "MAXXIUM", keywords: [] });
+      const req = mockRequest({}, { name: "MAXXIUM", keywords: [], species: "GATO" });
       const res = mockResponse();
       await createPriceKgBrand(req, res);
 

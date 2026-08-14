@@ -58,13 +58,18 @@ describe("priceKgTypes service — cliente API de tipos por kilo", () => {
       json: async () => ({ id: "t-1", name: "Adulto", synonyms: ["Adult"] }),
     });
 
-    const result = await createPriceKgType({ name: "Adulto", synonyms: ["Adult"] });
+    const result = await createPriceKgType({
+      name: "Adulto",
+      synonyms: ["Adult"],
+      species: "PERRO",
+    });
 
     expect(result).toEqual({ id: "t-1", name: "Adulto", synonyms: ["Adult"] });
     expect(mockFetch.mock.calls[0][1].method).toBe("POST");
     expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({
       name: "Adulto",
       synonyms: ["Adult"],
+      species: "PERRO",
     });
   });
 
@@ -75,7 +80,7 @@ describe("priceKgTypes service — cliente API de tipos por kilo", () => {
     });
 
     await expect(
-      createPriceKgType({ name: "Adulto", synonyms: [] }),
+      createPriceKgType({ name: "Adulto", synonyms: [], species: "PERRO" }),
     ).rejects.toThrow("Ya existe un tipo con ese nombre");
   });
 

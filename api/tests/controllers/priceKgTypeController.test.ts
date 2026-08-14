@@ -51,8 +51,8 @@ describe("PriceKgType Controller", () => {
   describe("listPriceKgTypes", () => {
     it("lists types ordered by sortOrder asc then name asc", async () => {
       const items = [
-        { id: "t1", name: "Adulto", synonyms: ["ADULTO", "ADULTOS"] },
-        { id: "t2", name: "Cachorro", synonyms: ["CACHORRO"] },
+        { id: "t1", name: "Adulto", synonyms: ["ADULTO", "ADULTOS"], species: "PERRO" },
+        { id: "t2", name: "Kitten", synonyms: ["KITTEN"], species: "GATO" },
       ];
       mockedPrisma.priceKgType.findMany.mockResolvedValue(items);
 
@@ -63,7 +63,7 @@ describe("PriceKgType Controller", () => {
       expect(mockedPrisma.priceKgType.findMany).toHaveBeenCalledWith({
         where: { organizationId: "org-1" },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-        select: { id: true, name: true, synonyms: true },
+        select: { id: true, name: true, synonyms: true, species: true },
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ items });
@@ -82,7 +82,7 @@ describe("PriceKgType Controller", () => {
 
   describe("createPriceKgType", () => {
     it("creates a type with explicit organizationId and returns 201", async () => {
-      const body = { name: "Adulto", synonyms: ["ADULTO"] };
+      const body = { name: "Adulto", synonyms: ["ADULTO"], species: "PERRO" };
       const created = { id: "t1", ...body, organizationId: "org-1" };
       mockedPrisma.priceKgType.create.mockResolvedValue(created);
 
@@ -91,7 +91,12 @@ describe("PriceKgType Controller", () => {
       await createPriceKgType(req, res);
 
       expect(mockedPrisma.priceKgType.create).toHaveBeenCalledWith({
-        data: { name: "Adulto", synonyms: ["ADULTO"], organizationId: "org-1" },
+        data: {
+          name: "Adulto",
+          synonyms: ["ADULTO"],
+          species: "PERRO",
+          organizationId: "org-1",
+        },
       });
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(created);
@@ -102,7 +107,7 @@ describe("PriceKgType Controller", () => {
         new Error("Unique constraint failed"),
       );
 
-      const req = mockRequest({}, { name: "Adulto", synonyms: [] });
+      const req = mockRequest({}, { name: "Adulto", synonyms: [], species: "GATO" });
       const res = mockResponse();
       await createPriceKgType(req, res);
 

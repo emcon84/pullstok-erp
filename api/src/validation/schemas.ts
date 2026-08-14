@@ -537,6 +537,11 @@ const priceKgTypeSynonymSchema = z
   .min(1, "El sinónimo no puede estar vacío")
   .max(60, "Máximo 60 caracteres");
 
+// Especie de la planilla (sdd/price-kg-plan): PERRO | GATO | AMBOS. Obligatoria
+// en create; opcional en update (ausente = no tocar). Los valores se guardan en
+// mayúscula exacta (mismo criterio que la migración TEXT y el enum Prisma).
+export const priceKgSpeciesSchema = z.enum(["PERRO", "GATO", "AMBOS"]);
+
 export const createPriceKgTypeSchema = z
   .object({
     name: z
@@ -548,6 +553,7 @@ export const createPriceKgTypeSchema = z
       .array(priceKgTypeSynonymSchema)
       .max(50, "Máximo 50 sinónimos")
       .default([]),
+    species: priceKgSpeciesSchema,
   })
   .strip();
 
@@ -563,6 +569,7 @@ export const updatePriceKgTypeSchema = z
       .array(priceKgTypeSynonymSchema)
       .max(50, "Máximo 50 sinónimos")
       .optional(),
+    species: priceKgSpeciesSchema.optional(),
   })
   .strip();
 
@@ -590,6 +597,7 @@ export const createPriceKgBrandSchema = z
       .array(priceKgBrandKeywordSchema)
       .max(50, "Máximo 50 palabras clave")
       .default([]),
+    species: priceKgSpeciesSchema,
   })
   .strip();
 
@@ -605,6 +613,7 @@ export const updatePriceKgBrandSchema = z
       .array(priceKgBrandKeywordSchema)
       .max(50, "Máximo 50 palabras clave")
       .optional(),
+    species: priceKgSpeciesSchema.optional(),
   })
   .strip();
 

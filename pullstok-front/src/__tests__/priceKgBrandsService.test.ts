@@ -65,6 +65,7 @@ describe("priceKgBrands service — cliente API de marcas por kilo", () => {
     const result = await createPriceKgBrand({
       name: "MAXXIUM CORDERO",
       keywords: ["MAXXIUM", "CORDERO"],
+      species: "PERRO",
     });
 
     expect(result).toEqual({
@@ -76,6 +77,7 @@ describe("priceKgBrands service — cliente API de marcas por kilo", () => {
     expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({
       name: "MAXXIUM CORDERO",
       keywords: ["MAXXIUM", "CORDERO"],
+      species: "PERRO",
     });
   });
 
@@ -86,7 +88,7 @@ describe("priceKgBrands service — cliente API de marcas por kilo", () => {
     });
 
     await expect(
-      createPriceKgBrand({ name: "MAXXIUM", keywords: [] }),
+      createPriceKgBrand({ name: "MAXXIUM", keywords: [], species: "PERRO" }),
     ).rejects.toThrow("Ya existe una marca con ese nombre");
   });
 

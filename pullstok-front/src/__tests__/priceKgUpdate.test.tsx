@@ -36,8 +36,9 @@ import { PriceKgUpdate } from "@/views/PriceKgUpdate";
 import {
   listPriceKgTypes,
   createPriceKgType,
+  type PriceKgType,
 } from "@/services/priceKgTypes";
-import { listPriceKgBrands } from "@/services/priceKgBrands";
+import { listPriceKgBrands, type PriceKgBrand } from "@/services/priceKgBrands";
 import { getPriceKgPlan, savePriceKgPlan } from "@/services/priceKgPlan";
 
 const mockListPriceKgTypes = vi.mocked(listPriceKgTypes);
@@ -46,14 +47,14 @@ const mockListPriceKgBrands = vi.mocked(listPriceKgBrands);
 const mockGetPriceKgPlan = vi.mocked(getPriceKgPlan);
 const mockSavePriceKgPlan = vi.mocked(savePriceKgPlan);
 
-const brands = [
-  { id: "brand-1", name: "Acme", keywords: ["ACME"] },
-  { id: "brand-2", name: "Zap", keywords: ["ZAP"] },
+const brands: PriceKgBrand[] = [
+  { id: "brand-1", name: "Acme", keywords: ["ACME"], species: "PERRO" },
+  { id: "brand-2", name: "Zap", keywords: ["ZAP"], species: "PERRO" },
 ];
 
-const types = [
-  { id: "t-1", name: "Adulto", synonyms: ["Adult", "Maduro"] },
-  { id: "t-2", name: "Cachorro", synonyms: ["Puppy"] },
+const types: PriceKgType[] = [
+  { id: "t-1", name: "Adulto", synonyms: ["Adult", "Maduro"], species: "AMBOS" },
+  { id: "t-2", name: "Cachorro", synonyms: ["Puppy"], species: "PERRO" },
 ];
 
 function renderView() {
@@ -145,6 +146,7 @@ describe("PriceKgUpdate — tipos, marcas y planilla por kilo", () => {
       id: "t-3",
       name: "Senior",
       synonyms: ["Senior"],
+      species: "PERRO",
     });
 
     renderView();
@@ -169,7 +171,21 @@ describe("PriceKgUpdate — tipos, marcas y planilla por kilo", () => {
       expect(mockCreatePriceKgType).toHaveBeenCalledWith({
         name: "Senior",
         synonyms: ["Senior", "Viejo"],
+        species: "PERRO",
       }),
     );
+  });
+
+  it("filtra la matriz por especie según la planilla activa", async () => {
+    mockListPriceKgTypes.mockResolvedValue([
+      { id: "t-1", name: "Cachorro", synonyms: [], species: "PERRO" },
+      { id: "t-2", name: "Kitten", synonyms: [], species: "GATO" },
+    ]);
+
+    renderView();
+
+    // Planilla activa = Perros (default): el tipo PERRO aparece, el GATO no.
+    expect(await screen.findByLabelText("Acme Cachorro")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Acme Kitten")).not.toBeInTheDocument();
   });
 });

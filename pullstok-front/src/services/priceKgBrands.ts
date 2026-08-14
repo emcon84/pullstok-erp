@@ -1,4 +1,5 @@
 import { API_URL } from "../constants";
+import type { PriceKgSpecies } from "./priceKgTypes";
 
 /**
  * Cliente API de marcas de precio por kilo (sdd/price-kg).
@@ -9,6 +10,7 @@ export interface PriceKgBrand {
   id: string;
   name: string;
   keywords: string[];
+  species: PriceKgSpecies;
 }
 
 /** Parsea un CSV de palabras clave: trim, filtra vacíos y deduplica. */
@@ -35,6 +37,7 @@ export const listPriceKgBrands = async (): Promise<PriceKgBrand[]> => {
 export const createPriceKgBrand = async (payload: {
   name: string;
   keywords: string[];
+  species: PriceKgSpecies;
 }): Promise<PriceKgBrand> => {
   const token = localStorage.getItem("token");
   const res = await fetch(`${API_URL}/price-kg-brands`, {
@@ -55,7 +58,7 @@ export const createPriceKgBrand = async (payload: {
 /** PUT /price-kg-brands/:id — actualiza una marca. */
 export const updatePriceKgBrand = async (
   id: string,
-  payload: { name?: string; keywords?: string[] },
+  payload: { name?: string; keywords?: string[]; species?: PriceKgSpecies },
 ): Promise<PriceKgBrand> => {
   const token = localStorage.getItem("token");
   const res = await fetch(`${API_URL}/price-kg-brands/${id}`, {

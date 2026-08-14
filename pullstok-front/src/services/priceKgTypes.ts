@@ -5,10 +5,13 @@ import { API_URL } from "../constants";
  * Mismo patrón que providers.ts: plain fetch + token de localStorage.
  */
 
+export type PriceKgSpecies = "PERRO" | "GATO" | "AMBOS";
+
 export interface PriceKgType {
   id: string;
   name: string;
   synonyms: string[];
+  species: PriceKgSpecies;
 }
 
 /** Parsea un CSV de sinónimos: trim, filtra vacíos y deduplica. */
@@ -35,6 +38,7 @@ export const listPriceKgTypes = async (): Promise<PriceKgType[]> => {
 export const createPriceKgType = async (payload: {
   name: string;
   synonyms: string[];
+  species: PriceKgSpecies;
 }): Promise<PriceKgType> => {
   const token = localStorage.getItem("token");
   const res = await fetch(`${API_URL}/price-kg-types`, {
@@ -55,7 +59,7 @@ export const createPriceKgType = async (payload: {
 /** PUT /price-kg-types/:id — actualiza un tipo. */
 export const updatePriceKgType = async (
   id: string,
-  payload: { name?: string; synonyms?: string[] },
+  payload: { name?: string; synonyms?: string[]; species?: PriceKgSpecies },
 ): Promise<PriceKgType> => {
   const token = localStorage.getItem("token");
   const res = await fetch(`${API_URL}/price-kg-types/${id}`, {
