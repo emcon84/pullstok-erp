@@ -48,7 +48,7 @@ const types: PriceKgType[] = [
 ];
 
 // Celda distinta por especie para la misma marca×tipo AMBOS (Acme × Adulto):
-// 2500 en Perros, 9000 en Gatos. Replica el bug AMBOS de PriceKgUpdate.
+// 2500 en Perros, 9000 en Gatos. Los precios sueltos SIEMPRE son redondos.
 const planCells: PriceKgPrice[] = [
   { id: "c1", brandId: "brand-1", typeId: "t-1", priceKg: 2500, species: "PERRO" },
   { id: "c2", brandId: "brand-1", typeId: "t-1", priceKg: 9000, species: "GATO" },
@@ -68,7 +68,7 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     mockGetPriceKgPlan.mockResolvedValue(planCells);
   });
 
-  it("busca 'acme' y muestra la tarjeta con Adulto a $2.500,00 (planilla Perro)", async () => {
+  it("muestra AMBOS precios a la vez (Perro y Gato) para una marca/tipo AMBOS", async () => {
     renderView();
 
     const input = screen.getByPlaceholderText(/buscá una marca/i);
@@ -78,7 +78,29 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
       await screen.findByRole("heading", { name: "Acme" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Adulto")).toBeInTheDocument();
-    expect(screen.getByText("$2.500,00")).toBeInTheDocument();
+
+    // Sin selector: la misma marca×tipo muestra su precio Perro y su precio
+    // Gato juntos, etiquetados, y sin decimales (precios sueltos redondos).
+    expect(screen.getAllByText("Perro").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Gato").length).toBeGreaterThan(0);
+    expect(screen.getByText("$2.500")).toBeInTheDocument();
+    expect(screen.getByText("$9.000")).toBeInTheDocument();
+  });
+
+  it("un tipo GATO-only (Kitten) muestra solo su precio de Gato", async () => {
+    renderView();
+
+    const input = screen.getByPlaceholderText(/buscá una marca/i);
+    fireEvent.change(input, { target: { value: "acme" } });
+    await screen.findByRole("heading", { name: "Acme" });
+
+    // Kitten (species GATO) NO muestra el badge Perro; muestra el de Gato con
+    // "—" porque no tiene celda cargada.
+    expect(screen.getByText("Kitten")).toBeInTheDocument();
+    expect(screen.queryByText("Perro")).toBeInTheDocument(); // del bloque Adulto
+    // Kitten no tiene badge Perro: contamos los badges "Perro" — solo 1 (Adulto).
+    expect(screen.getAllByText("Perro")).toHaveLength(1);
+    expect(screen.getAllByText("Gato")).toHaveLength(2); // Adulto + Kitten
   });
 
   it("busca 'zap', y luego una marca inexistente muestra 'Sin resultados'", async () => {
@@ -93,23 +115,6 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
 
     fireEvent.change(input, { target: { value: "noexiste" } });
     expect(await screen.findByText(/sin resultados/i)).toBeInTheDocument();
-  });
-
-  it("al cambiar a Gatos, Adulto pasa a $9.000,00 y aparece Kitten", async () => {
-    renderView();
-
-    const input = screen.getByPlaceholderText(/buscá una marca/i);
-    fireEvent.change(input, { target: { value: "acme" } });
-
-    // Planilla Perro activa (default): Acme × Adulto = 2500.
-    expect(await screen.findByText("$2.500,00")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /gatos/i }));
-
-    // Misma marca×tipo AMBOS ahora muestra la celda GATO (9000) y Kitten
-    // (tipo GATO) se vuelve visible.
-    expect(await screen.findByText("$9.000,00")).toBeInTheDocument();
-    expect(screen.getByText("Kitten")).toBeInTheDocument();
   });
 
   it("sin búsqueda muestra el estado vacío y no renderiza tarjetas de marca", async () => {

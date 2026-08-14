@@ -53,10 +53,11 @@ import {
   type PriceKgPlanEntry,
 } from "@/services/priceKgPlan";
 
+// Precios sueltos SIEMPRE redondos (decisión del usuario): sin decimales.
 const formatPrice = (n: number) =>
   `$${n.toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   })}`;
 
 // Key de la matriz de celdas: especie primero (una marca/tipo AMBOS tiene una
