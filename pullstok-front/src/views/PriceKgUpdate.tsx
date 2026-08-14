@@ -340,7 +340,7 @@ export const PriceKgUpdate = () => {
               Tipos (etapas de vida)
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4">
                 {loadingTypes ? (
                   <p className="text-sm text-muted-foreground">Cargando tipos...</p>
                 ) : types.length === 0 ? (
@@ -348,7 +348,7 @@ export const PriceKgUpdate = () => {
                     No hay tipos todavía. Creá el primero con el formulario de abajo.
                   </p>
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="max-h-[35vh] space-y-2 overflow-y-auto pr-1">
                     {types.map((t) => (
                       <li
                         key={t.id}
@@ -383,39 +383,42 @@ export const PriceKgUpdate = () => {
                   </ul>
                 )}
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="type-name">Nombre</Label>
-                    <Input
-                      id="type-name"
-                      value={typeName}
-                      onChange={(e) => setTypeName(e.target.value)}
-                      placeholder="Ej: Adulto"
-                    />
+                {/* Formulario fijo abajo: siempre visible, no scrollea con la lista */}
+                <div className="border-t pt-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="type-name">Nombre</Label>
+                      <Input
+                        id="type-name"
+                        value={typeName}
+                        onChange={(e) => setTypeName(e.target.value)}
+                        placeholder="Ej: Adulto"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="type-synonyms">Sinónimos (separados por coma)</Label>
+                      <Input
+                        id="type-synonyms"
+                        value={typeSynonyms}
+                        onChange={(e) => setTypeSynonyms(e.target.value)}
+                        placeholder="Ej: Adulto, Adult, Maduro"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="type-synonyms">Sinónimos (separados por coma)</Label>
-                    <Input
-                      id="type-synonyms"
-                      value={typeSynonyms}
-                      onChange={(e) => setTypeSynonyms(e.target.value)}
-                      placeholder="Ej: Adulto, Adult, Maduro"
-                    />
-                  </div>
-                </div>
 
-                <div className="flex gap-2">
-                  <Button
-                    disabled={!typeName.trim() || savingType}
-                    onClick={handleSaveType}
-                  >
-                    {editingTypeId ? "Guardar cambios" : "Agregar tipo"}
-                  </Button>
-                  {editingTypeId && (
-                    <Button variant="outline" onClick={resetTypeForm}>
-                      Cancelar
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      disabled={!typeName.trim() || savingType}
+                      onClick={handleSaveType}
+                    >
+                      {editingTypeId ? "Guardar cambios" : "Agregar tipo"}
                     </Button>
-                  )}
+                    {editingTypeId && (
+                      <Button variant="outline" onClick={resetTypeForm}>
+                        Cancelar
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <AlertDialog
@@ -454,7 +457,7 @@ export const PriceKgUpdate = () => {
               Marcas (líneas / sabores)
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4">
                 {loadingBrands ? (
                   <p className="text-sm text-muted-foreground">Cargando marcas...</p>
                 ) : brands.length === 0 ? (
@@ -462,7 +465,7 @@ export const PriceKgUpdate = () => {
                     No hay marcas todavía. Creá la primera con el formulario de abajo.
                   </p>
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="max-h-[35vh] space-y-2 overflow-y-auto pr-1">
                     {brands.map((b) => (
                       <li
                         key={b.id}
@@ -497,41 +500,44 @@ export const PriceKgUpdate = () => {
                   </ul>
                 )}
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="brand-name">Nombre</Label>
-                    <Input
-                      id="brand-name"
-                      value={brandName}
-                      onChange={(e) => setBrandName(e.target.value)}
-                      placeholder="Ej: MAXXIUM CORDERO"
-                    />
+                {/* Formulario fijo abajo: siempre visible, no scrollea con la lista */}
+                <div className="border-t pt-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="brand-name">Nombre</Label>
+                      <Input
+                        id="brand-name"
+                        value={brandName}
+                        onChange={(e) => setBrandName(e.target.value)}
+                        placeholder="Ej: MAXXIUM CORDERO"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="brand-keywords">
+                        Palabras clave (separadas por coma)
+                      </Label>
+                      <Input
+                        id="brand-keywords"
+                        value={brandKeywords}
+                        onChange={(e) => setBrandKeywords(e.target.value)}
+                        placeholder="Ej: MAXXIUM, CORDERO"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="brand-keywords">
-                      Palabras clave (separadas por coma)
-                    </Label>
-                    <Input
-                      id="brand-keywords"
-                      value={brandKeywords}
-                      onChange={(e) => setBrandKeywords(e.target.value)}
-                      placeholder="Ej: MAXXIUM, CORDERO"
-                    />
-                  </div>
-                </div>
 
-                <div className="flex gap-2">
-                  <Button
-                    disabled={!brandName.trim() || savingBrand}
-                    onClick={handleSaveBrand}
-                  >
-                    {editingBrandId ? "Guardar cambios" : "Agregar marca"}
-                  </Button>
-                  {editingBrandId && (
-                    <Button variant="outline" onClick={resetBrandForm}>
-                      Cancelar
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      disabled={!brandName.trim() || savingBrand}
+                      onClick={handleSaveBrand}
+                    >
+                      {editingBrandId ? "Guardar cambios" : "Agregar marca"}
                     </Button>
-                  )}
+                    {editingBrandId && (
+                      <Button variant="outline" onClick={resetBrandForm}>
+                        Cancelar
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <AlertDialog
