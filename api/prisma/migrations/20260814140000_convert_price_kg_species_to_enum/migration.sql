@@ -11,8 +11,15 @@
 -- no lo castea solo al cambiar el tipo de la columna (P3018/42804) — por eso
 -- primero se dropea, se altera el tipo y se re-agrega como enum.
 
--- CreateEnum
-CREATE TYPE "Species" AS ENUM ('PERRO', 'GATO', 'AMBOS');
+-- CreateEnum (condicional: un intento previo de esta misma migración pudo
+-- haber dejado el tipo creado antes de fallar en el ALTER TABLE; el deploy
+-- debe ser re-ejecutable sin chocar con `type "Species" already exists`).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'Species') THEN
+    CREATE TYPE "Species" AS ENUM ('PERRO', 'GATO', 'AMBOS');
+  END IF;
+END $$;
 
 -- AlterTable (drop default → alter type → restore default)
 ALTER TABLE "price_kg_types" ALTER COLUMN "species" DROP DEFAULT;
