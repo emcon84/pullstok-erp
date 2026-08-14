@@ -16,6 +16,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   Table,
   TableBody,
   TableCell,
@@ -326,222 +332,234 @@ export const PriceKgUpdate = () => {
         </Button>
       </div>
 
-      {/* Sección A — Gestión de tipos */}
+      {/* Sección A — Gestión de tipos (colapsable) */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Tipos (etapas de vida)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {loadingTypes ? (
-            <p className="text-sm text-muted-foreground">Cargando tipos...</p>
-          ) : types.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No hay tipos todavía. Creá el primero con el formulario de abajo.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {types.map((t) => (
-                <li
-                  key={t.id}
-                  className="flex items-center justify-between gap-2 rounded-md border p-3"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{t.name}</span>
-                    {t.synonyms.map((s) => (
-                      <Badge key={s} variant="outline">
-                        {s}
-                      </Badge>
+        <Accordion type="single" collapsible>
+          <AccordionItem value="types" className="border-b-0">
+            <AccordionTrigger className="px-6 py-4 text-base">
+              Tipos (etapas de vida)
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              <div className="space-y-4">
+                {loadingTypes ? (
+                  <p className="text-sm text-muted-foreground">Cargando tipos...</p>
+                ) : types.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No hay tipos todavía. Creá el primero con el formulario de abajo.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {types.map((t) => (
+                      <li
+                        key={t.id}
+                        className="flex items-center justify-between gap-2 rounded-md border p-3"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{t.name}</span>
+                          {t.synonyms.map((s) => (
+                            <Badge key={s} variant="outline">
+                              {s}
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditType(t)}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeleteTypeId(t.id)}
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      </li>
                     ))}
+                  </ul>
+                )}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="type-name">Nombre</Label>
+                    <Input
+                      id="type-name"
+                      value={typeName}
+                      onChange={(e) => setTypeName(e.target.value)}
+                      placeholder="Ej: Adulto"
+                    />
                   </div>
-                  <div className="flex shrink-0 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => startEditType(t)}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDeleteTypeId(t.id)}
-                    >
-                      Eliminar
-                    </Button>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="type-synonyms">Sinónimos (separados por coma)</Label>
+                    <Input
+                      id="type-synonyms"
+                      value={typeSynonyms}
+                      onChange={(e) => setTypeSynonyms(e.target.value)}
+                      placeholder="Ej: Adulto, Adult, Maduro"
+                    />
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
+                </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="type-name">Nombre</Label>
-              <Input
-                id="type-name"
-                value={typeName}
-                onChange={(e) => setTypeName(e.target.value)}
-                placeholder="Ej: Adulto"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="type-synonyms">Sinónimos (separados por coma)</Label>
-              <Input
-                id="type-synonyms"
-                value={typeSynonyms}
-                onChange={(e) => setTypeSynonyms(e.target.value)}
-                placeholder="Ej: Adulto, Adult, Maduro"
-              />
-            </div>
-          </div>
+                <div className="flex gap-2">
+                  <Button
+                    disabled={!typeName.trim() || savingType}
+                    onClick={handleSaveType}
+                  >
+                    {editingTypeId ? "Guardar cambios" : "Agregar tipo"}
+                  </Button>
+                  {editingTypeId && (
+                    <Button variant="outline" onClick={resetTypeForm}>
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
 
-          <div className="flex gap-2">
-            <Button
-              disabled={!typeName.trim() || savingType}
-              onClick={handleSaveType}
-            >
-              {editingTypeId ? "Guardar cambios" : "Agregar tipo"}
-            </Button>
-            {editingTypeId && (
-              <Button variant="outline" onClick={resetTypeForm}>
-                Cancelar
-              </Button>
-            )}
-          </div>
-
-          <AlertDialog
-            open={deleteTypeId !== null}
-            onOpenChange={(open) => {
-              if (!open) setDeleteTypeId(null);
-            }}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Eliminar tipo</AlertDialogTitle>
-                <AlertDialogDescription>
-                  ¿Seguro que querés eliminar este tipo? Esta acción no se puede
-                  deshacer.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteType}>
-                  Eliminar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </CardContent>
+                <AlertDialog
+                  open={deleteTypeId !== null}
+                  onOpenChange={(open) => {
+                    if (!open) setDeleteTypeId(null);
+                  }}
+                >
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Eliminar tipo</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        ¿Seguro que querés eliminar este tipo? Esta acción no se puede
+                        deshacer.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteType}>
+                        Eliminar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </Card>
 
-      {/* Sección B — Gestión de marcas */}
+      {/* Sección B — Gestión de marcas (colapsable) */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Marcas (líneas / sabores)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {loadingBrands ? (
-            <p className="text-sm text-muted-foreground">Cargando marcas...</p>
-          ) : brands.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No hay marcas todavía. Creá la primera con el formulario de abajo.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {brands.map((b) => (
-                <li
-                  key={b.id}
-                  className="flex items-center justify-between gap-2 rounded-md border p-3"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{b.name}</span>
-                    {b.keywords.map((k) => (
-                      <Badge key={k} variant="outline">
-                        {k}
-                      </Badge>
+        <Accordion type="single" collapsible>
+          <AccordionItem value="brands" className="border-b-0">
+            <AccordionTrigger className="px-6 py-4 text-base">
+              Marcas (líneas / sabores)
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              <div className="space-y-4">
+                {loadingBrands ? (
+                  <p className="text-sm text-muted-foreground">Cargando marcas...</p>
+                ) : brands.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No hay marcas todavía. Creá la primera con el formulario de abajo.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {brands.map((b) => (
+                      <li
+                        key={b.id}
+                        className="flex items-center justify-between gap-2 rounded-md border p-3"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{b.name}</span>
+                          {b.keywords.map((k) => (
+                            <Badge key={k} variant="outline">
+                              {k}
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditBrand(b)}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeleteBrandId(b.id)}
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      </li>
                     ))}
+                  </ul>
+                )}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="brand-name">Nombre</Label>
+                    <Input
+                      id="brand-name"
+                      value={brandName}
+                      onChange={(e) => setBrandName(e.target.value)}
+                      placeholder="Ej: MAXXIUM CORDERO"
+                    />
                   </div>
-                  <div className="flex shrink-0 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => startEditBrand(b)}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDeleteBrandId(b.id)}
-                    >
-                      Eliminar
-                    </Button>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="brand-keywords">
+                      Palabras clave (separadas por coma)
+                    </Label>
+                    <Input
+                      id="brand-keywords"
+                      value={brandKeywords}
+                      onChange={(e) => setBrandKeywords(e.target.value)}
+                      placeholder="Ej: MAXXIUM, CORDERO"
+                    />
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
+                </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="brand-name">Nombre</Label>
-              <Input
-                id="brand-name"
-                value={brandName}
-                onChange={(e) => setBrandName(e.target.value)}
-                placeholder="Ej: MAXXIUM CORDERO"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="brand-keywords">
-                Palabras clave (separadas por coma)
-              </Label>
-              <Input
-                id="brand-keywords"
-                value={brandKeywords}
-                onChange={(e) => setBrandKeywords(e.target.value)}
-                placeholder="Ej: MAXXIUM, CORDERO"
-              />
-            </div>
-          </div>
+                <div className="flex gap-2">
+                  <Button
+                    disabled={!brandName.trim() || savingBrand}
+                    onClick={handleSaveBrand}
+                  >
+                    {editingBrandId ? "Guardar cambios" : "Agregar marca"}
+                  </Button>
+                  {editingBrandId && (
+                    <Button variant="outline" onClick={resetBrandForm}>
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
 
-          <div className="flex gap-2">
-            <Button
-              disabled={!brandName.trim() || savingBrand}
-              onClick={handleSaveBrand}
-            >
-              {editingBrandId ? "Guardar cambios" : "Agregar marca"}
-            </Button>
-            {editingBrandId && (
-              <Button variant="outline" onClick={resetBrandForm}>
-                Cancelar
-              </Button>
-            )}
-          </div>
-
-          <AlertDialog
-            open={deleteBrandId !== null}
-            onOpenChange={(open) => {
-              if (!open) setDeleteBrandId(null);
-            }}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Eliminar marca</AlertDialogTitle>
-                <AlertDialogDescription>
-                  ¿Seguro que querés eliminar esta marca? Esta acción no se puede
-                  deshacer.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteBrand}>
-                  Eliminar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </CardContent>
+                <AlertDialog
+                  open={deleteBrandId !== null}
+                  onOpenChange={(open) => {
+                    if (!open) setDeleteBrandId(null);
+                  }}
+                >
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Eliminar marca</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        ¿Seguro que querés eliminar esta marca? Esta acción no se puede
+                        deshacer.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteBrand}>
+                        Eliminar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </Card>
 
       {/* Sección C — Planilla de precios por kilo */}
@@ -560,9 +578,9 @@ export const PriceKgUpdate = () => {
               Creá al menos una marca y un tipo para completar la planilla.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-md border">
+            <div className="max-h-[65vh] overflow-auto rounded-md border">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0] shadow-border">
                   <TableRow>
                     <TableHead className="min-w-[160px]">Marca</TableHead>
                     {types.map((t) => (

@@ -80,10 +80,16 @@ describe("PriceKgUpdate — tipos, marcas y planilla por kilo", () => {
 
     // La lista de tipos (sección A) muestra los nombres cargados (también
     // aparecen como columnas de la matriz, por eso findAllByText).
+    fireEvent.click(
+      screen.getByRole("button", { name: /tipos \(etapas de vida\)/i }),
+    );
     expect(await screen.findAllByText("Adulto")).not.toHaveLength(0);
     expect(screen.getAllByText("Cachorro")).not.toHaveLength(0);
 
     // La lista de marcas (sección B) muestra los nombres cargados.
+    fireEvent.click(
+      screen.getByRole("button", { name: /marcas \(líneas \/ sabores\)/i }),
+    );
     expect(await screen.findAllByText("Acme")).not.toHaveLength(0);
     expect(screen.getAllByText("Zap")).not.toHaveLength(0);
 
@@ -143,6 +149,12 @@ describe("PriceKgUpdate — tipos, marcas y planilla por kilo", () => {
 
     renderView();
     await screen.findAllByText("Adulto");
+
+    // El formulario vive dentro del acordeón colapsado: lo abrimos primero.
+    fireEvent.click(
+      screen.getByRole("button", { name: /tipos \(etapas de vida\)/i }),
+    );
+    await screen.findByLabelText("Nombre", { selector: "#type-name" });
 
     fireEvent.change(screen.getByLabelText("Nombre", { selector: "#type-name" }), {
       target: { value: "Senior" },
