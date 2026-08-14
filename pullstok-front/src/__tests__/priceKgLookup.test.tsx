@@ -31,7 +31,7 @@ import {
   listPriceKgBrands,
   type PriceKgBrand,
 } from "@/services/priceKgBrands";
-import { getPriceKgPlan } from "@/services/priceKgPlan";
+import { getPriceKgPlan, type PriceKgPrice } from "@/services/priceKgPlan";
 
 const mockListPriceKgTypes = vi.mocked(listPriceKgTypes);
 const mockListPriceKgBrands = vi.mocked(listPriceKgBrands);
@@ -49,7 +49,7 @@ const types: PriceKgType[] = [
 
 // Celda distinta por especie para la misma marca×tipo AMBOS (Acme × Adulto):
 // 2500 en Perros, 9000 en Gatos. Replica el bug AMBOS de PriceKgUpdate.
-const planCells = [
+const planCells: PriceKgPrice[] = [
   { id: "c1", brandId: "brand-1", typeId: "t-1", priceKg: 2500, species: "PERRO" },
   { id: "c2", brandId: "brand-1", typeId: "t-1", priceKg: 9000, species: "GATO" },
 ];
