@@ -16,7 +16,7 @@ export const listPriceKgTypes = async (_req: Request, res: Response) => {
     const organizationId = requireOrganizationId();
     const types = await prisma.priceKgType.findMany({
       where: { organizationId },
-      orderBy: { name: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: { id: true, name: true, synonyms: true },
     });
     return res.status(200).json({ items: types });

@@ -254,6 +254,10 @@ model PriceKgType {
   id             String         @id @default(uuid())
   name           String
   synonyms       String[]
+  // Orden de aparición en la planilla (matriz). Default alto → los tipos
+  // nuevos caen al final; se asigna 10, 20, 30... para dejar espacio entre
+  // inserciones. listPriceKgTypes ordena por sortOrder asc, name asc.
+  sortOrder      Int            @default(1000)
   organizationId String
   organization   Organization   @relation(fields: [organizationId], references: [id])
   createdAt      DateTime       @default(now())

@@ -49,7 +49,7 @@ describe("PriceKgType Controller", () => {
   });
 
   describe("listPriceKgTypes", () => {
-    it("lists types ordered by name asc with id/name/synonyms", async () => {
+    it("lists types ordered by sortOrder asc then name asc", async () => {
       const items = [
         { id: "t1", name: "Adulto", synonyms: ["ADULTO", "ADULTOS"] },
         { id: "t2", name: "Cachorro", synonyms: ["CACHORRO"] },
@@ -62,7 +62,7 @@ describe("PriceKgType Controller", () => {
 
       expect(mockedPrisma.priceKgType.findMany).toHaveBeenCalledWith({
         where: { organizationId: "org-1" },
-        orderBy: { name: "asc" },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
         select: { id: true, name: true, synonyms: true },
       });
       expect(res.status).toHaveBeenCalledWith(200);
