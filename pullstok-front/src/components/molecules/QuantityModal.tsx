@@ -30,10 +30,12 @@ interface QuantityModalProps {
   onClose: () => void;
 }
 
+// Etiquetas de modo de venta suelto (sdd/precios-suelto-planilla C-06):
+// el modo describe la unidad de venta, no el empaque del producto.
 const LOOSE_MODE_LABELS: Record<SaleMode, string> = {
-  BOLSA_CERRADA: "Bolsa cerrada",
-  POR_PESO: "Por peso (kg)",
-  POR_MONTO: "Por monto ($)",
+  BOLSA_CERRADA: "Entero",
+  POR_PESO: "Por kilo",
+  POR_MONTO: "Por monto",
 };
 
 export const QuantityModal = ({
@@ -127,6 +129,7 @@ export const QuantityModal = ({
                 <button
                   key={mode}
                   type="button"
+                  aria-pressed={saleMode === mode}
                   className={`flex-1 text-xs font-medium py-1.5 px-2 rounded-md transition-colors ${
                     saleMode === mode
                       ? "bg-background shadow-sm text-foreground"
