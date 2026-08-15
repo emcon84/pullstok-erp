@@ -74,7 +74,13 @@ describe("PriceKgPlan Controller", () => {
 
       expect(mockedPrisma.priceKgPrice.findMany).toHaveBeenCalledWith({
         where: { organizationId: "org-1" },
-        select: { id: true, brandId: true, typeId: true, priceKg: true },
+        select: {
+          id: true,
+          brandId: true,
+          typeId: true,
+          species: true,
+          priceKg: true,
+        },
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ items });
