@@ -106,7 +106,7 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
         exact: true,
       },
     ]);
-    mockCreateSale.mockResolvedValue({ message: "ok" });
+    mockCreateSale.mockResolvedValue(undefined);
   });
 
   it("muestra AMBOS precios a la vez (Perro y Gato) para una marca/tipo AMBOS", async () => {

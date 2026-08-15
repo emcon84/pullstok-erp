@@ -55,9 +55,6 @@ const rawCellPrice = (
   return n;
 };
 
-const speciesLabel = (s: PriceKgSpecies) =>
-  s === "PERRO" ? "Perro" : s === "GATO" ? "Gato" : "Perros y gatos";
-
 /**
  * Consulta de precios por kilo (pantalla de mostrador): lectura + venta suelta.
  * El buscador filtra marcas y, por tarjeta, muestra los precios por tipo con

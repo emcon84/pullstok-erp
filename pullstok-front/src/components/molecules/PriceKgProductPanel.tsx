@@ -210,7 +210,7 @@ export const PriceKgProductPanel = ({
                 </p>
               </div>
               <Badge variant="secondary" className="text-xs">
-                ${cellPrice.toLocaleString("es-AR")}/kg
+                ${cell.priceKg.toLocaleString("es-AR")}/kg
               </Badge>
             </div>
 
@@ -334,7 +334,7 @@ export const PriceKgProductPanel = ({
                         <span className="font-semibold text-foreground">
                           {kgEquiv.toFixed(2)} kg
                         </span>{" "}
-                        a ${cellPrice.toLocaleString("es-AR")}/kg
+                        a ${cell.priceKg.toLocaleString("es-AR")}/kg
                       </p>
                     )}
                   </div>
@@ -342,7 +342,7 @@ export const PriceKgProductPanel = ({
 
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm text-muted-foreground">
-                    ${cellPrice.toLocaleString("es-AR")}/kg
+                    ${cell.priceKg.toLocaleString("es-AR")}/kg
                   </span>
                   <span className="text-lg font-bold tabular-nums">
                     ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}

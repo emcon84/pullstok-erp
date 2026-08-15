@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import React from "react";
 
 vi.mock("@/services/priceKgReview", () => ({
   listQueue: vi.fn(),
@@ -21,6 +20,7 @@ import {
   approveEntry,
   rejectEntry,
 } from "@/services/priceKgReview";
+import type { ReviewQueueEntry } from "@/services/priceKgReview";
 import { toast } from "react-toastify";
 
 const listQueueMock = vi.mocked(listQueue);
@@ -28,9 +28,8 @@ const autoApplyMock = vi.mocked(autoApply);
 const approveEntryMock = vi.mocked(approveEntry);
 const rejectEntryMock = vi.mocked(rejectEntry);
 const toastSuccessMock = vi.mocked(toast.success);
-const toastErrorMock = vi.mocked(toast.error);
 
-const ENTRY = {
+const ENTRY: ReviewQueueEntry = {
   id: "e1",
   productId: "p1",
   productName: "PRO PLAN ADULTO PERRO 12KG",
