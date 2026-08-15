@@ -124,14 +124,17 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       // kg) y el precio es el unitario (para sueltos, el front manda
       // priceKgSuelto como price). POR_MONTO: el cliente manda el MONTO en
       // quantity; el server convierte de forma autoritativa (B-07) y guarda el
-      // snapshot de priceKgSuelto para que kg × priceKgSuelto reproduzca el
-      // total exactamente.
+      // snapshot del precio unitario para que kg × precio reproduzca el total
+      // exactamente.
       let lineQuantity = quantity;
       let linePrice = price;
       if (saleMode === "POR_MONTO") {
-        const priceKgSuelto = product.priceKgSuelto as number;
-        lineQuantity = round2(quantity / priceKgSuelto); // kg = round2(amount ÷ priceKgSuelto)
-        linePrice = priceKgSuelto; // snapshot congelado (B-04)
+        // C-05: el precio unitario es el de la CELDA de la planilla (viene en
+        // el payload como price). Fallback al priceKgSuelto almacenado SOLO si
+        // el payload no trae price (backwards compat para callers legados).
+        const unitPrice = price || (product.priceKgSuelto as number);
+        lineQuantity = round2(quantity / unitPrice); // kg = round2(amount ÷ unitPrice)
+        linePrice = unitPrice; // snapshot congelado (B-04)
       }
 
       // ── Conversión BOLSA_CERRADA a kg cuando el stock está en kg ──

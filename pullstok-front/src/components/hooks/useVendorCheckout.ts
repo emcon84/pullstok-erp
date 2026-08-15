@@ -42,7 +42,14 @@ export function useVendorCheckout({
           _id: i.productId,
           id: i.productId,
           name: i.name,
-          price: i.price,
+          // C-05: para POR_MONTO el precio unitario debe ser el de la CELDA de
+          // la planilla (guardado en priceKgSuelto del item), no el price=1 de
+          // la cuenta del carrito. Sin celda (showroom), priceKgSuelto ==
+          // priceKgSuelto almacenado → mismo comportamiento que antes.
+          price:
+            i.saleMode === "POR_MONTO"
+              ? (i.priceKgSuelto ?? i.price)
+              : i.price,
           quantity: i.stock,
           description: "",
           category: "",

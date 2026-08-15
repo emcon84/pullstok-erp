@@ -216,6 +216,56 @@ describe("salesService.createSale — loose decimal flow", () => {
     );
   });
 
+  it("POR_MONTO usa el precio de la CELDA del payload cuando difiere del priceKgSuelto almacenado (C-05)", async () => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    withVendorBranch();
+    // Almacenado 7500, pero la celda de la planilla manda 9200 en el payload.
+    tx.product.findFirst.mockResolvedValue({
+      ...branchProduct,
+      priceKgSuelto: 7500,
+    });
+    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 10 });
+    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+
+    await SaleService.createSale(
+      {
+        products: [
+          {
+            productId: "p-1",
+            name: "Alimento 15kg",
+            quantity: 15000, // monto en $
+            price: 9200, // precio de la celda de la planilla
+            category: "Balanceados",
+            saleMode: "POR_MONTO",
+          },
+        ],
+      },
+      ...vendorArgs,
+    );
+
+    // Stock descontado por el kg de la CELDA: round2(15000 ÷ 9200) = 1.63,
+    // NO round2(15000 ÷ 7500) = 2.00 del priceKgSuelto almacenado.
+    expect(tx.productStock.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ quantity: { gte: 1.63 } }),
+        data: { quantity: { decrement: 1.63 } },
+      }),
+    );
+
+    const saleCreateCall = tx.sale.create.mock.calls[0][0];
+    const storedItem = saleCreateCall.data.items.create[0];
+    expect(storedItem.quantity).toBe(1.63); // round2(15000 ÷ 9200)
+    expect(storedItem.price).toBe(9200); // snapshot = precio de la celda, NO 7500
+    expect(saleCreateCall.data.totalAmount).toBe(14996); // round2(1.63 × 9200)
+    // Reconciliation: kg de la celda × precio de la celda reproduce el total.
+    expect(Math.round(storedItem.quantity * storedItem.price * 100) / 100).toBe(
+      saleCreateCall.data.totalAmount,
+    );
+  });
+
   it("legacy BOLSA_CERRADA (absent saleMode) stays integer flow and total (B-03)", async () => {
     const tx = makeTx();
     mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
