@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader } from "@/components/atoms/loader";
+import { toast } from "react-toastify";
 import {
   listPriceKgTypes,
   type PriceKgType,
@@ -14,6 +15,17 @@ import {
   type PriceKgBrand,
 } from "@/services/priceKgBrands";
 import { getPriceKgPlan } from "@/services/priceKgPlan";
+import type { CellProduct } from "@/services/priceKgReview";
+import type { DataItem } from "@/types";
+import type { SaleMode } from "@/components/hooks/useVendorCart";
+import { useVendorCart } from "@/components/hooks/useVendorCart";
+import { useCreateSale } from "@/components/hooks/useSales";
+import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
+import {
+  PriceKgProductPanel,
+  buildCellSaleItem,
+  type CellContext,
+} from "@/components/molecules/PriceKgProductPanel";
 
 // Mismo helper que PriceKgUpdate (copiado local, no está exportado). Los
 // precios sueltos SIEMPRE son redondos (decisión del usuario): sin decimales.
@@ -28,28 +40,31 @@ const formatPrice = (n: number) =>
 const cellKey = (species: PriceKgSpecies, brandId: string, typeId: string) =>
   `${species}:${brandId}:${typeId}`;
 
-// Precio de una celda concreta (species, marca, tipo): string si existe, o
-// undefined si nunca se cargó. No parsea acá — el render decide.
-const cellPrice = (
+// Precio NUMÉRICO de una celda (o undefined si no existe): la fuente
+// autoritativa del precio suelto (sdd/precios-suelto-planilla C-05).
+const rawCellPrice = (
   cells: Record<string, string>,
   species: PriceKgSpecies,
   brandId: string,
   typeId: string,
-): string | undefined => {
+): number | undefined => {
   const raw = cells[cellKey(species, brandId, typeId)];
   if (raw === undefined || raw.trim() === "") return undefined;
   const n = parseFloat(raw);
   if (Number.isNaN(n) || n <= 0) return undefined;
-  return formatPrice(n);
+  return n;
 };
 
+const speciesLabel = (s: PriceKgSpecies) =>
+  s === "PERRO" ? "Perro" : s === "GATO" ? "Gato" : "Perros y gatos";
+
 /**
- * Consulta de precios por kilo (pantalla de mostrador): SOLO lectura. Buscador
- * grande que filtra marcas por nombre y muestra, por tarjeta, los precios por
- * tipo con AMBAS especies juntas cuando aplican: cada tipo declara su especie
- * (PERRO | GATO | AMBOS) y muestra un precio etiquetado por especie. Reusa los
- * mismos 3 GET de PriceKgUpdate, accesibles a cualquier rol autenticado — no
- * toca el backend.
+ * Consulta de precios por kilo (pantalla de mostrador): lectura + venta suelta.
+ * El buscador filtra marcas y, por tarjeta, muestra los precios por tipo con
+ * AMBAS especies juntas cuando aplican. Las celdas CON precio son clickeables
+ * y abren el panel de venta suelta (Sheet) que lista los productos que
+ * matchean esa celda y permite vender directo o sumar al pedido con el precio
+ * de la CELDA (no el priceKgSuelto del producto).
  */
 export const PriceKgLookup = () => {
   const [query, setQuery] = useState("");
@@ -57,6 +72,29 @@ export const PriceKgLookup = () => {
   const [brands, setBrands] = useState<PriceKgBrand[]>([]);
   const [cells, setCells] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [panelCell, setPanelCell] = useState<CellContext | null>(null);
+
+  const cart = useVendorCart();
+  const { createSale } = useCreateSale();
+
+  // Sucursal del vendedor: misma resolución que Dashboard (localStorage "user"
+  // + resolveDashboardBranchMode). ADMIN/MANAGEMENT → org-wide (sin sucursal).
+  const branchMode = useMemo(() => {
+    const raw = localStorage.getItem("user");
+    let role: string | undefined;
+    let branchIds: string[] | undefined;
+    if (raw) {
+      try {
+        const u = JSON.parse(raw);
+        role = u?.role;
+        branchIds = u?.branchIds;
+      } catch {
+        /* user corrupto → org-wide */
+      }
+    }
+    return resolveDashboardBranchMode(role, branchIds);
+  }, []);
+  const branchId = branchMode.kind === "single" ? branchMode.branchId : undefined;
 
   // Carga inicial paralela de tipos, marcas y planilla. Cualquier error se
   // degrada a listas vacías (la pantalla sigue funcionando con datos parciales).
@@ -105,6 +143,83 @@ export const PriceKgLookup = () => {
   // Los tipos se muestran TODOS, cada uno con las especies que le aplican.
   const showPerro = (t: PriceKgType) => t.species !== "GATO";
   const showGato = (t: PriceKgType) => t.species !== "PERRO";
+
+  const openCellPanel = (
+    brand: PriceKgBrand,
+    type: PriceKgType,
+    species: PriceKgSpecies,
+  ) => {
+    const priceKg = rawCellPrice(cells, species, brand.id, type.id);
+    if (priceKg === undefined) return; // celda sin precio: no-op
+    setPanelCell({
+      brandId: brand.id,
+      brandName: brand.name,
+      typeId: type.id,
+      typeName: type.name,
+      species,
+      priceKg,
+    });
+  };
+
+  // ── Venta suelta desde el panel: SIEMPRE con el precio de la celda (C-05) ──
+
+  const toDataItem = (p: CellProduct): DataItem => ({
+    _id: p.id,
+    id: p.id,
+    name: p.name,
+    price: p.priceKgSuelto ?? 0,
+    priceKgSuelto: p.priceKgSuelto ?? null,
+    quantity: p.stock,
+    category: p.category,
+  });
+
+  const handleSellDirect = async (
+    product: CellProduct,
+    qty: number,
+    mode: SaleMode,
+    amount: number,
+  ) => {
+    if (product.stock <= 0) {
+      toast.error("Producto sin stock");
+      return;
+    }
+    if (!panelCell?.priceKg) return;
+    try {
+      const item = buildCellSaleItem(
+        product,
+        qty,
+        mode,
+        amount,
+        panelCell.priceKg,
+      );
+      await createSale({ cart: [item] });
+      const qtyLabel = mode === "POR_PESO" ? `${qty} kg` : `$${amount}`;
+      toast.success(`Venta realizada — ${qtyLabel} "${product.name}"`);
+      setPanelCell(null);
+    } catch (err: any) {
+      toast.error(err?.message || "Error al realizar la venta directa");
+    }
+  };
+
+  const handleAddToCart = (
+    product: CellProduct,
+    qty: number,
+    mode: SaleMode,
+    amount: number,
+  ) => {
+    if (!panelCell?.priceKg) return;
+    const actualQty = mode === "POR_MONTO" ? amount : qty;
+    cart.addToCart(
+      toDataItem(product),
+      actualQty,
+      branchId ?? "",
+      product.stock,
+      mode,
+      panelCell.priceKg,
+    );
+    toast.success(`"${product.name}" agregado al pedido`);
+    setPanelCell(null);
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -159,22 +274,54 @@ export const PriceKgLookup = () => {
                     >
                       <p className="text-sm text-muted-foreground">{t.name}</p>
                       <div className="mt-2 space-y-2">
-                        {showPerro(t) && (
-                          <div className="flex items-center justify-between gap-2">
-                            <Badge variant="outline">Perro</Badge>
-                            <span className="text-3xl font-bold tabular-nums">
-                              {cellPrice(cells, "PERRO", b.id, t.id) ?? "—"}
-                            </span>
-                          </div>
-                        )}
-                        {showGato(t) && (
-                          <div className="flex items-center justify-between gap-2">
-                            <Badge variant="outline">Gato</Badge>
-                            <span className="text-3xl font-bold tabular-nums">
-                              {cellPrice(cells, "GATO", b.id, t.id) ?? "—"}
-                            </span>
-                          </div>
-                        )}
+                        {showPerro(t) &&
+                          (rawCellPrice(cells, "PERRO", b.id, t.id) !==
+                          undefined ? (
+                            <button
+                              type="button"
+                              aria-label={`Abrir venta suelta: ${b.name} ${t.name} Perro`}
+                              onClick={() => openCellPanel(b, t, "PERRO")}
+                              className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-background hover:shadow-sm cursor-pointer"
+                            >
+                              <Badge variant="outline">Perro</Badge>
+                              <span className="text-3xl font-bold tabular-nums">
+                                {formatPrice(
+                                  rawCellPrice(cells, "PERRO", b.id, t.id)!,
+                                )}
+                              </span>
+                            </button>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2">
+                              <Badge variant="outline">Perro</Badge>
+                              <span className="text-3xl font-bold tabular-nums text-muted-foreground/50">
+                                —
+                              </span>
+                            </div>
+                          ))}
+                        {showGato(t) &&
+                          (rawCellPrice(cells, "GATO", b.id, t.id) !==
+                          undefined ? (
+                            <button
+                              type="button"
+                              aria-label={`Abrir venta suelta: ${b.name} ${t.name} Gato`}
+                              onClick={() => openCellPanel(b, t, "GATO")}
+                              className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-background hover:shadow-sm cursor-pointer"
+                            >
+                              <Badge variant="outline">Gato</Badge>
+                              <span className="text-3xl font-bold tabular-nums">
+                                {formatPrice(
+                                  rawCellPrice(cells, "GATO", b.id, t.id)!,
+                                )}
+                              </span>
+                            </button>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2">
+                              <Badge variant="outline">Gato</Badge>
+                              <span className="text-3xl font-bold tabular-nums text-muted-foreground/50">
+                                —
+                              </span>
+                            </div>
+                          ))}
                       </div>
                     </div>
                   ))}
@@ -184,6 +331,18 @@ export const PriceKgLookup = () => {
           ))}
         </div>
       )}
+
+      {/* Panel de venta suelta de la celda seleccionada */}
+      <PriceKgProductPanel
+        open={!!panelCell}
+        cell={panelCell}
+        onClose={() => setPanelCell(null)}
+        onSellDirect={handleSellDirect}
+        onAddToCart={handleAddToCart}
+        onCreateProduct={() => {
+          toast.info("Creá el producto desde Productos y luego volvé a esta celda");
+        }}
+      />
     </div>
   );
 };

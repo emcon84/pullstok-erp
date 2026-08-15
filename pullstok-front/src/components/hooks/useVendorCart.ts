@@ -46,11 +46,17 @@ export function useVendorCart() {
       branchId: string,
       stock: number,
       saleMode?: SaleMode,
+      // Precio por kg que MANDA (sdd/precios-suelto-planilla C-05): la celda
+      // de la planilla, no el priceKgSuelto guardado en el producto. Cuando
+      // viene, gana sobre product.priceKgSuelto para el precio del item.
+      priceKgSueltoOverride?: number | null,
     ) => {
       setItems((prev) => {
         const pid = product._id || product.id;
         // Merge on productId + saleMode: mixed modes = separate cart lines (V-02).
         const mode = saleMode ?? "BOLSA_CERRADA";
+        const kgPrice =
+          priceKgSueltoOverride ?? product.priceKgSuelto ?? Number(product.price);
         const existing = prev.find(
           (i) => i.productId === pid && (i.saleMode ?? "BOLSA_CERRADA") === mode,
         );
@@ -71,13 +77,13 @@ export function useVendorCart() {
             price: mode === "POR_MONTO"
               ? 1 // amount IS the total; backend computes kg from priceKgSuelto
               : mode !== "BOLSA_CERRADA"
-              ? (product.priceKgSuelto ?? Number(product.price))
+              ? kgPrice
               : Number(product.price),
             stock,
             quantity,
             branchId,
             saleMode: mode,
-            priceKgSuelto: product.priceKgSuelto ?? null,
+            priceKgSuelto: priceKgSueltoOverride ?? product.priceKgSuelto ?? null,
           },
         ];
       });
