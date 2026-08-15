@@ -103,6 +103,9 @@ const PriceKgUpdate = lazy(() =>
 const PriceKgLookup = lazy(() =>
   import("./views/PriceKgLookup").then((m) => ({ default: m.PriceKgLookup })),
 );
+const AdminReviewQueue = lazy(() =>
+  import("./views/AdminReviewQueue").then((m) => ({ default: m.AdminReviewQueue })),
+);
 
 const BrandingSettings = lazy(() =>
   import("./views/BrandingSettings").then((m) => ({ default: m.BrandingSettings })),
@@ -273,6 +276,7 @@ const AppRoutes = () => (
         <Route path="/actualizar-precios" element={<BulkPriceUpdate />} />
         <Route path="/precios-por-kilo" element={<PriceKgUpdate />} />
         <Route path="/consultar-precios" element={<PriceKgLookup />} />
+        <Route path="/revision-precios-kg" element={<AdminReviewQueue />} />
         <Route path="/planilla-mayorista" element={<PriceListImport />} />
         <Route path="/planilla-mayorista/:id" element={<PriceListDetail />} />
         <Route path="/ajustes" element={<BrandingSettings />} />
