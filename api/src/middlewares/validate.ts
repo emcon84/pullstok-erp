@@ -22,3 +22,24 @@ export const validate =
     req.body = result.data;
     next();
   };
+
+/**
+ * Igual que `validate` pero sobre `req.query` (GET con filtros/paginación).
+ * Reemplaza el query por la versión parseada y tipada.
+ */
+export const validateQuery =
+  (schema: ZodType) =>
+  (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      return res.status(400).json({
+        message: "Parámetros inválidos",
+        errors: result.error.issues.map((issue) => ({
+          campo: issue.path.join(".") || "(query)",
+          error: issue.message,
+        })),
+      });
+    }
+    req.query = result.data as unknown as Request["query"];
+    next();
+  };

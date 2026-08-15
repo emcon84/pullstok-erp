@@ -667,6 +667,37 @@ export const savePriceKgPlanSchema = z
     }
   });
 
+// ---------- Cola de revisión de precios por kilo ----------
+// Query params de la cola de revisión (GET /price-kg-review/queue): filtros
+// opcionales por status/reason + paginación numbered (page/limit), mismos
+// límites que el resto del ERP.
+export const reviewQueueQuerySchema = z
+  .object({
+    status: z
+      .enum(["PENDING", "APPROVED", "REJECTED"])
+      .optional()
+      .describe("Filtro por estado de la entrada"),
+    reason: z
+      .enum(["FUZZY_MATCH", "MANUAL_OVERRIDE", "ORPHAN_CELL", "BRAND_NO_PLANILLA"])
+      .optional()
+      .describe("Filtro por motivo de la entrada"),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strip();
+
+// ---------- Query de productos por celda (panel de venta suelta) ----------
+// GET /price-kg-products?brandId&typeId&species: devuelve los productos que
+// matchean la celda de la planilla. Los tres son requeridos (una celda se
+// identifica por marca+tipo+especie).
+export const priceKgProductsQuerySchema = z
+  .object({
+    brandId: z.string().min(1, "brandId es requerido"),
+    typeId: z.string().min(1, "typeId es requerido"),
+    species: priceKgSpeciesSchema,
+  })
+  .strip();
+
 // ---------- Branding de la app (ERP) ----------
 // Configuración de branding del ERP, 1:1 con Organization.
 // Mismo patrón que updateStoreSettingsSchema: hex regex, URL nullable, strip.

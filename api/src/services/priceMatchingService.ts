@@ -52,6 +52,8 @@ interface ProductLike {
   categoryId: string | null;
   priceKgSuelto?: number | null;
   priceKgSueltoManual?: boolean;
+  weightKg?: number | null;
+  quantity?: number | null;
 }
 
 export interface BrandResolve {
