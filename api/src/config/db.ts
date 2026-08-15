@@ -21,6 +21,10 @@ const TENANT_MODELS = new Set([
   "PriceKgType",
   "PriceKgBrand",
   "PriceKgPrice",
+  // Cola de revisión del matching planilla↔productos (sdd/precios-suelto-planilla):
+  // cada org tiene su propia cola. Mismo patrón multi-tenant: findFirst /
+  // updateMany (nunca findUnique/update).
+  "ReviewQueueEntry",
   "ProductStock",
   "Category",
   "CategoryVariantDefinition",

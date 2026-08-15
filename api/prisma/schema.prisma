@@ -82,6 +82,7 @@ model Organization {
   businessHours         BusinessHourSetting?
   pricingSetting        PricingSetting?
   priceLists            PriceList[]
+  reviewQueueEntries    ReviewQueueEntry[]
 
   @@map("organizations")
 }
@@ -331,10 +332,66 @@ model PriceKgPrice {
   organization   Organization @relation(fields: [organizationId], references: [id])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  reviewQueueEntries ReviewQueueEntry[]
 
   @@unique([organizationId, brandId, typeId, species])
   @@index([organizationId])
   @@map("price_kg_prices")
+}
+
+// Estado de la cola de revisión de precios por kilo (sdd/precios-suelto-planilla).
+// PENDING = esperando decisión del admin; APPROVED/REJECTED = resuelta. NO se
+// auto-dismiss: las entradas quedan PENDING hasta que el admin actúa.
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Motivo por el que una entrada cae en la cola de revisión en vez de
+// auto-aplicarse:
+// - FUZZY_MATCH: marca o etapa matcheó con Levenshtein ≤ 2 (typo/alias).
+// - MANUAL_OVERRIDE: el producto tiene priceKgSueltoManual=true — NUNCA se
+//   auto-matchea, su precio queda intacto y pasa a revisión.
+// - ORPHAN_CELL: celda de planilla sin ningún producto matcheado.
+// - BRAND_NO_PLANILLA: marca/etapa resuelta sin celda de planilla para esa
+//   combinación (marca sin planilla correspondiente).
+enum ReviewReason {
+  FUZZY_MATCH
+  MANUAL_OVERRIDE
+  ORPHAN_CELL
+  BRAND_NO_PLANILLA
+}
+
+// Entrada de la cola de revisión del motor de matching planilla ↔ productos
+// (sdd/precios-suelto-planilla). Tenant-scoped (organizationId) y en
+// TENANT_MODELS (db.ts) → scope org automático anti-fuga. productId null =
+// celda huérfana (sin producto); priceKgPriceId null = sin celda (ej.
+// MANUAL_OVERRIDE sin celda que matchee). oldPriceKg = snapshot del precio
+// ANTES de aprobar; newPriceKg = precio de la celda a aplicar. Usar
+// findFirst/updateMany (nunca findUnique/update) per convención multi-tenant.
+model ReviewQueueEntry {
+  id             String        @id @default(uuid())
+  productId      String?
+  product        Product?      @relation(fields: [productId], references: [id])
+  priceKgPriceId String?
+  priceKgPrice   PriceKgPrice? @relation(fields: [priceKgPriceId], references: [id])
+  brandId        String?
+  typeId         String?
+  species        Species
+  reason         ReviewReason
+  status         ReviewStatus  @default(PENDING)
+  appliedAt      DateTime?
+  reviewedBy     String? // userId del revisor
+  oldPriceKg     Float? // snapshot antes de aprobar
+  newPriceKg     Float? // precio de la celda a aplicar
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, status])
+  @@map("review_queue_entries")
 }
 
 model Product {
@@ -386,6 +443,7 @@ model Product {
   // todos los productos tocados (matcheados + creados).
   providerId         String?
   provider           Provider?          @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  reviewQueueEntries ReviewQueueEntry[]
 
   @@index([organizationId])
   @@index([categoryId])
