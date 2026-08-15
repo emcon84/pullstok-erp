@@ -30,6 +30,7 @@ export const Pagination = ({
         size="icon"
         className="h-8 w-8"
         disabled={currentPage === 1}
+        aria-label="Primera página"
         onClick={() => go(1)}
       >
         <ChevronsLeft className="h-4 w-4" />
@@ -39,6 +40,7 @@ export const Pagination = ({
         size="icon"
         className="h-8 w-8"
         disabled={currentPage === 1}
+        aria-label="Página anterior"
         onClick={() => go(currentPage - 1)}
       >
         <ChevronLeft className="h-4 w-4" />
@@ -51,6 +53,7 @@ export const Pagination = ({
         size="icon"
         className="h-8 w-8"
         disabled={currentPage === totalPages}
+        aria-label="Página siguiente"
         onClick={() => go(currentPage + 1)}
       >
         <ChevronRight className="h-4 w-4" />
@@ -60,6 +63,7 @@ export const Pagination = ({
         size="icon"
         className="h-8 w-8"
         disabled={currentPage === totalPages}
+        aria-label="Última página"
         onClick={() => go(totalPages)}
       >
         <ChevronsRight className="h-4 w-4" />
