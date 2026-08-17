@@ -792,6 +792,115 @@ describe("createSaleSchema — saleMode-aware quantity validation (B-06/B-08)", 
   });
 });
 
+// ── Ventas sueltas por celda de la planilla (sdd/loose-lines-stock) ──
+describe("createSaleSchema — loose line by loosePriceId (loose-lines-stock)", () => {
+  it("POR_PESO without productId accepted when loosePriceId is present", () => {
+    const result = createSaleSchema.safeParse({
+      products: [
+        { loosePriceId: "cell-1", quantity: 2.35, price: 360, saleMode: "POR_PESO" },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.products[0].productId).toBeUndefined();
+      expect(result.data.products[0].loosePriceId).toBe("cell-1");
+    }
+  });
+
+  it("accepts looseName alongside loosePriceId", () => {
+    const result = createSaleSchema.safeParse({
+      products: [
+        {
+          loosePriceId: "cell-1",
+          looseName: "MAXXIUM ADULTO",
+          quantity: 1,
+          price: 2500,
+          saleMode: "POR_PESO",
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.products[0].looseName).toBe("MAXXIUM ADULTO");
+    }
+  });
+
+  it("POR_MONTO accepted with only loosePriceId", () => {
+    const result = createSaleSchema.safeParse({
+      products: [
+        { loosePriceId: "cell-1", quantity: 500, price: 2500, saleMode: "POR_MONTO" },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects POR_PESO without productId AND loosePriceId", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ quantity: 2.5, price: 360, saleMode: "POR_PESO" }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const flat = result.error.issues.map((i: any) => i.message).join(" | ");
+      expect(flat).toMatch(/loosePriceId o productId/i);
+    }
+  });
+
+  it("rejects BOLSA_CERRADA without productId (bolsa física exige producto)", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ loosePriceId: "cell-1", quantity: 2, price: 100 }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const flat = result.error.issues.map((i: any) => i.message).join(" | ");
+      expect(flat).toMatch(/requiere un producto/i);
+    }
+  });
+});
+
+describe("openBagSchema / setLooseStockSchema / listLooseStocksQuerySchema (loose-lines-stock)", () => {
+  const { openBagSchema, setLooseStockSchema, listLooseStocksQuerySchema } =
+    require("../../src/validation/schemas");
+
+  it("accepts a valid open-bag payload (branchId optional — vendedor la resuelve)", () => {
+    expect(openBagSchema.safeParse({ productId: "p-1" }).success).toBe(true);
+    expect(openBagSchema.safeParse({ productId: "p-1", branchId: "b-1" }).success).toBe(true);
+  });
+
+  it("rejects open-bag without productId", () => {
+    expect(openBagSchema.safeParse({ branchId: "b-1" }).success).toBe(false);
+  });
+
+  it("rejects open-bag with an empty productId", () => {
+    expect(openBagSchema.safeParse({ productId: "" }).success).toBe(false);
+  });
+
+  it("strips unknown open-bag fields", () => {
+    const result = openBagSchema.safeParse({ productId: "p-1", extra: 1 });
+    expect(result.success).toBe(true);
+    if (result.success) expect((result.data as any).extra).toBeUndefined();
+  });
+
+  it("accepts a non-negative quantity with 2dp for the manual set", () => {
+    expect(setLooseStockSchema.safeParse({ branchId: "b-1", quantity: 12.5 }).success).toBe(true);
+    expect(setLooseStockSchema.safeParse({ branchId: "b-1", quantity: "7" }).success).toBe(true);
+    expect(setLooseStockSchema.safeParse({ branchId: "b-1", quantity: 0 }).success).toBe(true);
+  });
+
+  it("rejects a negative quantity or more than 2dp", () => {
+    expect(setLooseStockSchema.safeParse({ branchId: "b-1", quantity: -1 }).success).toBe(false);
+    expect(setLooseStockSchema.safeParse({ branchId: "b-1", quantity: 1.234 }).success).toBe(false);
+  });
+
+  it("rejects the manual set without branchId", () => {
+    expect(setLooseStockSchema.safeParse({ quantity: 5 }).success).toBe(false);
+  });
+
+  it("accepts the list query (branchId optional)", () => {
+    expect(listLooseStocksQuerySchema.safeParse({}).success).toBe(true);
+    expect(listLooseStocksQuerySchema.safeParse({ branchId: "b-1" }).success).toBe(true);
+  });
+});
+
 describe("updateProductSchema — weightKg/bulkFactor + priceKgSuelto manual: número = manual, null = automático", () => {
   const { updateProductSchema, createProductSchema } = require("../../src/validation/schemas");
 

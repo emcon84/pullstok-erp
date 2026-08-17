@@ -215,12 +215,20 @@ export const updateCustomerSchema = createCustomerSchema.partial();
 // ---------- Ventas ----------
 // saleMode (sdd/venta-alimento-suelto B-08): opcional en el payload —
 // ausente = legado BOLSA_CERRADA. superRefine aplica las reglas por modo:
-// BOLSA_CERRADA exige cantidad entera (bolsa física); POR_PESO/POR_MONTO
-// exigen decimal <= 2dp (kg o monto, B-06/B-07). Discriminated-union
-// rechazada: rompe backward-compat con payloads legacy sin saleMode (D7).
+// BOLSA_CERRADA exige cantidad entera (bolsa física) + productId; POR_PESO/
+// POR_MONTO exigen decimal <= 2dp (kg o monto, B-06/B-07) y una referencia a
+// la línea: loosePriceId (celda de la planilla, loose-lines-stock) o productId
+// (backwards-compat). Discriminated-union rechazada: rompe backward-compat con
+// payloads legacy sin saleMode (D7).
 const saleProductSchema = z.object({
-  productId: z.string().min(1),
+  // Opcional: los renglones sueltos desde la planilla mandan loosePriceId sin
+  // productId físico (SaleItem.productId null en la DB).
+  productId: z.string().min(1).optional(),
   name: z.string().optional(),
+  // Celda de la planilla que se vende suelta (loose-lines-stock).
+  loosePriceId: z.string().min(1).optional(),
+  // Nombre de la línea suelta (fallback server: "MARCA · TIPO").
+  looseName: z.string().optional(),
   quantity: z.coerce.number().positive("La cantidad debe ser mayor a 0"),
   price: z.coerce.number().nonnegative(),
   category: z.string().optional(),
@@ -232,6 +240,13 @@ const saleProductSchema = z.object({
 }).superRefine((item, ctx) => {
   const mode = item.saleMode ?? "BOLSA_CERRADA";
   if (mode === "BOLSA_CERRADA") {
+    if (!item.productId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["productId"],
+        message: "Una venta de bolsa cerrada requiere un producto",
+      });
+    }
     if (!Number.isInteger(item.quantity)) {
       ctx.addIssue({
         code: "custom",
@@ -241,8 +256,16 @@ const saleProductSchema = z.object({
     }
     return;
   }
-  // POR_PESO / POR_MONTO: <= 2 decimales (multipleOf 0.01) y > 0 (ya
-  // garantizado por .positive() arriba).
+  // POR_PESO / POR_MONTO: la línea se identifica por loosePriceId o productId.
+  if (!item.loosePriceId && !item.productId) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["productId"],
+      message:
+        "Las ventas sueltas requieren loosePriceId o productId para identificar la línea",
+    });
+  }
+  // <= 2 decimales (multipleOf 0.01) y > 0 (ya garantizado por .positive()).
   if (Math.round(item.quantity * 100) !== item.quantity * 100) {
     ctx.addIssue({
       code: "custom",
@@ -898,3 +921,34 @@ export const adjustPriceListSchema = z
       seen.add(entryId);
     });
   });
+
+// ---------- Stock de alimento suelto (sdd/loose-lines-stock) ----------
+// POST /loose-stock/open-bag: abrir una bolsa de un producto en una sucursal.
+// branchId opcional: los VENDEDOR/CASHIER usan su sucursal asignada (el server
+// la resuelve); ADMIN/MANAGEMENT lo mandan explícito (si falta → 400).
+export const openBagSchema = z
+  .object({
+    productId: z.string().min(1, "productId es requerido"),
+    branchId: z.string().min(1).optional(),
+  })
+  .strip();
+
+// PUT /loose-stock/:lineId: ajuste manual del stock suelto de una línea (kg).
+// lineId en el path es la CELDA (priceKgPriceId); branchId va en el body —
+// la fila (celda, sucursal) se crea si no existe (carga inicial).
+export const setLooseStockSchema = z
+  .object({
+    branchId: z.string().min(1, "branchId es requerido"),
+    quantity: z.coerce
+      .number()
+      .nonnegative("La cantidad no puede ser negativa")
+      .multipleOf(0.01, "La cantidad admite hasta 2 decimales"),
+  })
+  .strip();
+
+// GET /loose-stock: listado filtrable por sucursal.
+export const listLooseStocksQuerySchema = z
+  .object({
+    branchId: z.string().min(1).optional(),
+  })
+  .strip();

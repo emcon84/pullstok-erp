@@ -31,6 +31,7 @@ import priceKgPlanRoutes from "./priceKgPlanRoutes";
 import priceKgReviewRoutes, {
   priceKgProductsRouter,
 } from "./priceKgReviewRoutes";
+import looseStockRoutes from "./looseStockRoutes";
 
 const router = Router();
 
@@ -69,5 +70,6 @@ router.use("/price-kg-brands", priceKgBrandRoutes);
 router.use("/price-kg-plan", priceKgPlanRoutes);
 router.use("/price-kg-review", priceKgReviewRoutes);
 router.use("/price-kg-products", priceKgProductsRouter);
+router.use("/loose-stock", looseStockRoutes);
 
 export default router;

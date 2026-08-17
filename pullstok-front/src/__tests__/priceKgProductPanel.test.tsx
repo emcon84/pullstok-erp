@@ -6,12 +6,18 @@ import {
   buildCellSaleItem,
 } from "@/components/molecules/PriceKgProductPanel";
 import { listProductsForCell } from "@/services/priceKgReview";
+import { getLooseStock } from "@/services/looseStock";
 
 vi.mock("@/services/priceKgReview", () => ({
   listProductsForCell: vi.fn(),
 }));
 
+vi.mock("@/services/looseStock", () => ({
+  getLooseStock: vi.fn(),
+}));
+
 const listProductsForCellMock = vi.mocked(listProductsForCell);
+const getLooseStockMock = vi.mocked(getLooseStock);
 
 const CELL = {
   brandId: "b-proplan",
@@ -20,6 +26,7 @@ const CELL = {
   typeName: "Adulto",
   species: "PERRO" as const,
   priceKg: 9200,
+  cellId: "c-proplan",
 };
 
 const PRODUCTS = [
@@ -69,6 +76,14 @@ describe("PriceKgProductPanel — panel de venta suelta por celda", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     listProductsForCellMock.mockResolvedValue(PRODUCTS);
+    getLooseStockMock.mockResolvedValue({
+      id: "ls-1",
+      priceKgPriceId: "c-proplan",
+      branchId: "b1",
+      quantity: 15.5,
+      lineName: "PRO PLAN · Adulto",
+      branchName: "Sucursal 1",
+    });
   });
 
   it("muestra marca, tipo, especie y precio de la celda, y carga los productos", async () => {
@@ -218,20 +233,53 @@ describe("PriceKgProductPanel — panel de venta suelta por celda", () => {
       name: "PRO PLAN ADULTO PERRO 12KG",
       priceKgSuelto: 7500,
     };
+    const cell = {
+      priceKg: 9200,
+      cellId: "c-proplan",
+      brandName: "PRO PLAN",
+      typeName: "Adulto",
+    };
 
     it("usa el precio de la CELDA, no el priceKgSuelto del producto", () => {
-      const item = buildCellSaleItem(product, 2, "POR_PESO", 0, 9200);
+      const item = buildCellSaleItem(product, 2, "POR_PESO", 0, cell);
       expect(item.product.price).toBe(9200);
       expect(item.totalPrice).toBe(18400);
       expect(item.saleMode).toBe("POR_PESO");
       expect(item.quantity).toBe(2);
+      expect(item.loosePriceId).toBe("c-proplan");
+      expect(item.looseName).toBe("PRO PLAN · Adulto");
     });
 
     it("POR_MONTO: quantity = monto y totalPrice = monto", () => {
-      const item = buildCellSaleItem(product, 0, "POR_MONTO", 4600, 9200);
+      const item = buildCellSaleItem(product, 0, "POR_MONTO", 4600, cell);
       expect(item.quantity).toBe(4600);
       expect(item.totalPrice).toBe(4600);
       expect(item.product.price).toBe(9200);
+      expect(item.loosePriceId).toBe("c-proplan");
     });
+
+    it("sin id de celda NO incluye loosePriceId (bolsa del producto físico)", () => {
+      const item = buildCellSaleItem(product, 2, "BOLSA_CERRADA", 0, {
+        priceKg: null,
+        cellId: null,
+        brandName: "",
+        typeName: "",
+      });
+      expect(item.loosePriceId).toBeUndefined();
+      expect(item.product.price).toBe(0);
+    });
+  });
+
+  it("muestra el stock suelto de la celda para la sucursal del vendedor", async () => {
+    renderPanel({ branchId: "b1" });
+    expect(getLooseStockMock).toHaveBeenCalledWith("c-proplan", "b1");
+    expect(await screen.findByText("15.50 kg")).toBeInTheDocument();
+  });
+
+  it("sin sucursal no consulta el stock suelto y muestra '—'", async () => {
+    renderPanel();
+    await screen.findByText("PRO PLAN ADULTO PERRO 12KG");
+    expect(getLooseStockMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/Stock suelto/)).toHaveTextContent("—");
   });
 });

@@ -26,6 +26,8 @@ interface VendorCartItem {
   quantity: number;
   branchId: string;
   saleMode?: SaleMode;
+  loosePriceId?: string;
+  looseName?: string;
 }
 
 interface DataItem {
@@ -46,21 +48,24 @@ const reducer = {
     branchId: string,
     stock: number,
     saleMode?: SaleMode,
+    priceKgSuelto?: number,
+    loosePriceId?: string,
+    looseName?: string,
   ): VendorCartItem[] {
     const pid = product._id || product.id || "";
     const mode = saleMode ?? "BOLSA_CERRADA";
-    const existing = prev.find(
-      (i) => i.productId === pid && (i.saleMode ?? "BOLSA_CERRADA") === mode,
-    );
+    const matches = (i: VendorCartItem) =>
+      i.productId === pid &&
+      (i.saleMode ?? "BOLSA_CERRADA") === mode &&
+      (i.loosePriceId ?? null) === (loosePriceId ?? null);
+    const existing = prev.find(matches);
     const price =
       mode === "POR_PESO"
-        ? (product.priceKgSuelto ?? product.price)
+        ? (priceKgSuelto ?? product.priceKgSuelto ?? product.price)
         : product.price;
     if (existing) {
       return prev.map((i) =>
-        i.productId === pid && (i.saleMode ?? "BOLSA_CERRADA") === mode
-          ? { ...i, quantity: i.quantity + quantity, stock }
-          : i,
+        matches(i) ? { ...i, quantity: i.quantity + quantity, stock } : i,
       );
     }
     return [
@@ -73,6 +78,7 @@ const reducer = {
         quantity,
         branchId,
         saleMode: mode,
+        ...(loosePriceId ? { loosePriceId, looseName } : {}),
       },
     ];
   },
@@ -216,5 +222,27 @@ describe("useVendorCart — saleMode merge + decimal counts (WU4, V-02)", () => 
     ];
     const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
     expect(itemCount).toBeCloseTo(2.0, 2); // 1.25 + 0.75 = 2.00
+  });
+
+  it("merge sueltos por productId + saleMode + loosePriceId (celda distinta = línea separada)", () => {
+    const item = (cellId: string, qty: number) =>
+      reducer.addToCart([], sampleProduct, qty, "b-1", 10, "POR_PESO", 360, cellId, "ACME · Adulto");
+    // Mismo producto físico vendido suelto desde DOS celdas distintas.
+    let cart = item("cell-a", 1);
+    cart = reducer.addToCart(cart, sampleProduct, 1.5, "b-1", 10, "POR_PESO", 360, "cell-a", "ACME · Adulto");
+    cart = reducer.addToCart(cart, sampleProduct, 2, "b-1", 10, "POR_PESO", 360, "cell-b", "ACME · Kitten");
+    expect(cart).toHaveLength(2);
+    expect(cart[0].quantity).toBe(2.5); // cell-a: 1 + 1.5 sumado
+    expect(cart[1].quantity).toBe(2); // cell-b separada
+    expect(cart[0].loosePriceId).toBe("cell-a");
+    expect(cart[1].loosePriceId).toBe("cell-b");
+  });
+
+  it("una bolsa cerrada del mismo producto NO se une con la línea suelta", () => {
+    let cart = reducer.addToCart([], sampleProduct, 3, "b-1", 10, "BOLSA_CERRADA");
+    cart = reducer.addToCart(cart, sampleProduct, 1.5, "b-1", 10, "POR_PESO", 360, "cell-a", "ACME · Adulto");
+    expect(cart).toHaveLength(2);
+    expect(cart[0].saleMode).toBe("BOLSA_CERRADA");
+    expect(cart[1].loosePriceId).toBe("cell-a");
   });
 });

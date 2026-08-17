@@ -1,20 +1,31 @@
 import { ProductsProps } from "./productsModel";
 
+export type SaleMode = "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO";
+
 export interface CartItem {
   product: ProductsProps;
   quantity: number;
   totalPrice: number;
-  saleMode?: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO";
+  saleMode?: SaleMode;
+  /** Id de la celda PriceKgPrice (venta suelta, loose-lines-stock): cuando
+   *  viene, el backend identifica la línea por loosePriceId y descuenta los kg
+   *  del LooseStock de la celda en lugar de bajar stock del producto físico. */
+  loosePriceId?: string;
+  /** Nombre de la línea suelta ("MARCA · TIPO") usado en el payload. */
+  looseName?: string;
 }
 
 export interface SaleRequest {
   products: {
-    productId: string;
+    productId?: string;
     quantity: string;
-    name: string;
+    name?: string;
     price: string;
-    description: string;
-    category: string;
+    description?: string;
+    category?: string;
+    saleMode?: SaleMode;
+    loosePriceId?: string;
+    looseName?: string;
   }[];
   orderId?: string;
 }

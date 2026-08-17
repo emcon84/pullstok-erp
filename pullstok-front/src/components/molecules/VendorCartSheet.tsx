@@ -22,8 +22,13 @@ interface VendorCartStatus {
 
 interface VendorCartHandlers {
   onOpenChange: (open: boolean) => void;
-  updateQty: (productId: string, quantity: number, saleMode?: SaleMode) => void;
-  remove: (productId: string, saleMode?: SaleMode) => void;
+  updateQty: (
+    productId: string,
+    quantity: number,
+    saleMode?: SaleMode,
+    loosePriceId?: string,
+  ) => void;
+  remove: (productId: string, saleMode?: SaleMode, loosePriceId?: string) => void;
   clearCart: () => void;
   saveOrder: () => void;
   confirmSale: () => void;
@@ -71,12 +76,19 @@ export const VendorCartSheet = ({
           <div className="flex-1 overflow-auto -mx-6 px-6 space-y-3 mt-4 mb-2">
             {cart.items.map((item) => (
               <CartItemRow
-                key={`${item.productId}-${item.saleMode ?? "BOLSA_CERRADA"}`}
+                key={`${item.productId}-${item.saleMode ?? "BOLSA_CERRADA"}-${item.loosePriceId ?? "bolsa"}`}
                 item={item}
                 onUpdateQty={(qty) =>
-                  handlers.updateQty(item.productId, qty, item.saleMode)
+                  handlers.updateQty(
+                    item.productId,
+                    qty,
+                    item.saleMode,
+                    item.loosePriceId,
+                  )
                 }
-                onRemove={() => handlers.remove(item.productId, item.saleMode)}
+                onRemove={() =>
+                  handlers.remove(item.productId, item.saleMode, item.loosePriceId)
+                }
               />
             ))}
           </div>

@@ -79,6 +79,7 @@ model Organization {
   appBranding           AppBranding?
   branches              Branch[]
   productStocks         ProductStock[]
+  looseStocks           LooseStock[]
   businessHours         BusinessHourSetting?
   pricingSetting        PricingSetting?
   priceLists            PriceList[]
@@ -125,6 +126,7 @@ model Branch {
   organization   Organization       @relation(fields: [organizationId], references: [id])
   assignments    BranchAssignment[]
   stocks         ProductStock[]
+  looseStocks    LooseStock[]
   storeSettings  StoreSettings[]
   sales          Sale[]
   orders         Order[]
@@ -333,6 +335,8 @@ model PriceKgPrice {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   reviewQueueEntries ReviewQueueEntry[]
+  looseStocks    LooseStock[]
+  saleItems      SaleItem[]
 
   @@unique([organizationId, brandId, typeId, species])
   @@index([organizationId])
@@ -476,6 +480,28 @@ model ProductStock {
   @@map("product_stocks")
 }
 
+// Stock de alimento SUELTO por línea de la planilla (celda PriceKgPrice) y por
+// sucursal (sdd/loose-lines-stock). Se carga abriendo una bolsa (openBag): se
+// descuenta 1 unidad de ProductStock (bolsa en kg) y se acredita weightKg en
+// esta tabla. La venta POR_PESO/POR_MONTO descuenta de acá en lugar del stock
+// de bolsas. Tenant-scoped (organizationId) y en TENANT_MODELS (db.ts) → scope
+// org automático anti-fuga; dentro del $transaction el orgId se pasa EXPLÍCITO.
+// Una fila por par (celda, sucursal) → @@unique. Float (kg fraccionarios).
+model LooseStock {
+  id             String       @id @default(uuid())
+  priceKgPriceId String
+  priceKgPrice   PriceKgPrice @relation(fields: [priceKgPriceId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  quantity       Float        @default(0)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([priceKgPriceId, branchId])
+  @@index([branchId])
+  @@map("loose_stocks")
+}
+
 model Order {
   id             String       @id @default(uuid())
   customerId     String
@@ -572,8 +598,15 @@ model SaleItem {
   id        String  @id @default(uuid())
   saleId    String
   sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
+  // null en renglones sueltos (venta POR_PESO/POR_MONTO de una línea de la
+  // planilla): el producto físico no se vende, se vende la celda (kg).
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  // Celda de la planilla "Precios por kilo" que se vendió suelta (kg). null en
+  // ventas legacy BOLSA_CERRADA. onDelete SetNull: borrar la celda NO borra el
+  // histórico de ventas, solo desvincula la línea (sin precio suelto asociado).
+  loosePriceId String?
+  loosePrice   PriceKgPrice? @relation(fields: [loosePriceId], references: [id], onDelete: SetNull)
   name      String
   // Float (sdd/venta-alimento-suelto B-03): kg decimales en venta suelta
   // (precedente: InvoiceItem.quantity Float). Las filas legacy se leen como

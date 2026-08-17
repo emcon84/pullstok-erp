@@ -12,9 +12,15 @@ import {
 } from "@/components/ui/sheet";
 import { Pagination } from "@/components/molecules/pagination";
 import { listProductsForCell, CellProduct } from "@/services/priceKgReview";
+import { getLooseStock } from "@/services/looseStock";
 import { round2 } from "@/lib/money";
 import type { PriceKgSpecies } from "@/services/priceKgTypes";
 import type { SaleMode } from "@/components/hooks/useVendorCart";
+
+// Mismo helper que looseSaleService.looseLineName: "MARCA · TIPO" (sin el
+// " · " cuando falta una de las dos partes).
+const looseLineName = (brand: string, type: string): string =>
+  [brand, type].filter(Boolean).join(" · ");
 
 /**
  * Panel de venta suelta de una celda de la planilla (sdd/precios-suelto-planilla).
@@ -32,12 +38,17 @@ export interface CellContext {
   typeName: string;
   species: PriceKgSpecies;
   priceKg: number | null;
+  /** Id de la celda PriceKgPrice (loosePriceId): lo manda la venta suelta. */
+  cellId?: string | null;
 }
 
 interface PriceKgProductPanelProps {
   open: boolean;
   onClose: () => void;
   cell: CellContext | null;
+  /** Sucursal del contexto (VENDEDOR/CASHIER asignado). Sin sucursal no se
+   *  puede mostrar el stock suelto por sucursal → se muestra "—". */
+  branchId?: string | null;
   onSellDirect: (
     product: CellProduct,
     qty: number,
@@ -67,6 +78,11 @@ export interface CellSaleItem {
   quantity: number;
   totalPrice: number;
   saleMode: SaleMode;
+  /** Id de la celda PriceKgPrice: identifica la línea suelta en el backend
+   *  (loose-lines-stock). Presente cuando el item sale de una celda. */
+  loosePriceId?: string;
+  /** Nombre de la línea ("MARCA · TIPO"), fallback de display del backend. */
+  looseName?: string;
 }
 
 export const buildCellSaleItem = (
@@ -74,18 +90,18 @@ export const buildCellSaleItem = (
   qty: number,
   mode: SaleMode,
   amount: number,
-  cellPrice: number,
+  cell: Pick<CellContext, "priceKg" | "cellId" | "brandName" | "typeName">,
 ): CellSaleItem => {
   const pid = (product._id || product.id || "") as string;
   const quantity = mode === "POR_MONTO" ? amount : qty;
-  const totalPrice = mode === "POR_MONTO" ? amount : round2(cellPrice * qty);
+  const totalPrice = mode === "POR_MONTO" ? amount : round2((cell.priceKg ?? 0) * qty);
   return {
     product: {
       _id: pid,
       id: pid,
       name: product.name,
       // La celda manda: NUNCA product.priceKgSuelto (C-05).
-      price: cellPrice,
+      price: cell.priceKg ?? 0,
       quantity: 0,
       description: "",
       category: "",
@@ -93,6 +109,14 @@ export const buildCellSaleItem = (
     quantity,
     totalPrice,
     saleMode: mode,
+    // Con id de celda la venta suelta identifica la línea por loosePriceId y
+    // el backend descuenta los kg del LooseStock de esa celda.
+    ...(cell.cellId
+      ? {
+          loosePriceId: cell.cellId,
+          looseName: looseLineName(cell.brandName, cell.typeName),
+        }
+      : {}),
   };
 };
 
@@ -102,12 +126,14 @@ export const PriceKgProductPanel = ({
   open,
   onClose,
   cell,
+  branchId,
   onSellDirect,
   onAddToCart,
   onCreateProduct,
 }: PriceKgProductPanelProps) => {
   const [products, setProducts] = useState<CellProduct[]>([]);
   const [loading, setLoading] = useState(false);
+  const [looseStockKg, setLooseStockKg] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -137,6 +163,27 @@ export const PriceKgProductPanel = ({
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
   }, [open, cell]);
+
+  // Stock suelto en kg de la celda para la sucursal del vendedor. Sin sucursal
+  // (ADMIN org-wide) no hay stock por sucursal que mostrar → null → "—".
+  useEffect(() => {
+    if (!open || !cell || cell.priceKg === null || !cell.cellId || !branchId) {
+      setLooseStockKg(null);
+      return;
+    }
+    let cancelled = false;
+    setLooseStockKg(null);
+    getLooseStock(cell.cellId, branchId)
+      .then((line) => {
+        if (!cancelled) setLooseStockKg(line?.quantity ?? 0);
+      })
+      .catch(() => {
+        if (!cancelled) setLooseStockKg(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, cell, branchId]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -207,6 +254,12 @@ export const PriceKgProductPanel = ({
                     : cell.species === "GATO"
                       ? "Gatos"
                       : "Perros y gatos"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Stock suelto:{" "}
+                  <span className="font-semibold text-foreground">
+                    {looseStockKg === null ? "—" : `${looseStockKg.toFixed(2)} kg`}
+                  </span>
                 </p>
               </div>
               <Badge variant="secondary" className="text-xs">

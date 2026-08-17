@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createSale, deleteSale, getSales } from "../../services/saleServices";
-import { CartItem, Sale } from "../../models/salesModel";
+import { CartItem, Sale, SaleMode } from "../../models/salesModel";
 
 export const useCreateSale = () => {
   const queryClient = useQueryClient();
@@ -12,15 +12,32 @@ export const useCreateSale = () => {
   >({
     mutationFn: async ({ cart, orderId }) => {
       const saleRequest = {
-        products: cart.map((item) => ({
-          productId: item.product._id || item.product.id || "",
-          quantity: item.quantity.toString(),
-          name: item.product.name,
-          price: item.product.price.toString(),
-          description: item.product.description || "",
-          category: item.product.category || "",
-          saleMode: (item as any).saleMode || "BOLSA_CERRADA",
-        })),
+        products: cart.map((item) => {
+          const saleMode: SaleMode = item.saleMode ?? "BOLSA_CERRADA";
+          if (item.loosePriceId) {
+            // Venta suelta desde la planilla: la línea se identifica por
+            // loosePriceId (SR único en el backend, saleProductSchema). NO se
+            // manda productId: el item suelto no consume stock físico.
+            return {
+              loosePriceId: item.loosePriceId,
+              looseName: item.looseName ?? item.product.name,
+              quantity: item.quantity.toString(),
+              name: item.product.name,
+              price: item.product.price.toString(),
+              category: item.product.category ?? "",
+              saleMode,
+            };
+          }
+          return {
+            productId: item.product._id || item.product.id || "",
+            quantity: item.quantity.toString(),
+            name: item.product.name,
+            price: item.product.price.toString(),
+            description: item.product.description || "",
+            category: item.product.category || "",
+            saleMode,
+          };
+        }),
       };
       await createSale(saleRequest, orderId);
     },

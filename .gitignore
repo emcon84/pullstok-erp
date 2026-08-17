@@ -27,4 +27,8 @@ api/invoices/*
 .DS_Store
 .vscode
 .idea
+.windsurf
 *.log
+
+# Certificados locales / staging (NUNCA subir claves privadas)
+api/certs/

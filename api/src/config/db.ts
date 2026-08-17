@@ -26,6 +26,10 @@ const TENANT_MODELS = new Set([
   // updateMany (nunca findUnique/update).
   "ReviewQueueEntry",
   "ProductStock",
+  // Stock de alimento suelto por línea de la planilla (PriceKgPrice) y sucursal
+  // (sdd/loose-lines-stock). Mismo patrón multi-tenant: findFirst / updateMany
+  // (nunca findUnique/upsert) → scope org automático anti-fuga.
+  "LooseStock",
   "Category",
   "CategoryVariantDefinition",
   "CategoryVariantOption",

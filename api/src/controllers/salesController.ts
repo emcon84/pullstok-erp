@@ -19,9 +19,10 @@ const createSale = async (req: AuthedRequest, res: Response) => {
         res.status(201).json(sale);
     } catch (error: any) {
         // 422 para errores de dominio del flujo suelto (B-06 amendment /
-        // B-08): el payload es válido pero la operación no se puede
-        // materializar (producto no elegible / requiere sucursal).
-        if (error?.code === "LOOSE_NOT_ELIGIBLE" || error?.code === "LOOSE_REQUIRES_BRANCH") {
+        // B-08 / loose-lines-stock): el payload es válido pero la operación no
+        // se puede materializar (producto sin línea en la planilla, requiere
+        // sucursal, stock suelto insuficiente, ...).
+        if (typeof error?.code === "string" && error.code.startsWith("LOOSE_")) {
             return res.status(422).json({ error: error.code, message: error.message });
         }
         res.status(400).json({ message: error.message });

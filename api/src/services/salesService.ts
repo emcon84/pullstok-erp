@@ -4,12 +4,18 @@ import { sendMail } from "./mailService";
 import { saleConfirmedEmail } from "./mailTemplates";
 import { emitOrdersChanged } from "../realtime/socket";
 import { round2 } from "../utils/money";
+import { resolveCellForProduct, looseLineName, CellWithNames } from "./looseSaleService";
 
 interface IProductSale {
-  productId: string;
-  name: string;
+  productId?: string;
+  name?: string;
+  // Venta suelta desde la planilla (sdd/loose-lines-stock): id de la celda
+  // PriceKgPrice que se vende. Sin productId físico (productId null en la DB).
+  loosePriceId?: string;
+  // Nombre de la línea suelta que manda el front (fallback: "MARCA · TIPO").
+  looseName?: string;
   quantity: number;
-  category: string;
+  category?: string;
   price: number;
   // Modo de venta del renglón (sdd/venta-alimento-suelto B-08): ausente =
   // legacy BOLSA_CERRADA (el schema lo normaliza con .default()).
@@ -69,7 +75,8 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
   const sale = await prisma.$transaction(async (tx) => {
     let totalAmount = 0;
     const saleItems: {
-      productId: string;
+      productId: string | null;
+      loosePriceId: string | null;
       name: string;
       quantity: number;
       category: string;
@@ -78,7 +85,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
     }[] = [];
 
     for (const item of saleRequest.products) {
-      if (!item.productId || !item.quantity || !item.price) {
+      if (!item.productId && !item.loosePriceId) {
         throw new Error("Faltan campos requeridos en un producto de la venta");
       }
 
@@ -88,31 +95,51 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       const price = parseFloat(String(item.price));
       const saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" =
         item.saleMode ?? "BOLSA_CERRADA";
+      const isLoose = saleMode === "POR_PESO" || saleMode === "POR_MONTO";
 
-      const product = await tx.product.findFirst({
-        where: { id: item.productId, organizationId },
-        include: { category: true },
-      });
-      if (!product) {
+      // El producto físico es OPCIONAL: los renglones sueltos desde la planilla
+      // mandan loosePriceId sin productId (loose-lines-stock).
+      const product = item.productId
+        ? await tx.product.findFirst({
+            where: { id: item.productId, organizationId },
+            include: { category: true },
+          })
+        : null;
+      if (item.productId && !product) {
         throw new Error(`Producto ${item.productId} no encontrado`);
       }
 
-      // ── Loose mode gates (B-08/B-06 amendment) — antes de tocar stock ──
-      if (saleMode === "POR_PESO" || saleMode === "POR_MONTO") {
-        const priceKgSuelto = product.priceKgSuelto as number | null;
-        if (!(priceKgSuelto && priceKgSuelto > 0)) {
+      // ── Resolución de celda + gate de sucursal (modos sueltos) ──
+      // La venta suelta NO descuenta del producto físico: descuenta los kg del
+      // LooseStock de la celda de la planilla (sdd/loose-lines-stock). La celda
+      // se resuelve por loosePriceId (panel de planilla) o, backwards-compat,
+      // por productId (matching del nombre contra la planilla).
+      let cell: CellWithNames | null = null;
+      if (isLoose) {
+        if (item.loosePriceId) {
+          cell = (await tx.priceKgPrice.findFirst({
+            where: { id: item.loosePriceId, organizationId },
+            include: {
+              brand: { select: { name: true } },
+              type: { select: { name: true } },
+            },
+          })) as CellWithNames | null;
+        } else if (item.productId) {
+          cell = await resolveCellForProduct(tx, organizationId, item.productId);
+        }
+        if (!cell) {
           const err: any = new Error(
-            `"${product.name}" no tiene precio por kg suelto configurado`,
+            "El producto no tiene una línea (celda) de la planilla para venta suelta",
           );
-          err.code = "LOOSE_NOT_ELIGIBLE";
+          err.code = "LOOSE_LINE_NOT_FOUND";
           throw err;
         }
         if (!sellerBranchId) {
           // B-06 amendment: el stock suelto fraccionario solo se puede
-          // bookkeepear en ProductStock (sucursal); Product.quantity (legacy,
-          // Int) no puede mantener fracciones de kg.
+          // bookkeepear en LooseStock (sucursal); sin sucursal no hay dónde
+          // descontar los kg.
           const err: any = new Error(
-            "Las ventas sueltas requieren una sucursal asignada (el stock fraccionario se descuenta de la sucursal)",
+            "Las ventas sueltas requieren una sucursal asignada (el stock suelto se descuenta de la sucursal)",
           );
           err.code = "LOOSE_REQUIRES_BRANCH";
           throw err;
@@ -121,8 +148,8 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
 
       // ── Resolución de cantidad y precio por modo ──
       // BOLSA_CERRADA / POR_PESO: la cantidad ya es la unidad final (bolsas /
-      // kg) y el precio es el unitario (para sueltos, el front manda
-      // priceKgSuelto como price). POR_MONTO: el cliente manda el MONTO en
+      // kg) y el precio es el unitario (para sueltos, el front manda el precio
+      // de la celda como price). POR_MONTO: el cliente manda el MONTO en
       // quantity; el server convierte de forma autoritativa (B-07) y guarda el
       // snapshot del precio unitario para que kg × precio reproduzca el total
       // exactamente.
@@ -130,42 +157,79 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       let linePrice = price;
       if (saleMode === "POR_MONTO") {
         // C-05: el precio unitario es el de la CELDA de la planilla (viene en
-        // el payload como price). Fallback al priceKgSuelto almacenado SOLO si
-        // el payload no trae price (backwards compat para callers legados).
-        const unitPrice = price || (product.priceKgSuelto as number);
+        // el payload como price). Fallback al priceKgSuelto almacenado o al
+        // priceKg de la celda SOLO si el payload no trae price (backwards
+        // compat para callers legados).
+        const unitPrice =
+          price || cell?.priceKg || (product?.priceKgSuelto as number) || 0;
+        if (!(unitPrice > 0)) {
+          const err: any = new Error(
+            "No hay precio por kg para convertir el monto en kilogramos",
+          );
+          err.code = "LOOSE_LINE_NOT_FOUND";
+          throw err;
+        }
         lineQuantity = round2(quantity / unitPrice); // kg = round2(amount ÷ unitPrice)
         linePrice = unitPrice; // snapshot congelado (B-04)
       }
 
-      // ── Conversión BOLSA_CERRADA a kg cuando el stock está en kg ──
-      // Después del backfill, ProductStock.quantity está en kg (no en bolsas).
-      // Vender 1 bolsa de 15 kg descuenta 15 kg del stock, no 1.
-      const productWeightKg = (product.weightKg && product.weightKg > 0)
-        ? product.weightKg
-        : null;
-      const stockUnits =
-        saleMode === "BOLSA_CERRADA" && productWeightKg
-          ? round2(lineQuantity * productWeightKg)
-          : lineQuantity;
+      const lineName = isLoose
+        ? item.looseName ??
+          looseLineName(cell?.brand?.name ?? "", cell?.type?.name ?? "")
+        : product!.name;
 
-      if (sellerBranchId) {
-        // ── Branch-scoped sale: check & deduct from ProductStock ──
+      // ── Deducción de stock según el pool correcto ──
+      if (isLoose && cell) {
+        // Ventas sueltas: descuentan kg del LooseStock de la celda (la bolsa
+        // física ya se abrió con openBag y su peso quedó acreditado acá).
+        const kg = lineQuantity;
+        const looseStock = await tx.looseStock.findFirst({
+          where: {
+            priceKgPriceId: cell.id,
+            branchId: sellerBranchId!,
+            organizationId,
+          },
+        });
+        if (!looseStock || looseStock.quantity < kg) {
+          throw new Error(
+            `Stock suelto insuficiente de "${lineName}" en tu sucursal`,
+          );
+        }
+        const updated = await tx.looseStock.updateMany({
+          where: {
+            priceKgPriceId: cell.id,
+            branchId: sellerBranchId!,
+            organizationId,
+            quantity: { gte: kg },
+          },
+          data: { quantity: { decrement: kg } },
+        });
+        if (updated.count === 0) {
+          throw new Error(
+            `Stock suelto insuficiente de "${lineName}" en tu sucursal`,
+          );
+        }
+      } else if (sellerBranchId) {
+        // BOLSA_CERRADA scoped a sucursal: el stock de bolsas volvió a UNIDADES
+        // (backfill reverse en 20260817120000_loose_lines_stock) — la bolsa
+        // cerrada descuenta 1 por bolsa, el suelto va por LooseStock.
+        const stockUnits = lineQuantity;
         const stock = await tx.productStock.findFirst({
           where: {
-            productId: product.id,
+            productId: product!.id,
             branchId: sellerBranchId,
             organizationId,
           },
         });
         if (!stock || stock.quantity < stockUnits) {
           throw new Error(
-            `Stock insuficiente de "${product.name}" en tu sucursal`,
+            `Stock insuficiente de "${product!.name}" en tu sucursal`,
           );
         }
 
         const updated = await tx.productStock.updateMany({
           where: {
-            productId: product.id,
+            productId: product!.id,
             branchId: sellerBranchId,
             organizationId,
             quantity: { gte: stockUnits },
@@ -174,20 +238,21 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         });
         if (updated.count === 0) {
           throw new Error(
-            `Stock insuficiente de "${product.name}" en tu sucursal`,
+            `Stock insuficiente de "${product!.name}" en tu sucursal`,
           );
         }
       } else {
         // ── Legacy / admin sale: deduct from product.quantity (HQ global) ──
-        if (product.quantity < stockUnits) {
+        const stockUnits = lineQuantity;
+        if (product!.quantity < stockUnits) {
           throw new Error(
-            `Stock insuficiente para el producto ${product.name}`,
+            `Stock insuficiente para el producto ${product!.name}`,
           );
         }
 
         const updated = await tx.product.updateMany({
           where: {
-            id: product.id,
+            id: product!.id,
             organizationId,
             quantity: { gte: stockUnits },
           },
@@ -195,7 +260,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         });
         if (updated.count === 0) {
           throw new Error(
-            `Stock insuficiente para el producto ${product.name}`,
+            `Stock insuficiente para el producto ${product!.name}`,
           );
         }
       }
@@ -203,10 +268,11 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       // Per-line total: round2 en el límite (D2). POR_MONTO ya viene resuelto
       // como kg × priceKgSuelto (B-07) → round2 de nuevo no cambia nada.
       saleItems.push({
-        productId: product.id,
-        name: product.name,
+        productId: isLoose ? null : product!.id,
+        loosePriceId: isLoose && cell ? cell.id : null,
+        name: lineName,
         quantity: lineQuantity,
-        category: product.category?.name ?? "Sin categoría",
+        category: product?.category?.name ?? "Sin categoría",
         price: linePrice,
         saleMode,
       });
@@ -353,27 +419,42 @@ export const deleteSale = async (id: string) => {
     await tx.sale.deleteMany({ where: { id } });
 
     if (sale.branchId) {
-      // Venta scoped a sucursal → reponer ProductStock.
+      // Venta scoped a sucursal → reponer el pool correcto por renglón:
+      // sueltos (loosePriceId) → LooseStock (kg de la celda); bolsas →
+      // ProductStock (unidades de bolsa).
       for (const item of sale.items) {
-        await tx.productStock.updateMany({
-          where: {
-            productId: item.productId,
-            branchId: sale.branchId,
-            organizationId: sale.organizationId,
-          },
-          data: { quantity: { increment: item.quantity } },
-        });
+        if (item.loosePriceId) {
+          await tx.looseStock.updateMany({
+            where: {
+              priceKgPriceId: item.loosePriceId,
+              branchId: sale.branchId,
+              organizationId: sale.organizationId,
+            },
+            data: { quantity: { increment: item.quantity } },
+          });
+        } else if (item.productId) {
+          await tx.productStock.updateMany({
+            where: {
+              productId: item.productId,
+              branchId: sale.branchId,
+              organizationId: sale.organizationId,
+            },
+            data: { quantity: { increment: item.quantity } },
+          });
+        }
       }
     } else {
       // Venta legacy / admin → reponer Product.quantity (stock global).
       for (const item of sale.items) {
-        await tx.product.updateMany({
-          where: {
-            id: item.productId,
-            organizationId: sale.organizationId,
-          },
-          data: { quantity: { increment: item.quantity } },
-        });
+        if (item.productId) {
+          await tx.product.updateMany({
+            where: {
+              id: item.productId,
+              organizationId: sale.organizationId,
+            },
+            data: { quantity: { increment: item.quantity } },
+          });
+        }
       }
     }
 

@@ -57,6 +57,9 @@ export function useVendorCheckout({
         quantity: i.quantity,
         totalPrice: i.price * i.quantity,
         saleMode: i.saleMode ?? "BOLSA_CERRADA",
+        // Ventas sueltas: la celda de la planilla que identifica la línea.
+        loosePriceId: i.loosePriceId,
+        looseName: i.looseName,
       }));
       await createSale({ cart });
       clearCart();

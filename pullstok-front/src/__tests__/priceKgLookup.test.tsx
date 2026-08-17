@@ -27,6 +27,10 @@ vi.mock("@/services/priceKgReview", () => ({
   listProductsForCell: vi.fn(),
 }));
 
+vi.mock("@/services/looseStock", () => ({
+  getLooseStock: vi.fn(),
+}));
+
 vi.mock("@/services/saleServices", () => ({
   createSale: vi.fn(),
   deleteSale: vi.fn(),
@@ -218,7 +222,7 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     expect(mockListProductsForCell).not.toHaveBeenCalled();
   });
 
-  it("vender directo usa el precio de la CELDA (no el priceKgSuelto del producto)", async () => {
+  it("vender directo usa el precio de la CELDA y manda loosePriceId (no productId)", async () => {
     renderView();
     await searchAcme();
 
@@ -237,12 +241,15 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     fireEvent.click(screen.getByRole("button", { name: /vender directo/i }));
 
     await waitFor(() => {
-      // El payload de la venta lleva price = celda ($2.500), no 7500.
+      // El payload de la venta lleva price = celda ($2.500), no 7500, y la
+      // línea se identifica por loosePriceId (celda c1) SIN productId: así el
+      // backend descuenta los kg del LooseStock de la celda.
       expect(mockCreateSale).toHaveBeenCalledWith(
         expect.objectContaining({
           products: [
             expect.objectContaining({
-              productId: "p1",
+              loosePriceId: "c1",
+              looseName: "Acme · Adulto",
               quantity: "2",
               price: "2500", // ← celda, no product.priceKgSuelto (7500)
               saleMode: "POR_PESO",
@@ -251,6 +258,8 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
         }),
         undefined,
       );
+      const payload = mockCreateSale.mock.calls[0][0];
+      expect(payload.products[0]).not.toHaveProperty("productId");
     });
     expect(toastSuccessMock).toHaveBeenCalledWith(expect.stringContaining("ACME ADULTO PERRO 12KG"));
   });
@@ -286,7 +295,7 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     expect(mockCreateSale).not.toHaveBeenCalled();
   });
 
-  it("agregar al pedido guarda el item en el carrito con el precio de la celda", async () => {
+  it("agregar al pedido guarda el item en el carrito con el precio y la celda", async () => {
     renderView();
     await searchAcme();
 
@@ -312,6 +321,8 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
         priceKgSuelto: 2500,
         quantity: 1.5,
         saleMode: "POR_PESO",
+        loosePriceId: "c1",
+        looseName: "Acme · Adulto",
       }),
     ]);
   });

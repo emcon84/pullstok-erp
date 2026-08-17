@@ -14,6 +14,11 @@ export interface VendorCartItem {
   branchId: string; // vendor's assigned branch
   saleMode?: SaleMode; // default BOLSA_CERRADA if absent
   priceKgSuelto?: number | null; // for POR_MONTO kg preview
+  /** Id de la celda PriceKgPrice (venta suelta): identifica la línea al
+   *  vender; ausente = bolsa cerrada de un producto físico. */
+  loosePriceId?: string;
+  /** Nombre de la línea suelta ("MARCA · TIPO") para el payload de la venta. */
+  looseName?: string;
 }
 
 const STORAGE_KEY = "vendor-cart";
@@ -50,21 +55,28 @@ export function useVendorCart() {
       // de la planilla, no el priceKgSuelto guardado en el producto. Cuando
       // viene, gana sobre product.priceKgSuelto para el precio del item.
       priceKgSueltoOverride?: number | null,
+      // Ventas sueltas desde la planilla: id de la celda PriceKgPrice (la
+      // línea) y su nombre. La celda PARTICIPA del merge para no unir líneas
+      // distintas del mismo producto físico.
+      loosePriceId?: string,
+      looseName?: string,
     ) => {
       setItems((prev) => {
         const pid = product._id || product.id;
-        // Merge on productId + saleMode: mixed modes = separate cart lines (V-02).
+        // Merge on productId + saleMode + celda suelta: mixed modes, y el
+        // mismo producto físico vendido desde celdas distintas, son líneas
+        // separadas (V-02).
         const mode = saleMode ?? "BOLSA_CERRADA";
         const kgPrice =
           priceKgSueltoOverride ?? product.priceKgSuelto ?? Number(product.price);
-        const existing = prev.find(
-          (i) => i.productId === pid && (i.saleMode ?? "BOLSA_CERRADA") === mode,
-        );
+        const matches = (i: VendorCartItem) =>
+          i.productId === pid &&
+          (i.saleMode ?? "BOLSA_CERRADA") === mode &&
+          (i.loosePriceId ?? null) === (loosePriceId ?? null);
+        const existing = prev.find(matches);
         if (existing) {
           return prev.map((i) =>
-            i.productId === pid && (i.saleMode ?? "BOLSA_CERRADA") === mode
-              ? { ...i, quantity: i.quantity + quantity, stock }
-              : i,
+            matches(i) ? { ...i, quantity: i.quantity + quantity, stock } : i,
           );
         }
         return [
@@ -84,6 +96,8 @@ export function useVendorCart() {
             branchId,
             saleMode: mode,
             priceKgSuelto: priceKgSueltoOverride ?? product.priceKgSuelto ?? null,
+            loosePriceId: loosePriceId ?? undefined,
+            looseName: looseName ?? undefined,
           },
         ];
       });
@@ -92,31 +106,37 @@ export function useVendorCart() {
   );
 
   const updateQuantity = useCallback(
-    (productId: string, quantity: number, saleMode?: SaleMode) => {
+    (
+      productId: string,
+      quantity: number,
+      saleMode?: SaleMode,
+      loosePriceId?: string,
+    ) => {
       setItems((prev) => {
         const mode = saleMode ?? "BOLSA_CERRADA";
+        const matches = (i: VendorCartItem) =>
+          i.productId === productId &&
+          (i.saleMode ?? "BOLSA_CERRADA") === mode &&
+          (i.loosePriceId ?? null) === (loosePriceId ?? null);
         return quantity <= 0
-          ? prev.filter(
-              (i) =>
-                !(i.productId === productId && (i.saleMode ?? "BOLSA_CERRADA") === mode),
-            )
-          : prev.map((i) =>
-              i.productId === productId && (i.saleMode ?? "BOLSA_CERRADA") === mode
-                ? { ...i, quantity }
-                : i,
-            );
+          ? prev.filter((i) => !matches(i))
+          : prev.map((i) => (matches(i) ? { ...i, quantity } : i));
       });
     },
     [],
   );
 
   const removeFromCart = useCallback(
-    (productId: string, saleMode?: SaleMode) => {
+    (productId: string, saleMode?: SaleMode, loosePriceId?: string) => {
       const mode = saleMode ?? "BOLSA_CERRADA";
       setItems((prev) =>
         prev.filter(
           (i) =>
-            !(i.productId === productId && (i.saleMode ?? "BOLSA_CERRADA") === mode),
+            !(
+              i.productId === productId &&
+              (i.saleMode ?? "BOLSA_CERRADA") === mode &&
+              (i.loosePriceId ?? null) === (loosePriceId ?? null)
+            ),
         ),
       );
     },

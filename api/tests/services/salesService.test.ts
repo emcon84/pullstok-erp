@@ -49,6 +49,11 @@ const mockedBase = basePrisma as unknown as {
 const makeTx = () => ({
   product: { findFirst: jest.fn(), updateMany: jest.fn() },
   productStock: { findFirst: jest.fn(), updateMany: jest.fn() },
+  looseStock: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn() },
+  priceKgPrice: { findFirst: jest.fn(), findMany: jest.fn() },
+  category: { findMany: jest.fn() },
+  priceKgBrand: { findMany: jest.fn() },
+  priceKgType: { findMany: jest.fn() },
   sale: { create: jest.fn(), deleteMany: jest.fn() },
   order: { findFirst: jest.fn(), updateMany: jest.fn() },
 });
@@ -61,6 +66,21 @@ const branchProduct = {
   priceKgSuelto: 360,
   category: { name: "Balanceados" },
 };
+
+// Celda de la planilla (loose-lines-stock): identifica la línea suelta.
+const looseCell = {
+  id: "cell-1",
+  brandId: "b-1",
+  typeId: "t-1",
+  species: "PERRO",
+  priceKg: 360,
+  brand: { name: "MAXXIUM" },
+  type: { name: "ADULTO" },
+};
+
+// Importa una celda resuelta por loosePriceId (tx.priceKgPrice.findFirst). Para
+// los tests que pasan productId (backwards-compat) se espía resolveCellForProduct
+// con jest.spyOn (evita reimplementar el matching acá).
 
 describe("salesService.getAllSales", () => {
   beforeEach(() => {
@@ -126,13 +146,14 @@ describe("salesService.createSale — loose decimal flow", () => {
     });
   };
 
-  it("POR_PESO 2.35kg: branch stock decrements 10 → 7.65, SaleItem stores decimal + saleMode", async () => {
+  it("POR_PESO 2.35kg via loosePriceId: LooseStock decrements 10 → 7.65, SaleItem stores decimal + saleMode with productId null (loose-lines-stock)", async () => {
     const tx = makeTx();
     mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
     withVendorBranch();
     tx.product.findFirst.mockResolvedValue(branchProduct);
-    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 10 });
-    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.priceKgPrice.findFirst.mockResolvedValue(looseCell);
+    tx.looseStock.findFirst.mockResolvedValue({ id: "ls-1", quantity: 10 });
+    tx.looseStock.updateMany.mockResolvedValue({ count: 1 });
     tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
     tx.order.findFirst.mockResolvedValue(null);
 
@@ -140,8 +161,8 @@ describe("salesService.createSale — loose decimal flow", () => {
       {
         products: [
           {
-            productId: "p-1",
-            name: "Alimento 15kg",
+            loosePriceId: "cell-1",
+            looseName: "MAXXIUM ADULTO",
             quantity: 2.35,
             price: 360,
             category: "Balanceados",
@@ -152,12 +173,17 @@ describe("salesService.createSale — loose decimal flow", () => {
       ...vendorArgs,
     );
 
-    expect(tx.productStock.updateMany).toHaveBeenCalledWith(
+    // El stock se descuenta del LooseStock de la celda, NO del ProductStock.
+    expect(tx.looseStock.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ quantity: { gte: 2.35 } }),
+        where: expect.objectContaining({
+          priceKgPriceId: "cell-1",
+          quantity: { gte: 2.35 },
+        }),
         data: { quantity: { decrement: 2.35 } },
       }),
     );
+    expect(tx.productStock.updateMany).not.toHaveBeenCalled();
     expect(tx.sale.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -165,6 +191,9 @@ describe("salesService.createSale — loose decimal flow", () => {
           items: {
             create: [
               expect.objectContaining({
+                productId: null,
+                loosePriceId: "cell-1",
+                name: "MAXXIUM ADULTO",
                 quantity: 2.35,
                 saleMode: "POR_PESO",
                 price: 360,
@@ -176,16 +205,14 @@ describe("salesService.createSale — loose decimal flow", () => {
     );
   });
 
-  it("POR_MONTO amount 500 at priceKgSuelto 150.25: kg=3.33, total=500.33, stored kg reproduces total (B-07)", async () => {
+  it("POR_PESO via loosePriceId without looseName falls back to MARCA · TIPO (loose-lines-stock)", async () => {
     const tx = makeTx();
     mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
     withVendorBranch();
-    tx.product.findFirst.mockResolvedValue({
-      ...branchProduct,
-      priceKgSuelto: 150.25,
-    });
-    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 10 });
-    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.product.findFirst.mockResolvedValue(null); // sin productId físico
+    tx.priceKgPrice.findFirst.mockResolvedValue(looseCell);
+    tx.looseStock.findFirst.mockResolvedValue({ id: "ls-1", quantity: 10 });
+    tx.looseStock.updateMany.mockResolvedValue({ count: 1 });
     tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
     tx.order.findFirst.mockResolvedValue(null);
 
@@ -193,8 +220,40 @@ describe("salesService.createSale — loose decimal flow", () => {
       {
         products: [
           {
-            productId: "p-1",
-            name: "Alimento 15kg",
+            loosePriceId: "cell-1",
+            quantity: 1,
+            price: 360,
+            saleMode: "POR_PESO",
+          },
+        ],
+      },
+      ...vendorArgs,
+    );
+
+    const saleCreateCall = tx.sale.create.mock.calls[0][0];
+    expect(saleCreateCall.data.items.create[0].name).toBe("MAXXIUM · ADULTO");
+    expect(saleCreateCall.data.items.create[0].productId).toBeNull();
+  });
+
+  it("POR_MONTO amount 500 at cell priceKg 150.25: kg=3.33, total=500.33, stored kg reproduces total (B-07)", async () => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    withVendorBranch();
+    tx.product.findFirst.mockResolvedValue(branchProduct);
+    tx.priceKgPrice.findFirst.mockResolvedValue({
+      ...looseCell,
+      priceKg: 150.25,
+    });
+    tx.looseStock.findFirst.mockResolvedValue({ id: "ls-1", quantity: 10 });
+    tx.looseStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+
+    await SaleService.createSale(
+      {
+        products: [
+          {
+            loosePriceId: "cell-1",
             quantity: 500, // monto en $
             price: 150.25,
             category: "Balanceados",
@@ -208,11 +267,18 @@ describe("salesService.createSale — loose decimal flow", () => {
     const saleCreateCall = tx.sale.create.mock.calls[0][0];
     const storedItem = saleCreateCall.data.items.create[0];
     expect(storedItem.quantity).toBe(3.33); // round2(500 ÷ 150.25)
-    expect(storedItem.price).toBe(150.25); // priceKgSuelto snapshot
+    expect(storedItem.price).toBe(150.25); // snapshot del precio de la celda
     expect(saleCreateCall.data.totalAmount).toBe(500.33); // round2(3.33 × 150.25)
-    // Reconciliation: stored kg × stored priceKgSuelto reproduces total exactly.
+    // Reconciliation: stored kg × stored priceKg reproduces total exactly.
     expect(Math.round(storedItem.quantity * storedItem.price * 100) / 100).toBe(
       saleCreateCall.data.totalAmount,
+    );
+    // El descuento de LooseStock usa los kg de la celda.
+    expect(tx.looseStock.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ quantity: { gte: 3.33 } }),
+        data: { quantity: { decrement: 3.33 } },
+      }),
     );
   });
 
@@ -220,13 +286,17 @@ describe("salesService.createSale — loose decimal flow", () => {
     const tx = makeTx();
     mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
     withVendorBranch();
-    // Almacenado 7500, pero la celda de la planilla manda 9200 en el payload.
+    // Almacenado 7500, pero la celda/planilla manda 9200 en el payload.
     tx.product.findFirst.mockResolvedValue({
       ...branchProduct,
       priceKgSuelto: 7500,
     });
-    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 10 });
-    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.priceKgPrice.findFirst.mockResolvedValue({
+      ...looseCell,
+      priceKg: 9200,
+    });
+    tx.looseStock.findFirst.mockResolvedValue({ id: "ls-1", quantity: 10 });
+    tx.looseStock.updateMany.mockResolvedValue({ count: 1 });
     tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
     tx.order.findFirst.mockResolvedValue(null);
 
@@ -234,8 +304,7 @@ describe("salesService.createSale — loose decimal flow", () => {
       {
         products: [
           {
-            productId: "p-1",
-            name: "Alimento 15kg",
+            loosePriceId: "cell-1",
             quantity: 15000, // monto en $
             price: 9200, // precio de la celda de la planilla
             category: "Balanceados",
@@ -246,9 +315,9 @@ describe("salesService.createSale — loose decimal flow", () => {
       ...vendorArgs,
     );
 
-    // Stock descontado por el kg de la CELDA: round2(15000 ÷ 9200) = 1.63,
+    // LooseStock descontado por el kg de la CELDA: round2(15000 ÷ 9200) = 1.63,
     // NO round2(15000 ÷ 7500) = 2.00 del priceKgSuelto almacenado.
-    expect(tx.productStock.updateMany).toHaveBeenCalledWith(
+    expect(tx.looseStock.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ quantity: { gte: 1.63 } }),
         data: { quantity: { decrement: 1.63 } },
@@ -313,7 +382,51 @@ describe("salesService.createSale — loose decimal flow", () => {
     );
   });
 
-  it("POR_PESO on a product without priceKgSuelto → LOOSE_NOT_ELIGIBLE", async () => {
+  it("BOLSA_CERRADA descuenta por BOLSA (1 por unidad), no multiplica weightKg (loose-lines-stock)", async () => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    withVendorBranch();
+    tx.product.findFirst.mockResolvedValue({
+      ...branchProduct,
+      weightKg: 15,
+      priceKgSuelto: null,
+    });
+    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 10 });
+    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+
+    await SaleService.createSale(
+      {
+        products: [
+          {
+            productId: "p-1",
+            name: "Alimento 15kg",
+            quantity: 3,
+            price: 4500,
+            category: "Balanceados",
+            saleMode: "BOLSA_CERRADA",
+          },
+        ],
+      },
+      ...vendorArgs,
+    );
+
+    // Backfill reverse: el stock de bolsas volvió a UNIDADES → 3 bolsas = −3,
+    // NO −45 (3 × weightKg).
+    expect(tx.productStock.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ quantity: { gte: 3 } }),
+        data: { quantity: { decrement: 3 } },
+      }),
+    );
+    expect(tx.looseStock.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("POR_PESO via productId (backwards-compat) sin celda en la planilla → LOOSE_LINE_NOT_FOUND", async () => {
+    const resolveSpy = jest
+      .spyOn(require("../../src/services/looseSaleService"), "resolveCellForProduct")
+      .mockResolvedValue(null);
     const tx = makeTx();
     mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
     withVendorBranch();
@@ -337,22 +450,22 @@ describe("salesService.createSale — loose decimal flow", () => {
       },
       ...vendorArgs,
     ).catch((e: any) => e);
+    resolveSpy.mockRestore();
 
-    expect(err.code).toBe("LOOSE_NOT_ELIGIBLE");
+    expect(err.code).toBe("LOOSE_LINE_NOT_FOUND");
     expect(tx.sale.create).not.toHaveBeenCalled();
   });
 
   it("POR_MONTO loose line without branch assignment (ADMIN path) → LOOSE_REQUIRES_BRANCH (B-06 amendment)", async () => {
     const tx = makeTx();
     mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
-    tx.product.findFirst.mockResolvedValue(branchProduct);
+    tx.priceKgPrice.findFirst.mockResolvedValue(looseCell);
 
     const err: any = await SaleService.createSale(
       {
         products: [
           {
-            productId: "p-1",
-            name: "Alimento",
+            loosePriceId: "cell-1",
             quantity: 500,
             price: 360,
             category: "x",
@@ -366,6 +479,7 @@ describe("salesService.createSale — loose decimal flow", () => {
 
     expect(err.code).toBe("LOOSE_REQUIRES_BRANCH");
     expect(tx.sale.create).not.toHaveBeenCalled();
+    expect(tx.looseStock.updateMany).not.toHaveBeenCalled();
   });
 
   it("BOLSA_CERRADA line without branch assignment keeps the legacy path (not rejected)", async () => {
@@ -397,15 +511,16 @@ describe("salesService.createSale — loose decimal flow", () => {
     expect(tx.sale.create).toHaveBeenCalledTimes(1);
   });
 
-  it("mixed cart: bolsa int line + loose decimal line sum exact per-line totals (B-08)", async () => {
+  it("mixed cart: bolsa int line (ProductStock) + loose decimal line (LooseStock) sum exact per-line totals (B-08/loose-lines-stock)", async () => {
     const tx = makeTx();
     mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
     withVendorBranch();
-    tx.product.findFirst
-      .mockResolvedValueOnce({ ...branchProduct, priceKgSuelto: null })
-      .mockResolvedValueOnce(branchProduct);
+    tx.product.findFirst.mockResolvedValue({ ...branchProduct, priceKgSuelto: null });
+    tx.priceKgPrice.findFirst.mockResolvedValue(looseCell);
     tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 10 });
     tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.looseStock.findFirst.mockResolvedValue({ id: "ls-1", quantity: 10 });
+    tx.looseStock.updateMany.mockResolvedValue({ count: 1 });
     tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
     tx.order.findFirst.mockResolvedValue(null);
 
@@ -414,7 +529,7 @@ describe("salesService.createSale — loose decimal flow", () => {
         products: [
           { productId: "p-1", name: "Bolsa", quantity: 3, price: 100, category: "x" },
           {
-            productId: "p-1",
+            loosePriceId: "cell-1",
             name: "Alimento",
             quantity: 2.35,
             price: 360,
@@ -430,16 +545,23 @@ describe("salesService.createSale — loose decimal flow", () => {
     // 300 + 846 = 1146 — suma exacta de los totales por línea.
     expect(saleCreateCall.data.totalAmount).toBe(1146);
     expect(saleCreateCall.data.items.create).toHaveLength(2);
+    // Cada pool se descuenta: bolsa → ProductStock, suelto → LooseStock.
+    expect(tx.productStock.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { quantity: { decrement: 3 } } }),
+    );
+    expect(tx.looseStock.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { quantity: { decrement: 2.35 } } }),
+    );
   });
 });
 
-// ── deleteSale: restore con cantidades decimales (B-06) ──
-describe("salesService.deleteSale — decimal restore", () => {
+// ── deleteSale: restore al pool correcto por renglón (loose-lines-stock) ──
+describe("salesService.deleteSale — restore correct pool", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("restores ProductStock with the exact decimal quantity on branch sale delete", async () => {
+  it("restores LooseStock with the exact decimal kg for a loose line (loosePriceId, productId null)", async () => {
     mockedPrisma.sale.findFirst.mockResolvedValue({
       id: "s-1",
       organizationId: "org-1",
@@ -448,7 +570,8 @@ describe("salesService.deleteSale — decimal restore", () => {
       invoice: null,
       items: [
         {
-          productId: "p-1",
+          productId: null,
+          loosePriceId: "cell-1",
           quantity: 3.33,
           saleMode: "POR_MONTO",
         },
@@ -459,11 +582,75 @@ describe("salesService.deleteSale — decimal restore", () => {
 
     await SaleService.deleteSale("s-1");
 
-    expect(tx.productStock.updateMany).toHaveBeenCalledWith(
+    expect(tx.looseStock.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: expect.objectContaining({ priceKgPriceId: "cell-1" }),
         data: { quantity: { increment: 3.33 } },
       }),
     );
+    expect(tx.productStock.updateMany).not.toHaveBeenCalled();
     expect(tx.product.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("restores ProductStock (unidades) for a bag line on branch sale delete", async () => {
+    mockedPrisma.sale.findFirst.mockResolvedValue({
+      id: "s-1",
+      organizationId: "org-1",
+      branchId: "b-1",
+      orderId: null,
+      invoice: null,
+      items: [
+        {
+          productId: "p-1",
+          loosePriceId: null,
+          quantity: 3,
+          saleMode: "BOLSA_CERRADA",
+        },
+      ],
+    });
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+
+    await SaleService.deleteSale("s-1");
+
+    expect(tx.productStock.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ productId: "p-1" }),
+        data: { quantity: { increment: 3 } },
+      }),
+    );
+    expect(tx.looseStock.updateMany).not.toHaveBeenCalled();
+    expect(tx.product.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("restores Product.quantity for a legacy bag line sold org-wide (no branch)", async () => {
+    mockedPrisma.sale.findFirst.mockResolvedValue({
+      id: "s-1",
+      organizationId: "org-1",
+      branchId: null,
+      orderId: null,
+      invoice: null,
+      items: [
+        {
+          productId: "p-1",
+          loosePriceId: null,
+          quantity: 2,
+          saleMode: "BOLSA_CERRADA",
+        },
+      ],
+    });
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+
+    await SaleService.deleteSale("s-1");
+
+    expect(tx.product.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "p-1" }),
+        data: { quantity: { increment: 2 } },
+      }),
+    );
+    expect(tx.productStock.updateMany).not.toHaveBeenCalled();
+    expect(tx.looseStock.updateMany).not.toHaveBeenCalled();
   });
 });

@@ -40,19 +40,39 @@ const formatPrice = (n: number) =>
 const cellKey = (species: PriceKgSpecies, brandId: string, typeId: string) =>
   `${species}:${brandId}:${typeId}`;
 
+// Una celda retiene su precio (String, para el formato) y el id de la celda
+// PriceKgPrice: ese id es el loosePriceId que identifica la línea suelta al
+// vender (loose-lines-stock).
+interface CellPriceEntry {
+  priceKg: string;
+  priceKgPriceId: string;
+}
+
+const cellPriceEntry = (
+  cells: Record<string, CellPriceEntry>,
+  species: PriceKgSpecies,
+  brandId: string,
+  typeId: string,
+): CellPriceEntry | undefined => {
+  const entry = cells[cellKey(species, brandId, typeId)];
+  if (!entry) return undefined;
+  if (entry.priceKg.trim() === "") return undefined;
+  const n = parseFloat(entry.priceKg);
+  if (Number.isNaN(n) || n <= 0) return undefined;
+  return entry;
+};
+
 // Precio NUMÉRICO de una celda (o undefined si no existe): la fuente
 // autoritativa del precio suelto (sdd/precios-suelto-planilla C-05).
 const rawCellPrice = (
-  cells: Record<string, string>,
+  cells: Record<string, CellPriceEntry>,
   species: PriceKgSpecies,
   brandId: string,
   typeId: string,
 ): number | undefined => {
-  const raw = cells[cellKey(species, brandId, typeId)];
-  if (raw === undefined || raw.trim() === "") return undefined;
-  const n = parseFloat(raw);
-  if (Number.isNaN(n) || n <= 0) return undefined;
-  return n;
+  const entry = cellPriceEntry(cells, species, brandId, typeId);
+  if (!entry) return undefined;
+  return parseFloat(entry.priceKg);
 };
 
 /**
@@ -67,7 +87,7 @@ export const PriceKgLookup = () => {
   const [query, setQuery] = useState("");
   const [types, setTypes] = useState<PriceKgType[]>([]);
   const [brands, setBrands] = useState<PriceKgBrand[]>([]);
-  const [cells, setCells] = useState<Record<string, string>>({});
+  const [cells, setCells] = useState<Record<string, CellPriceEntry>>({});
   const [loading, setLoading] = useState(true);
   const [panelCell, setPanelCell] = useState<CellContext | null>(null);
 
@@ -107,9 +127,12 @@ export const PriceKgLookup = () => {
         if (cancelled) return;
         setTypes(typesData);
         setBrands(brandsData);
-        const map: Record<string, string> = {};
+        const map: Record<string, CellPriceEntry> = {};
         for (const c of plan) {
-          map[cellKey(c.species, c.brandId, c.typeId)] = String(c.priceKg);
+          map[cellKey(c.species, c.brandId, c.typeId)] = {
+            priceKg: String(c.priceKg),
+            priceKgPriceId: c.id,
+          };
         }
         setCells(map);
       } catch {
@@ -146,15 +169,16 @@ export const PriceKgLookup = () => {
     type: PriceKgType,
     species: PriceKgSpecies,
   ) => {
-    const priceKg = rawCellPrice(cells, species, brand.id, type.id);
-    if (priceKg === undefined) return; // celda sin precio: no-op
+    const entry = cellPriceEntry(cells, species, brand.id, type.id);
+    if (!entry) return; // celda sin precio: no-op
     setPanelCell({
       brandId: brand.id,
       brandName: brand.name,
       typeId: type.id,
       typeName: type.name,
       species,
-      priceKg,
+      priceKg: parseFloat(entry.priceKg),
+      cellId: entry.priceKgPriceId,
     });
   };
 
@@ -182,13 +206,7 @@ export const PriceKgLookup = () => {
     }
     if (!panelCell?.priceKg) return;
     try {
-      const item = buildCellSaleItem(
-        product,
-        qty,
-        mode,
-        amount,
-        panelCell.priceKg,
-      );
+      const item = buildCellSaleItem(product, qty, mode, amount, panelCell);
       await createSale({ cart: [item] });
       const qtyLabel = mode === "POR_PESO" ? `${qty} kg` : `$${amount}`;
       toast.success(`Venta realizada — ${qtyLabel} "${product.name}"`);
@@ -213,6 +231,8 @@ export const PriceKgLookup = () => {
       product.stock,
       mode,
       panelCell.priceKg,
+      panelCell.cellId ?? undefined,
+      [panelCell.brandName, panelCell.typeName].filter(Boolean).join(" · "),
     );
     toast.success(`"${product.name}" agregado al pedido`);
     setPanelCell(null);
@@ -333,6 +353,7 @@ export const PriceKgLookup = () => {
       <PriceKgProductPanel
         open={!!panelCell}
         cell={panelCell}
+        branchId={branchId}
         onClose={() => setPanelCell(null)}
         onSellDirect={handleSellDirect}
         onAddToCart={handleAddToCart}
