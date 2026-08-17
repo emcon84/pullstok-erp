@@ -15,8 +15,6 @@ import {
   type PriceKgBrand,
 } from "@/services/priceKgBrands";
 import { getPriceKgPlan } from "@/services/priceKgPlan";
-import type { CellProduct } from "@/services/priceKgReview";
-import type { DataItem } from "@/types";
 import type { SaleMode } from "@/components/hooks/useVendorCart";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useCreateSale } from "@/components/hooks/useSales";
@@ -75,13 +73,17 @@ const rawCellPrice = (
   return parseFloat(entry.priceKg);
 };
 
+// Los tipos se muestran TODOS, cada uno con las especies que le aplican.
+const showPerro = (t: PriceKgType) => t.species !== "GATO";
+const showGato = (t: PriceKgType) => t.species !== "PERRO";
+
 /**
  * Consulta de precios por kilo (pantalla de mostrador): lectura + venta suelta.
  * El buscador filtra marcas y, por tarjeta, muestra los precios por tipo con
  * AMBAS especies juntas cuando aplican. Las celdas CON precio son clickeables
- * y abren el panel de venta suelta (Sheet) que lista los productos que
- * matchean esa celda y permite vender directo o sumar al pedido con el precio
- * de la CELDA (no el priceKgSuelto del producto).
+ * y abren el modal de venta suelta (replica el QuantityModal del dashboard):
+ * vende directo por kilo o por monto desde la propia CELDA, con el precio de
+ * la CELDA (no el priceKgSuelto de ningún producto) y sin elegir producto.
  */
 export const PriceKgLookup = () => {
   const [query, setQuery] = useState("");
@@ -161,9 +163,6 @@ export const PriceKgLookup = () => {
     : [];
 
   // Los tipos se muestran TODOS, cada uno con las especies que le aplican.
-  const showPerro = (t: PriceKgType) => t.species !== "GATO";
-  const showGato = (t: PriceKgType) => t.species !== "PERRO";
-
   const openCellPanel = (
     brand: PriceKgBrand,
     type: PriceKgType,
@@ -182,59 +181,56 @@ export const PriceKgLookup = () => {
     });
   };
 
-  // ── Venta suelta desde el panel: SIEMPRE con el precio de la celda (C-05) ──
-
-  const toDataItem = (p: CellProduct): DataItem => ({
-    _id: p.id,
-    id: p.id,
-    name: p.name,
-    price: p.priceKgSuelto ?? 0,
-    priceKgSuelto: p.priceKgSuelto ?? null,
-    quantity: p.stock,
-    category: p.category,
-  });
+  // ── Venta suelta desde la celda: SIEMPRE con el precio de la celda (C-05) ──
 
   const handleSellDirect = async (
-    product: CellProduct,
     qty: number,
     mode: SaleMode,
     amount: number,
   ) => {
-    if (product.stock <= 0) {
-      toast.error("Producto sin stock");
-      return;
-    }
     if (!panelCell?.priceKg) return;
+    const looseName = [panelCell.brandName, panelCell.typeName]
+      .filter(Boolean)
+      .join(" · ");
     try {
-      const item = buildCellSaleItem(product, qty, mode, amount, panelCell);
+      const item = buildCellSaleItem(panelCell, qty, mode, amount);
       await createSale({ cart: [item] });
       const qtyLabel = mode === "POR_PESO" ? `${qty} kg` : `$${amount}`;
-      toast.success(`Venta realizada — ${qtyLabel} "${product.name}"`);
+      toast.success(`Venta realizada — ${qtyLabel} "${looseName}"`);
       setPanelCell(null);
     } catch (err: any) {
       toast.error(err?.message || "Error al realizar la venta directa");
     }
   };
 
-  const handleAddToCart = (
-    product: CellProduct,
-    qty: number,
-    mode: SaleMode,
-    amount: number,
-  ) => {
+  const handleAddToCart = (qty: number, mode: SaleMode, amount: number) => {
     if (!panelCell?.priceKg) return;
     const actualQty = mode === "POR_MONTO" ? amount : qty;
+    const looseName = [panelCell.brandName, panelCell.typeName]
+      .filter(Boolean)
+      .join(" · ");
+    const cellId = panelCell.cellId ?? "";
     cart.addToCart(
-      toDataItem(product),
+      {
+        _id: cellId,
+        id: cellId,
+        name: looseName,
+        price: panelCell.priceKg,
+        priceKgSuelto: panelCell.priceKg,
+        quantity: 0,
+        category: "",
+      },
       actualQty,
       branchId ?? "",
-      product.stock,
+      // El stock de la línea lo resuelve el panel (getLooseStock); el carrito
+      // solo acumula el item suelto, que vende el backend contra LooseStock.
+      0,
       mode,
       panelCell.priceKg,
       panelCell.cellId ?? undefined,
-      [panelCell.brandName, panelCell.typeName].filter(Boolean).join(" · "),
+      looseName,
     );
-    toast.success(`"${product.name}" agregado al pedido`);
+    toast.success(`"${looseName}" agregado al pedido`);
     setPanelCell(null);
   };
 
@@ -349,17 +345,16 @@ export const PriceKgLookup = () => {
         </div>
       )}
 
-      {/* Panel de venta suelta de la celda seleccionada */}
+      {/* Modal de venta suelta de la celda seleccionada. key=cellId remontea el
+        panel por celda → el estado del formulario queda limpio en cada apertura. */}
       <PriceKgProductPanel
+        key={panelCell?.cellId ?? "closed"}
         open={!!panelCell}
         cell={panelCell}
         branchId={branchId}
         onClose={() => setPanelCell(null)}
         onSellDirect={handleSellDirect}
         onAddToCart={handleAddToCart}
-        onCreateProduct={() => {
-          toast.info("Creá el producto desde Productos y luego volvé a esta celda");
-        }}
       />
     </div>
   );

@@ -1,22 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 import {
   PriceKgProductPanel,
   buildCellSaleItem,
 } from "@/components/molecules/PriceKgProductPanel";
-import { listProductsForCell } from "@/services/priceKgReview";
 import { getLooseStock } from "@/services/looseStock";
-
-vi.mock("@/services/priceKgReview", () => ({
-  listProductsForCell: vi.fn(),
-}));
 
 vi.mock("@/services/looseStock", () => ({
   getLooseStock: vi.fn(),
 }));
 
-const listProductsForCellMock = vi.mocked(listProductsForCell);
 const getLooseStockMock = vi.mocked(getLooseStock);
 
 const CELL = {
@@ -29,35 +23,14 @@ const CELL = {
   cellId: "c-proplan",
 };
 
-const PRODUCTS = [
-  {
-    id: "p1",
-    name: "PRO PLAN ADULTO PERRO 12KG",
-    weightKg: 12,
-    stock: 5,
-    priceKgSuelto: 7500,
-    category: "Alimento Seco Perro",
-    exact: true,
-  },
-  {
-    id: "p2",
-    name: "PRO PLAN ADULTO PERRO 15KG",
-    weightKg: 15,
-    stock: 3,
-    priceKgSuelto: 7500,
-    category: "Alimento Seco Perro",
-    exact: true,
-  },
-  {
-    id: "p3",
-    name: "PRO PLAN SENIOR PERRO 12KG",
-    weightKg: 12,
-    stock: 8,
-    priceKgSuelto: 7000,
-    category: "Alimento Seco Perro",
-    exact: false,
-  },
-];
+const LOOSE_LINE = {
+  id: "ls-1",
+  priceKgPriceId: "c-proplan",
+  branchId: "b1",
+  quantity: 15.5,
+  lineName: "PRO PLAN · Adulto",
+  branchName: "Sucursal 1",
+};
 
 const renderPanel = (overrides: Partial<React.ComponentProps<typeof PriceKgProductPanel>> = {}) =>
   render(
@@ -67,172 +40,121 @@ const renderPanel = (overrides: Partial<React.ComponentProps<typeof PriceKgProdu
       cell={CELL}
       onSellDirect={vi.fn()}
       onAddToCart={vi.fn()}
-      onCreateProduct={vi.fn()}
       {...overrides}
     />,
   );
 
-describe("PriceKgProductPanel — panel de venta suelta por celda", () => {
+describe("PriceKgProductPanel — modal de venta suelta por celda", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    listProductsForCellMock.mockResolvedValue(PRODUCTS);
-    getLooseStockMock.mockResolvedValue({
-      id: "ls-1",
-      priceKgPriceId: "c-proplan",
-      branchId: "b1",
-      quantity: 15.5,
-      lineName: "PRO PLAN · Adulto",
-      branchName: "Sucursal 1",
-    });
+    getLooseStockMock.mockResolvedValue(LOOSE_LINE);
   });
 
-  it("muestra marca, tipo, especie y precio de la celda, y carga los productos", async () => {
-    renderPanel();
+  it("abre con la celda: nombre de línea, especie, precio de la celda y stock suelto", async () => {
+    const { findByText } = renderPanel({ branchId: "b1" });
 
-    expect(screen.getByText(/PRO PLAN/)).toBeInTheDocument();
-    expect(screen.getByText(/Adulto/)).toBeInTheDocument();
+    // Título = nombre de la línea "MARCA · TIPO"; badge de especie.
+    expect(await findByText("PRO PLAN · Adulto")).toBeInTheDocument();
     expect(screen.getByText("Perros")).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(listProductsForCellMock).toHaveBeenCalledWith({
-        brandId: "b-proplan",
-        typeId: "t-adulto",
-        species: "PERRO",
-      });
-    });
-    expect(await screen.findByText("PRO PLAN ADULTO PERRO 12KG")).toBeInTheDocument();
-    expect(screen.getByText("PRO PLAN ADULTO PERRO 15KG")).toBeInTheDocument();
+    // Precio autoritativo de la celda ($/kg), no priceKgSuelto de producto.
+    // Se ve en el badge de cabecera y en la línea de precio del modo activo.
+    expect((await screen.findAllByText(/\$9\.200\/kg/)).length).toBeGreaterThan(0);
+    // Stock suelto de la sucursal cargado desde looseStock: se ve en el header
+    // ("Stock suelto") y en la línea "Stock disponible" del modo activo.
+    expect(getLooseStockMock).toHaveBeenCalledWith("c-proplan", "b1");
+    expect((await screen.findAllByText("15.50 kg")).length).toBeGreaterThan(0);
+    // Sin búsqueda ni lista de productos.
+    expect(screen.queryByPlaceholderText(/buscar producto/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/sin productos que matcheen/i)).not.toBeInTheDocument();
   });
 
-  it("muestra el precio de la celda por kg (no el priceKgSuelto del producto)", async () => {
+  it("ofrece solo los modos sueltos: 'Por kilo' y 'Por monto'", async () => {
     renderPanel();
-    // El header muestra $9.200/kg de la celda
-    expect(await screen.findByText(/\$9\.200\/kg/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Por kilo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Por monto" })).toBeInTheDocument();
+    // Sin modo bolsa cerrada en el panel de celda.
+    expect(screen.queryByRole("button", { name: "Entero" })).not.toBeInTheDocument();
   });
 
-  it("filtra por texto en el buscador (client-side)", async () => {
+  it("sin sucursal no consulta el stock suelto y muestra '—'", () => {
     renderPanel();
-    await screen.findByText("PRO PLAN ADULTO PERRO 12KG");
-
-    fireEvent.change(screen.getByPlaceholderText(/buscar/i), {
-      target: { value: "15KG" },
-    });
-
-    expect(screen.queryByText("PRO PLAN ADULTO PERRO 12KG")).not.toBeInTheDocument();
-    expect(screen.getByText("PRO PLAN ADULTO PERRO 15KG")).toBeInTheDocument();
+    expect(getLooseStockMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/Stock suelto/)).toHaveTextContent("—");
   });
 
-  it("pagina 10 productos por página con Pagination numbered", async () => {
-    const many = Array.from({ length: 15 }, (_, i) => ({
-      id: `p${i}`,
-      name: `PRODUCTO ${i + 1}`,
-      weightKg: 10,
-      stock: 1,
-      priceKgSuelto: 8000,
-      category: "Alimento Seco Perro",
-      exact: true,
-    }));
-    listProductsForCellMock.mockResolvedValue(many);
+  it("POR_PESO: preview total = qty × precio de la celda", () => {
     renderPanel();
-
-    await screen.findByText("PRODUCTO 1");
-    expect(screen.getByText("PRODUCTO 10")).toBeInTheDocument();
-    expect(screen.queryByText("PRODUCTO 11")).not.toBeInTheDocument();
-    expect(screen.getByText("Página 1 de 2")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /siguiente|next/i }));
-    expect(screen.getByText("PRODUCTO 11")).toBeInTheDocument();
-  });
-
-  it("POR_PESO: preview total = qty × precio de la celda", async () => {
-    renderPanel();
-    await screen.findByText("PRO PLAN ADULTO PERRO 12KG");
-
-    fireEvent.click(screen.getByText("PRO PLAN ADULTO PERRO 12KG"));
     fireEvent.change(screen.getByLabelText("Kilogramos"), {
       target: { value: "2" },
     });
-
-    // 2 kg × $9.200 (celda) = $18.400
-    expect(screen.getByText(/\$18\.400/)).toBeInTheDocument();
+    // 2 kg × $9.200 (celda) = $18.400,00 (linea inline + total sobre acciones)
+    expect(screen.getAllByText("$18.400,00").length).toBeGreaterThan(0);
   });
 
   it("POR_MONTO: input de monto con equivalencia en kg a precio de celda", async () => {
     renderPanel();
-    await screen.findByText("PRO PLAN ADULTO PERRO 12KG");
-
-    fireEvent.click(screen.getByText("PRO PLAN ADULTO PERRO 12KG"));
     fireEvent.click(screen.getByRole("button", { name: "Por monto" }));
     fireEvent.change(screen.getByLabelText("Monto ($)"), {
       target: { value: "9200" },
     });
-
     // $9.200 / $9.200/kg = 1.00 kg
-    expect(screen.getByText("1.00 kg")).toBeInTheDocument();
+    expect(await screen.findByText("1.00 kg")).toBeInTheDocument();
   });
 
-  it("'Vender directo' llama onSellDirect con el producto, cantidad, modo y monto", async () => {
+  it("'Vender directo' llama onSellDirect(qty, modo, monto)", () => {
     const onSellDirect = vi.fn();
     renderPanel({ onSellDirect });
-    await screen.findByText("PRO PLAN ADULTO PERRO 12KG");
-
-    fireEvent.click(screen.getByText("PRO PLAN ADULTO PERRO 12KG"));
     fireEvent.change(screen.getByLabelText("Kilogramos"), {
       target: { value: "2.5" },
     });
     fireEvent.click(screen.getByRole("button", { name: /vender directo/i }));
-
-    expect(onSellDirect).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "p1" }),
-      2.5,
-      "POR_PESO",
-      0,
-    );
+    expect(onSellDirect).toHaveBeenCalledWith(2.5, "POR_PESO", 0);
   });
 
-  it("'Agregar al pedido' llama onAddToCart", async () => {
+  it("'Vender directo' en modo monto manda qty 0 y el monto", async () => {
+    const onSellDirect = vi.fn();
+    renderPanel({ onSellDirect });
+    fireEvent.click(screen.getByRole("button", { name: "Por monto" }));
+    fireEvent.change(screen.getByLabelText("Monto ($)"), {
+      target: { value: "4600" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /vender directo/i }));
+    expect(onSellDirect).toHaveBeenCalledWith(0, "POR_MONTO", 4600);
+  });
+
+  it("'Agregar al pedido' llama onAddToCart(qty, modo, monto)", () => {
     const onAddToCart = vi.fn();
     renderPanel({ onAddToCart });
-    await screen.findByText("PRO PLAN ADULTO PERRO 12KG");
-
-    fireEvent.click(screen.getByText("PRO PLAN ADULTO PERRO 12KG"));
-    fireEvent.click(screen.getByRole("button", { name: /agregar al pedido/i }));
-
-    expect(onAddToCart).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "p1" }),
-      expect.any(Number),
-      "POR_PESO",
-      0,
-    );
-  });
-
-  it("estado vacío: mensaje y botón 'Crear producto'", async () => {
-    listProductsForCellMock.mockResolvedValue([]);
-    const onCreateProduct = vi.fn();
-    renderPanel({ onCreateProduct });
-
-    expect(await screen.findByText(/sin productos/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
-    expect(onCreateProduct).toHaveBeenCalled();
-  });
-
-  it("celda sin precio: acciones deshabilitadas y aviso 'Sin precio en planilla'", async () => {
-    renderPanel({
-      cell: { ...CELL, priceKg: null },
+    fireEvent.change(screen.getByLabelText("Kilogramos"), {
+      target: { value: "1.5" },
     });
+    fireEvent.click(screen.getByRole("button", { name: /agregar al pedido/i }));
+    expect(onAddToCart).toHaveBeenCalledWith(1.5, "POR_PESO", 0);
+  });
 
+  it("celda sin precio: aviso 'Sin precio en planilla' y acciones deshabilitadas", () => {
+    renderPanel({ cell: { ...CELL, priceKg: null } });
     expect(screen.getByText("Sin precio en planilla")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /vender directo/i })).toBeDisabled();
-    expect(listProductsForCellMock).not.toHaveBeenCalled();
+    expect(getLooseStockMock).not.toHaveBeenCalled();
+  });
+
+  it("stock suelto en 0 con sucursal: aviso + vender deshabilitado", async () => {
+    getLooseStockMock.mockResolvedValue({ ...LOOSE_LINE, quantity: 0 });
+    renderPanel({ branchId: "b1" });
+    expect(
+      await screen.findByText("Sin stock suelto cargado"),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Kilogramos"), {
+      target: { value: "2" },
+    });
+    // El backend rechazaría (stock suelto insuficiente) → se bloquea antes.
+    expect(
+      screen.getByRole("button", { name: /vender directo/i }),
+    ).toBeDisabled();
   });
 
   describe("buildCellSaleItem", () => {
-    const product = {
-      _id: "p1",
-      id: "p1",
-      name: "PRO PLAN ADULTO PERRO 12KG",
-      priceKgSuelto: 7500,
-    };
     const cell = {
       priceKg: 9200,
       cellId: "c-proplan",
@@ -240,9 +162,10 @@ describe("PriceKgProductPanel — panel de venta suelta por celda", () => {
       typeName: "Adulto",
     };
 
-    it("usa el precio de la CELDA, no el priceKgSuelto del producto", () => {
-      const item = buildCellSaleItem(product, 2, "POR_PESO", 0, cell);
+    it("usa el precio de la CELDA y arma la línea con loosePriceId/looseName", () => {
+      const item = buildCellSaleItem(cell, 2, "POR_PESO", 0);
       expect(item.product.price).toBe(9200);
+      expect(item.product.name).toBe("PRO PLAN · Adulto");
       expect(item.totalPrice).toBe(18400);
       expect(item.saleMode).toBe("POR_PESO");
       expect(item.quantity).toBe(2);
@@ -251,35 +174,24 @@ describe("PriceKgProductPanel — panel de venta suelta por celda", () => {
     });
 
     it("POR_MONTO: quantity = monto y totalPrice = monto", () => {
-      const item = buildCellSaleItem(product, 0, "POR_MONTO", 4600, cell);
+      const item = buildCellSaleItem(cell, 0, "POR_MONTO", 4600);
       expect(item.quantity).toBe(4600);
       expect(item.totalPrice).toBe(4600);
       expect(item.product.price).toBe(9200);
       expect(item.loosePriceId).toBe("c-proplan");
     });
 
-    it("sin id de celda NO incluye loosePriceId (bolsa del producto físico)", () => {
-      const item = buildCellSaleItem(product, 2, "BOLSA_CERRADA", 0, {
-        priceKg: null,
-        cellId: null,
-        brandName: "",
-        typeName: "",
-      });
+    it("sin id de celda NO incluye loosePriceId y usa productId vacío", () => {
+      const item = buildCellSaleItem(
+        { priceKg: null, cellId: null, brandName: "", typeName: "" },
+        2,
+        "POR_PESO",
+        0,
+      );
       expect(item.loosePriceId).toBeUndefined();
+      expect(item.looseName).toBeUndefined();
+      expect(item.product._id).toBe("");
       expect(item.product.price).toBe(0);
     });
-  });
-
-  it("muestra el stock suelto de la celda para la sucursal del vendedor", async () => {
-    renderPanel({ branchId: "b1" });
-    expect(getLooseStockMock).toHaveBeenCalledWith("c-proplan", "b1");
-    expect(await screen.findByText("15.50 kg")).toBeInTheDocument();
-  });
-
-  it("sin sucursal no consulta el stock suelto y muestra '—'", async () => {
-    renderPanel();
-    await screen.findByText("PRO PLAN ADULTO PERRO 12KG");
-    expect(getLooseStockMock).not.toHaveBeenCalled();
-    expect(screen.getByText(/Stock suelto/)).toHaveTextContent("—");
   });
 });

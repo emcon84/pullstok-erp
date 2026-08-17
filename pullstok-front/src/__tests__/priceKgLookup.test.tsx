@@ -23,10 +23,6 @@ vi.mock("@/services/priceKgPlan", () => ({
   savePriceKgPlan: vi.fn(),
 }));
 
-vi.mock("@/services/priceKgReview", () => ({
-  listProductsForCell: vi.fn(),
-}));
-
 vi.mock("@/services/looseStock", () => ({
   getLooseStock: vi.fn(),
 }));
@@ -51,14 +47,14 @@ import {
   type PriceKgBrand,
 } from "@/services/priceKgBrands";
 import { getPriceKgPlan, type PriceKgPrice } from "@/services/priceKgPlan";
-import { listProductsForCell } from "@/services/priceKgReview";
+import { getLooseStock } from "@/services/looseStock";
 import { createSale } from "@/services/saleServices";
 import { toast } from "react-toastify";
 
 const mockListPriceKgTypes = vi.mocked(listPriceKgTypes);
 const mockListPriceKgBrands = vi.mocked(listPriceKgBrands);
 const mockGetPriceKgPlan = vi.mocked(getPriceKgPlan);
-const mockListProductsForCell = vi.mocked(listProductsForCell);
+const mockGetLooseStock = vi.mocked(getLooseStock);
 const mockCreateSale = vi.mocked(createSale);
 const toastErrorMock = vi.mocked(toast.error);
 const toastSuccessMock = vi.mocked(toast.success);
@@ -99,17 +95,14 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     mockListPriceKgTypes.mockResolvedValue(types);
     mockListPriceKgBrands.mockResolvedValue(brands);
     mockGetPriceKgPlan.mockResolvedValue(planCells);
-    mockListProductsForCell.mockResolvedValue([
-      {
-        id: "p1",
-        name: "ACME ADULTO PERRO 12KG",
-        weightKg: 12,
-        stock: 5,
-        priceKgSuelto: 7500,
-        category: "Alimento Seco Perro",
-        exact: true,
-      },
-    ]);
+    mockGetLooseStock.mockResolvedValue({
+      id: "ls-1",
+      priceKgPriceId: "c1",
+      branchId: "b1",
+      quantity: 15.5,
+      lineName: "Acme · Adulto",
+      branchName: "Sucursal 1",
+    });
     mockCreateSale.mockResolvedValue(undefined);
   });
 
@@ -179,7 +172,7 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     expect(screen.queryAllByText("Zap")).toHaveLength(0);
   });
 
-  // ── sdd/precios-suelto-planilla: celdas interactivas (panel de venta suelta) ──
+  // ── sdd/precios-suelto-planilla: celdas interactivas (modal de venta suelta) ──
 
   async function searchAcme() {
     const input = screen.getByPlaceholderText(/buscá una marca/i);
@@ -187,7 +180,7 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     await screen.findByRole("heading", { name: "Acme" });
   }
 
-  it("una celda CON precio es clickeable y abre el panel de venta suelta", async () => {
+  it("una celda CON precio abre el modal de venta suelta con la celda directo", async () => {
     renderView();
     await searchAcme();
 
@@ -197,14 +190,14 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     });
     fireEvent.click(cellButton);
 
-    expect(await screen.findByText(/venta suelta/i)).toBeInTheDocument();
-    expect(mockListProductsForCell).toHaveBeenCalledWith({
-      brandId: "brand-1",
-      typeId: "t-1",
-      species: "PERRO",
-    });
-    // El panel lista el producto de la celda.
-    expect(await screen.findByText("ACME ADULTO PERRO 12KG")).toBeInTheDocument();
+    // El modal abre con la línea de la CELDA: título "Acme · Adulto", el
+    // precio de la celda ($/kg) como autoritativo... sin buscar productos.
+    expect(await screen.findByRole("heading", { name: "Acme · Adulto" })).toBeInTheDocument();
+    expect(screen.getByText("Perros")).toBeInTheDocument();
+    expect(screen.getAllByText("$2.500/kg").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Por kilo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Por monto" })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/buscar producto/i)).not.toBeInTheDocument();
   });
 
   it("una celda SIN precio (—) no abre el panel", async () => {
@@ -218,8 +211,8 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     expect(dash).toBeDefined();
     fireEvent.click(dash!);
 
-    expect(screen.queryByText(/venta suelta/i)).not.toBeInTheDocument();
-    expect(mockListProductsForCell).not.toHaveBeenCalled();
+    expect(screen.queryByText("Acme · Adulto")).not.toBeInTheDocument();
+    expect(mockGetLooseStock).not.toHaveBeenCalled();
   });
 
   it("vender directo usa el precio de la CELDA y manda loosePriceId (no productId)", async () => {
@@ -231,19 +224,19 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
         name: /abrir venta suelta.*acme.*adulto.*perro/i,
       }),
     );
-    await screen.findByText("ACME ADULTO PERRO 12KG");
+    await screen.findByRole("heading", { name: "Acme · Adulto" });
 
-    // Selecciona el producto, pide 2 kg y vende.
-    fireEvent.click(screen.getByText("ACME ADULTO PERRO 12KG"));
+    // Pide 2 kg y vende directo desde la celda.
     fireEvent.change(screen.getByLabelText("Kilogramos"), {
       target: { value: "2" },
     });
     fireEvent.click(screen.getByRole("button", { name: /vender directo/i }));
 
     await waitFor(() => {
-      // El payload de la venta lleva price = celda ($2.500), no 7500, y la
-      // línea se identifica por loosePriceId (celda c1) SIN productId: así el
-      // backend descuenta los kg del LooseStock de la celda.
+      // El payload de la venta lleva price = celda ($2.500), nombre de línea
+      // "Acme · Adulto", y la línea se identifica por loosePriceId (celda c1)
+      // SIN productId: así el backend descuenta los kg del LooseStock de la
+      // celda.
       expect(mockCreateSale).toHaveBeenCalledWith(
         expect.objectContaining({
           products: [
@@ -251,7 +244,8 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
               loosePriceId: "c1",
               looseName: "Acme · Adulto",
               quantity: "2",
-              price: "2500", // ← celda, no product.priceKgSuelto (7500)
+              name: "Acme · Adulto",
+              price: "2500", // ← celda, no ningún priceKgSuelto de producto
               saleMode: "POR_PESO",
             }),
           ],
@@ -261,21 +255,26 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
       const payload = mockCreateSale.mock.calls[0][0];
       expect(payload.products[0]).not.toHaveProperty("productId");
     });
-    expect(toastSuccessMock).toHaveBeenCalledWith(expect.stringContaining("ACME ADULTO PERRO 12KG"));
+    expect(toastSuccessMock).toHaveBeenCalledWith(
+      expect.stringContaining("Acme · Adulto"),
+    );
   });
 
-  it("sin stock en la celda: aborta la venta con toast de error", async () => {
-    mockListProductsForCell.mockResolvedValue([
-      {
-        id: "p1",
-        name: "ACME ADULTO PERRO 12KG",
-        weightKg: 12,
-        stock: 0,
-        priceKgSuelto: 7500,
-        category: "Alimento Seco Perro",
-        exact: true,
-      },
-    ]);
+  it("con sucursal y stock suelto en 0: aviso y vender deshabilitado", async () => {
+    // VENDEDOR con sucursal → branchId resuelto; stock suelto 0 kg → el panel
+    // bloquea la venta (el backend rechazaría "stock suelto insuficiente").
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ role: "VENDEDOR", branchIds: ["b1"] }),
+    );
+    mockGetLooseStock.mockResolvedValue({
+      id: "ls-1",
+      priceKgPriceId: "c1",
+      branchId: "b1",
+      quantity: 0,
+      lineName: "Acme · Adulto",
+      branchName: "Sucursal 1",
+    });
     renderView();
     await searchAcme();
 
@@ -284,18 +283,21 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
         name: /abrir venta suelta.*acme.*adulto.*perro/i,
       }),
     );
-    await screen.findByText("ACME ADULTO PERRO 12KG");
-    fireEvent.click(screen.getByText("ACME ADULTO PERRO 12KG"));
+
+    expect(
+      await screen.findByText("Sin stock suelto cargado"),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Kilogramos"), {
       target: { value: "2" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /vender directo/i }));
-
-    expect(toastErrorMock).toHaveBeenCalledWith(expect.stringMatching(/sin stock/i));
+    expect(
+      screen.getByRole("button", { name: /vender directo/i }),
+    ).toBeDisabled();
+    expect(toastErrorMock).not.toHaveBeenCalled();
     expect(mockCreateSale).not.toHaveBeenCalled();
   });
 
-  it("agregar al pedido guarda el item en el carrito con el precio y la celda", async () => {
+  it("agregar al pedido guarda el item suelto de la línea con precio y celda", async () => {
     renderView();
     await searchAcme();
 
@@ -304,9 +306,8 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
         name: /abrir venta suelta.*acme.*adulto.*perro/i,
       }),
     );
-    await screen.findByText("ACME ADULTO PERRO 12KG");
+    await screen.findByRole("heading", { name: "Acme · Adulto" });
 
-    fireEvent.click(screen.getByText("ACME ADULTO PERRO 12KG"));
     fireEvent.change(screen.getByLabelText("Kilogramos"), {
       target: { value: "1.5" },
     });
@@ -315,9 +316,9 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     const cart = JSON.parse(localStorage.getItem("vendor-cart") || "[]");
     expect(cart).toEqual([
       expect.objectContaining({
-        productId: "p1",
-        name: "ACME ADULTO PERRO 12KG",
-        price: 2500, // ← celda, no 7500
+        productId: "c1", // la celda es el id del item sintético
+        name: "Acme · Adulto",
+        price: 2500, // ← celda, no ningún priceKgSuelto de producto
         priceKgSuelto: 2500,
         quantity: 1.5,
         saleMode: "POR_PESO",
@@ -325,5 +326,8 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
         looseName: "Acme · Adulto",
       }),
     ]);
+    expect(toastSuccessMock).toHaveBeenCalledWith(
+      expect.stringContaining("Acme · Adulto"),
+    );
   });
 });
