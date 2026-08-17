@@ -149,12 +149,21 @@ step "[9/9] Health check post-deploy (API + FRONT)..."
 api_ok=false
 front_ok=false
 
-sleep 3
-api_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$API_HEALTH_URL" || echo "000")
-if [ "$api_code" = "$EXPECTED_HTTP" ]; then
-    api_ok=true
-    echo "✅ API OK ($API_HEALTH_URL -> HTTP $api_code)"
-else
+# Poll: tras reiniciar el servicio, la API tarda unos segundos en bindear el
+# puerto. Un solo sleep 3 + curl disparaba falsos "connection refused" (HTTP 000)
+# y un auto-rollback injustificado. Se reintenta hasta 60s antes de fallar.
+api_ok=false
+for attempt in $(seq 1 20); do
+    api_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$API_HEALTH_URL" || echo "000")
+    if [ "$api_code" = "$EXPECTED_HTTP" ]; then
+        api_ok=true
+        echo "✅ API OK ($API_HEALTH_URL -> HTTP $api_code)"
+        break
+    fi
+    echo "  (intento $attempt/20: HTTP $api_code — reintentando en 3s)"
+    sleep 3
+done
+if ! $api_ok; then
     echo "❌ API falló ($API_HEALTH_URL -> HTTP $api_code)"
 fi
 
