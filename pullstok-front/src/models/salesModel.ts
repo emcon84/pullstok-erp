@@ -41,6 +41,11 @@ export interface Sale {
     price: number;
     category: string;
     productId: string;
+    /** Modo de venta del renglón: POR_PESO / POR_MONTO = línea suelta de la
+     *  planilla; ausente/BOLSA_CERRADA = bolsa % física. */
+    saleMode?: SaleMode;
+    /** Id de la celda PriceKgPrice cuando el renglón es venta suelta. */
+    loosePriceId?: string;
   }[];
   products?: {
     id?: string;

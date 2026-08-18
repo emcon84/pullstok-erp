@@ -45,6 +45,10 @@ const TAX_CONDITIONS = [
 
 type CustomerMode = "select" | "create";
 
+/** Filtro de tipo de venta: todas, sueltas (algún renglón POR_PESO/POR_MONTO) o
+ * bolsas cerradas (sin renglones sueltos). */
+type SaleTypeFilter = "all" | "loose" | "bag";
+
 interface InvoiceModalState {
   sale: Sale | null;
   mode: CustomerMode;
@@ -85,6 +89,7 @@ export const SalesPage = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [filterDate, setFilterDate] = useState("");
   const [filterProductName, setFilterProductName] = useState("");
+  const [filterType, setFilterType] = useState<SaleTypeFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
@@ -145,6 +150,13 @@ export const SalesPage = () => {
     }
   };
 
+  // Una venta es "suelta" si al menos un renglón se vendió por peso o monto
+  // (modos que el backend asocia a stock suelto en kg / LooseStock).
+  const isLooseSale = (sale: Sale) =>
+    (sale.items || []).some(
+      (item) => item.saleMode === "POR_PESO" || item.saleMode === "POR_MONTO",
+    );
+
   const filteredSales = sales.filter((sale) => {
     const matchesDate = filterDate
       ? new DateObject(sale.saleDate).format("YYYY-MM-DD") === filterDate
@@ -155,7 +167,13 @@ export const SalesPage = () => {
           product.name.toLowerCase().includes(filterProductName),
         )
       : true;
-    return matchesDate && matchesProduct;
+    const matchesType =
+      filterType === "all"
+        ? true
+        : filterType === "loose"
+          ? isLooseSale(sale)
+          : !isLooseSale(sale);
+    return matchesDate && matchesProduct && matchesType;
   });
 
   const totalPages = Math.ceil(filteredSales.length / itemsPerPage);
@@ -287,6 +305,22 @@ export const SalesPage = () => {
             />
           </div>
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="filter-type">Tipo de venta</Label>
+          <Select
+            value={filterType}
+            onValueChange={(value) => setFilterType(value as SaleTypeFilter)}
+          >
+            <SelectTrigger id="filter-type" className="w-auto min-w-[10rem]">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="loose">Solo sueltas</SelectItem>
+              <SelectItem value="bag">Solo bolsas</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Lista */}
@@ -332,6 +366,11 @@ export const SalesPage = () => {
                         className="text-muted-foreground"
                       >
                         Venta directa
+                      </Badge>
+                    )}
+                    {isLooseSale(sale) && (
+                      <Badge className="bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400">
+                        Suelta
                       </Badge>
                     )}
                     {isInvoiced && (
