@@ -3,6 +3,7 @@ import invoiceController from "../controllers/invoiceController";
 import { authenticateJWT } from "../middlewares/authMiddleware";
 import { checkBusinessHours } from "../middlewares/checkBusinessHours";
 import { checkInvoicingEnabled } from "../middlewares/checkInvoicingEnabled";
+import { checkArcaEnabled } from "../middlewares/checkArcaEnabled";
 import { validate } from "../middlewares/validate";
 import { createInvoiceSchema, updateInvoiceSchema } from "../validation/schemas";
 
@@ -29,6 +30,19 @@ router.put(
 );
 router.delete("/:id", invoiceController.deleteInvoice);
 router.put("/:id/issue", invoiceController.issueInvoice);
+// Emisión fiscal ARCA (design D6): checkArcaEnabled SOLO en estas dos rutas
+// (el CRUD de settings y check-enabled no lo llevan; el flujo interno issue()
+// no cambia). checkArcaEnabled adjunta req.arcaContext al pasar.
+router.put(
+  "/:id/issue-fiscal",
+  checkArcaEnabled,
+  invoiceController.issueFiscal,
+);
+router.put(
+  "/:id/retry-fiscal",
+  checkArcaEnabled,
+  invoiceController.retryFiscal,
+);
 router.put("/:id/pay", invoiceController.markAsPaid);
 router.put("/:id/cancel", invoiceController.cancelInvoice);
 

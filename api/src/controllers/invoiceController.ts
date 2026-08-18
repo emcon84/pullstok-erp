@@ -1,8 +1,15 @@
 import { Request, Response } from "express";
-import { prisma } from "../config/db";
+import { prisma, basePrisma } from "../config/db";
 import getNextSequenceValue from "../services/secuenceService";
 import { calculateInvoiceTotals, InvoiceLineInput } from "../services/invoiceCalc";
 import { requireOrganizationId } from "../config/tenantContext";
+import {
+  emitirFiscalmente,
+  reintentarFiscalmente,
+} from "../services/fiscalInvoiceService";
+import { createArcaClientHomo } from "../integrations/arca/arcaClient";
+import { ArcaError } from "../integrations/arca/types";
+import type { ArcaAuthContext } from "../integrations/arca/types";
 
 const invoiceInclude = {
   items: true,
@@ -24,6 +31,26 @@ const withDerivedPaymentStatus = <T extends { dueDate: Date | null; paymentStatu
   }
   return invoice;
 };
+
+// --- ARCA: contexto + cliente homo (sdd/arca-facturacion-electronica) ---
+
+const buildArcaContext = (setting: any, organizationId: string): ArcaAuthContext => ({
+  organizationId,
+  cuitEmisor: setting.cuitEmisor,
+  puntoVenta: setting.puntoVenta,
+  environment: setting.environment,
+  certPath: setting.certPath,
+  keyPath: setting.keyPath,
+});
+
+/** ¿El gate ARCA está habilitado para la org? (fila + enabled + campos completos). */
+const isArcaEnabled = (setting: any): boolean =>
+  !!setting &&
+  setting.enabled === true &&
+  !!setting.cuitEmisor &&
+  setting.puntoVenta != null &&
+  !!setting.certPath &&
+  !!setting.keyPath;
 
 // Crear una factura en DRAFT (sin number; conceptos libres de servicios).
 const createInvoice = async (req: Request, res: Response) => {
@@ -212,6 +239,37 @@ const issueInvoice = async (req: Request, res: Response) => {
         .json({ message: "Invoice not found or not in DRAFT status" });
     }
 
+    // ARCA habilitada (design D5): encadena la emisión fiscal en el mismo
+    // request. Si la emisión fiscal falla, la factura queda ISSUED interno sin
+    // CAE (o PENDING_CAE) — el flujo interno no se rompe; se devuelve el error
+    // fiscal adjunto para que el front ofrezca reintento (spec 6.1).
+    const arcaSetting = await basePrisma.arcaSetting.findUnique({
+      where: { organizationId },
+    });
+    if (isArcaEnabled(arcaSetting)) {
+      const ctx = buildArcaContext(arcaSetting, organizationId);
+      try {
+        const fiscal = await emitirFiscalmente(
+          invoice.id,
+          createArcaClientHomo(ctx),
+          ctx,
+        );
+        return res.status(200).json(withDerivedPaymentStatus(fiscal!));
+      } catch (error: any) {
+        const fiscalError =
+          error instanceof ArcaError
+            ? { code: error.code, message: error.message }
+            : { code: "ARCA_ERROR", message: error.message };
+        const pending = await prisma.invoice.findFirst({
+          where: { id: invoice.id },
+          include: invoiceInclude,
+        });
+        return res
+          .status(200)
+          .json({ ...withDerivedPaymentStatus(pending!), fiscalError });
+      }
+    }
+
     res.status(200).json(withDerivedPaymentStatus(invoice!));
   } catch (error: any) {
     if (error.message === "NO_ITEMS") {
@@ -220,6 +278,55 @@ const issueInvoice = async (req: Request, res: Response) => {
         .json({ message: "No se puede emitir una factura sin ítems" });
     }
     res.status(400).json({ message: error.message });
+  }
+};
+
+// Emisión fiscal explícita (PUT /:id/issue-fiscal). El gate checkArcaEnabled
+// ya adjuntó req.arcaContext (ArcaAuthContext); acá se construye el cliente
+// homo y se emite. Acepta ISSUED interno sin CAE.
+const issueFiscal = async (req: Request, res: Response) => {
+  try {
+    const ctx = (req as Request & { arcaContext?: ArcaAuthContext }).arcaContext;
+    if (!ctx) {
+      return res.status(403).json({ error: "ARCA_NOT_AVAILABLE" });
+    }
+    const invoice = await emitirFiscalmente(
+      req.params.id,
+      createArcaClientHomo(ctx),
+      ctx,
+    );
+    res.status(200).json(withDerivedPaymentStatus(invoice!));
+  } catch (error: any) {
+    if (error instanceof ArcaError) {
+      return res
+        .status(error.httpStatus)
+        .json({ error: error.code, message: error.message });
+    }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Reintento de emisión fiscal (PUT /:id/retry-fiscal). Desde PENDING_CAE,
+// reutiliza el MISMO correlativo reservado (spec 4.4.2/2.2).
+const retryFiscal = async (req: Request, res: Response) => {
+  try {
+    const ctx = (req as Request & { arcaContext?: ArcaAuthContext }).arcaContext;
+    if (!ctx) {
+      return res.status(403).json({ error: "ARCA_NOT_AVAILABLE" });
+    }
+    const invoice = await reintentarFiscalmente(
+      req.params.id,
+      createArcaClientHomo(ctx),
+      ctx,
+    );
+    res.status(200).json(withDerivedPaymentStatus(invoice!));
+  } catch (error: any) {
+    if (error instanceof ArcaError) {
+      return res
+        .status(error.httpStatus)
+        .json({ error: error.code, message: error.message });
+    }
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -290,6 +397,8 @@ export default {
   updateInvoice,
   deleteInvoice,
   issueInvoice,
+  issueFiscal,
+  retryFiscal,
   markAsPaid,
   cancelInvoice,
 };

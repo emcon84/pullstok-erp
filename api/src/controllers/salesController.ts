@@ -98,13 +98,18 @@ const createInvoiceFromSale = async (req: Request, res: Response) => {
             return res.status(409).json({ error: "SALE_ALREADY_INVOICED" });
         }
 
-        // Validar que el customer existe y pertenece a la org (la extensión
-        // también scopa Customer, así que un customerId de otra org → null).
-        const customer = await prisma.customer.findFirst({
-            where: { id: customerId },
-        });
-        if (!customer) {
+        // Validar el customer SOLO si viene (spec 6.1): sin customerId la
+        // Factura B de mostrador va sin identificar (DocTipo 99 / DocNro 0,
+        // sin Customer asociado). La extensión scopa Customer, así que un
+        // customerId de otra org → null → 404 (multi-tenant correcto).
+        let resolvedCustomerId: string | null = customerId ?? null;
+        if (resolvedCustomerId) {
+          const customer = await prisma.customer.findFirst({
+            where: { id: resolvedCustomerId },
+          });
+          if (!customer) {
             return res.status(404).json({ message: "Customer not found" });
+          }
         }
 
         // Mapear SaleItem → InvoiceLineInput. taxRate fijo 21% en v1.
@@ -122,7 +127,7 @@ const createInvoiceFromSale = async (req: Request, res: Response) => {
         const invoice = await prisma.invoice.create({
             data: {
                 organizationId,
-                customerId,
+                customerId: resolvedCustomerId,
                 saleId,
                 dueDate: dueDate ? new Date(dueDate) : undefined,
                 notes,
