@@ -1,5 +1,6 @@
 import { Router } from "express";
 import arcaSettingsController from "../controllers/arcaSettingsController";
+import padronController from "../controllers/padronController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
 import { validate } from "../middlewares/validate";
 import { arcaSettingsSchema } from "../validation/schemas";
@@ -29,6 +30,15 @@ router.get(
   "/arca/check-enabled",
   authenticateJWT,
   arcaSettingsController.getArcaEnabled,
+);
+
+// Padrón A4: consulta un CUIT para autocompletar clientes. Mismo gate que el
+// CRUD de clientes (cualquier rol autenticado). El front no bloquea la carga
+// manual si falla.
+router.get(
+  "/arca/padron/:cuit",
+  authenticateJWT,
+  padronController.getPadronByCuit,
 );
 
 export default router;

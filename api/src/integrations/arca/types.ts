@@ -65,6 +65,35 @@ export interface CaeResult {
   obs: ArcaObs[];
 }
 
+/** Impuesto de una persona del padrón A4 (idImpuesto 30 = IVA). */
+export interface PadronImpuesto {
+  id: number;
+  descripcion: string;
+  estado: string;
+}
+
+/** Domicilio fiscal devuelto por el padrón A4 (null si no viene). */
+export interface PadronDomicilio {
+  direccion: string;
+  localidad: string;
+  codPostal: string;
+  provincia: string;
+}
+
+/**
+ * Persona del padrón A4 (ws_sr_padron_a4 / getPersona). Shape tolerante:
+ * `razonSocial` puede venir como persona física (apellido+nombre) o jurídica
+ * (razonSocial); `estado` indica si la clave fiscal está vigente.
+ */
+export interface PadronPersona {
+  cuit: string;
+  razonSocial: string;
+  estado: string;
+  impuestos: PadronImpuesto[];
+  domicilio: PadronDomicilio | null;
+  constanciaUrl: string | null;
+}
+
 /** Contrato único de la capa ARCA (composición wsaa + wsfev1 + soap + signer). */
 export interface ArcaClient {
   /** WSAA: LoginCms con cache de TA 12 h en memoria por org (MUST NOT persistir). */
@@ -92,6 +121,8 @@ export const ARCA_ERROR_CODES = {
   INVOICE_ALREADY_ISSUED: "INVOICE_ALREADY_ISSUED",
   CAE_VENCIDO: "CAE_VENCIDO",
   CUIT_INVALIDO: "CUIT_INVALIDO",
+  ARCA_PADRON_ERROR: "ARCA_PADRON_ERROR",
+  ARCA_PADRON_NOT_FOUND: "ARCA_PADRON_NOT_FOUND",
 } as const;
 
 export type ArcaErrorCode =

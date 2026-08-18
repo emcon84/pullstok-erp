@@ -13,6 +13,7 @@ import {
   useUpdateCustomer,
 } from "../components/hooks/useCustomer";
 import { Loader } from "../components/atoms/loader";
+import { fetchPadron } from "../services/customerService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,11 +31,18 @@ export const Customers = () => {
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerEmail, setNewCustomerEmail] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [newCustomerTaxId, setNewCustomerTaxId] = useState("");
+  const [newCustomerTaxCondition, setNewCustomerTaxCondition] = useState("");
+  const [newCustomerAddress, setNewCustomerAddress] = useState("");
+  const [loadingPadron, setLoadingPadron] = useState(false);
 
   const [editCustomerId, setEditCustomerId] = useState<string | null>(null);
   const [updatedCustomerName, setUpdatedCustomerName] = useState("");
   const [updatedCustomerEmail, setUpdatedCustomerEmail] = useState("");
   const [updatedCustomerPhone, setUpdatedCustomerPhone] = useState("");
+  const [updatedCustomerTaxId, setUpdatedCustomerTaxId] = useState("");
+  const [updatedCustomerTaxCondition, setUpdatedCustomerTaxCondition] = useState("");
+  const [updatedCustomerAddress, setUpdatedCustomerAddress] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
@@ -50,12 +58,75 @@ export const Customers = () => {
 
   const openModal = () => setIsOpen(true);
 
+  const onlyDigits = (value: string) => value.replace(/\D/g, "");
+
+  /** Deriva la condición de IVA desde los impuestos del padrón (id 30 = IVA). */
+  const deriveTaxCondition = (impuestos: { id: number; descripcion: string; estado: string }[]): string => {
+    const iva = impuestos.find((i) => i.id === 30);
+    return iva?.descripcion || iva?.estado || "";
+  };
+
+  const handleArcaLookup = async (cuit: string) => {
+    const digits = onlyDigits(cuit);
+    if (digits.length !== 11) {
+      toast.error("Ingresá un CUIT de 11 dígitos para consultar ARCA");
+      return;
+    }
+    setLoadingPadron(true);
+    try {
+      const persona = await fetchPadron(digits);
+      setNewCustomerName(persona.razonSocial);
+      setNewCustomerTaxCondition(deriveTaxCondition(persona.impuestos));
+      if (persona.domicilio) {
+        const { direccion, localidad, codPostal, provincia } = persona.domicilio;
+        setNewCustomerAddress(
+          [direccion, localidad, provincia, codPostal].filter(Boolean).join(", "),
+        );
+      }
+      setNewCustomerTaxId(digits);
+      toast.success("Datos cargados desde ARCA. Revisá y confirmá antes de guardar.");
+    } catch (error: any) {
+      toast.error(error?.message || "Error al consultar el padrón de ARCA");
+    } finally {
+      setLoadingPadron(false);
+    }
+  };
+
+  const handleEditArcaLookup = async (cuit: string) => {
+    const digits = onlyDigits(cuit);
+    if (digits.length !== 11) {
+      toast.error("Ingresá un CUIT de 11 dígitos para consultar ARCA");
+      return;
+    }
+    setLoadingPadron(true);
+    try {
+      const persona = await fetchPadron(digits);
+      setUpdatedCustomerName(persona.razonSocial);
+      setUpdatedCustomerTaxCondition(deriveTaxCondition(persona.impuestos));
+      if (persona.domicilio) {
+        const { direccion, localidad, codPostal, provincia } = persona.domicilio;
+        setUpdatedCustomerAddress(
+          [direccion, localidad, provincia, codPostal].filter(Boolean).join(", "),
+        );
+      }
+      setUpdatedCustomerTaxId(digits);
+      toast.success("Datos cargados desde ARCA. Revisá y confirmá antes de guardar.");
+    } catch (error: any) {
+      toast.error(error?.message || "Error al consultar el padrón de ARCA");
+    } finally {
+      setLoadingPadron(false);
+    }
+  };
+
   const handleAddCustomer = async () => {
     submitCustomer(
       {
         name: newCustomerName,
         email: newCustomerEmail,
         phone: newCustomerPhone,
+        taxId: newCustomerTaxId || undefined,
+        taxCondition: newCustomerTaxCondition || undefined,
+        address: newCustomerAddress || undefined,
       },
       {
         onSuccess: () => {
@@ -96,6 +167,9 @@ export const Customers = () => {
       setUpdatedCustomerName(customerMatch.name);
       setUpdatedCustomerEmail(customerMatch.email);
       setUpdatedCustomerPhone(customerMatch.phone);
+      setUpdatedCustomerTaxId(customerMatch.taxId ?? "");
+      setUpdatedCustomerTaxCondition(customerMatch.taxCondition ?? "");
+      setUpdatedCustomerAddress(customerMatch.address ?? "");
       setIsEditModalOpen(true);
     }
   };
@@ -108,6 +182,9 @@ export const Customers = () => {
         name: updatedCustomerName,
         email: updatedCustomerEmail,
         phone: updatedCustomerPhone,
+        taxId: updatedCustomerTaxId || undefined,
+        taxCondition: updatedCustomerTaxCondition || undefined,
+        address: updatedCustomerAddress || undefined,
       },
       {
         onSuccess: () => {
@@ -127,6 +204,9 @@ export const Customers = () => {
     setNewCustomerName("");
     setNewCustomerEmail("");
     setNewCustomerPhone("");
+    setNewCustomerTaxId("");
+    setNewCustomerTaxCondition("");
+    setNewCustomerAddress("");
   };
 
   const closeEditModal = () => {
@@ -135,6 +215,9 @@ export const Customers = () => {
     setUpdatedCustomerName("");
     setUpdatedCustomerEmail("");
     setUpdatedCustomerPhone("");
+    setUpdatedCustomerTaxId("");
+    setUpdatedCustomerTaxCondition("");
+    setUpdatedCustomerAddress("");
   };
 
   if (loading) {
@@ -230,12 +313,20 @@ export const Customers = () => {
           name={newCustomerName}
           email={newCustomerEmail}
           phone={newCustomerPhone}
+          taxId={newCustomerTaxId}
+          taxCondition={newCustomerTaxCondition}
+          address={newCustomerAddress}
           setName={setNewCustomerName}
           setEmail={setNewCustomerEmail}
           setPhone={setNewCustomerPhone}
+          setTaxId={setNewCustomerTaxId}
+          setTaxCondition={setNewCustomerTaxCondition}
+          setAddress={setNewCustomerAddress}
           handleSaveCustomer={handleAddCustomer}
           handleCloseModal={closeModal}
           loadingCustomer={loadingCustomer}
+          loadingPadron={loadingPadron}
+          onArcaLookup={handleArcaLookup}
           isEditing={false}
         />
       </GenericModal>
@@ -245,12 +336,20 @@ export const Customers = () => {
           name={updatedCustomerName}
           email={updatedCustomerEmail}
           phone={updatedCustomerPhone}
+          taxId={updatedCustomerTaxId}
+          taxCondition={updatedCustomerTaxCondition}
+          address={updatedCustomerAddress}
           setName={setUpdatedCustomerName}
           setEmail={setUpdatedCustomerEmail}
           setPhone={setUpdatedCustomerPhone}
+          setTaxId={setUpdatedCustomerTaxId}
+          setTaxCondition={setUpdatedCustomerTaxCondition}
+          setAddress={setUpdatedCustomerAddress}
           handleSaveCustomer={handleSaveEditedCustomer}
           handleCloseModal={closeEditModal}
           loadingCustomer={loadingUpdate}
+          loadingPadron={loadingPadron}
+          onArcaLookup={handleEditArcaLookup}
           isEditing={true}
         />
       </GenericModal>

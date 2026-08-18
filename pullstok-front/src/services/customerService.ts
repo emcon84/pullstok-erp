@@ -2,6 +2,53 @@ import axios from "axios";
 import { CreateCustomer, Customer } from "../models/customerModel";
 import { API_URL } from "../constants";
 
+export interface PadronImpuesto {
+  id: number;
+  descripcion: string;
+  estado: string;
+}
+
+export interface PadronDomicilio {
+  direccion: string;
+  localidad: string;
+  codPostal: string;
+  provincia: string;
+}
+
+export interface PadronPersona {
+  cuit: string;
+  razonSocial: string;
+  estado: string;
+  impuestos: PadronImpuesto[];
+  domicilio: PadronDomicilio | null;
+  constanciaUrl: string | null;
+}
+
+const authHeaders = () => ({
+  Authorization: `Bearer ${localStorage.getItem("token")}`,
+});
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.error || error.response?.data?.message || fallback;
+  }
+  return fallback;
+};
+
+/** Consulta el padrón A4 de un CUIT para autocompletar la carga de clientes.
+ * El caller NO bloquea la carga manual si falla (CUIT inexistente → 404). */
+export const fetchPadron = async (cuit: string): Promise<PadronPersona> => {
+  try {
+    const response = await axios.get<PadronPersona>(
+      `${API_URL}/arca/padron/${cuit}`,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(extractErrorMessage(error, "Error al consultar el padrón de ARCA"));
+  }
+};
+
 export const getCustomers = async (): Promise<Customer[]> => {
   const token = localStorage.getItem("token"); // Obtén el token de autenticación
 

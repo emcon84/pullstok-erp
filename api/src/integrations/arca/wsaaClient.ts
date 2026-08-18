@@ -23,7 +23,9 @@ interface TaCacheEntry {
   expiresAt: number;
 }
 
-/** Cache en memoria por organizationId (MUST NOT persistir). */
+/** Cache en memoria por `${organizationId}:${service}` (MUST NOT persistir).
+ * Un TA es válido SOLO para el service del TRA que lo firmó: el de "wsfe" NO
+ * sirve para "ws_sr_padron_a4". */
 const taCache = new Map<string, TaCacheEntry>();
 
 export const clearTaCache = (): void => {
@@ -76,11 +78,15 @@ const isCacheable = (entry: TaCacheEntry): boolean =>
   entry.expiresAt > Date.now() &&
   entry.ta.expirationTime.getTime() > Date.now();
 
-/** Obtiene (y cachea) el TA de la org. Renueva si está vencido o faltan <0 ms. */
+/** Obtiene (y cachea) el TA de la org para el service pedido. Renueva si está
+ * vencido o faltan <0 ms. El service del TRA debe coincidir con el WS que se
+ * va a invocar (el TA es por service: "wsfe" ≠ "ws_sr_padron_a4"). */
 export const authenticateWsaa = async (
   context: ArcaAuthContext,
+  service = "wsfe",
 ): Promise<TicketAcceso> => {
-  const cached = taCache.get(context.organizationId);
+  const cacheKey = `${context.organizationId}:${service}`;
+  const cached = taCache.get(cacheKey);
   if (cached && isCacheable(cached)) {
     return cached.ta;
   }
@@ -91,7 +97,7 @@ export const authenticateWsaa = async (
       fs.readFile(context.keyPath, "utf8"),
     ]);
 
-    const tra = buildTra(context.cuitEmisor, "wsfe");
+    const tra = buildTra(context.cuitEmisor, service);
     const cms = signTra(tra, certPem, keyPem);
 
     const xml = await soapRequest({
@@ -105,7 +111,7 @@ export const authenticateWsaa = async (
       ta.expirationTime.getTime(),
       Date.now() + TA_MAX_CACHE_MS,
     );
-    taCache.set(context.organizationId, { ta, expiresAt });
+    taCache.set(cacheKey, { ta, expiresAt });
     return ta;
   } catch (err) {
     if (err instanceof ArcaError) {

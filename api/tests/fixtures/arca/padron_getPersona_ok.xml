@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <getPersonaResponse xmlns="http://a4.soap.wsaa.cf.afip.gob.ar/">
+      <personaReturn>
+        <idPersona>20000000001</idPersona>
+        <apellido>GOMEZ</apellido>
+        <nombre>JUAN CARLOS</nombre>
+        <estadoClave>ACTIVO</estadoClave>
+        <tipoPersona>FISICA</tipoPersona>
+        <relacion>CONSUMIDOR FINAL</relacion>
+        <impuesto>
+          <impuesto>
+            <idImpuesto>30</idImpuesto>
+            <descripcionImpuesto>IVA</descripcionImpuesto>
+            <periodo>2026-01</periodo>
+          </impuesto>
+        </impuesto>
+        <domicilio>
+          <direccion>AV CORRIENTES 1234</direccion>
+          <localidad>CIUDAD AUTONOMA BUENOS AIRES</localidad>
+          <codPostal>1043</codPostal>
+          <idProvincia>0</idProvincia>
+          <descripcionProvincia>CIUDAD AUTONOMA BUENOS AIRES</descripcionProvincia>
+        </domicilio>
+        <constancia>https://www.afip.gob.ar/constancia/123</constancia>
+      </personaReturn>
+    </getPersonaResponse>
+  </soap:Body>
+</soap:Envelope>
