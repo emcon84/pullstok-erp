@@ -77,6 +77,8 @@ model Organization {
   conversations         Conversation[]
   botConfig             BotConfig?
   appBranding           AppBranding?
+  arcaSetting           ArcaSetting?
+  arcaSequences         ArcaSequence[]
   branches              Branch[]
   productStocks         ProductStock[]
   looseStocks           LooseStock[]
@@ -669,10 +671,23 @@ enum OrderSource {
   INTERNAL
 }
 
+// Estado fiscal de una Invoice (sdd/arca-facturacion-electronica).
+// PENDING_CAE: emisión fiscal en curso o fallida — correlativo reservado ANTES
+// del SOAP a ARCA y datos de error (arcaErrorCode/Message) para el reintento.
+// Una Invoice ISSUED sin CAE es el comprobante interno FAC-XXXX (sin valor
+// fiscal); con ARCA habilitada el flujo nunca deja ISSUED sin CAE.
 enum InvoiceStatus {
   DRAFT
   ISSUED
+  PENDING_CAE
   CANCELLED
+}
+
+// Ambiente ARCA (WSAA/WSFEv1). HOMOLOGACION por defecto: el comercio pasa a
+// PRODUCCION solo cuando validó el alta de punto de venta y el certificado.
+enum ArcaEnvironment {
+  HOMOLOGACION
+  PRODUCCION
 }
 
 enum PaymentStatus {
@@ -685,8 +700,10 @@ model Invoice {
   id              String        @id @default(uuid())
   organizationId  String
   organization    Organization  @relation(fields: [organizationId], references: [id])
-  customerId      String
-  customer        Customer      @relation(fields: [customerId], references: [id])
+  // OPCIONAL desde sdd/arca-facturacion-electronica: la Factura B de mostrador
+  // sin identificar va con DocTipo 99 / DocNro 0 (sin Customer asociado).
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id])
   number          String? // null en DRAFT; "FAC-0001" asignado solo al ISSUED
   issueDate       DateTime      @default(now())
   dueDate         DateTime?
@@ -697,11 +714,21 @@ model Invoice {
   status          InvoiceStatus @default(DRAFT)
   paymentStatus   PaymentStatus @default(PENDING)
   notes           String?
-  // --- Fase 2 (AFIP/ARCA WSFEv1), nullable, sin lógica ---
-  tipoComprobante String?
-  puntoVenta      Int?
+  // --- Fase 2 (ARCA WSFEv1), nullable, con lógica desde arca-facturacion-electronica ---
+  tipoComprobante String?       // "1"=Factura A, "6"=Factura B (código ARCA)
+  puntoVenta      Int?          // PV fiscal configurado en ArcaSetting
   cae             String?
   caeVencimiento  DateTime?
+  // Correlativo fiscal reservado ANTES del SOAP (autoridad: FECompUltimoAutorizado).
+  cbteNro                 Int?
+  // Snapshot del receptor al emitir (RG 5616 / CondicionIVAReceptorId):
+  docTipoReceptor         Int?    // 80=CUIT, 96=DNI, 99=Consumidor Final
+  docNroReceptor          String? // "0" consumidor final; hasta 20 dígitos
+  condicionIvaReceptorId  Int?    // 1=RI, 5=Consumidor Final, 6=Monotributo
+  // Error de la última FECAESolicitar (para reintento y diagnóstico en UI):
+  arcaErrorCode           String?
+  arcaErrorMessage        String?
+  arcaAttempts            Int      @default(0)
   // --- Puente Sale→Invoice (opcional; facturas de servicio no tienen venta) ---
   saleId          String?       @unique
   sale            Sale?         @relation(fields: [saleId], references: [id])
@@ -724,6 +751,51 @@ model InvoiceItem {
   lineTotal   Float // snapshot: quantity * unitPrice (sin IVA)
 
   @@map("invoice_items")
+}
+
+// Configuración ARCA (WSAA/WSFEv1) por organización, 1:1 con Organization
+// (sdd/arca-facturacion-electronica). A PROPÓSITO fuera de TENANT_MODELS (ver
+// db.ts): se accede vía basePrisma filtrando por organizationId directamente
+// (mismo patrón que StoreSettings/AppBranding). Los CERTIFICADOS NUNCA se
+// guardan acá: solo las rutas crt/key en el VPS (fuera del repo). `enabled`
+// es el switch operativo del gate: false (default) mantiene el flujo interno
+// FAC-XXXX intacto hasta que el ADMIN configura y prende ARCA por org.
+model ArcaSetting {
+  id             String          @id @default(uuid())
+  organizationId String          @unique
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  // CUIT del emisor, 11 dígitos sin guiones (ej. 30709706701).
+  cuitEmisor     String
+  // Punto de venta fiscal del comercio (1..9999).
+  puntoVenta     Int
+  environment    ArcaEnvironment @default(HOMOLOGACION)
+  // VPS: /var/www/pullstok/certs/{org}/wswfev1-{env}.crt
+  certPath       String
+  // VPS: /var/www/pullstok/certs/{org}/wswfev1-{env}.key
+  keyPath        String
+  enabled        Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@map("arca_settings")
+}
+
+// Cache/contador local de la numeración fiscal por (org, puntoVenta,
+// tipoCbte). A PROPÓSITO fuera de TENANT_MODELS (mismo criterio que Counter).
+// La AUTORIDAD del número es ARCA (FECompUltimoAutorizado); esta tabla es
+// cache de observación + auditoría del último correlativo reservado.
+model ArcaSequence {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  puntoVenta     Int
+  // "1"=Factura A, "6"=Factura B (código ARCA).
+  tipoCbte       String
+  lastReserved   Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, puntoVenta, tipoCbte])
+  @@map("arca_sequences")
 }
 
 // Configuración de branding de la tienda online pública, 1:1 con Organization.
