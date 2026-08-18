@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Plus, Trash2 } from "lucide-react";
@@ -69,6 +70,14 @@ const ProductLineSearch = ({
   const [results, setResults] = useState<ProductSearchHit[]>([]);
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
+  // El dropdown se renderiza en un PORTAL a document.body con position fixed
+  // para que no lo recorte el overflow-x-auto del contenedor de la tabla.
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [anchorRect, setAnchorRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   const runSearch = async () => {
     const query = term.trim();
@@ -91,8 +100,78 @@ const ProductLineSearch = ({
     setTerm("");
   };
 
+  // Cuando se abre, captura la posición del input para anclar el dropdown.
+  useEffect(() => {
+    if (!open) return;
+    const el = anchorRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setAnchorRect({ top: r.bottom, left: r.left, width: r.width });
+  }, [open]);
+
+  // Cierra el dropdown al hacer click afuera.
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  const dropdown =
+    open && anchorRect ? (
+      createPortal(
+        <ul
+          className="fixed z-50 mt-1 max-h-48 w-full overflow-auto rounded border bg-background shadow-md"
+          style={{
+            top: anchorRect.top + 4,
+            left: anchorRect.left,
+            width: anchorRect.width,
+          }}
+          data-testid="product-search-results"
+        >
+          {results.map((hit) => (
+            <li key={hit.id}>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2 px-2 py-1 text-left text-sm hover:bg-accent"
+                onClick={() => pick(hit)}
+              >
+                <span>{hit.name}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {formatCurrency(hit.price)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>,
+        document.body,
+      )
+    ) : null;
+
+  const emptyState =
+    open && results.length === 0 && !searching && anchorRect
+      ? createPortal(
+          <p
+            className="fixed z-50 mt-1 rounded border bg-background px-2 py-1 text-xs text-muted-foreground shadow-md"
+            style={{
+              top: anchorRect.top + 4,
+              left: anchorRect.left,
+              width: anchorRect.width,
+            }}
+            data-testid="product-search-empty"
+          >
+            Sin resultados
+          </p>,
+          document.body,
+        )
+      : null;
+
   return (
-    <div className="relative">
+    <div ref={anchorRef} className="relative">
       <div className="flex gap-1">
         <Input
           value={value}
@@ -120,35 +199,8 @@ const ProductLineSearch = ({
           Buscar
         </Button>
       </div>
-      {open && results.length > 0 && (
-        <ul
-          className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border bg-background shadow-md"
-          data-testid="product-search-results"
-        >
-          {results.map((hit) => (
-            <li key={hit.id}>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-2 px-2 py-1 text-left text-sm hover:bg-accent"
-                onClick={() => pick(hit)}
-              >
-                <span>{hit.name}</span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {formatCurrency(hit.price)}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {open && results.length === 0 && !searching && (
-        <p
-          className="mt-1 text-xs text-muted-foreground"
-          data-testid="product-search-empty"
-        >
-          Sin resultados
-        </p>
-      )}
+      {dropdown}
+      {emptyState}
     </div>
   );
 };
