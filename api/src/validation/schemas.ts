@@ -507,6 +507,15 @@ export const bulkPriceUpdateSchema = z
     // secciones (PriceListEntry.productId), combinado como AND con marcas/
     // proveedores/categorías.
     priceListSectionIds: z.array(z.string().uuid("Sección de planilla inválida")).default([]),
+    // Overrides por SECCIÓN de planilla (línea del PDF): % propio por línea,
+    // precedencia product > section > category > global (mismo patrón que
+    // categoryPercentages/productPercentages). Vacío/ausente → sin overrides.
+    sectionPercentages: z
+      .array(z.object({
+        sectionId: z.string().uuid("Sección de planilla inválida"),
+        percentage: z.coerce.number().min(-100, "Mínimo -100%").max(500, "Máximo 500%"),
+      }))
+      .default([]),
     // Overrides por categoría/producto (sdd/bulk-price-overrides): % propio por
     // nodo de categoría y por fila de producto. Precedencia product > category
     // > global (percentage). 0% = incluido pero sin cambio; exclusión =

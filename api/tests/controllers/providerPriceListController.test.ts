@@ -807,6 +807,27 @@ describe("applyPriceList — proveedor de la planilla (providerName)", () => {
     expect(matchedUpdate[0].data.providerId).toBe("prov-existente");
   });
 
+  it("etiqueta el PriceList con el providerName real (ROYAL CANIN) en vez de ALICAN", async () => {
+    const tx = setupTx(null);
+    const res = fakeRes();
+    await applyPriceList(
+      fakeReq({ body: { ...applyBody, providerName: "ROYAL CANIN" } }),
+      res,
+    );
+
+    // El PriceList se crea con el proveedor del payload, no el ALICAN hardcodeado.
+    expect(tx.priceList.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ provider: "ROYAL CANIN" }),
+      }),
+    );
+    // Y el Provider de la org se resuelve con ese mismo nombre.
+    expect(tx.provider.create).toHaveBeenCalledWith({
+      data: { name: "ROYAL CANIN", organizationId: "org-1" },
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
   it("sin providerName NO resuelve proveedor ni toca providerId (back-compat)", async () => {
     const tx = setupTx(null);
     const res = fakeRes();

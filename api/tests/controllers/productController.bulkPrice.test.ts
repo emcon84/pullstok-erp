@@ -6,6 +6,7 @@ import productController, {
   buildCategoryParentMap,
   resolveEffectivePercentage,
   resolveSectionProductIds,
+  resolveSectionPercentageByProduct,
   BULK_UPDATE_MAX,
 } from "../../src/controllers/productController";
 import { prisma } from "../../src/config/db";
@@ -232,6 +233,57 @@ describe("resolveSectionProductIds — productIds de secciones con anti-fuga y d
   });
 });
 
+describe("resolveSectionPercentageByProduct — mapa productId → % con anti-fuga y primer-match", () => {
+  const mockTx = {
+    priceListEntry: { findMany: jest.fn() },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("returns an empty Map without querying the DB when sectionPercentages is empty", async () => {
+    const result = await resolveSectionPercentageByProduct(mockTx as any, "org-1", []);
+    expect(result.size).toBe(0);
+    expect(mockTx.priceListEntry.findMany).not.toHaveBeenCalled();
+  });
+
+  it("queries entries scoped by org and maps productId → %", async () => {
+    mockTx.priceListEntry.findMany.mockResolvedValue([
+      { productId: "p-1", sectionId: "sec-1" },
+      { productId: "p-2", sectionId: "sec-2" },
+    ]);
+    const result = await resolveSectionPercentageByProduct(mockTx as any, "org-1", [
+      { sectionId: "sec-1", percentage: 25 },
+      { sectionId: "sec-2", percentage: 10 },
+    ]);
+    expect(mockTx.priceListEntry.findMany).toHaveBeenCalledWith({
+      where: {
+        section: {
+          id: { in: ["sec-1", "sec-2"] },
+          priceList: { organizationId: "org-1" },
+        },
+        productId: { not: null },
+      },
+      select: { productId: true, sectionId: true },
+    });
+    expect(result.get("p-1")).toBe(25);
+    expect(result.get("p-2")).toBe(10);
+  });
+
+  it("keeps the FIRST override when a product appears in two sections", async () => {
+    mockTx.priceListEntry.findMany.mockResolvedValue([
+      { productId: "p-1", sectionId: "sec-1" },
+      { productId: "p-1", sectionId: "sec-2" },
+    ]);
+    const result = await resolveSectionPercentageByProduct(mockTx as any, "org-1", [
+      { sectionId: "sec-1", percentage: 25 },
+      { sectionId: "sec-2", percentage: 40 },
+    ]);
+    expect(result.get("p-1")).toBe(25);
+  });
+});
+
 describe("BULK_UPDATE_MAX module constant", () => {
   it("caps the affected set at 5000 products (exceeding → HTTP 400)", () => {
     expect(BULK_UPDATE_MAX).toBe(5000);
@@ -251,7 +303,7 @@ describe("buildCategoryParentMap — parent lookup for inheritance walk", () => 
   });
 });
 
-describe("resolveEffectivePercentage — product > nearest category ancestor > global", () => {
+describe("resolveEffectivePercentage — product > section > nearest category ancestor > global", () => {
   // Tree: a → b → c (a parent of b, b parent of c)
   const parentById = new Map<string, string | null>([
     ["a", null],
@@ -264,6 +316,7 @@ describe("resolveEffectivePercentage — product > nearest category ancestor > g
     categoryId?: string | null;
     categoryPercentages?: Array<[string, number]>;
     productPercentages?: Array<[string, number]>;
+    sectionPercentages?: Array<[string, number]>;
     globalPct?: number;
   }) =>
     resolveEffectivePercentage({
@@ -272,6 +325,7 @@ describe("resolveEffectivePercentage — product > nearest category ancestor > g
       parentById,
       categoryPercentages: new Map(o.categoryPercentages ?? []),
       productPercentages: new Map(o.productPercentages ?? []),
+      sectionPercentages: new Map(o.sectionPercentages ?? []),
       globalPct: o.globalPct ?? 15,
     });
 
@@ -288,6 +342,40 @@ describe("resolveEffectivePercentage — product > nearest category ancestor > g
         globalPct: 0,
       }),
     ).toBe(20);
+  });
+
+  it("section override wins over category and global (product sin override propio)", () => {
+    expect(
+      eff({
+        productId: "p-x",
+        sectionPercentages: [["p-x", 25]],
+        categoryPercentages: [["c", 10]],
+        globalPct: 0,
+      }),
+    ).toBe(25);
+  });
+
+  it("product override wins over a section override on the same product", () => {
+    expect(
+      eff({
+        productId: "p-x",
+        productPercentages: [["p-x", 20]],
+        sectionPercentages: [["p-x", 25]],
+        categoryPercentages: [["c", 10]],
+        globalPct: 0,
+      }),
+    ).toBe(20);
+  });
+
+  it("falls to the category override when the product has neither product nor section override", () => {
+    expect(
+      eff({
+        productId: "p-x",
+        sectionPercentages: [["p-otro", 25]],
+        categoryPercentages: [["c", 10]],
+        globalPct: 0,
+      }),
+    ).toBe(10);
   });
 
   it("an exact-self category override applies (own category)", () => {
@@ -329,6 +417,7 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
   const mockTx = {
     category: { findMany: jest.fn() },
     product: { findMany: jest.fn(), updateMany: jest.fn() },
+    priceListEntry: { findMany: jest.fn() },
   };
 
   const makeProduct = (i: number) => ({
@@ -363,6 +452,7 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
   const overrideDryRunReq = (overrides: {
     categoryPercentages?: Array<{ categoryId: string; percentage: number }>;
     productPercentages?: Array<{ productId: string; percentage: number }>;
+    sectionPercentages?: Array<{ sectionId: string; percentage: number }>;
     percentage?: number;
   }) =>
     ({
@@ -373,6 +463,7 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
         excludeProductIds: [],
         categoryPercentages: overrides.categoryPercentages ?? [],
         productPercentages: overrides.productPercentages ?? [],
+        sectionPercentages: overrides.sectionPercentages ?? [],
       },
       query: { dryRun: "true" },
     } as unknown as Request);
@@ -515,6 +606,49 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
       // previous 100+120=220; new 120+132=252
       expect(json.previousTotal).toBe(220);
       expect(json.newTotal).toBe(252);
+    });
+
+    it("applies a per-section override to the matched products of that section (preview)", async () => {
+      // p-a y p-b en la sección con override 25; p-c en otra sección sin
+      // override → global. La sección NO está en priceListSectionIds (alcance
+      // por marca/categoría): el override aplica igual a los productos del set.
+      mockedPrisma.product.findMany.mockResolvedValue([
+        prodWithCat("p-a", "aaa", "Perros", 100),
+        prodWithCat("p-b", "bbb", "Gatos", 100),
+        prodWithCat("p-c", "ccc", "Aves", 100),
+      ]);
+      // Mapeo sección → producto (resolveSectionPercentageByProduct sobre prisma).
+      (prisma.priceListEntry.findMany as unknown as jest.Mock).mockResolvedValue([
+        { productId: "p-a", sectionId: "sec-1" },
+        { productId: "p-b", sectionId: "sec-1" },
+      ]);
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        overrideDryRunReq({
+          percentage: 10,
+          sectionPercentages: [{ sectionId: "sec-1", percentage: 25 }],
+        }),
+        res,
+      );
+
+      const rows = res.json.mock.calls[0][0].rows as Array<{
+        id: string;
+        effectivePercentage: number;
+        newPrice: number;
+      }>;
+      expect(rows.find((r) => r.id === "p-a")).toMatchObject({
+        effectivePercentage: 25,
+        newPrice: 125,
+      });
+      expect(rows.find((r) => r.id === "p-b")).toMatchObject({
+        effectivePercentage: 25,
+        newPrice: 125,
+      });
+      expect(rows.find((r) => r.id === "p-c")).toMatchObject({
+        effectivePercentage: 10,
+        newPrice: 110,
+      });
     });
 
     it("inherits a parent category override to descendant products in preview (S2)", async () => {
@@ -796,6 +930,49 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
       });
       const json = res.json.mock.calls[0][0];
       expect(json.newTotal).toBe(360);
+    });
+
+    it("re-resolves section overrides INSIDE the tx and applies them to the matched products", async () => {
+      // La re-consulta in-tx es la fuente autoritativa: si el preview estuviera
+      // stale, el apply igual toma el Map resuelto contra `tx`.
+      (mockTx.priceListEntry.findMany as unknown as jest.Mock).mockResolvedValue([
+        { productId: "p-1", sectionId: "sec-1" },
+      ]);
+      mockTx.product.findMany.mockResolvedValue([
+        { id: "p-1", price: 100, categoryId: "a" },
+      ]);
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        {
+          body: {
+            brandValues: ["Acme"],
+            percentage: 10,
+            categoryIds: ["a"],
+            excludeProductIds: [],
+            categoryPercentages: [],
+            productPercentages: [],
+            sectionPercentages: [{ sectionId: "sec-1", percentage: 25 }],
+          },
+          query: {},
+        } as unknown as Request,
+        res,
+      );
+
+      // Re-consulta dentro del $transaction (tx, no prisma).
+      expect(mockTx.priceListEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            section: expect.objectContaining({ id: { in: ["sec-1"] } }),
+          }),
+        }),
+      );
+      expect(mockTx.product.updateMany).toHaveBeenCalledWith({
+        where: { id: "p-1" },
+        data: { price: 125 },
+      });
+      const json = res.json.mock.calls[0][0];
+      expect(json.newTotal).toBe(125);
     });
 
     it("applies a per-product override beating category and global (S4 apply-side)", async () => {

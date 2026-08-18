@@ -334,6 +334,7 @@ async function applyPriceListCore(
   productsCreated: number;
 }> {
   const { layout, period, sourceFilename, applyPrices = false, providerName, rows } = body;
+  const providerNameTrimmed = providerName?.trim();
   const imports = rows.filter((r) => r.accion === "import");
 
   if (imports.length === 0) {
@@ -391,7 +392,7 @@ async function applyPriceListCore(
     const created = await tx.priceList.create({
       data: {
         organizationId,
-        provider: "ALICAN",
+        provider: providerNameTrimmed ?? "ALICAN",
         type,
         period: period ?? null,
         sourceFilename,
@@ -410,7 +411,6 @@ async function applyPriceListCore(
       imports.some((r) => r.productId) ||
       (applyPrices && imports.some((r) => r.precioConIva != null));
     let providerId: string | null = null;
-    const providerNameTrimmed = providerName?.trim();
     if (providerNameTrimmed && touchesProducts) {
       const existing = await tx.provider.findFirst({
         where: {

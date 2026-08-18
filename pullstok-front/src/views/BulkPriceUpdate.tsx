@@ -109,6 +109,9 @@ export const BulkPriceUpdate = () => {
   const [productOverrides, setProductOverrides] = useState<
     Record<string, string>
   >({});
+  // Overrides de % por LÍNEA de planilla (grupo brand|line): clave = g.key,
+  // valor = string del input (vacío = sin override).
+  const [sectionOverrides, setSectionOverrides] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<{ id: string; name: string }[]>(
     [],
   );
@@ -236,6 +239,12 @@ export const BulkPriceUpdate = () => {
     return [...groups.values()];
   }, [sections]);
 
+  // Líneas (grupos brand|line) con al menos una sección seleccionada: son las
+  // que admiten un override de % propio en el panel "Porcentaje por línea".
+  const selectedSectionGroups = sectionGroups.filter((g) =>
+    g.ids.some((id) => selectedSectionIds.includes(id)),
+  );
+
   // Toggle de TODA una línea (todos los sectionIds del grupo).
   const toggleSectionGroup = (ids: string[]) => {
     setSelectedSectionIds((prev) => {
@@ -268,6 +277,17 @@ export const BulkPriceUpdate = () => {
     const productPercentages = Object.entries(productOverrides)
       .filter(([, value]) => value.trim() !== "" && !Number.isNaN(parseFloat(value)))
       .map(([productId, value]) => ({ productId, percentage: parseFloat(value) }));
+    // Overrides de % por línea de planilla: se expanden de grupo (brand|line) a
+    // TODAS las sectionIds del grupo. Precedencia product > section > category
+    // > global (el server mapea sectionId → productId de las secciones).
+    const sectionPercentages = Object.entries(sectionOverrides)
+      .filter(([, value]) => value.trim() !== "" && !Number.isNaN(parseFloat(value)))
+      .flatMap(([key, value]) => {
+        const group = sectionGroups.find((g) => g.key === key);
+        if (!group) return [];
+        const pct = parseFloat(value);
+        return group.ids.map((sectionId) => ({ sectionId, percentage: pct }));
+      });
     return {
       brandValues: selectedBrands,
       categoryIds,
@@ -277,6 +297,7 @@ export const BulkPriceUpdate = () => {
       percentage: pct,
       categoryPercentages,
       productPercentages,
+      sectionPercentages,
     };
   }, [
     selectedBrands,
@@ -287,6 +308,8 @@ export const BulkPriceUpdate = () => {
     percentage,
     categoryOverrides,
     productOverrides,
+    sectionOverrides,
+    sectionGroups,
   ]);
 
   const handlePreview = async (targetPage = 1) => {
@@ -481,7 +504,7 @@ export const BulkPriceUpdate = () => {
                     <SelectContent>
                       {priceLists.map((pl) => (
                         <SelectItem key={pl.id} value={pl.id}>
-                          {pl.sourceFilename}
+                          {pl.provider} · {pl.sourceFilename}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -509,8 +532,46 @@ export const BulkPriceUpdate = () => {
                       );
                     })}
                   </div>
+                  {selectedSectionGroups.length > 0 && (
+                    <div className="space-y-3 rounded-md border p-3">
+                      <p className="text-sm font-medium">Porcentaje por línea</p>
+                      <ul className="space-y-2">
+                        {selectedSectionGroups.map((g) => (
+                          <li key={g.key} className="flex items-center gap-2">
+                            <Label
+                              htmlFor={`sec-ov-${g.key}`}
+                              className="min-w-0 flex-1 truncate uppercase"
+                            >
+                              {g.label}
+                            </Label>
+                            <Input
+                              id={`sec-ov-${g.key}`}
+                              type="number"
+                              step="0.5"
+                              min="-100"
+                              max="500"
+                              className="h-8 w-24"
+                              value={sectionOverrides[g.key] ?? ""}
+                              placeholder="%"
+                              aria-label={`Porcentaje ${g.label}`}
+                              onChange={(e) =>
+                                setSectionOverrides((prev) => ({
+                                  ...prev,
+                                  [g.key]: e.target.value,
+                                }))
+                              }
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-xs text-muted-foreground">
+                        El porcentaje de la línea reemplaza al default para sus
+                        productos (no se suma).
+                      </p>
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground">
-                    Filtra por la línea del PDF de la planilla (ej. medicados).
+                    Filtra por la línea del PDF de la planilla (ej. la línea de medicados).
                     Se combina como Y con marcas/proveedor/categorías.
                   </p>
                 </div>

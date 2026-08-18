@@ -404,4 +404,54 @@ describe("BulkPriceUpdate — preview, exclusions and apply", () => {
       ),
     );
   });
+
+  it("expands a section override to ALL sectionIds of the selected group on preview", async () => {
+    const priceList = {
+      id: "pl-1",
+      provider: "ALICAN",
+      type: "WHOLESALE",
+      period: "2026-01-01",
+      sourceFilename: "alican-2026.pdf",
+      importedAt: "2026-01-01T00:00:00Z",
+      sectionsCount: 2,
+      entriesCount: 4,
+    };
+    const plSections = [
+      { id: "sec-1", brand: "SIEGERVET", line: "SIGER MEDICADOS", subline: "SIEGERVET PERROS", position: 1 },
+      { id: "sec-2", brand: "SIEGERVET", line: "SIGER MEDICADOS", subline: "SIEGERVET GATOS", position: 2 },
+    ];
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/price-lists/pl-1")) {
+        return Promise.resolve({ ok: true, json: async () => ({ sections: plSections }) });
+      }
+      if (url.includes("/price-lists")) {
+        return Promise.resolve({ ok: true, json: async () => ({ items: [priceList] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => brands });
+    });
+
+    renderView();
+    fireEvent.click(await screen.findByText("SIEGERVET · SIGER MEDICADOS"));
+    // Override de % para la línea seleccionada (panel "Porcentaje por línea").
+    fireEvent.change(
+      screen.getByLabelText(/porcentaje siegervet · siger medicados/i),
+      { target: { value: "25" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: /calcular preview/i }));
+
+    await screen.findByText("Producto 1");
+    await waitFor(() =>
+      expect(mockBulkPriceUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          priceListSectionIds: ["sec-1", "sec-2"],
+          sectionPercentages: [
+            { sectionId: "sec-1", percentage: 25 },
+            { sectionId: "sec-2", percentage: 25 },
+          ],
+        }),
+        true,
+        1,
+      ),
+    );
+  });
 });

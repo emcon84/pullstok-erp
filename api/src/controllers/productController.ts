@@ -840,6 +840,35 @@ export async function resolveSectionProductIds(
 }
 
 /**
+ * Mapa productId → % efectivo por sección de planilla (línea del PDF).
+ * Anti-fuga por org: las secciones se filtran vía su PriceList
+ * (organizationId). Vacío → Map vacío sin tocar la DB. Si un producto está
+ * en varias secciones con override, gana el PRIMERO encontrado.
+ */
+export async function resolveSectionPercentageByProduct(
+  tx: any,
+  orgId: string,
+  sectionPercentages: { sectionId: string; percentage: number }[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (sectionPercentages.length === 0) return map;
+  const pctBySection = new Map(sectionPercentages.map((s) => [s.sectionId, s.percentage]));
+  const entries = (await tx.priceListEntry.findMany({
+    where: {
+      section: { id: { in: [...pctBySection.keys()] }, priceList: { organizationId: orgId } },
+      productId: { not: null },
+    },
+    select: { productId: true, sectionId: true },
+  })) as { productId: string | null; sectionId: string }[];
+  for (const e of entries) {
+    if (e.productId && !map.has(e.productId)) {
+      map.set(e.productId, pctBySection.get(e.sectionId)!);
+    }
+  }
+  return map;
+}
+
+/**
  * Mapa id → parentId de todas las categorías de la org. Lo usan preview y
  * apply para caminar ancestros al resolver el % efectivo de un producto
  * (override de categoría hereda a TODO su subtree: nodo y descendientes).
@@ -851,22 +880,28 @@ export function buildCategoryParentMap(
 }
 
 /**
- * % efectivo de un producto: override por producto > override del nodo de
- * categoría o su ancestro más cercano (incl. sí mismo) > global. 0% explícito
- * es válido (incluido pero sin cambio de precio). null categoryId → salta la
- * caminata de ancestros. productOverrides desconocido → null (producto sin
- * override, se resuelve por categoría/global).
+ * % efectivo de un producto: override por producto > override por sección de
+ * planilla (línea del PDF) > override del nodo de categoría o su ancestro más
+ * cercano (incl. sí mismo) > global. 0% explícito es válido (incluido pero sin
+ * cambio de precio). null categoryId → salta la caminata de ancestros.
+ * productOverrides desconocido → null (producto sin override, se resuelve por
+ * categoría/global).
  */
 export function resolveEffectivePercentage(a: {
   productId: string | null;
   categoryId: string | null;
   parentById: ReadonlyMap<string, string | null>;
   productPercentages: ReadonlyMap<string, number>;
+  sectionPercentages?: ReadonlyMap<string, number>;
   categoryPercentages: ReadonlyMap<string, number>;
   globalPct: number;
 }): number {
   if (a.productId !== null && a.productPercentages.has(a.productId)) {
     return a.productPercentages.get(a.productId)!;
+  }
+  const sectionPct = a.sectionPercentages ?? new Map<string, number>();
+  if (a.productId !== null && sectionPct.has(a.productId)) {
+    return sectionPct.get(a.productId)!;
   }
   let catId = a.categoryId;
   while (catId !== null) {
@@ -888,6 +923,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       priceListSectionIds = [],
       categoryPercentages = [],
       productPercentages = [],
+      sectionPercentages = [],
     } = req.body as {
       brandValues: string[];
       percentage?: number;
@@ -897,6 +933,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       priceListSectionIds?: string[];
       categoryPercentages?: { categoryId: string; percentage: number }[];
       productPercentages?: { productId: string; percentage: number }[];
+      sectionPercentages?: { sectionId: string; percentage: number }[];
     };
     const dryRun = req.query.dryRun === "true";
     const organizationId = requireOrganizationId();
@@ -930,6 +967,14 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
     const prodPctMap = new Map(
       productPercentages.map((p) => [p.productId, p.percentage]),
     );
+    // Overrides por sección de planilla (línea del PDF): mapa productId → %.
+    // Se resuelve fuera del tx para el preview; el apply lo RE-resuelve dentro
+    // del $transaction (autoritativo — nunca confía en un preview stale).
+    const sectionPctMap = await resolveSectionPercentageByProduct(
+      prisma,
+      organizationId,
+      sectionPercentages,
+    );
 
     const products = await prisma.product.findMany({
       where,
@@ -954,6 +999,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         categoryId: p.categoryId ?? null,
         parentById,
         productPercentages: prodPctMap,
+        sectionPercentages: sectionPctMap,
         categoryPercentages: catPctMap,
         globalPct,
       });
@@ -991,6 +1037,13 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
           organizationId,
           priceListSectionIds,
         );
+        // Overrides por sección: re-resuelto DENTRO del tx (autoritativo, mismo
+        // patrón que resolveSectionProductIds — nunca confía en el preview).
+        const sectionPctMapTx = await resolveSectionPercentageByProduct(
+          tx,
+          organizationId,
+          sectionPercentages,
+        );
         const rowsTx = await tx.product.findMany({
           where: buildBulkPriceWhere(
             brandValues,
@@ -1007,15 +1060,16 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         if (rowsTx.length > BULK_UPDATE_MAX) {
           return { affected: rowsTx.length, previousTotal: 0, newTotal: 0, overCap: true };
         }
-        // Autoritativo: cada producto lleva su % EFECTIVO (product > categoría
-        // ancestro más cercana > global), igual que el preview. Nunca global a
-        // ciegas — los overrides se aplican al escribir (REQ-5).
+        // Autoritativo: cada producto lleva su % EFECTIVO (product > section >
+        // categoría ancestro más cercana > global), igual que el preview. Nunca
+        // global a ciegas — los overrides se aplican al escribir (REQ-5).
         const updates = rowsTx.map((r) => {
           const effective = resolveEffectivePercentage({
             productId: r.id,
             categoryId: r.categoryId ?? null,
             parentById,
             productPercentages: prodPctMap,
+            sectionPercentages: sectionPctMapTx,
             categoryPercentages: catPctMap,
             globalPct,
           });
