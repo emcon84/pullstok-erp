@@ -250,7 +250,16 @@ export const adjustPriceList = async (
 export interface ProductSearchHit {
   id: string;
   name: string;
+  price: number;
 }
+
+type SearchProductRaw = { id: string; name: string; price?: number };
+
+const toSearchHit = (p: SearchProductRaw): ProductSearchHit => ({
+  id: p.id,
+  name: p.name,
+  price: Number(p.price) || 0,
+});
 
 export const searchProducts = async (term: string): Promise<ProductSearchHit[]> => {
   const res = await fetch(
@@ -260,9 +269,6 @@ export const searchProducts = async (term: string): Promise<ProductSearchHit[]> 
   if (!res.ok) return [];
   const data = await res.json();
   // Forma paginada { items, total } cuando vienen page/pageSize.
-  if (Array.isArray(data)) return data.map((p) => ({ id: p.id, name: p.name }));
-  return (data.items ?? []).map((p: { id: string; name: string }) => ({
-    id: p.id,
-    name: p.name,
-  }));
+  if (Array.isArray(data)) return data.map(toSearchHit);
+  return (data.items ?? []).map(toSearchHit);
 };

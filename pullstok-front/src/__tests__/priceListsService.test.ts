@@ -155,13 +155,13 @@ describe("priceLists service — cliente API de planillas", () => {
     });
   });
 
-  it("searchProducts devuelve hits id/name (forma paginada del server)", async () => {
+  it("searchProducts devuelve hits id/name/price (forma paginada del server)", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ items: [{ id: "p-1", name: "SIEGER Puppy Mini x 1 Kg." }], total: 1 }),
+      json: async () => ({ items: [{ id: "p-1", name: "SIEGER Puppy Mini x 1 Kg.", price: 10642 }], total: 1 }),
     });
     const hits = await searchProducts("sieger puppy");
-    expect(hits).toEqual([{ id: "p-1", name: "SIEGER Puppy Mini x 1 Kg." }]);
+    expect(hits).toEqual([{ id: "p-1", name: "SIEGER Puppy Mini x 1 Kg.", price: 10642 }]);
     expect(mockFetch.mock.calls[0][0]).toContain("/products?name=sieger%20puppy");
   });
 });

@@ -108,7 +108,7 @@ describe("PriceListImport — wizard de importación", () => {
       productsCreated: 1,
     });
     mockSearch.mockResolvedValue([
-      { id: "p-9", name: "GOOSTER Sin Precio x 15 Kg." },
+      { id: "p-9", name: "GOOSTER Sin Precio x 15 Kg.", price: 0 },
     ]);
   });
 

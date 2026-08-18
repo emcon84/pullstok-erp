@@ -30,6 +30,10 @@ import {
   useUpdateInvoice,
 } from "../components/hooks/useInvoices";
 import { InvoiceItemRequest } from "../models/invoiceModel";
+import {
+  searchProducts,
+  type ProductSearchHit,
+} from "../services/priceLists";
 
 /**
  * Módulo Facturación de Servicios (sdd/facturacion-servicios, WS4).
@@ -48,6 +52,106 @@ const emptyItem: InvoiceItemRequest = {
 
 const formatCurrency = (amount: number) =>
   amount.toLocaleString("es-AR", { style: "currency", currency: "ARS" });
+
+/** Buscador de productos del catálogo para una línea de la factura. */
+const ProductLineSearch = ({
+  value,
+  onChange,
+  onPick,
+  disabled,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onPick: (hit: ProductSearchHit) => void;
+  disabled?: boolean;
+}) => {
+  const [term, setTerm] = useState("");
+  const [results, setResults] = useState<ProductSearchHit[]>([]);
+  const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+
+  const runSearch = async () => {
+    const query = term.trim();
+    if (!query) return;
+    setSearching(true);
+    try {
+      const hits = await searchProducts(query);
+      setResults(hits);
+      setOpen(true);
+    } catch {
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const pick = (hit: ProductSearchHit) => {
+    onPick(hit);
+    setOpen(false);
+    setTerm("");
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex gap-1">
+        <Input
+          value={value}
+          placeholder="Buscar producto…"
+          aria-label="Buscar producto"
+          disabled={disabled}
+          onChange={(e) => {
+            setTerm(e.target.value);
+            onChange(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              runSearch();
+            }
+          }}
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={runSearch}
+          disabled={searching || disabled}
+        >
+          Buscar
+        </Button>
+      </div>
+      {open && results.length > 0 && (
+        <ul
+          className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border bg-background shadow-md"
+          data-testid="product-search-results"
+        >
+          {results.map((hit) => (
+            <li key={hit.id}>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2 px-2 py-1 text-left text-sm hover:bg-accent"
+                onClick={() => pick(hit)}
+              >
+                <span>{hit.name}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {formatCurrency(hit.price)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && results.length === 0 && !searching && (
+        <p
+          className="mt-1 text-xs text-muted-foreground"
+          data-testid="product-search-empty"
+        >
+          Sin resultados
+        </p>
+      )}
+    </div>
+  );
+};
 
 const calculateTotals = (items: InvoiceItemRequest[]) => {
   let subtotal = 0;
@@ -258,11 +362,19 @@ export const InvoiceForm = () => {
             {items.map((item, index) => (
               <TableRow key={index}>
                 <TableCell>
-                  <Input
+                  <ProductLineSearch
                     value={item.description}
-                    placeholder="Descripción del servicio"
-                    onChange={(e) =>
-                      handleItemChange(index, "description", e.target.value)
+                    onChange={(value) =>
+                      handleItemChange(index, "description", value)
+                    }
+                    onPick={(hit) =>
+                      setItems((prev) =>
+                        prev.map((it, i) =>
+                          i === index
+                            ? { ...it, description: hit.name, unitPrice: hit.price }
+                            : it,
+                        ),
+                      )
                     }
                   />
                 </TableCell>
@@ -284,6 +396,8 @@ export const InvoiceForm = () => {
                     min="0"
                     step="0.01"
                     className="w-28"
+                    title="Precio del sistema, editable"
+                    data-testid={`unit-price-${index}`}
                     value={item.unitPrice}
                     onChange={(e) =>
                       handleItemChange(index, "unitPrice", e.target.value)
