@@ -73,18 +73,19 @@ const ProductLineSearch = ({
   // El dropdown se renderiza en un PORTAL a document.body con position fixed
   // para que no lo recorte el overflow-x-auto del contenedor de la tabla.
   const anchorRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLUListElement | null>(null);
   const [anchorRect, setAnchorRect] = useState<{
     top: number;
     left: number;
     width: number;
   } | null>(null);
 
-  const runSearch = async () => {
-    const query = term.trim();
-    if (!query) return;
+  const runSearch = async (query: string) => {
+    const q = query.trim();
+    if (!q) return;
     setSearching(true);
     try {
-      const hits = await searchProducts(query);
+      const hits = await searchProducts(q);
       setResults(hits);
       setOpen(true);
     } catch {
@@ -93,6 +94,20 @@ const ProductLineSearch = ({
       setSearching(false);
     }
   };
+
+  // Autocomplete: busca sola mientras se tipea (debounce 250ms).
+  useEffect(() => {
+    if (!term.trim()) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
+    const t = setTimeout(() => {
+      void runSearch(term);
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [term]);
 
   const pick = (hit: ProductSearchHit) => {
     onPick(hit);
@@ -109,11 +124,16 @@ const ProductLineSearch = ({
     setAnchorRect({ top: r.bottom, left: r.left, width: r.width });
   }, [open]);
 
-  // Cierra el dropdown al hacer click afuera.
+  // Cierra el dropdown al hacer click afuera. OJO: el dropdown vive en un
+  // portal a document.body, así que hay que excluirlo del check con su ref
+  // propio — si no, el mousedown lo cierra antes del click del item.
   useEffect(() => {
     if (!open) return;
     const onClickOutside = (e: MouseEvent) => {
-      if (anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideAnchor = anchorRef.current?.contains(target) ?? false;
+      const insideDropdown = dropdownRef.current?.contains(target) ?? false;
+      if (!insideAnchor && !insideDropdown) {
         setOpen(false);
       }
     };
@@ -125,6 +145,7 @@ const ProductLineSearch = ({
     open && anchorRect ? (
       createPortal(
         <ul
+          ref={dropdownRef}
           className="fixed z-50 mt-1 max-h-48 w-full overflow-auto rounded border bg-background shadow-md"
           style={{
             top: anchorRect.top + 4,
@@ -185,7 +206,7 @@ const ProductLineSearch = ({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              runSearch();
+              void runSearch(term);
             }
           }}
         />
@@ -193,10 +214,10 @@ const ProductLineSearch = ({
           type="button"
           size="sm"
           variant="outline"
-          onClick={runSearch}
+          onClick={() => runSearch(term)}
           disabled={searching || disabled}
         >
-          Buscar
+          {searching ? "Buscando…" : "Buscar"}
         </Button>
       </div>
       {dropdown}
