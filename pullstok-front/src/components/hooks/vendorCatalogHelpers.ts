@@ -11,13 +11,14 @@ export const branchQty = (p: DataItem) =>
   Number(p.stocks?.[0]?.quantity ?? 0);
 
 /**
- * Unidad de stock para el badge: "kg" si el producto se vende por peso
- * (priceKgSuelto > 0, derivado de price/weightKg/factor en el backend),
- * "u." si se vende por unidad. Mismo criterio que isLooseEligible (backend)
- * y QuantityModal (front).
+ * Unidad de stock para el badge: ProductStock.quantity es SIEMPRE en unidades
+ * (bolsas) tras la migración a stock por bolsas. El stock suelto en kg
+ * (LooseStock) se muestra aparte, en el panel de celdas / Stock suelto.
  */
-export const stockUnitLabel = (p: DataItem): string =>
-  Number(p.priceKgSuelto ?? 0) > 0 ? "kg" : "u.";
+export const stockUnitLabel = (_p: DataItem): string => {
+  void _p;
+  return "u.";
+};
 
 // Clave de sessionStorage para restaurar el filtro del listado al volver del
 // scanner (la vista se desmonta al navegar a /scanner y el filtro es local).

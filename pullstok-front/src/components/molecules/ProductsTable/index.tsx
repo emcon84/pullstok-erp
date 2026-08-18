@@ -68,10 +68,13 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
       ? Number(p.stocks?.[0]?.quantity ?? 0)
       : Number(p.stocks?.[0]?.quantity ?? p.quantity);
 
-  // Mismo criterio que isLooseEligible (backend) y QuantityModal: si el
-  // producto se vende por peso (priceKgSuelto > 0), el stock se muestra en kg.
-  const stockUnitLabel = (p: DataItem) =>
-    Number(p.priceKgSuelto ?? 0) > 0 ? "kg" : "u.";
+  // ProductStock.quantity es SIEMPRE en unidades (bolsas) tras la migración a
+  // stock por bolsas. El stock suelto en kg (LooseStock) se muestra aparte, en
+  // el panel de celdas / Stock suelto.
+  const stockUnitLabel = (_p: DataItem) => {
+    void _p;
+    return "u.";
+  };
 
   const sorted = [...products].sort((a, b) => {
     const aQty = branchQty(a);

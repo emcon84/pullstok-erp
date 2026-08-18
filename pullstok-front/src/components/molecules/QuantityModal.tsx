@@ -71,13 +71,13 @@ export const QuantityModal = ({
       ? amount
       : round2(displayPrice * (saleMode === "POR_PESO" ? qty : qty));
 
-  // Display stock per mode: kg for loose, bags for BOLSA_CERRADA.
-  // After DB conversion, ProductStock.quantity is in kg.
-  const weightKg = product?.weightKg ?? null;
-  const maxBags =
-    weightKg && weightKg > 0 ? Math.floor(maxStock / weightKg) : Math.floor(maxStock);
+  // Display stock per mode: ProductStock.quantity es SIEMPRE en unidades
+  // (bolsas) tras la migración a stock por bolsas. El suelto en kg vive en
+  // LooseStock y se muestra en el panel de celdas / Stock suelto.
+  const maxBags = Math.floor(maxStock);
 
-  // effectiveMax: bags for BOLSA, kg for loose.
+  // effectiveMax: bolsas para BOLSA_CERRADA; para POR_PESO/POR_MONTO también
+  // son unidades (bolsas) tras la migración.
   const effectiveMax =
     saleMode === "BOLSA_CERRADA" ? maxBags : maxStock;
 
@@ -174,7 +174,7 @@ export const QuantityModal = ({
               <p className="text-sm text-muted-foreground">
                 Stock disponible:{" "}
                 <span className="font-medium text-foreground">
-                  {maxStock.toFixed(2)} kg
+                  {maxBags} u.
                 </span>
               </p>
               <div className="flex items-baseline justify-between">
@@ -226,7 +226,7 @@ export const QuantityModal = ({
               <p className="text-sm text-muted-foreground">
                 Stock disponible:{" "}
                 <span className="font-medium text-foreground">
-                  {maxStock.toFixed(2)} kg
+                  {maxBags} u.
                 </span>
               </p>
             </>
@@ -238,12 +238,12 @@ export const QuantityModal = ({
               <p className="text-sm text-muted-foreground">
                 Stock disponible:{" "}
                 <span className="font-medium text-foreground">
-                  {maxStock.toFixed(2)} kg
+                  {maxBags} u.
                 </span>
               </p>
               <div className="flex items-baseline justify-between">
                 <span className="text-sm text-muted-foreground">
-                  ${displayPrice.toLocaleString("es-AR")}/kg
+                  ${displayPrice.toLocaleString("es-AR")}/u.
                 </span>
                 <span className="text-lg font-bold tabular-nums">
                   ${total.toLocaleString("es-AR")}
