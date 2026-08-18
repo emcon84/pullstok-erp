@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,13 @@ import {
 import { CategoryTreePickerMulti } from "@/components/molecules/CategoryTreePickerMulti";
 import { CategoryOverridesPanel } from "@/components/molecules/CategoryOverridesPanel";
 import { PrintBulkPriceList } from "@/components/molecules/PrintBulkPriceList";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { recomputeRow } from "@/lib/priceOverride";
 import { getCategories } from "@/services/onboardingService";
 import { listProviders, type Provider } from "@/services/providers";
@@ -42,6 +49,27 @@ import { API_URL } from "@/constants";
 interface BrandOption {
   id: string;
   value: string;
+}
+
+/** Resumen de una planilla importada (GET /price-lists → items). */
+interface PriceListSummary {
+  id: string;
+  provider: string;
+  type: string;
+  period: string | null;
+  sourceFilename: string;
+  importedAt: string;
+  sectionsCount: number;
+  entriesCount: number;
+}
+
+/** Sección de la jerarquía del PDF (marca → línea → sublínea). */
+interface PriceListSectionSummary {
+  id: string;
+  brand: string | null;
+  line: string | null;
+  subline: string | null;
+  position: number;
 }
 
 const formatPrice = (n: number) =>
@@ -66,6 +94,12 @@ export const BulkPriceUpdate = () => {
   // opcional que se combina con el de marcas como AND.
   const [providers, setProviders] = useState<Provider[]>([]);
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
+  // Planillas del proveedor (línea del PDF): selector de planilla + chips de
+  // línea (brand · line) que restringen el set a los productos matcheados.
+  const [priceLists, setPriceLists] = useState<PriceListSummary[]>([]);
+  const [selectedPriceListId, setSelectedPriceListId] = useState<string>("");
+  const [sections, setSections] = useState<PriceListSectionSummary[]>([]);
+  const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [percentage, setPercentage] = useState("");
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
@@ -129,6 +163,37 @@ export const BulkPriceUpdate = () => {
       .catch(() => setProviders([]));
   }, []);
 
+  // Carga las secciones de una planilla y limpia la selección previa.
+  const loadSections = useCallback((id: string) => {
+    fetch(`${API_URL}/price-lists/${id}`, { headers: headers() })
+      .then((res) => res.json())
+      .then((data) => {
+        setSections(data.sections ?? []);
+        setSelectedSectionIds([]);
+        scopeChanged();
+      })
+      .catch(() => {
+        setSections([]);
+        setSelectedSectionIds([]);
+      });
+  }, []);
+
+  // Load price lists (most recent first); preselecciona la primera y carga sus
+  // secciones.
+  useEffect(() => {
+    fetch(`${API_URL}/price-lists`, { headers: headers() })
+      .then((res) => res.json())
+      .then((data) => {
+        const items = (data.items ?? []) as PriceListSummary[];
+        setPriceLists(items);
+        if (items.length > 0) {
+          setSelectedPriceListId(items[0].id);
+          loadSections(items[0].id);
+        }
+      })
+      .catch(() => setPriceLists([]));
+  }, [loadSections]);
+
   // Any scope change invalidates preview, previous exclusions and category overrides.
   const scopeChanged = () => {
     setPreview(null);
@@ -151,11 +216,46 @@ export const BulkPriceUpdate = () => {
     scopeChanged();
   };
 
+  // Cambia la planilla seleccionada y recarga sus secciones.
+  const handlePriceListChange = (id: string) => {
+    setSelectedPriceListId(id);
+    loadSections(id);
+  };
+
+  // Grupos de LÍNEA (brand · line) sobre las secciones de la planilla actual;
+  // las secciones sin brand/line no participan del filtro.
+  const sectionGroups = useMemo(() => {
+    const groups = new Map<string, { key: string; label: string; ids: string[] }>();
+    for (const s of sections) {
+      if (!s.brand || !s.line) continue;
+      const key = `${s.brand}|${s.line}`;
+      const existing = groups.get(key);
+      if (existing) existing.ids.push(s.id);
+      else groups.set(key, { key, label: `${s.brand} · ${s.line}`, ids: [s.id] });
+    }
+    return [...groups.values()];
+  }, [sections]);
+
+  // Toggle de TODA una línea (todos los sectionIds del grupo).
+  const toggleSectionGroup = (ids: string[]) => {
+    setSelectedSectionIds((prev) => {
+      const anySelected = ids.some((id) => prev.includes(id));
+      if (anySelected) return prev.filter((id) => !ids.includes(id));
+      return [...prev, ...ids];
+    });
+    scopeChanged();
+  };
+
   const payload = useCallback((): BulkPriceUpdatePayload | null => {
-    // Al menos un filtro de alcance (marcas, proveedores o categorías) para no
-    // barrer toda la org por error — mismo criterio que el superRefine del
-    // bulkPriceUpdateSchema del backend.
-    if (selectedBrands.length === 0 && selectedProviderIds.length === 0 && categoryIds.length === 0) return null;
+    // Al menos un filtro de alcance (marcas, proveedores, categorías o línea
+    // de planilla) para no barrer toda la org por error — mismo criterio que el
+    // superRefine del bulkPriceUpdateSchema del backend.
+    if (
+      selectedBrands.length === 0 &&
+      selectedProviderIds.length === 0 &&
+      categoryIds.length === 0 &&
+      selectedSectionIds.length === 0
+    ) return null;
     const trimmed = percentage.trim();
     // Global opcional: vacío/NaN → undefined (server resuelve 0). Los overrides
     // propios por categoría/producto siguen aplicándose con prioridad.
@@ -173,6 +273,7 @@ export const BulkPriceUpdate = () => {
       categoryIds,
       excludeProductIds: [...excludedIds],
       providerIds: selectedProviderIds,
+      priceListSectionIds: selectedSectionIds,
       percentage: pct,
       categoryPercentages,
       productPercentages,
@@ -182,6 +283,7 @@ export const BulkPriceUpdate = () => {
     selectedProviderIds,
     categoryIds,
     excludedIds,
+    selectedSectionIds,
     percentage,
     categoryOverrides,
     productOverrides,
@@ -358,6 +460,67 @@ export const BulkPriceUpdate = () => {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
+                Línea de planilla (proveedor)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {priceLists.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay planillas importadas todavía.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label>Planilla de precios</Label>
+                  <Select
+                    value={selectedPriceListId}
+                    onValueChange={handlePriceListChange}
+                  >
+                    <SelectTrigger className="w-full" aria-label="Planilla de precios">
+                      <SelectValue placeholder="Seleccioná una planilla" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {priceLists.map((pl) => (
+                        <SelectItem key={pl.id} value={pl.id}>
+                          {pl.sourceFilename}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {sections.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Líneas</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {sectionGroups.map((g) => {
+                      const selected = g.ids.some((id) =>
+                        selectedSectionIds.includes(id),
+                      );
+                      return (
+                        <Badge
+                          key={g.key}
+                          variant={selected ? "default" : "outline"}
+                          className="cursor-pointer transition-opacity hover:opacity-80"
+                          onClick={() => toggleSectionGroup(g.ids)}
+                        >
+                          {g.label}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Filtra por la línea del PDF de la planilla (ej. medicados).
+                    Se combina como Y con marcas/proveedor/categorías.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
                 Categorías y porcentaje
               </CardTitle>
             </CardHeader>
@@ -418,7 +581,8 @@ export const BulkPriceUpdate = () => {
                 disabled={
                   (selectedBrands.length === 0 &&
                     selectedProviderIds.length === 0 &&
-                    categoryIds.length === 0) ||
+                    categoryIds.length === 0 &&
+                    selectedSectionIds.length === 0) ||
                   submitting
                 }
                 onClick={() => handlePreview(1)}
@@ -601,8 +765,8 @@ export const BulkPriceUpdate = () => {
               </>
             ) : (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                Seleccioná marcas, proveedor o categoría y el porcentaje para
-                calcular la vista previa.
+                Seleccioná marcas, proveedor, categoría o línea de planilla y el porcentaje
+                para calcular la vista previa.
               </p>
             )}
           </CardContent>

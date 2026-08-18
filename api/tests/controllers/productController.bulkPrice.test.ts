@@ -5,6 +5,7 @@ import productController, {
   buildBulkPriceWhere,
   buildCategoryParentMap,
   resolveEffectivePercentage,
+  resolveSectionProductIds,
   BULK_UPDATE_MAX,
 } from "../../src/controllers/productController";
 import { prisma } from "../../src/config/db";
@@ -17,6 +18,7 @@ jest.mock("../../src/config/db", () => ({
   prisma: {
     product: { findMany: jest.fn() },
     category: { findMany: jest.fn() },
+    priceListEntry: { findMany: jest.fn() },
     $transaction: jest.fn(),
   },
   basePrisma: {},
@@ -169,6 +171,64 @@ describe("buildBulkPriceWhere — providerIds (sdd/alican-wholesale-price-list/p
     expect(where.providerId).toEqual({ in: ["prov-1"] });
     expect(where.categoryId).toEqual({ in: ["cat-1"] });
     expect(where.id).toEqual({ notIn: ["p-1"] });
+  });
+});
+
+describe("buildBulkPriceWhere — sectionProductIds (línea de planilla del proveedor)", () => {
+  it("adds id in-filter when sectionProductIds is non-empty", () => {
+    const where = buildBulkPriceWhere(["Acme"], [], [], [], ["sec-1", "sec-2"]);
+    expect(where.id).toEqual({ in: ["sec-1", "sec-2"] });
+  });
+
+  it("combines id { in, notIn } when both sections and exclusions are present", () => {
+    const where = buildBulkPriceWhere(["Acme"], [], ["p-9"], [], ["sec-1"]);
+    expect(where.id).toEqual({ in: ["sec-1"], notIn: ["p-9"] });
+  });
+
+  it("omits id when sectionProductIds is empty/omitted (back-compat)", () => {
+    expect(buildBulkPriceWhere(["Acme"], [], [], []).id).toBeUndefined();
+    expect(buildBulkPriceWhere(["Acme"], [], [], [], []).id).toBeUndefined();
+  });
+
+  it("keeps the brand filter when sections are present (AND)", () => {
+    const where = buildBulkPriceWhere(["Acme"], [], [], [], ["sec-1"]);
+    expect(where.variantAssignments).toBeDefined();
+  });
+});
+
+describe("resolveSectionProductIds — productIds de secciones con anti-fuga y dedupe", () => {
+  const mockTx = {
+    priceListEntry: { findMany: jest.fn() },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("returns [] without querying the DB when sectionIds is empty", async () => {
+    const result = await resolveSectionProductIds(mockTx as any, "org-1", []);
+    expect(result).toEqual([]);
+    expect(mockTx.priceListEntry.findMany).not.toHaveBeenCalled();
+  });
+
+  it("queries entries scoped by org and returns deduped productIds", async () => {
+    mockTx.priceListEntry.findMany.mockResolvedValue([
+      { productId: "p-1" },
+      { productId: "p-1" },
+      { productId: "p-2" },
+    ]);
+    const result = await resolveSectionProductIds(mockTx as any, "org-1", ["sec-1"]);
+    expect(mockTx.priceListEntry.findMany).toHaveBeenCalledWith({
+      where: {
+        section: {
+          id: { in: ["sec-1"] },
+          priceList: { organizationId: "org-1" },
+        },
+        productId: { not: null },
+      },
+      select: { productId: true },
+    });
+    expect(result).toEqual(["p-1", "p-2"]);
   });
 });
 

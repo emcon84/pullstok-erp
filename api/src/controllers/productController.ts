@@ -785,7 +785,9 @@ export async function resolveCategoryScope(
  * variant "Marca") AND categoryId in expanded (solo si hay expansión) AND id
  * notIn excludeProductIds (solo si hay exclusiones) AND providerId in
  * providerIds (solo si hay proveedores — sdd/alican-wholesale-price-list/providers:
- * el filtro de marcas y el de proveedores se combinan como AND). SIN filtro
+ * el filtro de marcas y el de proveedores se combinan como AND) AND id in
+ * sectionProductIds (solo si hay secciones de planilla — restringe a los
+ * productos matcheados de esas líneas del PDF). SIN filtro
  * publishedToStore: aplica a TODOS los productos matcheados, incluidos no
  * publicados (comportamiento confirmado).
  */
@@ -794,6 +796,7 @@ export function buildBulkPriceWhere(
   expanded: string[],
   excludeProductIds: string[],
   providerIds: string[] = [],
+  sectionProductIds: string[] = [],
 ) {
   const where: any = {};
   if (brandValues.length > 0) {
@@ -809,7 +812,31 @@ export function buildBulkPriceWhere(
   if (expanded.length > 0) where.categoryId = { in: expanded };
   if (excludeProductIds.length > 0) where.id = { notIn: excludeProductIds };
   if (providerIds.length > 0) where.providerId = { in: providerIds };
+  if (sectionProductIds.length > 0) {
+    where.id = { ...(where.id ?? {}), in: sectionProductIds };
+  }
   return where;
+}
+
+/**
+ * Productos matcheados de las secciones de planilla seleccionadas (líneas del
+ * PDF). Anti-fuga por org: las secciones se filtran vía su PriceList
+ * (organizationId). Vacío → [] sin tocar la DB. El resultado se dedupea.
+ */
+export async function resolveSectionProductIds(
+  tx: any,
+  orgId: string,
+  sectionIds: string[],
+): Promise<string[]> {
+  if (sectionIds.length === 0) return [];
+  const entries = (await tx.priceListEntry.findMany({
+    where: {
+      section: { id: { in: sectionIds }, priceList: { organizationId: orgId } },
+      productId: { not: null },
+    },
+    select: { productId: true },
+  })) as { productId: string | null }[];
+  return [...new Set(entries.map((e) => e.productId!))];
 }
 
 /**
@@ -858,6 +885,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       categoryIds = [],
       excludeProductIds = [],
       providerIds = [],
+      priceListSectionIds = [],
       categoryPercentages = [],
       productPercentages = [],
     } = req.body as {
@@ -866,6 +894,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       categoryIds?: string[];
       excludeProductIds?: string[];
       providerIds?: string[];
+      priceListSectionIds?: string[];
       categoryPercentages?: { categoryId: string; percentage: number }[];
       productPercentages?: { productId: string; percentage: number }[];
     };
@@ -875,7 +904,18 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
     const globalPct = percentage ?? 0;
 
     const expanded = await resolveCategoryScope(prisma, categoryIds);
-    const where = buildBulkPriceWhere(brandValues, expanded, excludeProductIds, providerIds);
+    const sectionProductIds = await resolveSectionProductIds(
+      prisma,
+      organizationId,
+      priceListSectionIds,
+    );
+    const where = buildBulkPriceWhere(
+      brandValues,
+      expanded,
+      excludeProductIds,
+      providerIds,
+      sectionProductIds,
+    );
 
     // Overrides: mapa de ancestros (para heredar override de categoría al
     // subtree) + maps de % por categoría/producto. Preview Y apply resuelven
@@ -944,8 +984,21 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       // in-tx para que el >cap NUNCA escriba (rollback implícito).
       const result = await prisma.$transaction(async (tx) => {
         const expandedTx = await resolveCategoryScope(tx, categoryIds);
+        // Apply autoritativo: re-resuelve los productIds de las secciones
+        // DENTRO del tx (nunca confía en el preview stale).
+        const sectionProductIdsTx = await resolveSectionProductIds(
+          tx,
+          organizationId,
+          priceListSectionIds,
+        );
         const rowsTx = await tx.product.findMany({
-          where: buildBulkPriceWhere(brandValues, expandedTx, excludeProductIds, providerIds),
+          where: buildBulkPriceWhere(
+            brandValues,
+            expandedTx,
+            excludeProductIds,
+            providerIds,
+            sectionProductIdsTx,
+          ),
           select: { id: true, price: true, categoryId: true },
         });
         if (rowsTx.length === 0) {
@@ -980,7 +1033,13 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         // B-05c: recompute priceKgSuelto for the SAME resolved set after
         // the price writes, inside the same $transaction. Overrides (per-product
         // bulkFactor) are resolved per row by the service.
-        const recomputeWhere = buildBulkPriceWhere(brandValues, expandedTx, excludeProductIds, providerIds);
+        const recomputeWhere = buildBulkPriceWhere(
+          brandValues,
+          expandedTx,
+          excludeProductIds,
+          providerIds,
+          sectionProductIdsTx,
+        );
         await recomputeForBulkPriceUpdate(tx, recomputeWhere, organizationId);
 
         const prevTotal =

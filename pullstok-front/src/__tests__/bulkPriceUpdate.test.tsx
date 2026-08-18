@@ -361,4 +361,47 @@ describe("BulkPriceUpdate — preview, exclusions and apply", () => {
 
     expect(screen.queryByRole("button", { name: /imprimir listado/i })).not.toBeInTheDocument();
   });
+
+  it("includes priceListSectionIds with the group ids on preview when a planilla line is selected", async () => {
+    const priceList = {
+      id: "pl-1",
+      provider: "ALICAN",
+      type: "WHOLESALE",
+      period: "2026-01-01",
+      sourceFilename: "alican-2026.pdf",
+      importedAt: "2026-01-01T00:00:00Z",
+      sectionsCount: 2,
+      entriesCount: 4,
+    };
+    const plSections = [
+      { id: "sec-1", brand: "SIEGERVET", line: "SIGER MEDICADOS", subline: "SIEGERVET PERROS", position: 1 },
+      { id: "sec-2", brand: "SIEGERVET", line: "SIGER MEDICADOS", subline: "SIEGERVET GATOS", position: 2 },
+      { id: "sec-3", brand: "SIEGERVET", line: null, subline: null, position: 3 },
+    ];
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/price-lists/pl-1")) {
+        return Promise.resolve({ ok: true, json: async () => ({ sections: plSections }) });
+      }
+      if (url.includes("/price-lists")) {
+        return Promise.resolve({ ok: true, json: async () => ({ items: [priceList] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => brands });
+    });
+
+    renderView();
+    // Espera a que carguen las planillas y sus secciones.
+    fireEvent.click(await screen.findByText("SIEGERVET · SIGER MEDICADOS"));
+    fireEvent.click(screen.getByRole("button", { name: /calcular preview/i }));
+
+    await screen.findByText("Producto 1");
+    await waitFor(() =>
+      expect(mockBulkPriceUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          priceListSectionIds: ["sec-1", "sec-2"],
+        }),
+        true,
+        1,
+      ),
+    );
+  });
 });

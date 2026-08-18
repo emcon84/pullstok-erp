@@ -311,6 +311,10 @@ export interface BulkPriceUpdatePayload {
   /** Filtro por proveedor (sdd/alican-wholesale-price-list/providers):
    * OPCIONAL. Se combina con el filtro de marcas como AND. */
   providerIds?: string[];
+  /** Filtro por sección de planilla del proveedor (línea del PDF, ej.
+   * "SIGER MEDICADOS"): OPCIONAL. Restringe a los productos matcheados de esas
+   * secciones; se combina como AND con los demás filtros. */
+  priceListSectionIds?: string[];
   /** Global opcional: sin valor el server resuelve 0 para productos sin override. */
   percentage?: number;
   categoryPercentages: CategoryPriceOverride[];

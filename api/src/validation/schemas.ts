@@ -502,6 +502,11 @@ export const bulkPriceUpdateSchema = z
     // de marcas como AND (marcas Y proveedor; si solo mandás providerIds y
     // brandValues trae una marca, es AND). Vacío/ausente → sin filtro (back-compat).
     providerIds: z.array(z.string().uuid("Proveedor inválido")).default([]),
+    // Filtro por sección de planilla del proveedor (línea del PDF, ej.
+    // "SIGER MEDICADOS"): OPCIONAL. Restringe a los productos matcheados de esas
+    // secciones (PriceListEntry.productId), combinado como AND con marcas/
+    // proveedores/categorías.
+    priceListSectionIds: z.array(z.string().uuid("Sección de planilla inválida")).default([]),
     // Overrides por categoría/producto (sdd/bulk-price-overrides): % propio por
     // nodo de categoría y por fila de producto. Precedencia product > category
     // > global (percentage). 0% = incluido pero sin cambio; exclusión =
@@ -517,11 +522,17 @@ export const bulkPriceUpdateSchema = z
   })
   .strip()
   .superRefine((data, ctx) => {
-    if (data.brandValues.length === 0 && data.providerIds.length === 0 && data.categoryIds.length === 0) {
+    if (
+      data.brandValues.length === 0 &&
+      data.providerIds.length === 0 &&
+      data.categoryIds.length === 0 &&
+      data.priceListSectionIds.length === 0
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["brandValues"],
-        message: "Seleccioná al menos una marca, un proveedor o una categoría",
+        message:
+          "Seleccioná al menos una marca, un proveedor, una categoría o una línea de planilla",
       });
     }
     const seenCategories = new Set<string>();
