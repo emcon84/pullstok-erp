@@ -339,4 +339,67 @@ describe("fiscalInvoiceService.emitirFiscalmente", () => {
 
     expect(mock.calls.requestCAE).toBe(0);
   });
+
+  it("ya autorizado + consultar devuelve CAE → ISSUED con CAE (design D5 paso 6)", async () => {
+    setInvoice(makePendingInvoice());
+    mock.failNextRequestCAE = new ArcaError(
+      ARCA_ERROR_CODES.ARCA_ALREADY_AUTHORIZED,
+      "El comprobante ya fue autorizado",
+      409,
+    );
+
+    const invoice = (await reintentarFiscalmente("inv-1", mock, CTX))!;
+
+    // Recuperó el CAE vía FECompConsultar con el correlativo reservado.
+    expect(mock.calls.consultarComprobante).toBe(1);
+    expect(mock.lastConsultado).toMatchObject({
+      puntoVenta: 2,
+      tipoCbte: 6,
+      cbteNro: 13,
+    });
+    expect(invoice.status).toBe("ISSUED");
+    expect(invoice.cae).toBe("72431470192419");
+    // Se adoptó el CAE y se limpió el error.
+    const issuedCall = mockedPrisma.invoice.updateMany.mock.calls.find(
+      (c: any) => c[0]?.data?.status === "ISSUED",
+    );
+    expect(issuedCall).toBeDefined();
+    expect(issuedCall[0].data).toMatchObject({
+      cae: "72431470192419",
+      arcaErrorCode: null,
+      arcaErrorMessage: null,
+    });
+    // No se incrementó arcaAttempts (se resolvió, no se quedó en PENDING_CAE).
+    expect(currentInvoice.status).toBe("ISSUED");
+  });
+
+  it("ya autorizado + consultar sin CAE → PENDING_CAE con error (design D5 paso 6)", async () => {
+    setInvoice(makePendingInvoice());
+    mock.failNextRequestCAE = new ArcaError(
+      ARCA_ERROR_CODES.ARCA_ALREADY_AUTHORIZED,
+      "Ya autorizado pero sin CAE recuperable",
+      409,
+    );
+    // La consulta no encuentra CAE (se sobreescribe el método real del mock,
+    // pero se mantiene el contador de calls para el assert).
+    mock.consultarComprobante = async () => {
+      mock.calls.consultarComprobante++;
+      return null;
+    };
+
+    await expect(
+      reintentarFiscalmente("inv-1", mock, CTX),
+    ).rejects.toMatchObject({ code: ARCA_ERROR_CODES.ARCA_ALREADY_AUTHORIZED });
+
+    expect(mock.calls.consultarComprobante).toBe(1);
+    // Queda PENDING_CAE con el error persistido, NUNCA ISSUED.
+    expect(currentInvoice.status).toBe("PENDING_CAE");
+    expect(currentInvoice.cae).toBeNull();
+    expect(currentInvoice.arcaErrorCode).toBe("ARCA_ALREADY_AUTHORIZED");
+    expect(currentInvoice.arcaAttempts).toBe(2); // 1 inicial + 1 incremento
+    const issued = mockedPrisma.invoice.updateMany.mock.calls.find(
+      (c: any) => c[0]?.data?.status === "ISSUED",
+    );
+    expect(issued).toBeUndefined();
+  });
 });

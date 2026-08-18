@@ -269,6 +269,34 @@ const emitirCore = async (
     result = await client.requestCAE(caeReq);
   } catch (err) {
     const { code, message } = asArcaError(err);
+
+    // Design D5 paso 6: si el comprobante ya se autorizó en AFIP (timeout tras
+    // procesarse), recuperamos el CAE vía FECompConsultar en lugar de dejar la
+    // factura en PENDING_CAE permanente.
+    if (code === ARCA_ERROR_CODES.ARCA_ALREADY_AUTHORIZED) {
+      const consulta = await client.consultarComprobante({
+        puntoVenta: ctx.puntoVenta,
+        tipoCbte: Number(tipoCbte),
+        cbteNro,
+      });
+      if (consulta?.cae) {
+        await prisma.invoice.updateMany({
+          where: { id: invoice.id },
+          data: {
+            status: "ISSUED",
+            cae: consulta.cae,
+            caeVencimiento: parseArcaDate(consulta.caeVencimiento),
+            arcaErrorCode: null,
+            arcaErrorMessage: null,
+          },
+        });
+        return prisma.invoice.findFirst({
+          where: { id: invoice.id },
+          include: { items: true, customer: true },
+        });
+      }
+    }
+
     await prisma.invoice.updateMany({
       where: { id: invoice.id },
       data: {

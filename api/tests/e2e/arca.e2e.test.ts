@@ -49,6 +49,9 @@ describe('E2E: ARCA facturación electrónica homo', () => {
         where: { invoice: { organizationId } },
       });
       await basePrisma.invoice.deleteMany({ where: { organizationId } });
+      await basePrisma.sale.deleteMany({ where: { organizationId } });
+      await basePrisma.product.deleteMany({ where: { organizationId } });
+      await basePrisma.category.deleteMany({ where: { organizationId } });
       await basePrisma.customer.deleteMany({ where: { organizationId } });
       await basePrisma.counter.deleteMany({ where: { organizationId } });
       await basePrisma.user.deleteMany({ where: { organizationId } });
@@ -111,7 +114,7 @@ describe('E2E: ARCA facturación electrónica homo', () => {
     return res.body.id as string;
   };
 
-  /** Crea una Invoice DRAFT de servicios. Sin customerId → Factura B (99/0). */
+  /** Crea una Invoice DRAFT de servicios con customerId → Factura A (80). */
   const createInvoice = async (
     token: string,
     opts: { customerId?: string; amount?: number } = {},
@@ -125,6 +128,53 @@ describe('E2E: ARCA facturación electrónica homo', () => {
           { description: 'Servicio ARCA', quantity: 1, unitPrice: opts.amount ?? 100, taxRate: 21 },
         ],
       });
+    expect(res.status).toBe(201);
+    return res.body as { id: string };
+  };
+
+  /** Crea una categoría y devuelve su id (para el bridge Sale→Invoice). */
+  const createCategory = async (token: string, name: string) => {
+    const res = await request(app)
+      .post('/api/categories')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ names: [name] });
+    expect(res.status).toBe(201);
+    return res.body[0].id as string;
+  };
+
+  /** Crea un producto y devuelve su id. */
+  const createProduct = async (token: string, categoryId: string, name: string) => {
+    const res = await request(app)
+      .post('/api/products')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name, price: 100, quantity: 10, categoryId });
+    expect(res.status).toBe(201);
+    return res.body as { id: string };
+  };
+
+  /** Crea una venta y devuelve su id. */
+  const createSale = async (token: string, productId: string) => {
+    const res = await request(app)
+      .post('/api/sales')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ products: [{ productId, quantity: 1, price: 100 }] });
+    expect(res.status).toBe(201);
+    return res.body as { id: string };
+  };
+
+  /**
+   * Crea una Invoice DRAFT vía el bridge de ventas POST /api/sales/:saleId/invoice
+   * SIN customerId → Factura B (DocTipo 99 / DocNro 0). Es el único camino con
+   * customerId opcional (spec 6.2); createInvoiceSchema exige customerId.
+   */
+  const createSaleInvoice = async (token: string) => {
+    const categoryId = await createCategory(token, 'Cat ARCA B');
+    const product = await createProduct(token, categoryId, 'Producto ARCA B');
+    const sale = await createSale(token, product.id);
+    const res = await request(app)
+      .post(`/api/sales/${sale.id}/invoice`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
     expect(res.status).toBe(201);
     return res.body as { id: string };
   };
@@ -153,7 +203,7 @@ describe('E2E: ARCA facturación electrónica homo', () => {
       const { token } = await createOrgWithPlan('PRO', 'b');
       await configureArca(token, '30709706701', 2);
 
-      const invoice = await createInvoice(token); // sin customerId
+      const invoice = await createSaleInvoice(token); // sin customerId → B (99/0)
       const issueRes = await issueInternal(token, invoice.id);
       expect(issueRes.status).toBe(200);
 

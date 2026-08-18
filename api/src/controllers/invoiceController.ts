@@ -374,6 +374,11 @@ const cancelInvoice = async (req: Request, res: Response) => {
         .status(400)
         .json({ message: "Solo se pueden cancelar facturas emitidas (ISSUED)" });
     }
+    if (existing.cae != null) {
+      return res
+        .status(409)
+        .json({ message: "No se puede cancelar una factura emitida fiscalmente con CAE" });
+    }
 
     await prisma.invoice.updateMany({
       where: { id },
