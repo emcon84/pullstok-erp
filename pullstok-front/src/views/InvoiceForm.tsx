@@ -77,7 +77,7 @@ export const InvoiceForm = () => {
 
   useEffect(() => {
     if (!invoice) return;
-    setCustomerId(invoice.customerId);
+    setCustomerId(invoice.customerId ?? "");
     setDueDate(invoice.dueDate ? invoice.dueDate.slice(0, 10) : "");
     setNotes(invoice.notes || "");
     setItems(

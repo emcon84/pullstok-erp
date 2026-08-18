@@ -15,6 +15,16 @@
 #   3. Auto-rollback al commit anterior si cualquier check falla.
 #
 # No hace seeding (paso manual aparte) y nunca toca api/uploads/.
+#
+# === Facturación electrónica ARCA (sdd/arca-facturacion-electronica) ===
+# Los certificados WSASS/WSFEv1 NO van en el repo ni en la DB: solo rutas
+# (ArcaSetting.certPath/keyPath). Convención de paths por org en el VPS:
+#   /var/www/pullstok/certs/{organizationId}/wswfev1-{HOMOLOGACION|PRODUCCION}.crt
+#   /var/www/pullstok/certs/{organizationId}/wswfev1-{HOMOLOGACION|PRODUCCION}.key
+# El ADMIN carga esas rutas al configurar ARCA (PUT /api/arca-settings). El
+# deploy NO sube certs; solo garantiza que exista el directorio raíz. La
+# migración ARCA (tablas arca_settings/arca_sequences + PENDING_CAE + campos
+# fiscales) se aplica con `prisma migrate deploy` más abajo.
 
 set -euo pipefail
 
@@ -118,6 +128,21 @@ step "[6/9] Aplicando migraciones de Prisma..."
     pnpm exec prisma migrate deploy
 )
 echo "✅ Migraciones aplicadas"
+
+# ---------------------------------------------------------------------------
+# 6b) CERTIFICADOS ARCA (facturación electrónica)
+# ---------------------------------------------------------------------------
+# Solo se asegura el directorio raíz de certs (los archivos los carga el ADMIN
+# vía PUT /api/arca-settings; nunca se suben con el deploy). Si no hay certs,
+# el gate checkArcaEnabled sigue apagado (enabled=false) → flujo interno FAC-XXXX
+# intacto (spec 6.1 no-regresión).
+CERTS_ROOT="$PROJECT_DIR/certs"
+if [ ! -d "$CERTS_ROOT" ]; then
+    mkdir -p "$CERTS_ROOT"
+    echo "✅ Creado directorio de certs ARCA: $CERTS_ROOT"
+else
+    echo "✅ Directorio de certs ARCA ya existe: $CERTS_ROOT"
+fi
 
 # ---------------------------------------------------------------------------
 # 7) REINICIAR SERVICIO (systemd)

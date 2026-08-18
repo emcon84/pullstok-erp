@@ -7,8 +7,32 @@ import { Customer } from "./customerModel";
  * invoiceController.ts. Sin productId: conceptos libres (description).
  */
 
-export type InvoiceStatus = "DRAFT" | "ISSUED" | "CANCELLED";
+export type InvoiceStatus = "DRAFT" | "ISSUED" | "PENDING_CAE" | "CANCELLED";
 export type PaymentStatus = "PENDING" | "PAID" | "OVERDUE";
+
+/**
+ * Estado fiscal de una factura emitida contra ARCA (sdd/arca-facturacion-
+ * electronica, spec 6). El número fiscal visible es puntoVenta-cbteNro; el
+ * number interno FAC-XXXX queda como referencia de trazabilidad.
+ */
+export interface FiscalData {
+  /** Código ARCA del comprobante: "1"=Factura A, "6"=Factura B. */
+  tipoComprobante?: string | null;
+  /** Punto de venta fiscal configurado en ArcaSetting. */
+  puntoVenta?: number | null;
+  /** Correlativo fiscal reservado (autoridad: FECompUltimoAutorizado). */
+  cbteNro?: number | null;
+  /** CAE otorgado por ARCA (null = aún no emitido fiscalmente). */
+  cae?: string | null;
+  caeVencimiento?: string | null;
+  /** Error de la última emisión fiscal (para reintento/diagnóstico). */
+  arcaErrorCode?: string | null;
+  arcaErrorMessage?: string | null;
+  arcaAttempts?: number;
+  docTipoReceptor?: number | null;
+  docNroReceptor?: string | null;
+  condicionIvaReceptorId?: number | null;
+}
 
 export interface InvoiceItem {
   id?: string;
@@ -22,8 +46,10 @@ export interface InvoiceItem {
 export interface Invoice {
   id: string;
   organizationId?: string;
-  customerId: string;
-  customer: Customer;
+  // OPCIONAL desde sdd/arca-facturacion-electronica: la Factura B de
+  // mostrador sin identificar va sin Customer asociado (DocTipo 99/0).
+  customerId: string | null;
+  customer: Customer | null;
   number?: string | null;
   issueDate: string;
   dueDate?: string | null;
@@ -36,6 +62,18 @@ export interface Invoice {
   notes?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  // Campos fiscales ARCA (spec 6): presentes si hubo emisión fiscal.
+  tipoComprobante?: string | null;
+  puntoVenta?: number | null;
+  cbteNro?: number | null;
+  cae?: string | null;
+  caeVencimiento?: string | null;
+  arcaErrorCode?: string | null;
+  arcaErrorMessage?: string | null;
+  arcaAttempts?: number;
+  docTipoReceptor?: number | null;
+  docNroReceptor?: string | null;
+  condicionIvaReceptorId?: number | null;
 }
 
 export interface InvoiceItemRequest {
@@ -46,7 +84,7 @@ export interface InvoiceItemRequest {
 }
 
 export interface CreateInvoiceRequest {
-  customerId: string;
+  customerId?: string;
   dueDate?: string;
   notes?: string;
   items: InvoiceItemRequest[];

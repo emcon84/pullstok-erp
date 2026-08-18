@@ -22,7 +22,7 @@ import {
   useIssueInvoice,
   useMarkInvoiceAsPaid,
 } from "../components/hooks/useInvoices";
-import { InvoiceStatus, PaymentStatus } from "../models/invoiceModel";
+import { InvoiceStatus, PaymentStatus, Invoice } from "../models/invoiceModel";
 import { exportToPDF } from "../utils/exportToPDF";
 import { useConfirm } from "../components/hooks/useConfirm";
 import { getMe } from "../services/onboardingService";
@@ -58,15 +58,25 @@ const formatDate = (date?: string | null) =>
 const formatCurrency = (amount: number) =>
   amount.toLocaleString("es-AR", { style: "currency", currency: "ARS" });
 
-const STATUS_VARIANT: Record<InvoiceStatus, "secondary" | "default" | "destructive"> = {
+/** Número fiscal visible: "0002-00000013" (puntoVenta-cbteNro). null si la
+ * factura no tiene emisión fiscal (spec 6: el número fiscal es el visible; el
+ * number interno FAC-XXXX queda como referencia de trazabilidad). */
+const fiscalNumber = (invoice: Invoice): string | null =>
+  invoice.puntoVenta != null && invoice.cbteNro != null
+    ? `${String(invoice.puntoVenta).padStart(4, "0")}-${String(invoice.cbteNro).padStart(8, "0")}`
+    : null;
+
+const STATUS_VARIANT: Record<InvoiceStatus, "secondary" | "default" | "destructive" | "outline"> = {
   DRAFT: "secondary",
   ISSUED: "default",
+  PENDING_CAE: "outline",
   CANCELLED: "destructive",
 };
 
 const STATUS_LABEL: Record<InvoiceStatus, string> = {
   DRAFT: "Borrador",
   ISSUED: "Emitida",
+  PENDING_CAE: "Emisión fiscal pendiente",
   CANCELLED: "Cancelada",
 };
 
@@ -194,10 +204,15 @@ export const InvoiceDetail = () => {
           </Button>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
-              Factura {invoice.number || "(borrador)"}
+              Factura {fiscalNumber(invoice) ?? invoice.number ?? "(borrador)"}
             </h1>
             <p className="text-sm text-muted-foreground">
               Cliente: {invoice.customer?.name || "-"}
+              {invoice.number && (
+                <span className="ml-2">
+                  · Ref. interna: {invoice.number}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -267,6 +282,44 @@ export const InvoiceDetail = () => {
           <p className="mt-1 text-sm">{formatDate(invoice.dueDate)}</p>
         </div>
       </Card>
+
+      {invoice.cae && (
+        <Card className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-xs text-muted-foreground">Número fiscal</p>
+            <p className="mt-1 text-sm font-medium">{fiscalNumber(invoice)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">CAE</p>
+            <p className="mt-1 text-sm font-medium">{invoice.cae}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Vencimiento CAE</p>
+            <p className="mt-1 text-sm">{formatDate(invoice.caeVencimiento)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Tipo comprobante</p>
+            <p className="mt-1 text-sm">
+              {invoice.tipoComprobante === "1"
+                ? "Factura A"
+                : invoice.tipoComprobante === "6"
+                  ? "Factura B"
+                  : "-"}
+            </p>
+          </div>
+        </Card>
+      )}
+      {invoice.status === "PENDING_CAE" && invoice.arcaErrorMessage && (
+        <Card className="border-destructive p-5">
+          <p className="text-sm font-medium text-destructive">
+            La emisión fiscal falló: {invoice.arcaErrorMessage}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            La factura quedó en estado pendiente de CAE. Usá "Reintentar emisión
+            fiscal" para volver a intentarlo con el mismo correlativo.
+          </p>
+        </Card>
+      )}
 
       <Card className="p-5">
         <h2 className="mb-4 font-medium">Conceptos</h2>

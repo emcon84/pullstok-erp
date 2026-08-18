@@ -44,15 +44,17 @@ const formatDate = (date?: string | null) =>
 const formatCurrency = (amount: number) =>
   amount.toLocaleString("es-AR", { style: "currency", currency: "ARS" });
 
-const STATUS_VARIANT: Record<InvoiceStatus, "secondary" | "default" | "destructive"> = {
+const STATUS_VARIANT: Record<InvoiceStatus, "secondary" | "default" | "destructive" | "outline"> = {
   DRAFT: "secondary",
   ISSUED: "default",
+  PENDING_CAE: "outline",
   CANCELLED: "destructive",
 };
 
 const STATUS_LABEL: Record<InvoiceStatus, string> = {
   DRAFT: "Borrador",
   ISSUED: "Emitida",
+  PENDING_CAE: "Emisión fiscal pendiente",
   CANCELLED: "Cancelada",
 };
 
