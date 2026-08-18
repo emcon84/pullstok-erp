@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidCuit } from "../services/arcaCalc";
 
 // ---------- Auth ----------
 export const loginSchema = z.object({
@@ -362,8 +363,11 @@ export const updateInvoiceSchema = z.object({
 // Body del endpoint POST /sales/:saleId/invoice. Los ítems se mapean de la
 // venta (SaleItem → InvoiceLineInput con taxRate 21%); el body solo pide
 // el cliente de facturación, vencimiento opcional y notas.
+// customerId OPCIONAL desde sdd/arca-facturacion-electronica (spec 6.1): la
+// Factura B de mostrador sin identificar va con DocTipo 99 / DocNro 0 (sin
+// Customer asociado). Sin ARCA configurada el flujo interno no cambia.
 export const createSaleInvoiceSchema = z.object({
-  customerId: z.string().min(1, "El cliente es requerido"),
+  customerId: z.string().min(1).optional(),
   dueDate: z.string().min(1).optional(),
   notes: z.string().optional(),
 });
@@ -970,5 +974,30 @@ export const setLooseStockSchema = z
 export const listLooseStocksQuerySchema = z
   .object({
     branchId: z.string().min(1).optional(),
+  })
+  .strip();
+
+// ---------- Configuración ARCA (sdd/arca-facturacion-electronica) ----------
+// CRUD 1:1 con Organization (ArcaSetting). Validación dura: un payload
+// inválido aquí no debe poder romper el gate de emisión fiscal por accidente.
+//  - cuitEmisor: 11 dígitos con DV mod 11 (isValidCuit normaliza guiones).
+//  - puntoVenta: entero 1..9999.
+//  - environment: HOMOLOGACION | PRODUCCION.
+//  - certPath/keyPath: rutas no vacías (los certificados NUNCA van en la DB).
+export const arcaSettingsSchema = z
+  .object({
+    cuitEmisor: z
+      .string()
+      .min(1, "El CUIT del emisor es requerido")
+      .refine(isValidCuit, "CUIT inválido (formato o dígito verificador incorrecto)"),
+    puntoVenta: z
+      .number()
+      .int("El punto de venta debe ser un número entero")
+      .min(1, "El punto de venta debe estar entre 1 y 9999")
+      .max(9999, "El punto de venta debe estar entre 1 y 9999"),
+    environment: z.enum(["HOMOLOGACION", "PRODUCCION"]),
+    certPath: z.string().min(1, "La ruta del certificado no puede estar vacía"),
+    keyPath: z.string().min(1, "La ruta de la clave no puede estar vacía"),
+    enabled: z.boolean().default(false),
   })
   .strip();

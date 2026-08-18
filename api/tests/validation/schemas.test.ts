@@ -5,6 +5,8 @@ import {
   createSaleSchema,
   applyPriceListSchema,
   adjustPriceListSchema,
+  arcaSettingsSchema,
+  createSaleInvoiceSchema,
 } from "../../src/validation/schemas";
 
 describe("createUserSchema — role enum expansion", () => {
@@ -1231,6 +1233,76 @@ describe("adjustPriceListSchema — ajuste masivo de sugeridos", () => {
     if (result.success) {
       expect(result.data.excludeEntryIds).toEqual([]);
       expect(result.data.entryOverrides).toEqual([]);
+    }
+  });
+});
+
+describe("arcaSettingsSchema (sdd/arca-facturacion-electronica)", () => {
+  const valid = {
+    cuitEmisor: "30709706701",
+    puntoVenta: 2,
+    environment: "HOMOLOGACION",
+    certPath: "/var/www/pullstok/certs/org-1/wswfev1-HOMOLOGACION.crt",
+    keyPath: "/var/www/pullstok/certs/org-1/wswfev1-HOMOLOGACION.key",
+  };
+
+  it("acepta un payload válido y normaliza CUIT con guiones", () => {
+    const result = arcaSettingsSchema.safeParse({
+      ...valid,
+      cuitEmisor: "30-70970670-1",
+      enabled: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.enabled).toBe(true);
+    }
+  });
+
+  it("rechaza CUIT con DV incorrecto", () => {
+    const result = arcaSettingsSchema.safeParse({
+      ...valid,
+      cuitEmisor: "30-70970670-2",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza punto de venta fuera de rango (0 y 10000)", () => {
+    expect(arcaSettingsSchema.safeParse({ ...valid, puntoVenta: 0 }).success).toBe(false);
+    expect(arcaSettingsSchema.safeParse({ ...valid, puntoVenta: 10000 }).success).toBe(false);
+  });
+
+  it("rechaza environment inválido y rutas vacías", () => {
+    expect(
+      arcaSettingsSchema.safeParse({ ...valid, environment: "LOCAL" }).success,
+    ).toBe(false);
+    expect(
+      arcaSettingsSchema.safeParse({ ...valid, certPath: "" }).success,
+    ).toBe(false);
+    expect(
+      arcaSettingsSchema.safeParse({ ...valid, keyPath: "" }).success,
+    ).toBe(false);
+  });
+
+  it("enabled default false si se omite", () => {
+    const result = arcaSettingsSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.enabled).toBe(false);
+    }
+  });
+});
+
+describe("createSaleInvoiceSchema — customerId opcional (spec 6.1)", () => {
+  it("acepta body SIN customerId (Factura B de mostrador sin identificar)", () => {
+    const result = createSaleInvoiceSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("acepta customerId presente", () => {
+    const result = createSaleInvoiceSchema.safeParse({ customerId: "cust-1" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.customerId).toBe("cust-1");
     }
   });
 });
