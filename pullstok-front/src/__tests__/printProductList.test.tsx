@@ -18,7 +18,7 @@ describe("PrintProductList — listado de productos imprimible", () => {
   it("muestra el logo en el encabezado", () => {
     render(<PrintProductList products={[product()]} />);
     const logo = screen.getByTestId("print-logo") as HTMLImageElement;
-    expect(logo.src).toContain("logo-horizontal.svg");
+    expect(logo.src).toContain("logo-vertical.png");
   });
 
   it("muestra todos los productos sin paginar", () => {

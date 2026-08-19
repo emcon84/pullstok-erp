@@ -21,7 +21,7 @@ describe("PrintBulkPriceList — listado imprimible de precios actualizados", ()
   it("muestra el logo en el encabezado", () => {
     render(<PrintBulkPriceList rows={[row()]} />);
     const logo = screen.getByTestId("print-logo") as HTMLImageElement;
-    expect(logo.src).toContain("logo-horizontal.svg");
+    expect(logo.src).toContain("logo-vertical.png");
   });
 
   it("muestra todas las filas sin paginar", () => {
