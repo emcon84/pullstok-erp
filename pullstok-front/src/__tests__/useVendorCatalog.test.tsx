@@ -40,13 +40,15 @@ describe("useVendorCatalog — filtro por título de planilla (server-side)", ()
       isFetchingNextPage: false,
       hasNextPage: false,
       loadMore: vi.fn(),
+      error: null,
     });
     mockUseProductFacets.mockReturnValue({
-      categories: [{ name: "Alimentos" }],
+      categories: [{ id: "cat-1", name: "Alimentos" }],
       variants: [],
       titles: [
         { key: "MAXXIUM|MAXXIUM PERROS", label: "MAXXIUM PERROS", count: 2 },
       ],
+      loading: false,
     });
   });
 
