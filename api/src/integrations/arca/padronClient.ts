@@ -112,11 +112,14 @@ export const getPersona = async (
   cuit: string,
 ): Promise<PadronPersona> => {
   const ta = await authenticateWsaa(context, PADRON_SERVICE);
+  // El padrón A4 se consulta con el CUIT que tiene la autorización del
+  // servicio (padronCuit). Si no está configurado, cae al cuitEmisor.
+  const cuitRepresentada = context.padronCuit ?? context.cuitEmisor;
   const xml = await soapRequest({
     url: resolvePadronUrl(context.environment),
     soapAction: `${PADRON_SOAP_NS}GetPersona`,
     body: buildSoapEnvelope(
-      buildGetPersonaBody(ta, context.cuitEmisor, cuit),
+      buildGetPersonaBody(ta, cuitRepresentada, cuit),
     ),
   });
 

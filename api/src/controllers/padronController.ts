@@ -27,6 +27,10 @@ const buildContextFromSetting = (setting: any) => {
   return {
     organizationId: setting.organizationId,
     cuitEmisor: setting.cuitEmisor,
+    // El padrón A4 se consulta con el CUIT que tiene la autorización del
+    // servicio (persona física que habilitó ws_sr_padron_a4), que puede
+    // diferir del cuitEmisor de facturación. Null → cae a cuitEmisor.
+    padronCuit: setting.padronCuit ?? undefined,
     puntoVenta: setting.puntoVenta ?? 0,
     environment: setting.environment ?? "HOMOLOGACION",
     certPath: setting.certPath,

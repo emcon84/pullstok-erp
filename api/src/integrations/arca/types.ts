@@ -19,6 +19,9 @@ export interface TicketAcceso {
 export interface ArcaAuthContext {
   organizationId: string;
   cuitEmisor: string;
+  /** CUIT con autorización del padrón A4 (autocompletar clientes). Si no está
+   * presente, el cliente del padrón cae a `cuitEmisor`. */
+  padronCuit?: string;
   puntoVenta: number;
   environment: ArcaEnvironment;
   certPath: string;

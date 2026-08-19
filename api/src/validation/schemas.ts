@@ -990,6 +990,12 @@ export const arcaSettingsSchema = z
       .string()
       .min(1, "El CUIT del emisor es requerido")
       .refine(isValidCuit, "CUIT inválido (formato o dígito verificador incorrecto)"),
+    // CUIT con autorización del padrón A4 (autocompletar clientes). Opcional;
+    // si no se manda, el padrón usa cuitEmisor (comportamiento previo).
+    padronCuit: z
+      .string()
+      .refine((v) => v === "" || isValidCuit(v), "CUIT del padrón inválido")
+      .optional(),
     puntoVenta: z
       .number()
       .int("El punto de venta debe ser un número entero")

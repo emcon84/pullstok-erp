@@ -766,6 +766,11 @@ model ArcaSetting {
   organization   Organization    @relation(fields: [organizationId], references: [id])
   // CUIT del emisor, 11 dígitos sin guiones (ej. 30709706701).
   cuitEmisor     String
+  // CUIT con autorización del padrón A4 (ws_sr_padron_a4) para autocompletar
+  // clientes. Difiere de cuitEmisor cuando la facturación (Don Colacho) y la
+  // consulta de padrón (persona física con la autorización) usan CUITs
+  // distintos. Null → cae a cuitEmisor (comportamiento previo).
+  padronCuit     String?
   // Punto de venta fiscal del comercio (1..9999).
   puntoVenta     Int
   environment    ArcaEnvironment @default(HOMOLOGACION)

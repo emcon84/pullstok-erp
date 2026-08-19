@@ -21,6 +21,7 @@ export const getArcaSettings = async (_req: AuthedRequest, res: Response) => {
 
     res.status(200).json({
       cuitEmisor: settings?.cuitEmisor ?? "",
+      padronCuit: settings?.padronCuit ?? null,
       puntoVenta: settings?.puntoVenta ?? null,
       environment: settings?.environment ?? "HOMOLOGACION",
       certPath: settings?.certPath ?? "",
