@@ -94,44 +94,65 @@ export const authenticateWsaa = async (
     return cached.ta;
   }
 
-  try {
-    const [certPem, keyPem] = await Promise.all([
-      fs.readFile(context.certPath, "utf8"),
-      fs.readFile(context.keyPath, "utf8"),
-    ]);
+  // AFIP retiene el TA por un lapso preventivo (homologación: 10 min,
+  // producción: 2 min) tras una emisión. Si otro proceso (o un reintento
+  // anterior) tiene un TA vigente, WSAA responde coe.alreadyAuthenticated.
+  // En ese caso esperamos con backoff hasta que se libere, en vez de fallar
+  // y dejar el flujo (p.ej. consulta de padrón) roto de forma transitoria.
+  const ALREADY_AUTH = /ya posee un TA valido|alreadyAuthenticated/i;
+  const MAX_WAIT_MS = 10 * 60 * 1000; // cubre la retención de homo (10 min)
+  const startedAt = Date.now();
 
-    const tra = buildTra(context.cuitEmisor, service);
-    const cms = signTra(tra, certPem, keyPem);
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      const [certPem, keyPem] = await Promise.all([
+        fs.readFile(context.certPath, "utf8"),
+        fs.readFile(context.keyPath, "utf8"),
+      ]);
 
-    const xml = await soapRequest({
-      url: resolveWsaaUrl(context.environment),
-      soapAction: WSAA_SOAP_ACTION,
-      body: buildSoapEnvelope(buildLoginCmsBody(cms)),
-    });
+      const tra = buildTra(context.cuitEmisor, service);
+      const cms = signTra(tra, certPem, keyPem);
 
-    const ta = parseLoginCmsResponse(xml);
-    const expiresAt = Math.min(
-      ta.expirationTime.getTime(),
-      Date.now() + TA_MAX_CACHE_MS,
-    );
-    taCache.set(cacheKey, { ta, expiresAt });
-    return ta;
-  } catch (err) {
-    if (err instanceof ArcaError) {
-      if (err.code === ARCA_ERROR_CODES.ARCA_AUTH_ERROR) {
-        throw err;
-      }
-      // Transporte/parseo de WSAA se reporta como error de autenticación
-      throw new ArcaError(
-        ARCA_ERROR_CODES.ARCA_AUTH_ERROR,
-        `Error WSAA: ${err.message}`,
-        502,
+      const xml = await soapRequest({
+        url: resolveWsaaUrl(context.environment),
+        soapAction: WSAA_SOAP_ACTION,
+        body: buildSoapEnvelope(buildLoginCmsBody(cms)),
+      });
+
+      const ta = parseLoginCmsResponse(xml);
+      const expiresAt = Math.min(
+        ta.expirationTime.getTime(),
+        Date.now() + TA_MAX_CACHE_MS,
       );
+      taCache.set(cacheKey, { ta, expiresAt });
+      return ta;
+    } catch (err) {
+      // Si es la retención de TA (alreadyAuthenticated), esperamos el lapso
+      // y reintentamos (hasta MAX_WAIT_MS). Cualquier otro error se propaga.
+      const isRetention =
+        err instanceof ArcaError &&
+        ALREADY_AUTH.test(err.message) &&
+        Date.now() - startedAt < MAX_WAIT_MS;
+      if (!isRetention) {
+        if (err instanceof ArcaError) {
+          if (err.code === ARCA_ERROR_CODES.ARCA_AUTH_ERROR) {
+            throw err;
+          }
+          throw new ArcaError(
+            ARCA_ERROR_CODES.ARCA_AUTH_ERROR,
+            `Error WSAA: ${err.message}`,
+            502,
+          );
+        }
+        throw new ArcaError(
+          ARCA_ERROR_CODES.ARCA_AUTH_ERROR,
+          `Error WSAA: ${(err as Error).message}`,
+          502,
+        );
+      }
+      // Retención activa: esperar un backoff corto y reintentar.
+      await new Promise((r) => setTimeout(r, 5_000));
     }
-    throw new ArcaError(
-      ARCA_ERROR_CODES.ARCA_AUTH_ERROR,
-      `Error WSAA: ${(err as Error).message}`,
-      502,
-    );
   }
 };
