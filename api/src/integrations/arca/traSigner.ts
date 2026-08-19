@@ -2,11 +2,34 @@
 // El TRA es el XML que WSAA exige firmado (RFC 2315, SHA-1, signed attributes
 // content-type + message-digest + signing-time). El CUIT va en el header del
 // LoginCms, NO en el TRA.
+//
+// FORMATO VALIDADO contra el WSAA de homologación (agosto 2026): AFIP homo
+// rechaza con `xml.bad / No se ha podido interpretar el XML contra el SCHEMA`
+// si las fechas llevan milisegundos u offset (p.ej. toISOString() → "...Z") o
+// si el uniqueId es largo (Date.now() → 13 dígitos). El formato que acepta es:
+//   - generationTime/expirationTime en hora local "YYYY-MM-DDTHH:mm:ss" (sin
+//     milisegundos, sin offset de zona horaria).
+//   - uniqueId CORTO (6 dígitos); un valor de 13 dígitos también devuelve
+//     xml.bad en homo.
+// Con el cert correcto y el servicio autorizado, así obtiene el TicketAcceso.
 
 import forge from "node-forge";
 
+/** uniqueId de 6 dígitos (AFIP homo rechaza valores largos con xml.bad). */
+const buildShortUniqueId = (): string =>
+  String(Math.floor(100000 + Math.random() * 900000));
+
+/** Fecha local sin milisegundos ni offset: "YYYY-MM-DDTHH:mm:ss". */
+const formatTraDate = (date: Date): string => {
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  );
+};
+
 export const buildTra = (
-  cuit: string,
+  _cuit: string,
   service: string,
   expirationHours = 24,
 ): string => {
@@ -14,18 +37,14 @@ export const buildTra = (
   const expirationTime = new Date(
     generationTime.getTime() + expirationHours * 3600 * 1000,
   );
-  // uniqueId: entero largo sin signo (los tests exigen ^\d+$)
-  const uniqueId = `${Date.now()}${cuit.slice(-4)}${Math.floor(
-    Math.random() * 1000,
-  )}`;
 
   return (
     '<?xml version="1.0" encoding="UTF-8"?>' +
     '<loginTicketRequest version="1.0">' +
     "<header>" +
-    `<uniqueId>${uniqueId}</uniqueId>` +
-    `<generationTime>${generationTime.toISOString()}</generationTime>` +
-    `<expirationTime>${expirationTime.toISOString()}</expirationTime>` +
+    `<uniqueId>${buildShortUniqueId()}</uniqueId>` +
+    `<generationTime>${formatTraDate(generationTime)}</generationTime>` +
+    `<expirationTime>${formatTraDate(expirationTime)}</expirationTime>` +
     "</header>" +
     `<service>${service}</service>` +
     "</loginTicketRequest>"

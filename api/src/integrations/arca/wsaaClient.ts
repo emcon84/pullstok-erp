@@ -39,11 +39,14 @@ const resolveWsaaUrl = (environment: ArcaEnvironment): string => {
   return process.env.ARCA_WSAA_HOMO_URL ?? DEFAULT_WSAA_URLS.HOMOLOGACION;
 };
 
-/** Body de LoginCms: namespace del servicio + CMS firmado en in0. */
+/** Body de LoginCms: namespace del servicio + CMS firmado en in0.
+ * La operación SOAP correcta es `loginCms` (así lo define el WSDL
+ * https://wsaahomo.afip.gov.ar/ws/services/LoginCms?wsdl); usar
+ * `loginTicketRequest` devuelve "No such operation 'loginTicketRequest'". */
 export const buildLoginCmsBody = (cmsBase64: string): string =>
-  '<ns1:loginTicketRequest xmlns:ns1="http://wsaa.view.sua.dvadac.desein.afip.gov">' +
+  '<ns1:loginCms xmlns:ns1="http://wsaa.view.sua.dvadac.desein.afip.gov">' +
   `<ns1:in0>${cmsBase64}</ns1:in0>` +
-  "</ns1:loginTicketRequest>";
+  "</ns1:loginCms>";
 
 /** Decodifica LoginCmsReturn (base64 con token XML) y devuelve el TA. */
 export const parseLoginCmsResponse = (xml: string): TicketAcceso => {

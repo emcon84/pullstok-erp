@@ -56,7 +56,7 @@ beforeEach(() => {
 describe("buildLoginCmsBody", () => {
   it("envuelve el CMS en el namespace del servicio LoginCms", () => {
     const body = buildLoginCmsBody("b64-cms");
-    expect(body).toContain('<ns1:loginTicketRequest xmlns:ns1="http://wsaa.view.sua.dvadac.desein.afip.gov">');
+    expect(body).toContain('<ns1:loginCms xmlns:ns1="http://wsaa.view.sua.dvadac.desein.afip.gov">');
     expect(body).toContain("b64-cms");
   });
 });
@@ -111,11 +111,19 @@ describe("authenticateWsaa", () => {
       fs.readFileSync(path.join(FIXTURES, "loginCms_ok.xml"), "utf8"),
     );
 
-    await authenticateWsaa(CONTEXT);
-    await authenticateWsaa(CONTEXT);
+    // Fijamos la fecha ANTES de la expiración del fixture (loginCms_ok.xml
+    // expira 2026-08-19T12:00:00-03:00) para que el TA siga vigente entre
+    // ambas llamadas y la segunda reutilice la cache.
+    jest.useFakeTimers().setSystemTime(new Date("2026-08-19T10:00:00-03:00"));
+    try {
+      await authenticateWsaa(CONTEXT);
+      await authenticateWsaa(CONTEXT);
 
-    expect(soapRequestMock).toHaveBeenCalledTimes(1);
-    expect(signTraMock).toHaveBeenCalledTimes(1);
+      expect(soapRequestMock).toHaveBeenCalledTimes(1);
+      expect(signTraMock).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("la cache es por organización (orgs distintas no comparten TA)", async () => {
