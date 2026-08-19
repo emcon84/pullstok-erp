@@ -170,4 +170,10 @@
     color: #000 !important;
     border-color: #000 !important;
   }
+  /* Las tablas fluyen entre hojas: solo evitamos cortar una fila a la
+     mitad, nunca saltos de página forzados entre marcas/secciones. */
+  .print-area tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

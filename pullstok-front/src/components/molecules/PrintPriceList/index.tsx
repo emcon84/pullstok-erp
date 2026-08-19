@@ -48,7 +48,7 @@ export const PrintPriceList = ({ plan }: PrintPriceListProps) => {
       />
 
       {sections.map((section) => (
-        <div key={section.id} className="mb-6 break-inside-avoid">
+        <div key={section.id} className="mb-6">
           {(section.brand || section.line || section.subline) && (
             <h2 className="mb-2 border-b pb-1 text-base font-bold uppercase">
               {[section.brand, section.line, section.subline]

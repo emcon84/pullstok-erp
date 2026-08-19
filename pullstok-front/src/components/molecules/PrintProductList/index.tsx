@@ -51,7 +51,7 @@ export const PrintProductList = ({ products }: PrintProductListProps) => {
       )}
 
       {groups.map((group) => (
-        <div key={group.brand} className="mb-6 break-inside-avoid">
+        <div key={group.brand} className="mb-6">
           <h2 className="mb-2 border-b pb-1 text-base font-bold uppercase">
             {group.brand}
           </h2>
