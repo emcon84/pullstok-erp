@@ -114,6 +114,76 @@ describe("PrintProductList — listado de productos imprimible", () => {
     expect(screen.getByText(/\d{1,2}\/\d{1,2}\/\d{2,4}/)).toBeInTheDocument();
   });
 
+  it("agrupa por título de planilla en orden de position (orden del PDF)", () => {
+    const products = [
+      product({
+        name: "Puppy A",
+        planSection: {
+          brand: "SIEGER",
+          line: "SUPER PREMIUM PARA PERROS",
+          subline: "SIEGER PUPPY",
+          position: 2,
+        },
+      }),
+      product({
+        name: "Adulto B",
+        planSection: {
+          brand: "SIEGER",
+          line: null,
+          subline: "SIEGER ADULTO",
+          position: 1,
+        },
+      }),
+      product({
+        name: "Puppy B",
+        planSection: {
+          brand: "SIEGER",
+          line: "SUPER PREMIUM PARA PERROS",
+          subline: "SIEGER PUPPY",
+          position: 2,
+        },
+      }),
+    ];
+
+    render(<PrintProductList products={products} />);
+
+    const titles = screen
+      .getAllByRole("heading", { level: 2, hidden: true })
+      .map((h) => h.textContent);
+    expect(titles).toEqual(["SIEGER ADULTO", "SIEGER PUPPY"]);
+    expect(screen.getByText("Puppy A")).toBeInTheDocument();
+    expect(screen.getByText("Puppy B")).toBeInTheDocument();
+    expect(screen.getByText("Adulto B")).toBeInTheDocument();
+  });
+
+  it("mezcla: con título de planilla va a su grupo; sin título a su marca", () => {
+    const products = [
+      product({
+        name: "Purina Adultos",
+        variantAssignments: [
+          { option: { value: "Purina", variant: { name: "Marca" } } },
+        ],
+      }),
+      product({
+        name: "Puppy A",
+        planSection: {
+          brand: "SIEGER",
+          line: null,
+          subline: "SIEGER PUPPY",
+          position: 1,
+        },
+      }),
+    ];
+
+    render(<PrintProductList products={products} />);
+
+    const titles = screen
+      .getAllByRole("heading", { level: 2, hidden: true })
+      .map((h) => h.textContent);
+    // Títulos de planilla primero (orden del PDF), luego las marcas.
+    expect(titles).toEqual(["SIEGER PUPPY", "Purina"]);
+  });
+
   it("muestra el mensaje vacío cuando no hay productos", () => {
     render(<PrintProductList products={[]} />);
 

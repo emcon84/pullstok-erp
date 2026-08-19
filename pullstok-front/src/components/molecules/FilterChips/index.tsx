@@ -15,6 +15,11 @@ export interface FilterChipsProps {
   onClear: () => void;
   quickCategories?: string[];
   quickVariants?: { name: string; values: string[] }[];
+  /** Títulos de planilla SECO (sdd/alican-plan-titles): opcionales. Solo se
+   * renderiza el grupo de chips si se pasan (cero impacto en otras vistas). */
+  titles?: { key: string; label: string; count: number }[];
+  titleFilter?: string | null;
+  onTitleChange?: (key: string | null) => void;
 }
 
 // ── Filter helpers ──
@@ -81,6 +86,9 @@ export const FilterChips = ({
   onClear,
   quickCategories: quickCategoriesProp,
   quickVariants: quickVariantsProp,
+  titles,
+  titleFilter,
+  onTitleChange,
 }: FilterChipsProps) => {
   // Extract unique categories. When the caller supplies complete facets
   // (vendor dashboard), use them directly; otherwise derive from the loaded
@@ -135,7 +143,11 @@ export const FilterChips = ({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [categoryFilter, products, quickVariantsProp]);
 
-  const hasFilters = !!(categoryFilter || splitTerms(filter).length > 0);
+  const hasFilters = !!(categoryFilter || titleFilter || splitTerms(filter).length > 0);
+
+  const activeTitle = titleFilter
+    ? titles?.find((t) => t.key === titleFilter) ?? null
+    : null;
 
   return (
     <div className="space-y-2">
@@ -143,6 +155,17 @@ export const FilterChips = ({
       {hasFilters && (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Filtros:</span>
+          {activeTitle && onTitleChange && (
+            <Badge variant="secondary" className="gap-1 pr-1 text-xs uppercase">
+              {activeTitle.label}
+              <button
+                onClick={() => onTitleChange(null)}
+                className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
           {categoryFilter && (
             <Badge variant="secondary" className="gap-1 pr-1 text-xs uppercase">
               {categoryFilter}
@@ -194,6 +217,29 @@ export const FilterChips = ({
             </Badge>
           ))}
         </ScrollRow>
+      )}
+
+      {/* ── Plan title chips (sdd/alican-plan-titles) ── */}
+      {titles !== undefined && titles.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground shrink-0 w-16">
+            Títulos
+          </span>
+          <ScrollRow className="gap-1.5">
+            {titles.map((t) => (
+              <Badge
+                key={t.key}
+                variant={titleFilter === t.key ? "default" : "outline"}
+                className="shrink-0 cursor-pointer px-2.5 py-1 text-xs font-medium whitespace-nowrap uppercase"
+                onClick={() =>
+                  onTitleChange?.(titleFilter === t.key ? null : t.key)
+                }
+              >
+                {t.label} ({t.count})
+              </Badge>
+            ))}
+          </ScrollRow>
+        </div>
       )}
 
       {/* ── Variant chips grouped by type ── */}

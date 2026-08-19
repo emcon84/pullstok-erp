@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { groupByBrand, productBrandOf, groupByPdfHierarchy } from "@/lib/printGrouping";
+import {
+  groupByBrand,
+  groupByPlanTitle,
+  planTitleOf,
+  planTitleKeyOf,
+  productBrandOf,
+  groupByPdfHierarchy,
+} from "@/lib/printGrouping";
 
 interface Item {
   id: string;
@@ -118,5 +125,127 @@ describe("groupByPdfHierarchy — jerarquía del PDF para la planilla mayorista"
     expect(s.brand).toBe("SIEGER");
     expect(s.line).toBe("SUPER PREMIUM PARA PERROS");
     expect(s.subline).toBe("SIEGER PUPPY");
+  });
+});
+
+describe("planTitleOf — label de título de planilla de un producto", () => {
+  const section = (
+    overrides: Partial<{ brand: string | null; line: string | null; subline: string | null; position: number }>,
+  ) => ({ planSection: { brand: null, line: null, subline: null, position: 0, ...overrides } });
+
+  it("devuelve '' sin planSection", () => {
+    expect(planTitleOf({})).toBe("");
+    expect(planTitleOf({ planSection: null })).toBe("");
+  });
+
+  it("label = subline ?? brand (regla exacta del backend)", () => {
+    expect(planTitleOf(section({ brand: "SIEGER", line: "SUPER PREMIUM PARA PERROS", subline: "SIEGER PUPPY" })))
+      .toBe("SIEGER PUPPY");
+    expect(planTitleOf(section({ brand: "MAXXIUM", line: null, subline: "MAXXIUM PERROS" })))
+      .toBe("MAXXIUM PERROS");
+    expect(planTitleOf(section({ brand: "BENTONITA HOMEBRAND", line: null, subline: null })))
+      .toBe("BENTONITA HOMEBRAND");
+  });
+
+  it("sin subline ni brand → '' (aunque haya línea)", () => {
+    expect(planTitleOf(section({ brand: null, line: "LÍNEA SUELTA", subline: null }))).toBe("");
+  });
+});
+
+describe("planTitleKeyOf — clave compuesta para el filtro", () => {
+  const section = (
+    overrides: Partial<{ brand: string | null; line: string | null; subline: string | null; position: number }>,
+  ) => ({ planSection: { brand: null, line: null, subline: null, position: 0, ...overrides } });
+
+  it("construye [brand, line, subline].filter(Boolean).join('|')", () => {
+    expect(planTitleKeyOf(section({ brand: "SIEGER", line: "SUPER PREMIUM PARA PERROS", subline: "SIEGER PUPPY" })))
+      .toBe("SIEGER|SUPER PREMIUM PARA PERROS|SIEGER PUPPY");
+    expect(planTitleKeyOf(section({ brand: "MAXXIUM", line: null, subline: "MAXXIUM PERROS" })))
+      .toBe("MAXXIUM|MAXXIUM PERROS");
+    expect(planTitleKeyOf(section({ brand: "AGILITY", line: null, subline: null })))
+      .toBe("AGILITY");
+  });
+
+  it("devuelve '' sin planSection", () => {
+    expect(planTitleKeyOf({})).toBe("");
+    expect(planTitleKeyOf({ planSection: null })).toBe("");
+  });
+});
+
+describe("groupByPlanTitle — agrupación por título de planilla para impresión", () => {
+  interface Item {
+    id: string;
+    name: string;
+    variantAssignments?: { option?: { value?: string; variant?: { name?: string } } }[];
+    planSection?: { brand: string | null; line: string | null; subline: string | null; position: number } | null;
+  }
+  const item = (
+    id: string,
+    name: string,
+    planSection: Item["planSection"] = null,
+    brand = "",
+  ): Item => ({
+    id,
+    name,
+    ...(brand
+      ? { variantAssignments: [{ option: { value: brand, variant: { name: "Marca" } } }] }
+      : {}),
+    planSection,
+  });
+
+  it("agrupa por label y ordena los grupos por position mínima (orden del PDF)", () => {
+    const items = [
+      item("1", "Puppy A", { brand: "SIEGER", line: "SUPER PREMIUM PARA PERROS", subline: "SIEGER PUPPY", position: 2 }),
+      item("2", "Adulto A", { brand: "SIEGER", line: null, subline: "SIEGER ADULTO", position: 1 }),
+      item("3", "Puppy B", { brand: "SIEGER", line: "SUPER PREMIUM PARA PERROS", subline: "SIEGER PUPPY", position: 3 }),
+    ];
+    const groups = groupByPlanTitle(items);
+    expect(groups.map((g) => g.title)).toEqual(["SIEGER ADULTO", "SIEGER PUPPY"]);
+    expect(groups[1].items.map((i) => i.name)).toEqual(["Puppy A", "Puppy B"]);
+  });
+
+  it("los productos sin planSection caen a su marca (productBrandOf)", () => {
+    const items = [
+      item("1", "Puppy A", { brand: "SIEGER", line: null, subline: "SIEGER PUPPY", position: 1 }),
+      item("2", "Purina Adultos", null, "Purina"),
+    ];
+    const groups = groupByPlanTitle(items);
+    expect(groups.map((g) => g.title)).toEqual(["SIEGER PUPPY", "Purina"]);
+    expect(groups[1].items.map((i) => i.name)).toEqual(["Purina Adultos"]);
+  });
+
+  it("sin planSection ni marca va al bucket final 'Sin marca'", () => {
+    const items = [
+      item("1", "Collar Suelto", null),
+      item("2", "Purina Pro", null, "Purina"),
+      item("3", "Konga Snack", null, "Konga"),
+    ];
+    const groups = groupByPlanTitle(items);
+    expect(groups.map((g) => g.title)).toEqual(["Konga", "Purina", "Sin marca"]);
+    expect(groups[2].items.map((i) => i.name)).toEqual(["Collar Suelto"]);
+  });
+
+  it("mezcla en un mismo grupo productos con el mismo label (título = marca)", () => {
+    const items = [
+      item("1", "Maxxium Perros 15kg", { brand: "MAXXIUM", line: "PERROS", subline: null, position: 4 }, "MAXXIUM"),
+      item("2", "Maxxium Suelto", null, "MAXXIUM"),
+    ];
+    const groups = groupByPlanTitle(items);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].title).toBe("MAXXIUM");
+    expect(groups[0].items.map((i) => i.name)).toEqual(["Maxxium Perros 15kg", "Maxxium Suelto"]);
+  });
+
+  it("ordena los items dentro de cada grupo por nombre (locale es)", () => {
+    const items = [
+      item("1", "Zeta", null, "Purina"),
+      item("2", "Alfa", null, "Purina"),
+    ];
+    const groups = groupByPlanTitle(items);
+    expect(groups[0].items.map((i) => i.name)).toEqual(["Alfa", "Zeta"]);
+  });
+
+  it("devuelve [] para items vacíos", () => {
+    expect(groupByPlanTitle<Item>([])).toEqual([]);
   });
 });

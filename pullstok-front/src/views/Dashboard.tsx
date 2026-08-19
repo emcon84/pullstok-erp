@@ -24,7 +24,7 @@ import { PrintProductList } from "../components/molecules/PrintProductList";
 import { ProductDrawer } from "../components/molecules/ProductDrawer";
 import { QuickPriceModal } from "../components/molecules/QuickPriceModal";
 import { Statistics } from "./Statistics";
-import { useProducts } from "../components/hooks/useProducts";
+import { useProducts, useProductFacets } from "../components/hooks/useProducts";
 import { useStockSummary } from "../components/hooks/useStockSummary";
 import { DataItem } from "../types";
 import { useGetSales, useCreateSale } from "../components/hooks/useSales";
@@ -42,6 +42,7 @@ import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
 import { VendorDashboard } from "./VendorDashboard";
 import { FilterChips } from "../components/molecules/FilterChips";
+import { planTitleKeyOf } from "@/lib/printGrouping";
 import {
   parseFilterTerms,
   matchesProductFilter,
@@ -58,6 +59,9 @@ export const Dashboard = () => {
   const [filter, setFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [providerFilter, setProviderFilter] = useState("");
+  // Título de planilla SECO (sdd/alican-plan-titles): filtro client-side por
+  // la clave compuesta [brand, line, subline].filter(Boolean).join("|").
+  const [titleFilter, setTitleFilter] = useState<string | null>(null);
   const [selectedStat, setSelectedStat] = useState<StatType>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -102,6 +106,8 @@ export const Dashboard = () => {
     loading: productsLoading,
     error: productsError,
   } = useProducts(branchFilter);
+  // Títulos de planilla (facets del backend): chips para el filtro client-side.
+  const { titles: facetTitles } = useProductFacets();
   const { sales, loading: salesLoading } = useGetSales(resolvedBranchId);
   const { budgets, loading: loadingBudgets } = useGetBudgets(resolvedBranchId);
   const { orders, loading: loadingOrders } = useOrders(resolvedBranchId);
@@ -186,9 +192,12 @@ export const Dashboard = () => {
         return String(name).toLowerCase() === providerFilter.toLowerCase();
       });
     }
+    if (titleFilter) {
+      list = list.filter((p) => planTitleKeyOf(p) === titleFilter);
+    }
     if (filterTerms.length === 0) return list;
     return list.filter((product) => matchesProductFilter(product, filterTerms));
-  }, [products, filterTerms, categoryFilter, providerFilter]);
+  }, [products, filterTerms, categoryFilter, providerFilter, titleFilter]);
 
   // Proveedores disponibles en el catálogo cargado (para el select de filtro).
   const availableProviders = useMemo(() => {
@@ -405,9 +414,12 @@ export const Dashboard = () => {
         products={products}
         filter={filter}
         categoryFilter={categoryFilter}
+        titles={facetTitles}
+        titleFilter={titleFilter}
+        onTitleChange={setTitleFilter}
         onFilterChange={setFilter}
         onCategoryChange={setCategoryFilter}
-        onClear={() => { setFilter(""); setCategoryFilter(""); setProviderFilter(""); }}
+        onClear={() => { setFilter(""); setCategoryFilter(""); setProviderFilter(""); setTitleFilter(null); }}
       />
 
       {/* Tabla de productos / stock */}

@@ -121,6 +121,10 @@ export const getStockSummary = async (): Promise<StockSummary> => {
 export interface ProductFacets {
   categories: { id: string; name: string }[];
   variants: { name: string; values: string[] }[];
+  /** Títulos de planilla SECO (sdd/alican-plan-titles): chips de filtro por
+   * título del PDF (ej. "SIEGER PUPPY"). key = [brand, line, subline].
+   * filter(Boolean).join("|") — contract exacto con GET /products?title=. */
+  titles: { key: string; label: string; count: number }[];
 }
 
 /**
@@ -158,6 +162,16 @@ export const getProductFacets = async (
   }
 };
 
+/**
+ * Garantiza `planSection` en cada DataItem (null si la API no lo trae): la
+ * sección de planilla SECO más reciente ya viene del backend; este paso la
+ * normaliza en AMBOS shapes (array plano y envelope paginado).
+ */
+const normalizePlanSection = (item: DataItem): DataItem => ({
+  ...item,
+  planSection: item.planSection ?? null,
+});
+
 /** Server-side pagination envelope (opt-in, only when page + pageSize are sent). */
 export interface PaginatedProducts {
   items: DataItem[];
@@ -177,12 +191,17 @@ export function products(
   search?: string,
   category?: string,
 ): Promise<DataItem[]>;
+// Paginados: page/pageSize en las posiciones 4/5 (contrato legacy intacto,
+// LooseStockAdmin usa products(undefined, "", undefined, 1, 300)); el título de
+// planilla es OPCIONAL y va al final (solo lo usa la variante paginada del
+// vendor dashboard).
 export function products(
   branchId: string | undefined,
   search: string | undefined,
   category: string | undefined,
   page: number,
   pageSize: number,
+  title?: string,
 ): Promise<PaginatedProducts>;
 export async function products(
   branchId?: string,
@@ -190,6 +209,7 @@ export async function products(
   category?: string,
   page?: number,
   pageSize?: number,
+  title?: string,
 ): Promise<DataItem[] | PaginatedProducts> {
   try {
     const token = localStorage.getItem("token");
@@ -198,6 +218,7 @@ export async function products(
     if (branchId) params.branchId = branchId;
     if (search) params.name = search;
     if (category) params.category = category;
+    if (title) params.title = title;
     if (page !== undefined && pageSize !== undefined) {
       params.page = String(page);
       params.pageSize = String(pageSize);
@@ -209,7 +230,14 @@ export async function products(
         Authorization: `Bearer ${token}`,
       },
     });
-    return response.data;
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data.map(normalizePlanSection);
+    }
+    return {
+      ...data,
+      items: (data.items ?? []).map(normalizePlanSection),
+    } as PaginatedProducts;
   } catch (error) {
     if (axios.isAxiosError(error)) {
       // Error específico de Axios

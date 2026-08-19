@@ -115,3 +115,94 @@ describe("FilterChips — multi-marca desde las pills", () => {
     expect(onFilterChange).toHaveBeenCalledWith("Proplan");
   });
 });
+
+describe("FilterChips — chips de títulos de planilla", () => {
+  const titles = [
+    { key: "SIEGER|SUPER PREMIUM PARA PERROS|SIEGER PUPPY", label: "SIEGER PUPPY", count: 3 },
+    { key: "MAXXIUM|MAXXIUM PERROS", label: "MAXXIUM PERROS", count: 2 },
+  ];
+
+  function renderTitleChips(titleFilter: string | null = null) {
+    const onFilterChange = vi.fn();
+    const onCategoryChange = vi.fn();
+    const onClear = vi.fn();
+    const onTitleChange = vi.fn();
+    render(
+      <FilterChips
+        products={products}
+        filter=""
+        categoryFilter=""
+        onFilterChange={onFilterChange}
+        onCategoryChange={onCategoryChange}
+        onClear={onClear}
+        titles={titles}
+        titleFilter={titleFilter}
+        onTitleChange={onTitleChange}
+      />,
+    );
+    return { onFilterChange, onCategoryChange, onClear, onTitleChange };
+  }
+
+  function clickPill(text: string) {
+    const el = screen
+      .getAllByText(text)
+      .find((n) => n.className.includes("cursor-pointer"));
+    if (!el) throw new Error(`pill ${text} not found`);
+    fireEvent.click(el);
+  }
+
+  it("muestra el grupo con el header 'Títulos' y chips con label y conteo", () => {
+    renderTitleChips();
+
+    expect(screen.getByText("Títulos")).toBeInTheDocument();
+    expect(screen.getByText("SIEGER PUPPY (3)")).toBeInTheDocument();
+    expect(screen.getByText("MAXXIUM PERROS (2)")).toBeInTheDocument();
+  });
+
+  it("seleccionar un título activa onTitleChange con la key", () => {
+    const { onTitleChange } = renderTitleChips();
+
+    clickPill("SIEGER PUPPY (3)");
+
+    expect(onTitleChange).toHaveBeenCalledWith("SIEGER|SUPER PREMIUM PARA PERROS|SIEGER PUPPY");
+  });
+
+  it("un título activo se deselecciona al clickearlo (onTitleChange(null))", () => {
+    const { onTitleChange } = renderTitleChips("SIEGER|SUPER PREMIUM PARA PERROS|SIEGER PUPPY");
+
+    clickPill("SIEGER PUPPY (3)");
+
+    expect(onTitleChange).toHaveBeenCalledWith(null);
+  });
+
+  it("el título activo aparece como badge en la barra de filtros (label sin conteo)", () => {
+    const { onTitleChange } = renderTitleChips("MAXXIUM|MAXXIUM PERROS");
+
+    expect(screen.getByText("Filtros:")).toBeInTheDocument();
+    // El chip muestra label + conteo; el badge de la barra solo el label.
+    expect(screen.getByText("MAXXIUM PERROS (2)")).toBeInTheDocument();
+    expect(screen.getByText("MAXXIUM PERROS")).toBeInTheDocument();
+
+    // El botón X del badge deselecciona (null).
+    const xButton = screen
+      .getAllByRole("button")
+      .find((b) => b.querySelector("svg"));
+    fireEvent.click(xButton!);
+    expect(onTitleChange).toHaveBeenCalledWith(null);
+  });
+
+  it("sin la prop titles no renderiza el grupo (cero impacto en otras vistas)", () => {
+    render(
+      <FilterChips
+        products={products}
+        filter=""
+        categoryFilter=""
+        onFilterChange={vi.fn()}
+        onCategoryChange={vi.fn()}
+        onClear={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText("SIEGER PUPPY")).not.toBeInTheDocument();
+    expect(screen.queryByText("Títulos")).not.toBeInTheDocument();
+  });
+});

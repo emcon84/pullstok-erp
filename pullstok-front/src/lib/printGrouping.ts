@@ -56,6 +56,108 @@ export function productBrandOf(product: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
+// Títulos de planilla SECO (sdd/alican-plan-titles)
+// ---------------------------------------------------------------------------
+
+export interface PlanSection {
+  brand: string | null;
+  line: string | null;
+  subline: string | null;
+  position: number;
+}
+
+/**
+ * Título de planilla de un producto (sdd/alican-plan-titles): LABEL usado para
+ * agrupar/encabezar. Regla exacta del backend: subline ?? brand. Vacío si el
+ * producto no tiene sección de planilla (o la sección no tiene subline ni
+ * brand).
+ */
+export function planTitleOf(p: {
+  planSection?: PlanSection | null;
+}): string {
+  return p.planSection?.subline ?? p.planSection?.brand ?? "";
+}
+
+/**
+ * Clave compuesta [brand, line, subline].filter(Boolean).join("|") — contract
+ * exacto con GET /products?title= y con las facets (títulos) del backend. Se
+ * usa para el filtro client-side del dashboard: los chips se comparan por key,
+ * no por label.
+ */
+export function planTitleKeyOf(p: {
+  planSection?: PlanSection | null;
+}): string {
+  const s = p.planSection;
+  return s ? [s.brand, s.line, s.subline].filter(Boolean).join("|") : "";
+}
+
+export interface PlanTitleGroup<T> {
+  title: string;
+  items: T[];
+}
+
+const planTitlePositionOf = (item: unknown): number => {
+  const s = (item as { planSection?: { position?: number } | null })?.planSection;
+  return typeof s?.position === "number" ? s.position : Infinity;
+};
+
+const sortByName = (a: unknown, b: unknown) =>
+  String((a as { name?: string }).name ?? "").localeCompare(
+    String((b as { name?: string }).name ?? ""),
+    "es",
+    { sensitivity: "base" },
+  );
+
+/**
+ * Agrupa items por título de planilla para impresión. Preserva el orden del
+ * PDF: los grupos con sección se ordenan por position (mínima) y luego
+ * alfabético. Los productos SIN planSection caen a su marca (productBrandOf) y
+ * los que no tienen marca ni sección van al bucket final "Sin marca". Dentro de
+ * cada grupo los items se ordenan por nombre (locale es).
+ */
+export function groupByPlanTitle<T>(products: T[]): PlanTitleGroup<T>[] {
+  const byLabel = new Map<
+    string,
+    { title: string; position: number; items: T[] }
+  >();
+
+  const bucketFor = (title: string, position = Infinity) => {
+    const entry = byLabel.get(title) ?? { title, position, items: [] };
+    return entry;
+  };
+
+  for (const item of products) {
+    const label = planTitleOf(item as { planSection?: PlanSection | null });
+    if (label) {
+      const entry = bucketFor(label);
+      const pos = planTitlePositionOf(item);
+      if (pos !== Infinity) entry.position = Math.min(entry.position, pos);
+      entry.items.push(item);
+      byLabel.set(label, entry);
+    } else {
+      const brand = productBrandOf(item).trim();
+      const title = brand || "Sin marca";
+      const entry = bucketFor(title);
+      entry.items.push(item);
+      byLabel.set(title, entry);
+    }
+  }
+
+  const groups = [...byLabel.values()]
+    .map((g) => ({ title: g.title, items: [...g.items].sort(sortByName) }))
+    .sort((a, b) => {
+      if (a.title === "Sin marca") return 1;
+      if (b.title === "Sin marca") return -1;
+      const pa = byLabel.get(a.title)!.position;
+      const pb = byLabel.get(b.title)!.position;
+      if (pa !== pb) return pa - pb;
+      return a.title.localeCompare(b.title, "es", { sensitivity: "base" });
+    });
+
+  return groups;
+}
+
+// ---------------------------------------------------------------------------
 // Jerarquía DEL PDF para la planilla mayorista (sdd/alican-wholesale-price-list)
 // ---------------------------------------------------------------------------
 

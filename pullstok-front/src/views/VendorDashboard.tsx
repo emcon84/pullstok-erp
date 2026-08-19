@@ -116,11 +116,22 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     [catalog.setCategoryFilter, catalog.resetSelection],
   );
 
+  const handleTitleChange = useCallback(
+    (key: string | null) => {
+      // Server-side: el título se envía como ?title=<key> junto con los demás
+      // filtros (AND). Toggle del chip activo deselecciona (null) y refetchea.
+      catalog.setTitleFilter(key);
+      catalog.resetSelection();
+    },
+    [catalog.setTitleFilter, catalog.resetSelection],
+  );
+
   const handleClearFilters = useCallback(() => {
     catalog.setFilter("");
     catalog.setCategoryFilter("");
+    catalog.setTitleFilter(null);
     catalog.resetSelection();
-  }, [catalog.setFilter, catalog.setCategoryFilter, catalog.resetSelection]);
+  }, [catalog.setFilter, catalog.setCategoryFilter, catalog.setTitleFilter, catalog.resetSelection]);
 
   const handleAssignBarcode = useCallback(
     (product: DataItem) => {
@@ -172,6 +183,9 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           products={catalog.items}
           quickCategories={catalog.facetsCategories.map((c) => c.name)}
           quickVariants={catalog.facetsVariants}
+          titles={catalog.facetsTitles}
+          titleFilter={catalog.titleFilter}
+          onTitleChange={handleTitleChange}
           filter={catalog.filter}
           categoryFilter={catalog.categoryFilter}
           onFilterChange={handleFilterChange}
@@ -184,15 +198,18 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
       {catalog.items.length === 0 ? (
         <div className="py-12 text-center space-y-3">
           <p className="text-muted-foreground">
-            {catalog.filter || catalog.categoryFilter ? "Sin resultados con estos filtros." : "No hay productos."}
+            {catalog.filter || catalog.categoryFilter || catalog.titleFilter
+              ? "Sin resultados con estos filtros."
+              : "No hay productos."}
           </p>
-          {(catalog.filter || catalog.categoryFilter) && (
+          {(catalog.filter || catalog.categoryFilter || catalog.titleFilter) && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 catalog.setFilter("");
                 catalog.setCategoryFilter("");
+                catalog.setTitleFilter(null);
               }}
             >
               Limpiar filtros

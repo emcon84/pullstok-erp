@@ -89,8 +89,9 @@ export const useInfiniteProducts = (
   branchId?: string,
   search?: string,
   category?: string,
+  title?: string,
 ) => {
-  const queryKey = ["products", branchId, search, category].filter(Boolean);
+  const queryKey = ["products", branchId, search, category, title].filter(Boolean);
 
   const {
     data,
@@ -108,7 +109,7 @@ export const useInfiniteProducts = (
   >({
     queryKey,
     queryFn: ({ pageParam }) =>
-      fetchProducts(branchId, search, category, pageParam, PAGE_SIZE),
+      fetchProducts(branchId, search, category, pageParam, PAGE_SIZE, title),
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
     initialPageParam: 1,
     placeholderData: (prev) => prev, // keep previous pages while searching
@@ -148,6 +149,7 @@ export const useProductFacets = (category?: string) => {
   return {
     categories: data?.categories ?? [],
     variants: data?.variants ?? [],
+    titles: data?.titles ?? [],
     loading: isLoading,
   };
 };

@@ -20,6 +20,15 @@ export interface DataItem {
   // desnormalizado { id, name } que trae la API en el include de productos.
   providerId?: string;
   provider?: { id?: string; name: string } | null;
+  // Sección de planilla SECO MÁS RECIENTE (sdd/alican-plan-titles): la API la
+  // expone como planSection con la jerarquía del PDF (brand/line/subline/
+  // position). NUNCA incluye precios de proveedor.
+  planSection?: {
+    brand: string | null;
+    line: string | null;
+    subline: string | null;
+    position: number;
+  } | null;
   price: number | string;
   quantity: number | string;
 }

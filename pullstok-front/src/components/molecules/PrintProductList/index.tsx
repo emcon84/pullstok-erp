@@ -7,20 +7,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { DataItem } from "@/types";
-import { groupByBrand, productBrandOf } from "@/lib/printGrouping";
+import { groupByPlanTitle } from "@/lib/printGrouping";
 import { PrintHeader } from "@/components/molecules/PrintHeader";
 
 interface PrintProductListProps {
   products: DataItem[];
 }
 
-const sortByName = (a: DataItem, b: DataItem) =>
-  String(a.name ?? "").localeCompare(String(b.name ?? ""), "es", {
-    sensitivity: "base",
-  });
-
 export const PrintProductList = ({ products }: PrintProductListProps) => {
-  const groups = groupByBrand(products, productBrandOf, sortByName);
+  // Títulos ALICAN: los productos con planSection se agrupan por título en
+  // orden del PDF; sin sección caen a su marca (productBrandOf) y los que no
+  // tienen marca ni sección van al bucket final "Sin marca".
+  const groups = groupByPlanTitle(products);
 
   return (
     <div className="print-area hidden print:block" aria-hidden="true">
@@ -29,7 +27,7 @@ export const PrintProductList = ({ products }: PrintProductListProps) => {
         subtitle={`${new Date().toLocaleDateString("es-AR")} · ${products.length} productos`}
       />
 
-      {groups.length === 0 && (
+      {products.length === 0 && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -51,9 +49,9 @@ export const PrintProductList = ({ products }: PrintProductListProps) => {
       )}
 
       {groups.map((group) => (
-        <div key={group.brand} className="mb-6">
+        <div key={group.title} className="mb-6">
           <h2 className="mb-2 border-b pb-1 text-base font-bold uppercase">
-            {group.brand}
+            {group.title}
           </h2>
           <Table>
             <TableHeader>

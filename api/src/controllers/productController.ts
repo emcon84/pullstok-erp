@@ -369,11 +369,64 @@ export function buildProductSearchWhere(searchTerm: string): any {
   };
 }
 
+/**
+ * Candidate WHERE para el filtro `?title=` (sdd/alican-plan-titles). El front
+ * deriva la clave de una sección como `[brand, line, subline].filter(Boolean)
+ * .join("|")` (contract exacto). Prisma no puede concatenar columnas en un
+ * WHERE, así que se enumeran las asignaciones posibles de las partes a los 3
+ * campos en orden, con los campos NO usados fijados a null: así cada candidato
+ * matchea EXACTAMENTE las secciones cuya clave compuesta da el valor buscado
+ * (una sección con brand+line+subline NO matchea una clave de 2 partes porque
+ * su candidato exige null en el campo sobrante). Asunción: las secciones del
+ * PDF Alican siempre llevan brand; si el día de mañana una sección tuviera
+ * solo line+subline (brand null) el candidato {line, subline} la cubre igual.
+ */
+export function planTitleWhereCandidates(
+  key: string,
+): { brand: string | null; line: string | null; subline: string | null }[] {
+  const parts = key
+    .split("|")
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  if (parts.length === 1) {
+    return [{ brand: parts[0], line: null, subline: null }];
+  }
+  if (parts.length === 2) {
+    return [
+      { brand: parts[0], line: parts[1], subline: null },
+      { brand: parts[0], line: null, subline: parts[1] },
+      { brand: null, line: parts[0], subline: parts[1] },
+    ];
+  }
+  if (parts.length === 3) {
+    return [{ brand: parts[0], line: parts[1], subline: parts[2] }];
+  }
+  return [];
+}
+
 const getProducts = async (req: Request, res: Response) => {
   try {
-    const { name, category, minPrice, maxPrice, description, branchId } = req.query;
+    const { name, category, minPrice, maxPrice, description, branchId, title } = req.query;
 
     const where: any = {};
+
+    if (title) {
+      const candidates = planTitleWhereCandidates(title as string);
+      if (candidates.length === 0) {
+        // Clave sin partes válidas: ningún producto puede matchearla.
+        where.id = "__no-match__";
+      } else {
+        where.priceListEntries = {
+          some: {
+            matched: true,
+            section: {
+              priceList: { type: "SECO" },
+              OR: candidates,
+            },
+          },
+        };
+      }
+    }
 
     if (name) {
       const searchTerm = name as string;
@@ -403,6 +456,18 @@ const getProducts = async (req: Request, res: Response) => {
           },
         },
       },
+      // Sección de planilla SECO MÁS RECIENTE (sdd/alican-plan-titles): solo
+      // brand/line/subline/position. NUNCA se exponen precios de proveedor.
+      priceListEntries: {
+        where: { matched: true, section: { priceList: { type: "SECO" as const } } },
+        orderBy: { section: { priceList: { period: "desc" as const } } },
+        take: 1,
+        select: {
+          section: {
+            select: { brand: true, line: true, subline: true, position: true },
+          },
+        },
+      },
       ...(branchId
         ? {
             stocks: {
@@ -411,6 +476,19 @@ const getProducts = async (req: Request, res: Response) => {
             },
           }
         : {}),
+    };
+
+    // Exponer solo la sección de la planilla (planSection) y descartar el array
+    // completo de entries (que incluiría precios de proveedor si se ampliara).
+    const mapProduct = (p: any) => {
+      const { priceListEntries, ...rest } = p;
+      return {
+        ...rest,
+        planSection:
+          Array.isArray(priceListEntries) && priceListEntries.length > 0
+            ? priceListEntries[0].section ?? null
+            : null,
+      };
     };
 
     // Paginación SERVER-SIDE opt-in (vendor dashboard). Solo se activa cuando
@@ -446,7 +524,7 @@ const getProducts = async (req: Request, res: Response) => {
       ]);
 
       res.status(200).json({
-        items,
+        items: items.map(mapProduct),
         total,
         page,
         pageSize,
@@ -456,7 +534,7 @@ const getProducts = async (req: Request, res: Response) => {
     }
 
     const products = await prisma.product.findMany({ where, include });
-    res.status(200).json(products);
+    res.status(200).json(products.map(mapProduct));
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -473,6 +551,7 @@ const getProducts = async (req: Request, res: Response) => {
  */
 export const getProductFilterFacets = async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrganizationId();
     const category = req.query.category as string | undefined;
 
     const categories = await prisma.category.findMany({
@@ -515,7 +594,56 @@ export const getProductFilterFacets = async (req: Request, res: Response) => {
         .sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    res.status(200).json({ categories, variants });
+    // Títulos de planilla SECO (sdd/alican-plan-titles): mismas reglas que el
+    // include de GET /products — entries matcheadas de planillas SECO de la org
+    // actual. La clave compuesta y la etiqueta replican EXACTAMENTE la derivación
+    // del front (src/lib/printGrouping.ts). El count cuenta productos DISTINTOS
+    // por título (un producto puede aparecer en varias filas/secciones). El
+    // orden es por position de sección (orden del PDF) y luego alfabético.
+    const entries = await prisma.priceListEntry.findMany({
+      where: {
+        matched: true,
+        productId: { not: null },
+        section: { priceList: { organizationId, type: "SECO" } },
+      },
+      select: {
+        productId: true,
+        section: {
+          select: { brand: true, line: true, subline: true, position: true },
+        },
+      },
+    });
+
+    const byKey = new Map<
+      string,
+      { key: string; label: string; count: number; position: number }
+    >();
+    const productsPerKey = new Map<string, Set<string>>();
+    for (const e of entries) {
+      const s = e.section;
+      if (!s.brand && !s.subline) continue; // sin marca ni sublínea no hay título
+      if (!e.productId) continue; // el where ya filtra not null; guard para TS
+      const key = [s.brand, s.line, s.subline].filter(Boolean).join("|");
+      const label = s.subline ?? s.brand ?? "";
+      const bucket = byKey.get(key) ?? { key, label, count: 0, position: Infinity };
+      if (!productsPerKey.has(key)) productsPerKey.set(key, new Set());
+      if (!productsPerKey.get(key)!.has(e.productId)) {
+        productsPerKey.get(key)!.add(e.productId);
+        bucket.count += 1;
+      }
+      bucket.position = Math.min(bucket.position, s.position);
+      byKey.set(key, bucket);
+    }
+    const titles = [...byKey.values()]
+      .map((t) => ({ key: t.key, label: t.label, count: t.count }))
+      .sort((a, b) => {
+        const pa = byKey.get(a.key)!.position;
+        const pb = byKey.get(b.key)!.position;
+        if (pa !== pb) return pa - pb;
+        return a.label.localeCompare(b.label, "es");
+      });
+
+    res.status(200).json({ categories, variants, titles });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
