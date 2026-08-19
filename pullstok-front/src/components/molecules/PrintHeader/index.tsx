@@ -18,7 +18,7 @@ export const PrintHeader = ({ title, subtitle }: PrintHeaderProps) => (
       src={logoUrl}
       alt="Logo"
       data-testid="print-logo"
-      className="h-12 w-auto max-w-56 object-contain"
+      className="h-24 w-auto max-w-72 object-contain"
     />
     <div>
       <h1 className="text-lg font-bold">{title}</h1>
