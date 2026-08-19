@@ -236,6 +236,23 @@ describe("groupByPlanTitle — agrupación por título de planilla para impresi�
     expect(groups[0].items.map((i) => i.name)).toEqual(["Maxxium Perros 15kg", "Maxxium Suelto"]);
   });
 
+  it("AGILITY CATS se agrupa por nombre en su propio título (no se mezcla con AGILITY)", () => {
+    const items = [
+      item("1", "AGILITY Cachorros x 3 Kg.", null, "AGILITY"),
+      item("2", "AGILITY CATS KITTEN X 1.5 KG.", null, "AGILITY"),
+      item("3", "AGILITY + CATS CONTROL DE PESO X 1.5KG.", null, "AGILITY"),
+      item("4", "AGILITY + Adult Cat Salmón x 1,5 Kg.", null, "AGILITY"),
+    ];
+    const groups = groupByPlanTitle(items);
+    expect(groups.map((g) => g.title)).toEqual(["AGILITY", "AGILITY CATS"]);
+    expect(groups[0].items.map((i) => i.name)).toEqual(["AGILITY Cachorros x 3 Kg."]);
+    expect(groups[1].items.map((i) => i.name)).toEqual([
+      "AGILITY + Adult Cat Salmón x 1,5 Kg.",
+      "AGILITY + CATS CONTROL DE PESO X 1.5KG.",
+      "AGILITY CATS KITTEN X 1.5 KG.",
+    ]);
+  });
+
   it("ordena los items dentro de cada grupo por nombre (locale es)", () => {
     const items = [
       item("1", "Zeta", null, "Purina"),

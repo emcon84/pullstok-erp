@@ -67,14 +67,37 @@ export interface PlanSection {
 }
 
 /**
+ * Prefijos del NOMBRE de producto que identifican a la línea AGILITY CATS
+ * (gatos). El PDF ALICAN no trae un bloque standalone a nivel marca para
+ * AGILITY CATS: los productos de gatos llegan con el nombre diferenciado
+ * ("AGILITY CATS KITTEN", "AGILITY + CATS CONTROL DE PESO", "AGILITY + Adult
+ * Cat Salmón") mientras los de perros son "AGILITY Cachorros/Adulto/...". Se
+ * derivan por nombre para no mezclarlos en el mismo título de impresión.
+ */
+const AGILITY_CATS_NAME_PREFIXES = [
+  "AGILITY CATS",
+  "AGILITY + CATS",
+  "AGILITY + ADULT CAT",
+] as const;
+
+const hasAgilityCatsName = (name: string): boolean => {
+  const upper = name.trim().toUpperCase();
+  return AGILITY_CATS_NAME_PREFIXES.some((p) => upper.startsWith(p));
+};
+
+/**
  * Título de planilla de un producto (sdd/alican-plan-titles): LABEL usado para
- * agrupar/encabezar. Regla exacta del backend: subline ?? brand. Vacío si el
- * producto no tiene sección de planilla (o la sección no tiene subline ni
- * brand).
+ * agrupar/encabezar. Regla base exacta del backend: subline ?? brand. Vacío si
+ * el producto no tiene sección de planilla (o la sección no tiene subline ni
+ * brand). Excepción ALICAN por nombre: la línea AGILITY CATS se detecta por el
+ * nombre del producto (ver AGILITY_CATS_NAME_PREFIXES) porque el PDF no la
+ * separa a nivel marca.
  */
 export function planTitleOf(p: {
+  name?: string;
   planSection?: PlanSection | null;
 }): string {
+  if (p.name && hasAgilityCatsName(p.name)) return "AGILITY CATS";
   return p.planSection?.subline ?? p.planSection?.brand ?? "";
 }
 
@@ -127,7 +150,10 @@ export function groupByPlanTitle<T>(products: T[]): PlanTitleGroup<T>[] {
   };
 
   for (const item of products) {
-    const label = planTitleOf(item as { planSection?: PlanSection | null });
+    const label = planTitleOf(item as {
+      name?: string;
+      planSection?: PlanSection | null;
+    });
     if (label) {
       const entry = bucketFor(label);
       const pos = planTitlePositionOf(item);
