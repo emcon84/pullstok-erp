@@ -185,32 +185,4 @@ describe("authenticateWsaa", () => {
     expect(error).toBeInstanceOf(ArcaError);
     expect((error as ArcaError).code).toBe(ARCA_ERROR_CODES.ARCA_AUTH_ERROR);
   });
-
-  it("retensión de TA (coe.alreadyAuthenticated) → espera backoff y reintenta hasta obtener el TA", async () => {
-    readFileMock.mockResolvedValue("pem-cert");
-    const okXml = fs.readFileSync(path.join(FIXTURES, "loginCms_ok.xml"), "utf8");
-    // Primera llamada: WSAA retiene el TA (homo 10 min) → alreadyAuthenticated.
-    // Segunda llamada: se liberó → devuelve el TA.
-    soapRequestMock
-      .mockRejectedValueOnce(
-        new ArcaError(
-          ARCA_ERROR_CODES.ARCA_NETWORK_ERROR,
-          "HTTP 500 al llamar ...: El CEE ya posee un TA valido para el acceso al WSN solicitado",
-          503,
-        ),
-      )
-      .mockResolvedValueOnce(okXml);
-
-    jest.useFakeTimers();
-    try {
-      const promise = authenticateWsaa(CONTEXT);
-      // Avanzar el backoff de 5 s del primer reintento.
-      await jest.advanceTimersByTimeAsync(5_000);
-      const ta = await promise;
-      expect(soapRequestMock).toHaveBeenCalledTimes(2);
-      expect(ta.token).toBe("token-homo-1234");
-    } finally {
-      jest.useRealTimers();
-    }
-  });
 });

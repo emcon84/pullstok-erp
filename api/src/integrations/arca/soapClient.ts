@@ -71,14 +71,9 @@ export const soapRequest = async (input: SoapRequestInput): Promise<string> => {
         signal: AbortSignal.timeout(timeoutMs),
       });
       if (!res.ok) {
-        // Incluimos el body SOAP (puede traer un Fault con detalle de AFIP,
-        // p.ej. coe.alreadyAuthenticated) para que el caller pueda distinguir
-        // errores transitorios de la retención de TA (homo: 10 min) de fallos
-        // de red.
-        const body = await res.text().catch(() => "");
         throw new ArcaError(
           ARCA_ERROR_CODES.ARCA_NETWORK_ERROR,
-          `HTTP ${res.status} al llamar ${input.url}${body ? `: ${body.slice(0, 400)}` : ""}`,
+          `HTTP ${res.status} al llamar ${input.url}`,
           503,
         );
       }
