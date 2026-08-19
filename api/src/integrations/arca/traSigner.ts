@@ -7,8 +7,11 @@
 // rechaza con `xml.bad / No se ha podido interpretar el XML contra el SCHEMA`
 // si las fechas llevan milisegundos u offset (p.ej. toISOString() → "...Z") o
 // si el uniqueId es largo (Date.now() → 13 dígitos). El formato que acepta es:
-//   - generationTime/expirationTime en hora local "YYYY-MM-DDTHH:mm:ss" (sin
-//     milisegundos, sin offset de zona horaria).
+//   - generationTime/expirationTime en hora de BUENOS AIRES "YYYY-MM-DDTHH:mm:ss"
+//     (sin milisegundos, sin offset). IMPORTANTE: AFIP valida la hora contra
+//     America/Argentina/Buenos_Aires; si el servidor está en otra zona (p.ej.
+//     UTC en el VPS) hay que convertir, si no AFIP ve la fecha en el futuro y
+//     responde "generationTime posee formato o dato inválido".
 //   - uniqueId CORTO (6 dígitos); un valor de 13 dígitos también devuelve
 //     xml.bad en homo.
 // Con el cert correcto y el servicio autorizado, así obtiene el TicketAcceso.
@@ -19,12 +22,18 @@ import forge from "node-forge";
 const buildShortUniqueId = (): string =>
   String(Math.floor(100000 + Math.random() * 900000));
 
-/** Fecha local sin milisegundos ni offset: "YYYY-MM-DDTHH:mm:ss". */
+// Argentina no usa DST desde 2009: UTC-3 fijo.
+const BUENOS_AIRES_OFFSET_MS = -3 * 3600 * 1000;
+
+/** Fecha en hora de Buenos Aires, sin milisegundos ni offset:
+ * "YYYY-MM-DDTHH:mm:ss". AFIP valida la hora contra esta zona, NO contra la
+ * zona del servidor (que en el VPS es UTC). */
 const formatTraDate = (date: Date): string => {
+  const buenosAires = new Date(date.getTime() + BUENOS_AIRES_OFFSET_MS);
   const pad = (n: number): string => String(n).padStart(2, "0");
   return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+    `${buenosAires.getUTCFullYear()}-${pad(buenosAires.getUTCMonth() + 1)}-${pad(buenosAires.getUTCDate())}` +
+    `T${pad(buenosAires.getUTCHours())}:${pad(buenosAires.getUTCMinutes())}:${pad(buenosAires.getUTCSeconds())}`
   );
 };
 
