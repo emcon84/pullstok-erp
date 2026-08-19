@@ -18,6 +18,12 @@ function row(overrides: Partial<BulkPricePreviewRow> = {}): BulkPricePreviewRow 
 }
 
 describe("PrintBulkPriceList — listado imprimible de precios actualizados", () => {
+  it("muestra el logo en el encabezado", () => {
+    render(<PrintBulkPriceList rows={[row()]} />);
+    const logo = screen.getByTestId("print-logo") as HTMLImageElement;
+    expect(logo.src).toContain("logo-horizontal.svg");
+  });
+
   it("muestra todas las filas sin paginar", () => {
     const rows = Array.from({ length: 12 }, (_, i) =>
       row({ name: `Producto ${i + 1}` }),

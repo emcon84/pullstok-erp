@@ -163,4 +163,11 @@
     width: 100%;
     padding: 16px;
   }
+  /* Impresiones en negro pleno: forzar texto y bordes a negro sólido para
+     que no salgan grises/claras (text-muted-foreground y bordes claros). */
+  .print-area,
+  .print-area * {
+    color: #000 !important;
+    border-color: #000 !important;
+  }
 }

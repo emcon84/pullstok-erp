@@ -52,6 +52,7 @@ import {
   savePriceKgPlan,
   type PriceKgPlanEntry,
 } from "@/services/priceKgPlan";
+import { PrintHeader } from "@/components/molecules/PrintHeader";
 
 // Precios sueltos SIEMPRE redondos (decisión del usuario): sin decimales.
 const formatPrice = (n: number) =>
@@ -871,13 +872,11 @@ export const PriceKgUpdate = () => {
           imprimir (ver @media print en index.css). Sin estado: el botón solo
           llama window.print() y el navegador decide cuándo muestra esto. */}
       <div className="print-area hidden print:block" aria-hidden="true">
-        <div className="mb-4">
-          <h1 className="text-lg font-bold">{printTitle}</h1>
-          <p className="text-sm text-muted-foreground">
-            {new Date().toLocaleDateString("es-AR")} · {loadedCount} celdas
-          </p>
-        </div>
-          <Table>
+        <PrintHeader
+          title={printTitle}
+          subtitle={`${new Date().toLocaleDateString("es-AR")} · ${loadedCount} celdas`}
+        />
+        <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Marca</TableHead>

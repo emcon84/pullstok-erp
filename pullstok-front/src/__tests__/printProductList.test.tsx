@@ -15,6 +15,12 @@ function product(overrides: Partial<DataItem> = {}): DataItem {
 }
 
 describe("PrintProductList — listado de productos imprimible", () => {
+  it("muestra el logo en el encabezado", () => {
+    render(<PrintProductList products={[product()]} />);
+    const logo = screen.getByTestId("print-logo") as HTMLImageElement;
+    expect(logo.src).toContain("logo-horizontal.svg");
+  });
+
   it("muestra todos los productos sin paginar", () => {
     const products = Array.from({ length: 12 }, (_, i) =>
       product({ name: `Producto ${i + 1}` }),

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -9,7 +8,7 @@ import {
 } from "@/components/ui/table";
 import type { PriceListDetail } from "@/services/priceLists";
 import { groupByPdfHierarchy } from "@/lib/printGrouping";
-import { useBrandingContext } from "@/contexts/BrandingContext";
+import { PrintHeader } from "@/components/molecules/PrintHeader";
 
 interface PrintPriceListProps {
   plan: PriceListDetail;
@@ -28,40 +27,25 @@ const formatPeriod = (period: string | null) =>
 
 /**
  * Área imprimible de la planilla mayorista (sdd/alican-wholesale-price-list):
- * logo de la empresa (BrandingContext.logoUrl, fallback displayName si la
- * imagen no carga), jerarquía DEL PDF (marca → línea → sublínea) y por
- * producto 2 columnas: Precio (Con IVA del proveedor) y Sugerido ("—" si no
- * hay). Mismo patrón print-area que PrintProductList/PrintBulkPriceList.
+ * encabezado con logo horizontal oficial, jerarquía DEL PDF (marca → línea →
+ * sublínea) y por producto 2 columnas: Precio (Con IVA del proveedor) y
+ * Sugerido ("—" si no hay). Mismo patrón print-area que
+ * PrintProductList/PrintBulkPriceList.
  */
 export const PrintPriceList = ({ plan }: PrintPriceListProps) => {
-  const { branding } = useBrandingContext();
-  const [logoFailed, setLogoFailed] = useState(false);
   const sections = groupByPdfHierarchy(plan.sections);
 
   return (
     <div className="print-area hidden print:block" aria-hidden="true">
-      <div className="mb-4 flex items-center gap-3">
-        {branding.logoUrl && !logoFailed && (
-          <img
-            src={branding.logoUrl}
-            alt="Logo"
-            className="h-12 w-12 object-contain"
-            data-testid="print-logo"
-            onError={() => setLogoFailed(true)}
-          />
-        )}
-        <div>
-          <h1 className="text-lg font-bold">
-            {logoFailed || !branding.logoUrl
-              ? branding.displayName || "Pullstok"
-              : "Planilla mayorista"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
+      <PrintHeader
+        title="Planilla mayorista"
+        subtitle={
+          <>
             {plan.type}
             {formatPeriod(plan.period)} · {plan.sections.length} secciones
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {sections.map((section) => (
         <div key={section.id} className="mb-6 break-inside-avoid">

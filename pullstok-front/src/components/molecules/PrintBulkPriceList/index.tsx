@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/table";
 import type { BulkPricePreviewRow } from "@/services/productService";
 import { groupByBrand } from "@/lib/printGrouping";
+import { PrintHeader } from "@/components/molecules/PrintHeader";
 
 interface PrintBulkPriceListProps {
   rows: BulkPricePreviewRow[];
@@ -32,12 +33,10 @@ export const PrintBulkPriceList = ({ rows }: PrintBulkPriceListProps) => {
 
   return (
     <div className="print-area hidden print:block" aria-hidden="true">
-      <div className="mb-4">
-        <h1 className="text-lg font-bold">Listado de precios actualizados</h1>
-        <p className="text-sm text-muted-foreground">
-          {new Date().toLocaleDateString("es-AR")} · {rows.length} productos
-        </p>
-      </div>
+      <PrintHeader
+        title="Listado de precios actualizados"
+        subtitle={`${new Date().toLocaleDateString("es-AR")} · ${rows.length} productos`}
+      />
 
       {groups.length === 0 && (
         <Table>

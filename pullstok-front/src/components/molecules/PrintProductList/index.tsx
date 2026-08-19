@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/table";
 import type { DataItem } from "@/types";
 import { groupByBrand, productBrandOf } from "@/lib/printGrouping";
+import { PrintHeader } from "@/components/molecules/PrintHeader";
 
 interface PrintProductListProps {
   products: DataItem[];
@@ -23,12 +24,10 @@ export const PrintProductList = ({ products }: PrintProductListProps) => {
 
   return (
     <div className="print-area hidden print:block" aria-hidden="true">
-      <div className="mb-4">
-        <h1 className="text-lg font-bold">Listado de productos</h1>
-        <p className="text-sm text-muted-foreground">
-          {new Date().toLocaleDateString("es-AR")} · {products.length} productos
-        </p>
-      </div>
+      <PrintHeader
+        title="Listado de productos"
+        subtitle={`${new Date().toLocaleDateString("es-AR")} · ${products.length} productos`}
+      />
 
       {groups.length === 0 && (
         <Table>
