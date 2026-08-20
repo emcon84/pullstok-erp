@@ -94,6 +94,7 @@ const products = [
     name: "Puppy A",
     price: 100,
     quantity: 1,
+    provider: { name: "ALICAN" },
     planSection: { brand: "SIEGER", line: "SUPER PREMIUM PARA PERROS", subline: "SIEGER PUPPY", position: 1 },
   },
   {
@@ -101,9 +102,10 @@ const products = [
     name: "Perros 15kg",
     price: 100,
     quantity: 1,
+    provider: { name: "ALICAN" },
     planSection: { brand: "MAXXIUM", line: null, subline: "MAXXIUM PERROS", position: 2 },
   },
-  { _id: "p3", name: "Collar Suelto", price: 100, quantity: 1, planSection: null },
+  { _id: "p3", name: "Collar Suelto", price: 100, quantity: 1, provider: { name: "ALICAN" }, planSection: null },
 ];
 
 function renderDashboard() {
@@ -124,6 +126,13 @@ function clickPill(text: string) {
     .find((n) => n.className.includes("cursor-pointer"));
   if (!el) throw new Error(`pill ${text} not found`);
   fireEvent.click(el);
+}
+
+// Elige una opción en el Select de proveedor (shadcn/radix): click en el
+// trigger (combobox) y luego en la opción visible.
+async function selectProvider(name: string) {
+  fireEvent.click(screen.getByRole("combobox"));
+  fireEvent.click(await screen.findByText(name));
 }
 
 describe("Dashboard — filtro client-side por título de planilla", () => {
@@ -154,16 +163,54 @@ describe("Dashboard — filtro client-side por título de planilla", () => {
     mockUseOrders.mockReturnValue({ orders: [], loading: false } as never);
   });
 
-  it("renderiza los chips de títulos desde las facets (client-side)", () => {
+  it("sin proveedor ALICAN no muestra ni el selector de tipo ni los títulos", async () => {
     renderDashboard();
+
+    expect(screen.queryByText("Tipo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Todos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Títulos")).not.toBeInTheDocument();
+    expect(screen.queryByText("SECO")).not.toBeInTheDocument();
+    expect(screen.queryByText("WET")).not.toBeInTheDocument();
+  });
+
+  it("al elegir ALICAN aparecen el selector de tipo (etiqueta Tipo) y los títulos", async () => {
+    renderDashboard();
+
+    await selectProvider("ALICAN");
+
+    expect(screen.getByText("Tipo")).toBeInTheDocument();
+    expect(screen.getByText("Todos")).toBeInTheDocument();
+    expect(screen.getByText("SECO")).toBeInTheDocument();
+    expect(screen.getByText("WET")).toBeInTheDocument();
+    expect(screen.getByText("Títulos")).toBeInTheDocument();
+    expect(screen.getByText("SIEGER PUPPY (1)")).toBeInTheDocument();
+    expect(screen.getByText("MAXXIUM PERROS (1)")).toBeInTheDocument();
+  });
+
+  it("al salir de ALICAN se ocultan los filtros específicos", async () => {
+    renderDashboard();
+
+    await selectProvider("ALICAN");
+    expect(screen.getByText("Tipo")).toBeInTheDocument();
+
+    await selectProvider("Todos los proveedores");
+
+    expect(screen.queryByText("Tipo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Títulos")).not.toBeInTheDocument();
+  });
+
+  it("renderiza los chips de títulos desde las facets (client-side)", async () => {
+    renderDashboard();
+    await selectProvider("ALICAN");
 
     expect(screen.getByText("Títulos")).toBeInTheDocument();
     expect(screen.getByText("SIEGER PUPPY (1)")).toBeInTheDocument();
     expect(screen.getByText("MAXXIUM PERROS (1)")).toBeInTheDocument();
   });
 
-  it("elegir un título filtra por la clave compuesta [brand, line, subline]", () => {
+  it("elegir un título filtra por la clave compuesta [brand, line, subline]", async () => {
     renderDashboard();
+    await selectProvider("ALICAN");
     expect(screen.getByTestId("products-table").textContent).toContain(
       "Collar Suelto",
     );
@@ -176,8 +223,9 @@ describe("Dashboard — filtro client-side por título de planilla", () => {
     expect(table.textContent).not.toContain("Collar Suelto");
   });
 
-  it("toggle del título activo lo deselecciona y restaura la lista completa", () => {
+  it("toggle del título activo lo deselecciona y restaura la lista completa", async () => {
     renderDashboard();
+    await selectProvider("ALICAN");
 
     clickPill("MAXXIUM PERROS (1)");
     expect(screen.getByTestId("products-table").textContent).toBe("Perros 15kg");
@@ -220,17 +268,19 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
     mockUseOrders.mockReturnValue({ orders: [], loading: false } as never);
   });
 
-  it("renderiza el selector con Todos/SECO/WET", () => {
+  it("renderiza el selector con Todos/SECO/WET al elegir ALICAN", async () => {
     renderDashboard();
+    await selectProvider("ALICAN");
 
-    expect(screen.getByText("Tipo de planilla")).toBeInTheDocument();
+    expect(screen.getByText("Tipo")).toBeInTheDocument();
     expect(screen.getByText("Todos")).toBeInTheDocument();
     expect(screen.getByText("SECO")).toBeInTheDocument();
     expect(screen.getByText("WET")).toBeInTheDocument();
   });
 
-  it("cambiar a WET limpia el título activo y pasa priceListType=WET a los hooks", () => {
+  it("cambiar a WET limpia el título activo y pasa priceListType=WET a los hooks", async () => {
     renderDashboard();
+    await selectProvider("ALICAN");
 
     // Primero se elige un título (filtro client-side activo).
     clickPill("SIEGER PUPPY (1)");
@@ -251,8 +301,9 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
     expect(mockUseProductFacets).toHaveBeenLastCalledWith(undefined, "WET");
   });
 
-  it("volver a Todos quita el priceListType (undefined) de los hooks", () => {
+  it("volver a Todos quita el priceListType (undefined) de los hooks", async () => {
     renderDashboard();
+    await selectProvider("ALICAN");
 
     clickPill("WET");
     clickPill("Todos");

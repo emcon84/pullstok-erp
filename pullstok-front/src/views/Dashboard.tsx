@@ -153,6 +153,19 @@ export const Dashboard = () => {
     if (t !== planType) setTitleFilter(null);
   };
 
+  // El selector de tipo y los chips de títulos de planilla son filtros
+  // específicos de ALICAN: solo se muestran cuando ese proveedor está
+  // seleccionado. Al salir de ALICAN se limpian (las claves de título y el
+  // tipo no aplican a otros proveedores).
+  const isAlican = providerFilter.toLowerCase() === "alican";
+  const handleProviderChange = (name: string) => {
+    setProviderFilter(name);
+    if (name.toLowerCase() !== "alican") {
+      setTitleFilter(null);
+      setPlanType(null);
+    }
+  };
+
   const openEditDrawer = (data: DataItem) => {
     setDrawerProduct(data);
     setDrawerOpen(true);
@@ -407,7 +420,7 @@ export const Dashboard = () => {
         <div className="max-w-xs">
           <Select
             value={providerFilter || "all"}
-            onValueChange={(v) => setProviderFilter(v === "all" ? "" : v)}
+            onValueChange={(v) => handleProviderChange(v === "all" ? "" : v)}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Todos los proveedores" />
@@ -424,32 +437,35 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {/* Filtro por tipo de planilla ALICAN (SECO/WET): null = Todos */}
-      <div className="flex items-center gap-2">
-        <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
-          Tipo de planilla
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {([null, "SECO", "WET"] as const).map((t) => (
-            <Badge
-              key={t ?? "all"}
-              variant={planType === t ? "default" : "outline"}
-              className="shrink-0 cursor-pointer px-2.5 py-1 text-xs font-medium whitespace-nowrap uppercase"
-              onClick={() => handlePlanTypeChange(t)}
-            >
-              {t ?? "Todos"}
-            </Badge>
-          ))}
+      {/* Filtro por tipo de planilla ALICAN (SECO/WET): null = Todos. Solo se
+          muestra cuando el proveedor seleccionado es ALICAN. */}
+      {isAlican && (
+        <div className="flex items-center gap-2">
+          <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+            Tipo
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {([null, "SECO", "WET"] as const).map((t) => (
+              <Badge
+                key={t ?? "all"}
+                variant={planType === t ? "default" : "outline"}
+                className="shrink-0 cursor-pointer px-2.5 py-1 text-xs font-medium whitespace-nowrap uppercase"
+                onClick={() => handlePlanTypeChange(t)}
+              >
+                {t ?? "Todos"}
+              </Badge>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Filter chips ── */}
       <FilterChips
         products={products}
         filter={filter}
         categoryFilter={categoryFilter}
-        titles={facetTitles}
-        titleFilter={titleFilter}
+        titles={isAlican ? facetTitles : undefined}
+        titleFilter={isAlican ? titleFilter : null}
         onTitleChange={setTitleFilter}
         onFilterChange={setFilter}
         onCategoryChange={setCategoryFilter}
