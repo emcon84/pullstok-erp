@@ -405,6 +405,24 @@ describe("BulkPriceUpdate — preview, exclusions and apply", () => {
     );
   });
 
+  it("includes priceListTypes with the selected types on preview when a type chip is selected", async () => {
+    renderView();
+    await selectBrandAndPercent();
+    fireEvent.click(await screen.findByText("SECO"));
+    fireEvent.click(screen.getByRole("button", { name: /calcular preview/i }));
+
+    await screen.findByText("Producto 1");
+    await waitFor(() =>
+      expect(mockBulkPriceUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          priceListTypes: ["SECO"],
+        }),
+        true,
+        1,
+      ),
+    );
+  });
+
   it("expands a section override to ALL sectionIds of the selected group on preview", async () => {
     const priceList = {
       id: "pl-1",

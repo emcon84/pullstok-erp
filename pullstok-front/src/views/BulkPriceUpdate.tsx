@@ -98,6 +98,11 @@ export const BulkPriceUpdate = () => {
   // línea (brand · line) que restringen el set a los productos matcheados.
   const [priceLists, setPriceLists] = useState<PriceListSummary[]>([]);
   const [selectedPriceListId, setSelectedPriceListId] = useState<string>("");
+  // Tipos de planilla (SECO/WET) para filtrar: vacío = sin filtro (todos los
+  // que tengan planilla); se combina como AND con el resto de los filtros.
+  const [selectedPriceListTypes, setSelectedPriceListTypes] = useState<
+    ("SECO" | "WET")[]
+  >([]);
   const [sections, setSections] = useState<PriceListSectionSummary[]>([]);
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
@@ -219,6 +224,13 @@ export const BulkPriceUpdate = () => {
     scopeChanged();
   };
 
+  const togglePriceListType = (type: "SECO" | "WET") => {
+    setSelectedPriceListTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
+    );
+    scopeChanged();
+  };
+
   // Cambia la planilla seleccionada y recarga sus secciones.
   const handlePriceListChange = (id: string) => {
     setSelectedPriceListId(id);
@@ -294,6 +306,7 @@ export const BulkPriceUpdate = () => {
       excludeProductIds: [...excludedIds],
       providerIds: selectedProviderIds,
       priceListSectionIds: selectedSectionIds,
+      priceListTypes: selectedPriceListTypes,
       percentage: pct,
       categoryPercentages,
       productPercentages,
@@ -305,6 +318,7 @@ export const BulkPriceUpdate = () => {
     categoryIds,
     excludedIds,
     selectedSectionIds,
+    selectedPriceListTypes,
     percentage,
     categoryOverrides,
     productOverrides,
@@ -487,6 +501,28 @@ export const BulkPriceUpdate = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Tipo de planilla</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(["SECO", "WET"] as const).map((t) => (
+                    <Badge
+                      key={t}
+                      variant={
+                        selectedPriceListTypes.includes(t) ? "default" : "outline"
+                      }
+                      className="cursor-pointer transition-opacity hover:opacity-80"
+                      onClick={() => togglePriceListType(t)}
+                    >
+                      {t}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Filtra por tipo de planilla (SECO o WET). Sin selección =
+                  todas. Se combina como Y con proveedor/línea/categorías.
+                </p>
+              </div>
+
               {priceLists.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No hay planillas importadas todavía.

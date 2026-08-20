@@ -915,9 +915,11 @@ export async function resolveCategoryScope(
  * providerIds (solo si hay proveedores — sdd/alican-wholesale-price-list/providers:
  * el filtro de marcas y el de proveedores se combinan como AND) AND id in
  * sectionProductIds (solo si hay secciones de planilla — restringe a los
- * productos matcheados de esas líneas del PDF). SIN filtro
- * publishedToStore: aplica a TODOS los productos matcheados, incluidos no
- * publicados (comportamiento confirmado).
+ * productos matcheados de esas líneas del PDF) AND priceListEntries.some sobre
+ * el tipo de planilla seleccionado (priceListTypes SECO/WET — solo si hay
+ * tipos, scoped por org anti-fuga). SIN filtro publishedToStore: aplica a
+ * TODOS los productos matcheados, incluidos no publicados (comportamiento
+ * confirmado).
  */
 export function buildBulkPriceWhere(
   brandValues: string[],
@@ -925,6 +927,8 @@ export function buildBulkPriceWhere(
   excludeProductIds: string[],
   providerIds: string[] = [],
   sectionProductIds: string[] = [],
+  priceListTypes: string[] = [],
+  organizationId?: string,
 ) {
   const where: any = {};
   if (brandValues.length > 0) {
@@ -942,6 +946,18 @@ export function buildBulkPriceWhere(
   if (providerIds.length > 0) where.providerId = { in: providerIds };
   if (sectionProductIds.length > 0) {
     where.id = { ...(where.id ?? {}), in: sectionProductIds };
+  }
+  if (priceListTypes.length > 0) {
+    where.priceListEntries = {
+      some: {
+        section: {
+          priceList: {
+            type: { in: priceListTypes },
+            ...(organizationId ? { organizationId } : {}),
+          },
+        },
+      },
+    };
   }
   return where;
 }
@@ -1049,6 +1065,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       excludeProductIds = [],
       providerIds = [],
       priceListSectionIds = [],
+      priceListTypes = [],
       categoryPercentages = [],
       productPercentages = [],
       sectionPercentages = [],
@@ -1059,6 +1076,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       excludeProductIds?: string[];
       providerIds?: string[];
       priceListSectionIds?: string[];
+      priceListTypes?: ("SECO" | "WET")[];
       categoryPercentages?: { categoryId: string; percentage: number }[];
       productPercentages?: { productId: string; percentage: number }[];
       sectionPercentages?: { sectionId: string; percentage: number }[];
@@ -1080,6 +1098,8 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       excludeProductIds,
       providerIds,
       sectionProductIds,
+      priceListTypes,
+      organizationId,
     );
 
     // Overrides: mapa de ancestros (para heredar override de categoría al
@@ -1179,6 +1199,8 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
             excludeProductIds,
             providerIds,
             sectionProductIdsTx,
+            priceListTypes,
+            organizationId,
           ),
           select: { id: true, price: true, categoryId: true },
         });
@@ -1221,6 +1243,8 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
           excludeProductIds,
           providerIds,
           sectionProductIdsTx,
+          priceListTypes,
+          organizationId,
         );
         await recomputeForBulkPriceUpdate(tx, recomputeWhere, organizationId);
 

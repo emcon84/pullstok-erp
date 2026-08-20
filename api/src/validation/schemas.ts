@@ -511,6 +511,11 @@ export const bulkPriceUpdateSchema = z
     // secciones (PriceListEntry.productId), combinado como AND con marcas/
     // proveedores/categorías.
     priceListSectionIds: z.array(z.string().uuid("Sección de planilla inválida")).default([]),
+    // Filtro por TIPO de planilla (SECO/WET): OPCIONAL. Cuando viene, el where
+    // restringe a productos con entradas en planillas del/los tipo(s)
+    // seleccionado(s) (Product → PriceListEntry → section → priceList.type),
+    // combinado como AND con marcas/proveedores/categorías.
+    priceListTypes: z.array(z.enum(["SECO", "WET"])).optional().default([]),
     // Overrides por SECCIÓN de planilla (línea del PDF): % propio por línea,
     // precedencia product > section > category > global (mismo patrón que
     // categoryPercentages/productPercentages). Vacío/ausente → sin overrides.
@@ -539,13 +544,14 @@ export const bulkPriceUpdateSchema = z
       data.brandValues.length === 0 &&
       data.providerIds.length === 0 &&
       data.categoryIds.length === 0 &&
-      data.priceListSectionIds.length === 0
+      data.priceListSectionIds.length === 0 &&
+      data.priceListTypes.length === 0
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["brandValues"],
         message:
-          "Seleccioná al menos una marca, un proveedor, una categoría o una línea de planilla",
+          "Seleccioná al menos una marca, un proveedor, una categoría, una línea de planilla o un tipo de planilla",
       });
     }
     const seenCategories = new Set<string>();

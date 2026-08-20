@@ -343,6 +343,9 @@ export interface BulkPriceUpdatePayload {
    * "SIGER MEDICADOS"): OPCIONAL. Restringe a los productos matcheados de esas
    * secciones; se combina como AND con los demás filtros. */
   priceListSectionIds?: string[];
+  /** Filtro por tipo de planilla (SECO/WET): OPCIONAL, default []. Vacío = sin
+   * filtro (todos los que tengan planilla); se combina como AND con el resto. */
+  priceListTypes?: ("SECO" | "WET")[];
   /** Overrides de % por sección de planilla (línea del PDF): precedencia
    * product > section > category > global. OPCIONAL. */
   sectionPercentages?: { sectionId: string; percentage: number }[];

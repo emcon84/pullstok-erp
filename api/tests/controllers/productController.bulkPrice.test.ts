@@ -197,6 +197,36 @@ describe("buildBulkPriceWhere — sectionProductIds (línea de planilla del prov
   });
 });
 
+describe("buildBulkPriceWhere — priceListTypes (tipo de planilla SECO/WET)", () => {
+  it("adds a priceListEntries some-filter on the selected types when priceListTypes is non-empty", () => {
+    const where = buildBulkPriceWhere([], [], [], [], [], ["SECO", "WET"], "org-1");
+    expect(where.priceListEntries).toEqual({
+      some: {
+        section: {
+          priceList: {
+            type: { in: ["SECO", "WET"] },
+            organizationId: "org-1",
+          },
+        },
+      },
+    });
+  });
+
+  it("omits priceListEntries when priceListTypes is empty/omitted (back-compat)", () => {
+    expect(buildBulkPriceWhere(["Acme"], [], [], [], [], []).priceListEntries).toBeUndefined();
+    expect(buildBulkPriceWhere(["Acme"], [], [], [], [], [], "org-1").priceListEntries).toBeUndefined();
+  });
+
+  it("combines priceListTypes with providerIds, category, brand and section filters as AND", () => {
+    const where = buildBulkPriceWhere(["Acme"], ["cat-1"], ["p-1"], ["prov-1"], ["sec-1"], ["SECO"], "org-1");
+    expect(where.priceListEntries).toBeDefined();
+    expect(where.providerId).toEqual({ in: ["prov-1"] });
+    expect(where.categoryId).toEqual({ in: ["cat-1"] });
+    expect(where.id).toEqual({ in: ["sec-1"], notIn: ["p-1"] });
+    expect(where.variantAssignments).toBeDefined();
+  });
+});
+
 describe("resolveSectionProductIds — productIds de secciones con anti-fuga y dedupe", () => {
   const mockTx = {
     priceListEntry: { findMany: jest.fn() },
@@ -572,6 +602,40 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
         expect(row.effectivePercentage).toBe(10);
         expect(row.newPrice).toBe(110);
       }
+    });
+
+    it("passes priceListTypes to the preview where (filter by price list type, AND with brand)", async () => {
+      mockedPrisma.product.findMany.mockResolvedValue(makeMany(2));
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        {
+          body: {
+            brandValues: ["Acme"],
+            percentage: 10,
+            categoryIds: [],
+            excludeProductIds: [],
+            priceListTypes: ["SECO"],
+          },
+          query: { dryRun: "true" },
+        } as unknown as Request,
+        res,
+      );
+
+      expect(mockedPrisma.product.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            priceListEntries: {
+              some: {
+                section: {
+                  priceList: { type: { in: ["SECO"] }, organizationId: "org-1" },
+                },
+              },
+            },
+          }),
+        }),
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
     });
 
     it("applies a per-category override to that category's products and recomputes aggregates", async () => {
@@ -1032,6 +1096,47 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
       const json = res.json.mock.calls[0][0];
       expect(json.affected).toBe(1);
       expect(json.newTotal).toBe(100);
+    });
+
+    it("passes priceListTypes to the re-resolved where inside the transaction (apply-side)", async () => {
+      mockTx.product.findMany.mockResolvedValue([
+        { id: "p-1", price: 100, categoryId: "a" },
+      ]);
+      const res = mockResponse();
+
+      await productController.bulkPriceUpdate(
+        {
+          body: {
+            brandValues: ["Acme"],
+            percentage: 10,
+            categoryIds: ["a"],
+            excludeProductIds: [],
+            priceListTypes: ["WET"],
+          },
+          query: {},
+        } as unknown as Request,
+        res,
+      );
+
+      expect(mockTx.product.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            priceListEntries: {
+              some: {
+                section: {
+                  priceList: { type: { in: ["WET"] }, organizationId: "org-1" },
+                },
+              },
+            },
+          }),
+        }),
+      );
+      expect(mockTx.product.updateMany).toHaveBeenCalledWith({
+        where: { id: "p-1" },
+        data: { price: 110 },
+      });
+      const json = res.json.mock.calls[0][0];
+      expect(json.newTotal).toBe(110);
     });
   });
 });

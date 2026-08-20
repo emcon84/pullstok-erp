@@ -585,6 +585,72 @@ describe("bulkPriceUpdateSchema — providerIds (sdd/alican-wholesale-price-list
   });
 });
 
+describe("bulkPriceUpdateSchema — priceListTypes (tipo de planilla SECO/WET)", () => {
+  const validBrandValues = ["Acme"];
+
+  it("accepts an array of valid price list types (SECO/WET)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      priceListTypes: ["SECO", "WET"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.priceListTypes).toEqual(["SECO", "WET"]);
+    }
+  });
+
+  it("omitting priceListTypes defaults it to an empty array (no type filter, back-compat)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.priceListTypes).toEqual([]);
+    }
+  });
+
+  it("accepts an explicit empty priceListTypes array", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      priceListTypes: [],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.priceListTypes).toEqual([]);
+    }
+  });
+
+  it("rejects an invalid price list type value", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: validBrandValues,
+      percentage: 10,
+      priceListTypes: ["SECO", "HUMEDO"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts priceListTypes as the sole scope filter (no brands/providers/categories)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: [],
+      percentage: 10,
+      priceListTypes: ["SECO"],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty brandValues with no scope filter at all (empty priceListTypes too)", () => {
+    const result = bulkPriceUpdateSchema.safeParse({
+      brandValues: [],
+      percentage: 10,
+      priceListTypes: [],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("bulkPriceUpdateSchema — per-category/product override arrays", () => {
   const catA = "00000000-0000-4000-8000-0000000000aa";
   const catB = "00000000-0000-4000-8000-0000000000bb";
