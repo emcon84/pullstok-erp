@@ -40,6 +40,11 @@ const TENANT_MODELS = new Set([
   "Sale",
   "Receipt",
   "Invoice",
+  // Sesión de caja (sdd/caja-apertura-cierre): tenant-scoped (organizationId).
+  // Mismo patrón multi-tenant: findFirst / updateMany (nunca findUnique/update)
+  // → scope org automático anti-fuga. SalePayment NO se agrega: no tiene
+  // organizationId propio, se scopea vía su Sale/CashSession.
+  "CashSession",
   // Chat: la conversación es tenant-scoped (tiene organizationId) → scope
   // automático anti-fuga en los endpoints del operador. Message NO se agrega:
   // no tiene organizationId propio, se scopea vía su Conversation.

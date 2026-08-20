@@ -41,6 +41,26 @@ enum PriceListType {
   WET
 }
 
+// Medio de pago de una venta (sdd/caja-apertura-cierre). Solo EFECTIVO suma al
+// arqueo de caja (closingByMethod/expectedAmount); TARJETA_*/TRANSFERENCIA/QR
+// son informativos del desglose (no son efectivo en caja física).
+enum PaymentMethod {
+  EFECTIVO
+  TARJETA_CREDITO
+  TARJETA_DEBITO
+  TRANSFERENCIA
+  QR
+}
+
+// Estado de una sesión de caja (sdd/caja-apertura-cierre). OPEN = turno en
+// curso; CLOSED = cerrada con arqueo. Una sola OPEN por (branch, cashier) se
+// garantiza en DB vía el índice único parcial `cash_session_single_open`
+// (agregado a mano en la migración, NO regenerable por Prisma).
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
 // El tenant: cada negocio que compra el ERP es una Organization.
 model Organization {
   id                    String      @id @default(uuid())
@@ -86,6 +106,7 @@ model Organization {
   pricingSetting        PricingSetting?
   priceLists            PriceList[]
   reviewQueueEntries    ReviewQueueEntry[]
+  cashSessions          CashSession[]
 
   @@map("organizations")
 }
@@ -109,6 +130,7 @@ model User {
   resetToken         String?
   resetTokenExpiry   DateTime?
   branchAssignments  BranchAssignment[]
+  cashSessions       CashSession[]
 
   @@index([organizationId])
   @@map("users")
@@ -133,6 +155,7 @@ model Branch {
   sales          Sale[]
   orders         Order[]
   quotations     Quotation[]
+  cashSessions   CashSession[]
 
   @@unique([organizationId, name])
   @@map("branches")
@@ -591,9 +614,70 @@ model Sale {
   // Branch scoping: nullable para backward-compat (existing rows = null = org-wide).
   branchId       String?
   branch         Branch?      @relation(fields: [branchId], references: [id])
+  // Sesión de caja a la que pertenece la venta (sdd/caja-apertura-cierre R8).
+  // FK nullable = backward-compat: ventas legacy/admin sin caja quedan null.
+  cashSessionId  String?
+  cashSession    CashSession? @relation(fields: [cashSessionId], references: [id])
+  // Desglose de medios de pago (sdd/caja-apertura-cierre R6/R7/R8).
+  payments       SalePayment[]
 
   @@index([organizationId])
   @@map("sales")
+}
+
+// Sesión de caja: un turno de caja por (branch, cashier). Tenant-scoped
+// (organizationId) y en TENANT_MODELS (db.ts) → scope org automático
+// anti-fuga (findFirst/updateMany, NUNCA findUnique/update). La apertura
+// registra el fondo inicial; el cierre hace el arqueo comparando el conteo
+// real (closingByMethod/closingAmount) contra lo esperado (expectedAmount =
+// openingAmount + Σ EFECTIVO de los pagos de la sesión). La garantía de "una
+// sola OPEN por (branch, cashier)" es el índice único parcial
+// `cash_session_single_open` (a mano en la migración, NO regenerar).
+model CashSession {
+  id             String            @id @default(uuid())
+  branchId       String
+  branch         Branch            @relation(fields: [branchId], references: [id])
+  cashierId      String
+  cashier        User              @relation(fields: [cashierId], references: [id])
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  openedAt       DateTime          @default(now())
+  closedAt       DateTime?
+  openingAmount  Float             @default(0)
+  expectedAmount Float?
+  closingAmount  Float?
+  closingByMethod Json?
+  status         CashSessionStatus @default(OPEN)
+  observations   String?
+  sales          Sale[]
+  payments       SalePayment[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([branchId, status])
+  @@index([cashierId, status])
+  @@index([organizationId])
+  @@map("cash_sessions")
+}
+
+// Desglose de medios de pago de una venta (sdd/caja-apertura-cierre R6-R8).
+// NO tiene organizationId propio (se scopea vía su Sale/CashSession, que sí
+// son tenant models) → a propósito FUERA de TENANT_MODELS (patrón Message/
+// PriceListSection). onDelete Cascade: borrar la venta borra sus pagos;
+// cashSessionId onDelete SetNull: cerrar/reabrir no rompe el histórico.
+model SalePayment {
+  id            String        @id @default(uuid())
+  saleId        String
+  sale          Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  method        PaymentMethod
+  amount        Float
+  cashSessionId String?
+  cashSession   CashSession?  @relation(fields: [cashSessionId], references: [id])
+  createdAt     DateTime      @default(now())
+
+  @@index([saleId])
+  @@index([cashSessionId])
+  @@map("sale_payments")
 }
 
 model SaleItem {
