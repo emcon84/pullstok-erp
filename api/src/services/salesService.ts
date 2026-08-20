@@ -27,6 +27,13 @@ interface ISaleRequest {
   // Opcional: pedido de la tienda online que esta venta procesa. Si viene, la
   // Order se cierra (COMPLETED), se enlaza a la Sale y se manda mail al cliente.
   orderId?: string;
+  // Desglose de medios de pago (sdd/caja-apertura-cierre R6/R7). Opcional:
+  // ventas legacy/admin sin payments siguen funcionando. Σ payments == total
+  // se valida server-side con round2.
+  payments?: { method: string; amount: number }[];
+  // Sesión de caja a la que se asocia la venta (R8). Para VENDEDOR/CASHIER el
+  // server la resuelve de la sesión OPEN; para gestión se acepta del request.
+  cashSessionId?: string;
 }
 
 const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: string) => {
@@ -69,6 +76,30 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
     if (!branch) {
       throw new Error("Tu sucursal asignada no está activa.");
     }
+  }
+
+  // ── Cash session gate (sdd/caja-apertura-cierre R9) ──
+  // VENDEDOR/CASHIER necesitan una caja OPEN en su sucursal para vender. La
+  // sesión abierta se resuelve ACÁ (fuera de la transacción) y se usa para
+  // setear Sale.cashSessionId + SalePayment.cashSessionId (R8). ADMIN/
+  // MANAGEMENT (y roles sin sucursal) quedan eximidos: venden sin cashSessionId
+  // (backward-compat) o con el cashSessionId explícito del request.
+  let resolvedCashSessionId: string | null = null;
+  if (sellerBranchId && userId && (role === "VENDEDOR" || role === "CASHIER")) {
+    const openSession = await prisma.cashSession.findFirst({
+      where: { branchId: sellerBranchId, cashierId: userId, status: "OPEN" },
+      select: { id: true },
+    });
+    if (!openSession) {
+      const err: any = new Error(
+        "Necesitás una caja abierta en tu sucursal para poder vender.",
+      );
+      err.code = "CASH_SESSION_REQUIRED";
+      throw err;
+    }
+    resolvedCashSessionId = openSession.id;
+  } else if (saleRequest.cashSessionId) {
+    resolvedCashSessionId = saleRequest.cashSessionId;
   }
 
   // ── Transaction ──
@@ -290,13 +321,46 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       }
     }
 
+    // ── Payments sum == total (sdd/caja-apertura-cierre R6/R7) ──
+    // Nunca se confía en un total enviado por el cliente: la suma de los
+    // payments se compara contra el totalAmount calculado server-side con
+    // round2 (tolerancia de centavos). Payments opcionales → backward-compat.
+    const payments = saleRequest.payments ?? [];
+    if (payments.length > 0) {
+      const declaredSum = round2(
+        payments.reduce((acc, p) => acc + round2(p.amount), 0),
+      );
+      if (declaredSum !== round2(totalAmount)) {
+        const err: any = new Error(
+          "La suma de los medios de pago no coincide con el total de la venta",
+        );
+        err.code = "PAYMENTS_DO_NOT_MATCH_TOTAL";
+        throw err;
+      }
+    }
+
     const created = await tx.sale.create({
       data: {
         organizationId,
         totalAmount,
         ...(sellerBranchId ? { branchId: sellerBranchId } : {}),
         ...(orderId ? { orderId } : {}),
+        // Venta asociada a la caja abierta (R8); null en ventas legacy/admin.
+        ...(resolvedCashSessionId ? { cashSessionId: resolvedCashSessionId } : {}),
         items: { create: saleItems },
+        // Desglose de medios de pago (R6-R8). Cada SalePayment lleva la
+        // cashSessionId de la venta.
+        ...(payments.length > 0
+          ? {
+              payments: {
+                create: payments.map((p) => ({
+                  method: p.method as any,
+                  amount: p.amount,
+                  cashSessionId: resolvedCashSessionId ?? undefined,
+                })),
+              },
+            }
+          : {}),
       },
       include: { items: true },
     });

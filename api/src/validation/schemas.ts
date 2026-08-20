@@ -275,13 +275,116 @@ const saleProductSchema = z.object({
     });
   }
 });
+// Medio de pago de una venta (sdd/caja-apertura-cierre). La suma de
+// payments[].amount DEBE ser igual al total calculado server-side (nunca se
+// confía en un total enviado por el cliente). Solo EFECTIVO suma al arqueo.
+export const paymentSchema = z.object({
+  method: z.enum(
+    ["EFECTIVO", "TARJETA_CREDITO", "TARJETA_DEBITO", "TRANSFERENCIA", "QR"],
+    { message: "Método de pago inválido" },
+  ),
+  amount: z.coerce
+    .number()
+    .positive("El monto debe ser mayor a 0")
+    .multipleOf(0.01, "El monto admite hasta 2 decimales"),
+});
+
 export const createSaleSchema = z.object({
   products: z.array(saleProductSchema).min(1, "La venta debe tener al menos un producto"),
   // Opcional: si la venta se genera procesando un pedido de la tienda online,
   // apunta a esa Order. La venta la marca COMPLETED y dispara el mail de
   // "compra confirmada" al cliente (ver salesService.createSale).
   orderId: z.string().min(1).optional(),
+  // Desglose de medios de pago (sdd/caja-apertura-cierre R6/R7). Opcional:
+  // ventas legacy/admin sin payments siguen funcionando (backward-compat).
+  // La suma == total se valida server-side. Se rechazan métodos duplicados.
+  payments: z
+    .array(paymentSchema)
+    .optional()
+    .superRefine((payments, ctx) => {
+      if (!payments) return;
+      const seen = new Set<string>();
+      payments.forEach((p, i) => {
+        if (seen.has(p.method)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["payments", i, "method"],
+            message: "Método de pago duplicado en la lista",
+          });
+        }
+        seen.add(p.method);
+      });
+    }),
+  // CashSession a la que se asocia la venta (sdd/caja-apertura-cierre R8).
+  cashSessionId: z.string().min(1).optional(),
 });
+
+// ---------- Caja (sdd/caja-apertura-cierre) ----------
+// Apertura de caja. branchId/openingAmount/observations opcionales: los
+// CASHIER/VENDEDOR usan su sucursal asignada (el server la resuelve);
+// ADMIN/MANAGEMENT lo mandan explícito (si falta → INVALID_BRANCH).
+export const openCashSessionSchema = z
+  .object({
+    branchId: z.string().min(1).optional(),
+    openingAmount: z.coerce
+      .number()
+      .nonnegative("El fondo inicial no puede ser negativo")
+      .multipleOf(0.01, "El monto admite hasta 2 decimales")
+      .optional(),
+    observations: z.string().optional(),
+  })
+  .strip();
+
+// Cierre/arqueo. closingByMethod es un record método → monto con al menos 1
+// entrada (conteo real por método). closingAmount opcional (conteo total).
+const PAYMENT_METHODS = [
+  "EFECTIVO",
+  "TARJETA_CREDITO",
+  "TARJETA_DEBITO",
+  "TRANSFERENCIA",
+  "QR",
+] as const;
+
+export const closeCashSessionSchema = z
+  .object({
+    closingByMethod: z
+      .record(
+        z.string(),
+        z.coerce
+          .number()
+          .nonnegative("El monto no puede ser negativo")
+          .multipleOf(0.01, "El monto admite hasta 2 decimales"),
+      )
+      .refine((obj) => Object.keys(obj ?? {}).length >= 1, {
+        message: "Debe enviar al menos un método con su conteo",
+      })
+      .superRefine((obj, ctx) => {
+        for (const key of Object.keys(obj ?? {})) {
+          if (!(PAYMENT_METHODS as readonly string[]).includes(key)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["closingByMethod", key],
+              message: "Método de pago inválido",
+            });
+          }
+        }
+      }),
+    closingAmount: z.coerce
+      .number()
+      .nonnegative("El monto no puede ser negativo")
+      .multipleOf(0.01, "El monto admite hasta 2 decimales")
+      .optional(),
+    observations: z.string().optional(),
+  })
+  .strip();
+
+// Query de listado de cajas: filtros opcionales por status/branchId.
+export const cashSessionQuerySchema = z
+  .object({
+    status: z.enum(["OPEN", "CLOSED"]).optional(),
+    branchId: z.string().min(1).optional(),
+  })
+  .strip();
 
 // ---------- Órdenes ----------
 const orderProductSchema = z.object({

@@ -14,8 +14,8 @@ const invoiceInclude = {
 // Create a new sale
 const createSale = async (req: AuthedRequest, res: Response) => {
     try {
-        const { products, orderId } = req.body;
-        const sale = await SaleService.createSale({ products, orderId }, req.user!.id, req.user!.role);
+        const { products, orderId, payments, cashSessionId } = req.body;
+        const sale = await SaleService.createSale({ products, orderId, payments, cashSessionId }, req.user!.id, req.user!.role);
         res.status(201).json(sale);
     } catch (error: any) {
         // 422 para errores de dominio del flujo suelto (B-06 amendment /
@@ -24,6 +24,15 @@ const createSale = async (req: AuthedRequest, res: Response) => {
         // sucursal, stock suelto insuficiente, ...).
         if (typeof error?.code === "string" && error.code.startsWith("LOOSE_")) {
             return res.status(422).json({ error: error.code, message: error.message });
+        }
+        // Gate de caja (sdd/caja-apertura-cierre R9): el operativo no tiene una
+        // caja OPEN en su sucursal → 422 (payload válido, operación bloqueada).
+        if (error?.code === "CASH_SESSION_REQUIRED") {
+            return res.status(422).json({ error: error.code, message: error.message });
+        }
+        // Payments que no cuadran con el total (R7) → 400.
+        if (error?.code === "PAYMENTS_DO_NOT_MATCH_TOTAL") {
+            return res.status(400).json({ error: error.code, message: error.message });
         }
         res.status(400).json({ message: error.message });
     }

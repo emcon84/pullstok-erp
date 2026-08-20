@@ -4,6 +4,7 @@ import { prisma, basePrisma } from "../../src/config/db";
 jest.mock("../../src/config/db", () => ({
   prisma: {
     branch: { findFirst: jest.fn() },
+    cashSession: { findFirst: jest.fn() },
     sale: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -33,6 +34,7 @@ jest.mock("../../src/realtime/socket", () => ({
 
 const mockedPrisma = prisma as unknown as {
   branch: { findFirst: jest.Mock };
+  cashSession: { findFirst: jest.Mock };
   sale: {
     findMany: jest.Mock;
     findFirst: jest.Mock;
@@ -143,6 +145,12 @@ describe("salesService.createSale — loose decimal flow", () => {
     (prisma.branch.findFirst as unknown as jest.Mock).mockResolvedValue({
       id: "b-1",
       isActive: true,
+    });
+    // Cash gate (R9): VENDEDOR/CASHIER necesitan una caja OPEN para vender.
+    mockedPrisma.cashSession.findFirst.mockResolvedValue({
+      id: "cs-1",
+      branchId: "b-1",
+      status: "OPEN",
     });
   };
 
@@ -652,5 +660,158 @@ describe("salesService.deleteSale — restore correct pool", () => {
     );
     expect(tx.productStock.updateMany).not.toHaveBeenCalled();
     expect(tx.looseStock.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+// ── createSale: cash gate + SalePayment (sdd/caja-apertura-cierre R6-R9) ──
+describe("salesService.createSale — cash session gate + sale payments", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const vendorArgs: [string, string] = ["u-1", "VENDEDOR"];
+
+  const withVendorBranch = () => {
+    mockedBase.branchAssignment.findMany.mockResolvedValue([{ branchId: "b-1" }]);
+    (prisma.branch.findFirst as unknown as jest.Mock).mockResolvedValue({
+      id: "b-1",
+      isActive: true,
+    });
+    // Cash gate (R9): VENDEDOR/CASHIER necesitan una caja OPEN para vender.
+    mockedPrisma.cashSession.findFirst.mockResolvedValue({
+      id: "cs-1",
+      branchId: "b-1",
+      status: "OPEN",
+    });
+  };
+
+  const openCashSession = { id: "cs-1", branchId: "b-1", status: "OPEN" };
+
+  const runSale = async (
+    products: any[],
+    extra: any = {},
+    args: [string, string] = vendorArgs,
+  ) => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    tx.product.findFirst.mockResolvedValue({ ...branchProduct, priceKgSuelto: null });
+    tx.product.updateMany.mockResolvedValue({ count: 1 }); // legacy/admin path
+    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 100 });
+    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+    const sale = await SaleService.createSale(
+      { products, ...extra },
+      ...args,
+    ).catch((e: any) => e);
+    return { tx, sale };
+  };
+
+  it("R6: single EFECTIVO payment matching total persists one SalePayment and sets cashSessionId", async () => {
+    withVendorBranch();
+    mockedPrisma.cashSession.findFirst.mockResolvedValue(openCashSession);
+    const { tx } = await runSale(
+      [{ productId: "p-1", name: "Bolsa", quantity: 1, price: 100, category: "x" }],
+      { payments: [{ method: "EFECTIVO", amount: 100 }] },
+    );
+
+    const createCall = tx.sale.create.mock.calls[0][0];
+    expect(createCall.data.cashSessionId).toBe("cs-1");
+    expect(createCall.data.payments.create).toEqual([
+      { method: "EFECTIVO", amount: 100, cashSessionId: "cs-1" },
+    ]);
+  });
+
+  it("R7: mixed payments summing to total persist multiple SalePayment rows", async () => {
+    withVendorBranch();
+    mockedPrisma.cashSession.findFirst.mockResolvedValue(openCashSession);
+    const { tx } = await runSale(
+      [{ productId: "p-1", name: "Bolsa", quantity: 2, price: 50, category: "x" }],
+      {
+        payments: [
+          { method: "EFECTIVO", amount: 50 },
+          { method: "TARJETA_CREDITO", amount: 50 },
+        ],
+      },
+    );
+
+    const createCall = tx.sale.create.mock.calls[0][0];
+    expect(createCall.data.totalAmount).toBe(100);
+    expect(createCall.data.payments.create).toHaveLength(2);
+  });
+
+  it("R7: payments summing != total → PAYMENTS_DO_NOT_MATCH_TOTAL (no sale created)", async () => {
+    withVendorBranch();
+    mockedPrisma.cashSession.findFirst.mockResolvedValue(openCashSession);
+    const { tx, sale } = await runSale(
+      [{ productId: "p-1", name: "Bolsa", quantity: 1, price: 100, category: "x" }],
+      {
+        payments: [
+          { method: "EFECTIVO", amount: 50 },
+          { method: "TARJETA_CREDITO", amount: 40 },
+        ],
+      },
+    );
+
+    expect((sale as any).code).toBe("PAYMENTS_DO_NOT_MATCH_TOTAL");
+    expect(tx.sale.create).not.toHaveBeenCalled();
+  });
+
+  it("R8: SalePayment records cashSessionId from the open session (R8)", async () => {
+    withVendorBranch();
+    mockedPrisma.cashSession.findFirst.mockResolvedValue(openCashSession);
+    const { tx } = await runSale(
+      [{ productId: "p-1", name: "Bolsa", quantity: 1, price: 100, category: "x" }],
+      { payments: [{ method: "EFECTIVO", amount: 100 }] },
+    );
+
+    const createCall = tx.sale.create.mock.calls[0][0];
+    expect(createCall.data.payments.create[0].cashSessionId).toBe("cs-1");
+    expect(createCall.data.cashSessionId).toBe("cs-1");
+  });
+
+  it("R9: VENDEDOR without an OPEN cash session in their branch → CASH_SESSION_REQUIRED", async () => {
+    withVendorBranch();
+    mockedPrisma.cashSession.findFirst.mockResolvedValue(null); // no OPEN session
+
+    const err: any = await SaleService.createSale(
+      {
+        products: [{ productId: "p-1", name: "Bolsa", quantity: 1, price: 100, category: "x" }],
+      },
+      ...vendorArgs,
+    ).catch((e: any) => e);
+
+    expect(err.code).toBe("CASH_SESSION_REQUIRED");
+    expect(mockedPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("R9: VENDEDOR with an OPEN session can sell (gate passes, cashSessionId set)", async () => {
+    withVendorBranch();
+    mockedPrisma.cashSession.findFirst.mockResolvedValue(openCashSession);
+    const { tx, sale } = await runSale(
+      [{ productId: "p-1", name: "Bolsa", quantity: 1, price: 100, category: "x" }],
+    );
+
+    expect((sale as any).id).toBe("s-1");
+    const createCall = tx.sale.create.mock.calls[0][0];
+    expect(createCall.data.cashSessionId).toBe("cs-1");
+  });
+
+  it("R9: ADMIN is exempt from the gate and sells with cashSessionId=null (backward-compat)", async () => {
+    // No branch assignment, no OPEN session lookup for ADMIN.
+    mockedPrisma.cashSession.findFirst.mockResolvedValue(undefined as any);
+    const { tx, sale } = await runSale(
+      [{ productId: "p-1", name: "Bolsa", quantity: 2, price: 100, category: "x" }],
+      { payments: [{ method: "EFECTIVO", amount: 200 }] },
+      ["u-admin", "ADMIN"],
+    );
+
+    expect((sale as any).id).toBe("s-1");
+    const createCall = tx.sale.create.mock.calls[0][0];
+    expect(createCall.data.cashSessionId).toBeUndefined();
+    // Payments still persisted (cashSessionId null), Σ == total.
+    expect(createCall.data.payments.create).toEqual([
+      { method: "EFECTIVO", amount: 200, cashSessionId: undefined },
+    ]);
   });
 });
