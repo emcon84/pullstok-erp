@@ -404,9 +404,36 @@ export function planTitleWhereCandidates(
   return [];
 }
 
+const PLAN_LIST_TYPES = ["SECO", "WET"] as const;
+type PlanListType = (typeof PLAN_LIST_TYPES)[number];
+
+/**
+ * Resuelve el query param opcional ?priceListType= (SECO|WET). Ausente → SECO
+ * (comportamiento legacy byte-for-byte). Valor inválido → error 400 con
+ * mensaje claro. La validación vive en el controller porque el filtro llega
+ * por query string, no por body (donde ya existe el zod de los schemas).
+ */
+function resolvePriceListType(
+  raw: string | undefined,
+): { value: PlanListType } | { error: string } {
+  if (raw === undefined) return { value: "SECO" };
+  if (raw === "SECO" || raw === "WET") return { value: raw };
+  return {
+    error: `Tipo de planilla inválido: "${raw}". Valores permitidos: "SECO" o "WET".`,
+  };
+}
+
 const getProducts = async (req: Request, res: Response) => {
   try {
     const { name, category, minPrice, maxPrice, description, branchId, title } = req.query;
+
+    const planType = resolvePriceListType(
+      req.query.priceListType as string | undefined,
+    );
+    if ("error" in planType) {
+      res.status(400).json({ message: planType.error });
+      return;
+    }
 
     const where: any = {};
 
@@ -420,11 +447,32 @@ const getProducts = async (req: Request, res: Response) => {
           some: {
             matched: true,
             section: {
-              priceList: { type: "SECO" },
+              priceList: { type: planType.value },
               OR: candidates,
             },
           },
         };
+      }
+    }
+
+    // ?priceListType= presente → filtra por pertenencia a la planilla de ese
+    // tipo (solo productos con entries matcheadas del tipo elegido). Ausente →
+    // comportamiento actual sin filtro de pertenencia.
+    if (req.query.priceListType !== undefined) {
+      const membership = {
+        some: {
+          matched: true,
+          section: { priceList: { type: planType.value } },
+        },
+      };
+      if (where.priceListEntries) {
+        // El filtro por título ya fijó un `some` sobre la misma relación
+        // (Prisma no permite dos claves `some`): se combinan como AND.
+        where.priceListEntries = {
+          some: { AND: [where.priceListEntries.some, membership.some] },
+        };
+      } else {
+        where.priceListEntries = membership;
       }
     }
 
@@ -456,10 +504,14 @@ const getProducts = async (req: Request, res: Response) => {
           },
         },
       },
-      // Sección de planilla SECO MÁS RECIENTE (sdd/alican-plan-titles): solo
-      // brand/line/subline/position. NUNCA se exponen precios de proveedor.
+      // Sección de planilla del tipo seleccionado (?priceListType=, default
+      // SECO) MÁS RECIENTE (sdd/alican-plan-titles): solo brand/line/subline/
+      // position. NUNCA se exponen precios de proveedor.
       priceListEntries: {
-        where: { matched: true, section: { priceList: { type: "SECO" as const } } },
+        where: {
+          matched: true,
+          section: { priceList: { type: planType.value } },
+        },
         orderBy: { section: { priceList: { period: "desc" as const } } },
         take: 1,
         select: {
@@ -554,6 +606,14 @@ export const getProductFilterFacets = async (req: Request, res: Response) => {
     const organizationId = requireOrganizationId();
     const category = req.query.category as string | undefined;
 
+    const planType = resolvePriceListType(
+      req.query.priceListType as string | undefined,
+    );
+    if ("error" in planType) {
+      res.status(400).json({ message: planType.error });
+      return;
+    }
+
     const categories = await prisma.category.findMany({
       where: { products: { some: {} } },
       select: { id: true, name: true },
@@ -594,17 +654,18 @@ export const getProductFilterFacets = async (req: Request, res: Response) => {
         .sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    // Títulos de planilla SECO (sdd/alican-plan-titles): mismas reglas que el
-    // include de GET /products — entries matcheadas de planillas SECO de la org
-    // actual. La clave compuesta y la etiqueta replican EXACTAMENTE la derivación
-    // del front (src/lib/printGrouping.ts). El count cuenta productos DISTINTOS
-    // por título (un producto puede aparecer en varias filas/secciones). El
-    // orden es por position de sección (orden del PDF) y luego alfabético.
+    // Títulos de planilla del tipo seleccionado (sdd/alican-plan-titles,
+    // default SECO): mismas reglas que el include de GET /products — entries
+    // matcheadas de planillas de ese tipo de la org actual. La clave compuesta
+    // y la etiqueta replican EXACTAMENTE la derivación del front
+    // (src/lib/printGrouping.ts). El count cuenta productos DISTINTOS por
+    // título (un producto puede aparecer en varias filas/secciones). El orden
+    // es por position de sección (orden del PDF) y luego alfabético.
     const entries = await prisma.priceListEntry.findMany({
       where: {
         matched: true,
         productId: { not: null },
-        section: { priceList: { organizationId, type: "SECO" } },
+        section: { priceList: { organizationId, type: planType.value } },
       },
       select: {
         productId: true,

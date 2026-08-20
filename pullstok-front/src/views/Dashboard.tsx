@@ -62,6 +62,9 @@ export const Dashboard = () => {
   // Título de planilla SECO (sdd/alican-plan-titles): filtro client-side por
   // la clave compuesta [brand, line, subline].filter(Boolean).join("|").
   const [titleFilter, setTitleFilter] = useState<string | null>(null);
+  // Tipo de planilla ALICAN (SECO/WET): null = Todos (comportamiento actual).
+  // Filtra el listado server-side y define qué títulos muestran las facets.
+  const [planType, setPlanType] = useState<"SECO" | "WET" | null>(null);
   const [selectedStat, setSelectedStat] = useState<StatType>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -105,9 +108,13 @@ export const Dashboard = () => {
     products,
     loading: productsLoading,
     error: productsError,
-  } = useProducts(branchFilter);
+  } = useProducts(branchFilter, undefined, undefined, planType ?? undefined);
   // Títulos de planilla (facets del backend): chips para el filtro client-side.
-  const { titles: facetTitles } = useProductFacets();
+  // En modo WET la planilla es plana y el backend devuelve titles vacíos.
+  const { titles: facetTitles } = useProductFacets(
+    undefined,
+    planType ?? undefined,
+  );
   const { sales, loading: salesLoading } = useGetSales(resolvedBranchId);
   const { budgets, loading: loadingBudgets } = useGetBudgets(resolvedBranchId);
   const { orders, loading: loadingOrders } = useOrders(resolvedBranchId);
@@ -137,6 +144,14 @@ export const Dashboard = () => {
   const addProduct = () => { setDrawerProduct(null); setDrawerOpen(true); };
   const addSales = () => setIsModalSalesOpen(true);
   const addUpload = () => setIsModalUploadOpen(true);
+
+  // Cambio de tipo de planilla ALICAN (Todos/SECO/WET). Los títulos de
+  // planilla son por tipo: al cambiar se limpia el filtro de título activo
+  // (una key SECO no aplica en WET y viceversa) y se refetch con el nuevo tipo.
+  const handlePlanTypeChange = (t: "SECO" | "WET" | null) => {
+    setPlanType(t);
+    if (t !== planType) setTitleFilter(null);
+  };
 
   const openEditDrawer = (data: DataItem) => {
     setDrawerProduct(data);
@@ -408,6 +423,25 @@ export const Dashboard = () => {
           </Select>
         </div>
       )}
+
+      {/* Filtro por tipo de planilla ALICAN (SECO/WET): null = Todos */}
+      <div className="flex items-center gap-2">
+        <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+          Tipo de planilla
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {([null, "SECO", "WET"] as const).map((t) => (
+            <Badge
+              key={t ?? "all"}
+              variant={planType === t ? "default" : "outline"}
+              className="shrink-0 cursor-pointer px-2.5 py-1 text-xs font-medium whitespace-nowrap uppercase"
+              onClick={() => handlePlanTypeChange(t)}
+            >
+              {t ?? "Todos"}
+            </Badge>
+          ))}
+        </div>
+      </div>
 
       {/* ── Filter chips ── */}
       <FilterChips

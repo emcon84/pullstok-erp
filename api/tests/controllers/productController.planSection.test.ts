@@ -223,6 +223,82 @@ describe("productController.getProducts — planSection y filtro por título", (
     expect(body.items[0]).not.toHaveProperty("priceListEntries");
     expect(body.total).toBe(1);
   });
+
+  it("?priceListType=WET filtra por pertenencia a la planilla WET y usa type WET en el include", async () => {
+    mockedPrisma.product.findMany.mockResolvedValue([{ id: "p-1", name: "X" }]);
+
+    const req = query({ priceListType: "WET" });
+    const res = mockResponse();
+
+    await productController.getProducts(req, res);
+
+    const callArgs = mockedPrisma.product.findMany.mock.calls[0][0];
+    expect(callArgs.where.priceListEntries).toEqual({
+      some: {
+        matched: true,
+        section: { priceList: { type: "WET" } },
+      },
+    });
+    expect(callArgs.include.priceListEntries.where).toEqual({
+      matched: true,
+      section: { priceList: { type: "WET" } },
+    });
+  });
+
+  it("?priceListType=WET&title=<key> usa WET en el filtro por título y en la pertenencia (AND)", async () => {
+    mockedPrisma.product.findMany.mockResolvedValue([{ id: "p-1", name: "X" }]);
+
+    const req = query({ priceListType: "WET", title: "MAXXIUM|PERROS" });
+    const res = mockResponse();
+
+    await productController.getProducts(req, res);
+
+    const callArgs = mockedPrisma.product.findMany.mock.calls[0][0];
+    expect(callArgs.where.priceListEntries).toEqual({
+      some: {
+        AND: [
+          {
+            matched: true,
+            section: {
+              priceList: { type: "WET" },
+              OR: [
+                { brand: "MAXXIUM", line: "PERROS", subline: null },
+                { brand: "MAXXIUM", line: null, subline: "PERROS" },
+                { brand: null, line: "MAXXIUM", subline: "PERROS" },
+              ],
+            },
+          },
+          { matched: true, section: { priceList: { type: "WET" } } },
+        ],
+      },
+    });
+    expect(callArgs.include.priceListEntries.where.section.priceList.type).toBe("WET");
+  });
+
+  it("priceListType inválido → 400 con mensaje claro y sin consultar", async () => {
+    const req = query({ priceListType: "HUMEDO" });
+    const res = mockResponse();
+
+    await productController.getProducts(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("Tipo de planilla inválido"),
+      }),
+    );
+    expect(mockedPrisma.product.findMany).not.toHaveBeenCalled();
+  });
+
+  it("priceListType inválido también respeta la rama paginada (400 antes de contar)", async () => {
+    const req = query({ page: "1", pageSize: "30", priceListType: "SECO,WET" });
+    const res = mockResponse();
+
+    await productController.getProducts(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(mockedPrisma.product.count).not.toHaveBeenCalled();
+  });
 });
 
 describe("productController.getProductFilterFacets — títulos de planilla", () => {
@@ -315,6 +391,51 @@ describe("productController.getProductFilterFacets — títulos de planilla", ()
     const where = mockedPrisma.priceListEntry.findMany.mock.calls[0][0].where;
     expect(where.section.priceList.organizationId).toBe("org-1");
     expect(where.section.priceList.type).toBe("SECO");
+  });
+
+  it("?priceListType=WET filtra entries por type WET y devuelve titles vacíos (planilla plana)", async () => {
+    mockedPrisma.category.findMany.mockResolvedValue([]);
+    mockedPrisma.priceListEntry.findMany.mockResolvedValue([
+      {
+        productId: "p-1",
+        section: { brand: null, line: null, subline: null, position: 1 },
+      },
+      {
+        productId: "p-2",
+        section: { brand: null, line: null, subline: null, position: 1 },
+      },
+    ]);
+
+    const res = mockResponse();
+    await productController.getProductFilterFacets(query({ priceListType: "WET" }), res);
+
+    const callArgs = mockedPrisma.priceListEntry.findMany.mock.calls[0][0];
+    expect(callArgs.where).toEqual({
+      matched: true,
+      productId: { not: null },
+      section: { priceList: { organizationId: "org-1", type: "WET" } },
+    });
+
+    // La sección plana de WET (sin brand ni subline) no genera títulos: la
+    // regla `if (!s.brand && !s.subline) continue` la descarta → titles [].
+    expect(res.json).toHaveBeenCalledWith({
+      categories: [],
+      variants: [],
+      titles: [],
+    });
+  });
+
+  it("priceListType inválido en facets → 400 sin consultar entries", async () => {
+    const res = mockResponse();
+    await productController.getProductFilterFacets(query({ priceListType: "MOJADO" }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("Tipo de planilla inválido"),
+      }),
+    );
+    expect(mockedPrisma.priceListEntry.findMany).not.toHaveBeenCalled();
   });
 });
 

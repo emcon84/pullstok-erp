@@ -121,9 +121,11 @@ export const getStockSummary = async (): Promise<StockSummary> => {
 export interface ProductFacets {
   categories: { id: string; name: string }[];
   variants: { name: string; values: string[] }[];
-  /** Títulos de planilla SECO (sdd/alican-plan-titles): chips de filtro por
-   * título del PDF (ej. "SIEGER PUPPY"). key = [brand, line, subline].
-   * filter(Boolean).join("|") — contract exacto con GET /products?title=. */
+  /** Títulos de planilla del tipo seleccionado (?priceListType=, default SECO;
+   * sdd/alican-plan-titles): chips de filtro por título del PDF (ej. "SIEGER
+   * PUPPY"). key = [brand, line, subline].filter(Boolean).join("|") — contract
+   * exacto con GET /products?title=. En WET la planilla es plana y vuelve [].
+   */
   titles: { key: string; label: string; count: number }[];
 }
 
@@ -134,12 +136,14 @@ export interface ProductFacets {
  */
 export const getProductFacets = async (
   category?: string,
+  priceListType?: "SECO" | "WET",
 ): Promise<ProductFacets> => {
   try {
     const token = localStorage.getItem("token");
 
     const params: Record<string, string> = {};
     if (category) params.category = category;
+    if (priceListType) params.priceListType = priceListType;
 
     const response = await axios.get<ProductFacets>(
       `${API_URL}/products/filter-facets`,
@@ -190,11 +194,13 @@ export function products(
   branchId?: string,
   search?: string,
   category?: string,
+  priceListType?: "SECO" | "WET",
 ): Promise<DataItem[]>;
 // Paginados: page/pageSize en las posiciones 4/5 (contrato legacy intacto,
 // LooseStockAdmin usa products(undefined, "", undefined, 1, 300)); el título de
 // planilla es OPCIONAL y va al final (solo lo usa la variante paginada del
-// vendor dashboard).
+// vendor dashboard). priceListType también es OPCIONAL y va al final (posición
+// 7): la variante plana del dashboard admin lo recibe en la posición 4.
 export function products(
   branchId: string | undefined,
   search: string | undefined,
@@ -202,14 +208,16 @@ export function products(
   page: number,
   pageSize: number,
   title?: string,
+  priceListType?: "SECO" | "WET",
 ): Promise<PaginatedProducts>;
 export async function products(
   branchId?: string,
   search?: string,
   category?: string,
-  page?: number,
-  pageSize?: number,
+  priceListTypeOrPage?: string | number,
+  pageSizeOrPriceListType?: number | "SECO" | "WET",
   title?: string,
+  priceListType?: "SECO" | "WET",
 ): Promise<DataItem[] | PaginatedProducts> {
   try {
     const token = localStorage.getItem("token");
@@ -219,6 +227,21 @@ export async function products(
     if (search) params.name = search;
     if (category) params.category = category;
     if (title) params.title = title;
+
+    // priceListType llega por la posición 4 (variante plana del dashboard
+    // admin) o por la 7 (variante paginada del vendor dashboard); nunca ambas.
+    const effectivePriceListType =
+      typeof priceListTypeOrPage === "string"
+        ? (priceListTypeOrPage as "SECO" | "WET")
+        : priceListType;
+    if (effectivePriceListType) params.priceListType = effectivePriceListType;
+
+    const page =
+      typeof priceListTypeOrPage === "number" ? priceListTypeOrPage : undefined;
+    const pageSize =
+      typeof pageSizeOrPriceListType === "number"
+        ? pageSizeOrPriceListType
+        : undefined;
     if (page !== undefined && pageSize !== undefined) {
       params.page = String(page);
       params.pageSize = String(pageSize);

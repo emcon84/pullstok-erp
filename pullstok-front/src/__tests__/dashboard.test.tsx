@@ -191,3 +191,78 @@ describe("Dashboard — filtro client-side por título de planilla", () => {
     );
   });
 });
+
+describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    mockUseProducts.mockReturnValue({
+      products,
+      loading: false,
+      error: null,
+    } as never);
+    mockUseProductFacets.mockReturnValue({
+      titles: [
+        { key: SIEGER_KEY, label: "SIEGER PUPPY", count: 1 },
+        { key: MAXXIUM_KEY, label: "MAXXIUM PERROS", count: 1 },
+      ],
+      categories: [],
+      variants: [],
+    } as never);
+    mockUseGetSales.mockReturnValue({ sales: [], loading: false } as never);
+    mockUseCreateSale.mockReturnValue({ createSale: vi.fn() } as never);
+    mockUseStockSummary.mockReturnValue({
+      summary: { branches: [] },
+      loading: false,
+      error: null,
+    } as never);
+    mockUseGetBudgets.mockReturnValue({ budgets: [], loading: false } as never);
+    mockUseOrders.mockReturnValue({ orders: [], loading: false } as never);
+  });
+
+  it("renderiza el selector con Todos/SECO/WET", () => {
+    renderDashboard();
+
+    expect(screen.getByText("Tipo de planilla")).toBeInTheDocument();
+    expect(screen.getByText("Todos")).toBeInTheDocument();
+    expect(screen.getByText("SECO")).toBeInTheDocument();
+    expect(screen.getByText("WET")).toBeInTheDocument();
+  });
+
+  it("cambiar a WET limpia el título activo y pasa priceListType=WET a los hooks", () => {
+    renderDashboard();
+
+    // Primero se elige un título (filtro client-side activo).
+    clickPill("SIEGER PUPPY (1)");
+    expect(screen.getByTestId("products-table").textContent).toBe("Puppy A");
+
+    clickPill("WET");
+
+    // El filtro por título se limpió al cambiar de tipo → lista completa.
+    expect(screen.getByTestId("products-table").textContent).toBe(
+      "Puppy A | Perros 15kg | Collar Suelto",
+    );
+    expect(mockUseProducts).toHaveBeenLastCalledWith(
+      undefined,
+      undefined,
+      undefined,
+      "WET",
+    );
+    expect(mockUseProductFacets).toHaveBeenLastCalledWith(undefined, "WET");
+  });
+
+  it("volver a Todos quita el priceListType (undefined) de los hooks", () => {
+    renderDashboard();
+
+    clickPill("WET");
+    clickPill("Todos");
+
+    expect(mockUseProducts).toHaveBeenLastCalledWith(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
+    expect(mockUseProductFacets).toHaveBeenLastCalledWith(undefined, undefined);
+  });
+});

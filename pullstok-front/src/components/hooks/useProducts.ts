@@ -59,10 +59,17 @@ export const usePorducts = () => {
 }
 
 // Hook para obtener la lista de productos
-export const useProducts = (branchId?: string, search?: string, category?: string) => {
+export const useProducts = (
+  branchId?: string,
+  search?: string,
+  category?: string,
+  priceListType?: "SECO" | "WET",
+) => {
   const { data, error, isLoading } = useQuery<DataItem[], Error>({
-    queryKey: ["products", branchId, search, category].filter(Boolean),
-    queryFn: () => fetchProducts(branchId, search, category),
+    queryKey: ["products", branchId, search, category, priceListType].filter(
+      Boolean,
+    ),
+    queryFn: () => fetchProducts(branchId, search, category, priceListType),
     placeholderData: (prev) => prev, // keep previous while fetching
   });
 
@@ -90,8 +97,16 @@ export const useInfiniteProducts = (
   search?: string,
   category?: string,
   title?: string,
+  priceListType?: "SECO" | "WET",
 ) => {
-  const queryKey = ["products", branchId, search, category, title].filter(Boolean);
+  const queryKey = [
+    "products",
+    branchId,
+    search,
+    category,
+    title,
+    priceListType,
+  ].filter(Boolean);
 
   const {
     data,
@@ -109,7 +124,15 @@ export const useInfiniteProducts = (
   >({
     queryKey,
     queryFn: ({ pageParam }) =>
-      fetchProducts(branchId, search, category, pageParam, PAGE_SIZE, title),
+      fetchProducts(
+        branchId,
+        search,
+        category,
+        pageParam,
+        PAGE_SIZE,
+        title,
+        priceListType,
+      ),
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
     initialPageParam: 1,
     placeholderData: (prev) => prev, // keep previous pages while searching
@@ -139,10 +162,17 @@ export const useInfiniteProducts = (
  * it; when cleared (category undefined) variants come back empty but the
  * categories stay complete.
  */
-export const useProductFacets = (category?: string) => {
+export const useProductFacets = (
+  category?: string,
+  priceListType?: "SECO" | "WET",
+) => {
   const { data, isLoading } = useQuery<ProductFacets, Error>({
-    queryKey: ["product-facets", category || "all"],
-    queryFn: () => getProductFacets(category),
+    queryKey: [
+      "product-facets",
+      category || "all",
+      priceListType || "all",
+    ],
+    queryFn: () => getProductFacets(category, priceListType),
     placeholderData: (prev) => prev, // keep previous while fetching
   });
 
