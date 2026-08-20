@@ -20,6 +20,9 @@ vi.mock("@/components/hooks/useVendorCheckout", () => ({
 vi.mock("@/components/hooks/useVendorKeyboard", () => ({
   useVendorKeyboard: vi.fn(),
 }));
+vi.mock("@/components/hooks/useCashSession", () => ({
+  useGetCurrentCashSession: vi.fn(),
+}));
 
 vi.mock("@/components/molecules/VendorSearchBar", () => ({
   VendorSearchBar: () => <div data-testid="search-bar" />,
@@ -46,6 +49,7 @@ import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useVendorQuantityModal } from "@/components/hooks/useVendorQuantityModal";
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useVendorKeyboard } from "@/components/hooks/useVendorKeyboard";
+import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 
 const mockUseVendorCatalog = vi.mocked(useVendorCatalog);
 
@@ -110,6 +114,12 @@ function renderVendor(catalogOverrides: Record<string, unknown> = {}) {
     handleSaveOrder: vi.fn(),
   } as never);
   vi.mocked(useVendorKeyboard).mockReturnValue(undefined as never);
+  vi.mocked(useGetCurrentCashSession).mockReturnValue({
+    session: null,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  } as never);
 
   render(<VendorDashboard branchId="branch-1" />);
   return catalog;

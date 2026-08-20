@@ -1,4 +1,5 @@
 import { ProductsProps } from "./productsModel";
+import { PaymentMethod } from "./cashSessionModel";
 
 export type SaleMode = "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO";
 
@@ -28,6 +29,10 @@ export interface SaleRequest {
     looseName?: string;
   }[];
   orderId?: string;
+  /** Desglose de medios de pago (R6/R7): la suma debe igualar el total. */
+  payments?: { method: PaymentMethod; amount: number }[];
+  /** Id de la caja OPEN del vendedor (R8/R9). */
+  cashSessionId?: string;
 }
 
 export interface Sale {

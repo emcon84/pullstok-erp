@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createSale, deleteSale, getSales } from "../../services/saleServices";
 import { CartItem, Sale, SaleMode } from "../../models/salesModel";
+import { PaymentInput } from "../../models/cashSessionModel";
 
 export const useCreateSale = () => {
   const queryClient = useQueryClient();
@@ -8,9 +9,9 @@ export const useCreateSale = () => {
   const mutation = useMutation<
     void,
     Error,
-    { cart: CartItem[]; orderId?: string }
+    { cart: CartItem[]; orderId?: string; payments?: PaymentInput[]; cashSessionId?: string }
   >({
-    mutationFn: async ({ cart, orderId }) => {
+    mutationFn: async ({ cart, orderId, payments, cashSessionId }) => {
       const saleRequest = {
         products: cart.map((item) => {
           const saleMode: SaleMode = item.saleMode ?? "BOLSA_CERRADA";
@@ -38,6 +39,8 @@ export const useCreateSale = () => {
             saleMode,
           };
         }),
+        payments,
+        cashSessionId,
       };
       await createSale(saleRequest, orderId);
     },

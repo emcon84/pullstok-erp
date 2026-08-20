@@ -14,6 +14,7 @@ import { useVendorQuantityModal } from "@/components/hooks/useVendorQuantityModa
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useVendorKeyboard } from "@/components/hooks/useVendorKeyboard";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
+import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import {
   branchQty,
   VENDOR_FILTER_KEY,
@@ -56,6 +57,8 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     clearCart: cart.clearCart,
     totalAmount: cart.totalAmount,
   });
+  // Caja OPEN del vendedor (R8/R9): se propaga al confirmar la venta.
+  const { session: currentSession } = useGetCurrentCashSession(branchId);
 
   useVendorKeyboard({
     qtyModal,
@@ -301,6 +304,7 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           saveOrder: checkout.handleSaveOrder,
           confirmSale: checkout.handleConfirmSale,
         }}
+        cashSessionId={currentSession?.id}
       />
 
       {/* ── Product Drawer (stock across all branches) ── */}

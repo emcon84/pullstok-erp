@@ -5,6 +5,7 @@ import { useCreateOrder } from "./useOrder";
 import type { VendorCartItem } from "./useVendorCart";
 import type { CartItem } from "../../models/salesModel";
 import type { CreateOrder } from "../../models/orderModel";
+import type { PaymentInput } from "../../models/cashSessionModel";
 
 interface UseVendorCheckoutParams {
   branchId: string;
@@ -33,44 +34,47 @@ export function useVendorCheckout({
   const [confirming, setConfirming] = useState(false);
 
   // ── Confirm sale ──
-  const handleConfirmSale = useCallback(async () => {
-    if (cartItems.length === 0) return;
-    setConfirming(true);
-    try {
-      const cart: CartItem[] = cartItems.map((i) => ({
-        product: {
-          _id: i.productId,
-          id: i.productId,
-          name: i.name,
-          // C-05: para POR_MONTO el precio unitario debe ser el de la CELDA de
-          // la planilla (guardado en priceKgSuelto del item), no el price=1 de
-          // la cuenta del carrito. Sin celda (showroom), priceKgSuelto ==
-          // priceKgSuelto almacenado → mismo comportamiento que antes.
-          price:
-            i.saleMode === "POR_MONTO"
-              ? (i.priceKgSuelto ?? i.price)
-              : i.price,
-          quantity: i.stock,
-          description: "",
-          category: "",
-        },
-        quantity: i.quantity,
-        totalPrice: i.price * i.quantity,
-        saleMode: i.saleMode ?? "BOLSA_CERRADA",
-        // Ventas sueltas: la celda de la planilla que identifica la línea.
-        loosePriceId: i.loosePriceId,
-        looseName: i.looseName,
-      }));
-      await createSale({ cart });
-      clearCart();
-      setCartOpen(false);
-      toast.success("Pedido confirmado y vendido");
-    } catch (err: any) {
-      toast.error(err?.message || "Error al confirmar el pedido");
-    } finally {
-      setConfirming(false);
-    }
-  }, [cartItems, createSale, clearCart, setCartOpen]);
+  const handleConfirmSale = useCallback(
+    async (payments?: PaymentInput[], cashSessionId?: string) => {
+      if (cartItems.length === 0) return;
+      setConfirming(true);
+      try {
+        const cart: CartItem[] = cartItems.map((i) => ({
+          product: {
+            _id: i.productId,
+            id: i.productId,
+            name: i.name,
+            // C-05: para POR_MONTO el precio unitario debe ser el de la CELDA de
+            // la planilla (guardado en priceKgSuelto del item), no el price=1 de
+            // la cuenta del carrito. Sin celda (showroom), priceKgSuelto ==
+            // priceKgSuelto almacenado → mismo comportamiento que antes.
+            price:
+              i.saleMode === "POR_MONTO"
+                ? (i.priceKgSuelto ?? i.price)
+                : i.price,
+            quantity: i.stock,
+            description: "",
+            category: "",
+          },
+          quantity: i.quantity,
+          totalPrice: i.price * i.quantity,
+          saleMode: i.saleMode ?? "BOLSA_CERRADA",
+          // Ventas sueltas: la celda de la planilla que identifica la línea.
+          loosePriceId: i.loosePriceId,
+          looseName: i.looseName,
+        }));
+        await createSale({ cart, payments, cashSessionId });
+        clearCart();
+        setCartOpen(false);
+        toast.success("Pedido confirmado y vendido");
+      } catch (err: any) {
+        toast.error(err?.message || "Error al confirmar el pedido");
+      } finally {
+        setConfirming(false);
+      }
+    },
+    [cartItems, createSale, clearCart, setCartOpen],
+  );
 
   // ── Save cart as Pending Order ──
   // Mismo shape que el pedido directo de la vista Pedidos (Orders.tsx), más el
