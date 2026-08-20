@@ -134,6 +134,10 @@ const PriceListDetail = lazy(() =>
   import("./views/PriceListDetail").then((m) => ({ default: m.PriceListDetail })),
 );
 
+const PriceListList = lazy(() =>
+  import("./views/PriceListList").then((m) => ({ default: m.PriceListList })),
+);
+
 const AppRoutes = () => (
   <Router>
     <Routes>
@@ -281,7 +285,8 @@ const AppRoutes = () => (
         <Route path="/consultar-precios" element={<PriceKgLookup />} />
         <Route path="/revision-precios-kg" element={<AdminReviewQueue />} />
         <Route path="/stock-suelto" element={<LooseStockAdmin />} />
-        <Route path="/planilla-mayorista" element={<PriceListImport />} />
+        <Route path="/planilla-mayorista" element={<PriceListList />} />
+        <Route path="/planilla-mayorista/importar" element={<PriceListImport />} />
         <Route path="/planilla-mayorista/:id" element={<PriceListDetail />} />
         <Route path="/ajustes" element={<BrandingSettings />} />
         <Route path="/ajustes/horarios" element={<BusinessHoursSettings />} />

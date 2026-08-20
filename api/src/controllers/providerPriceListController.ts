@@ -150,6 +150,23 @@ function defaultDecisions(preview: PreviewRow[]): ApplyDecision[] {
   }));
 }
 
+/**
+ * Regla de re-import del suggestedPrice: si el producto YA tiene un valor
+ * actual y difiere del que recalcularía el PDF (comparación round2 vs round2,
+ * robusta ante drift de floats), fue ajustado a mano (BulkPriceUpdate /
+ * adjustPriceList) → se CONSERVA el valor actual. Si coincide o es null → se
+ * recalcula. Los null que devuelve computed (fila sin precios) se propagan.
+ */
+function resolveReimportSuggested(
+  computed: number | null,
+  current: number | null | undefined,
+): number | null {
+  if (computed === null) return null;
+  if (current === null || current === undefined) return computed;
+  const preserved = round2(Number(current));
+  return preserved === computed ? computed : preserved;
+}
+
 async function extractPdfText(filePath: string): Promise<string> {
   const buf = await fs.promises.readFile(filePath);
   const parser = new PDFParse({ data: buf });
@@ -314,6 +331,12 @@ async function syncHqStockInline(
  * Filas con precioConIva null: no aplican precio ni se crean (planilla-only).
  * Con applyPrices=false (ausente): comportamiento ORIGINAL — solo
  * suggestedPrice, NUNCA product.price, NUNCA crea productos.
+ *
+ * Re-import (sdd/alican-wholesale-price-list/reimport): los productos
+ * matcheados que YA tienen un suggestedPrice ajustado a mano (difiere del
+ * recalculado por el PDF) lo CONSERVAN — tanto en Product.suggestedPrice como
+ * en el PriceListEntry.suggestedPrice de la planilla recreada (así la planilla
+ * impresa muestra el ajuste). Sin ajuste (coincide o null) → se recalcula.
  */
 async function applyPriceListCore(
   organizationId: string,
@@ -368,16 +391,22 @@ async function applyPriceListCore(
   return prisma.$transaction(async (tx) => {
     // Anti-fuga (REQ-12): los productId deben existir en la org. El cliente tx
     // hereda la extensión tenant → el findMany ya scopea por organizationId.
+    // De paso se lee el suggestedPrice ACTUAL de cada producto: el re-import
+    // conserva los ajustes manuales (resolveReimportSuggested más abajo).
+    const currentSuggestedById = new Map<string, number | null>();
     const productIds = [
       ...new Set(imports.map((r) => r.productId).filter((id): id is string => Boolean(id))),
     ];
     if (productIds.length > 0) {
       const found = await tx.product.findMany({
         where: { id: { in: productIds } },
-        select: { id: true },
+        select: { id: true, suggestedPrice: true },
       });
       if (found.length !== productIds.length) {
         throw new ApplyPriceListError("Producto manual fuera de la organización");
+      }
+      for (const p of found) {
+        currentSuggestedById.set(p.id, p.suggestedPrice == null ? null : Number(p.suggestedPrice));
       }
     }
 
@@ -449,11 +478,18 @@ async function applyPriceListCore(
       // payload stale), se REUTILIZA en vez de duplicar el catálogo.
       const existingProducts = await tx.product.findMany({
         where: { organizationId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, suggestedPrice: true },
       });
       for (const p of existingProducts) {
         const key = normalizeName(p.name);
         if (key && !existingByName.has(key)) existingByName.set(key, p.id);
+        // Los reutilizados por nombre también conservan su ajuste manual.
+        if (key) {
+          currentSuggestedById.set(
+            p.id,
+            p.suggestedPrice == null ? null : Number(p.suggestedPrice),
+          );
+        }
       }
 
       for (const r of imports) {
@@ -503,7 +539,11 @@ async function applyPriceListCore(
       let entryPosition = 0;
       for (const r of section.entries) {
         const productId = r.productId ?? resolveByPosition.get(r.position) ?? null;
-        const sugerido = computeSuggestedPrice(r.precioConIva ?? null, r.precioSinIva ?? null);
+        const computed = computeSuggestedPrice(r.precioConIva ?? null, r.precioSinIva ?? null);
+        const sugerido = resolveReimportSuggested(
+          computed,
+          productId ? currentSuggestedById.get(productId) : undefined,
+        );
         await tx.priceListEntry.create({
           data: {
             sectionId: sec.id,
@@ -532,7 +572,10 @@ async function applyPriceListCore(
       if (createdIds.has(productId)) continue; // ya queda con price+sugerido
       seenProducts.add(productId);
       const data: { suggestedPrice: number | null; price?: number; providerId?: string } = {
-        suggestedPrice: computeSuggestedPrice(r.precioConIva ?? null, r.precioSinIva ?? null),
+        suggestedPrice: resolveReimportSuggested(
+          computeSuggestedPrice(r.precioConIva ?? null, r.precioSinIva ?? null),
+          currentSuggestedById.get(productId),
+        ),
       };
       if (applyPrices && r.precioConIva != null) {
         data.price = round2(r.precioConIva);

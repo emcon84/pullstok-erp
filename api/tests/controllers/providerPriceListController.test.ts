@@ -374,6 +374,51 @@ describe("applyPriceList — transacción idempotente (precios del proveedor int
     expect(tx.product.updateMany).toHaveBeenCalledTimes(1);
   });
 
+  it("conserva un suggestedPrice ajustado a mano al re-importar (difiere del recalculado por el PDF)", async () => {
+    const tx = txMock();
+    // El producto ya tiene un sugerido MANUAL (15000 ≠ 14190.04 que recalcula el PDF).
+    tx.product.findMany.mockResolvedValue([{ id: uuid, suggestedPrice: 15000 }]);
+    mockedPrisma.$transaction.mockImplementation(
+      async (fn: (t: unknown) => unknown) => fn(tx),
+    );
+    const res = fakeRes();
+    await applyPriceList(fakeReq({ body: applyBody }), res);
+
+    // El Product conserva 15000 (no se pisa) y la ENTRY de la planilla nueva
+    // imprime el valor conservado.
+    const updateCall = tx.product.updateMany.mock.calls[0];
+    expect(updateCall[0].data).toEqual({ suggestedPrice: 15000 });
+    const entryData = tx.priceListEntry.create.mock.calls[0][0].data;
+    expect(entryData.suggestedPrice).toBe(15000);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("recalcula el suggestedPrice cuando el actual coincide o es null", async () => {
+    // Actual = el recalculado (coincide) → se recalcula igual (mismo valor).
+    const tx = txMock();
+    tx.product.findMany.mockResolvedValue([{ id: uuid, suggestedPrice: 14190.04 }]);
+    mockedPrisma.$transaction.mockImplementation(
+      async (fn: (t: unknown) => unknown) => fn(tx),
+    );
+    const res = fakeRes();
+    await applyPriceList(fakeReq({ body: applyBody }), res);
+    const updateCall = tx.product.updateMany.mock.calls[0];
+    expect(updateCall[0].data.suggestedPrice).toBe(14190.04);
+    expect(res.status).toHaveBeenCalledWith(200);
+
+    // Actual null → se recalcula (no conserva).
+    const tx2 = txMock();
+    tx2.product.findMany.mockResolvedValue([{ id: uuid, suggestedPrice: null }]);
+    mockedPrisma.$transaction.mockImplementation(
+      async (fn: (t: unknown) => unknown) => fn(tx2),
+    );
+    const res2 = fakeRes();
+    await applyPriceList(fakeReq({ body: applyBody }), res2);
+    const updateCall2 = tx2.product.updateMany.mock.calls[0];
+    expect(updateCall2[0].data.suggestedPrice).toBe(14190.04);
+    expect(res2.status).toHaveBeenCalledWith(200);
+  });
+
   it("returns 400 when a manual productId is outside the org", async () => {
     const tx = txMock();
     tx.product.findMany.mockResolvedValue([]); // el producto no pertenece a la org
@@ -712,6 +757,35 @@ describe("applyPriceList — aplicar precios al catálogo (applyPrices=true)", (
       priceUpdated: 1,
       productsCreated: 0,
     });
+  });
+
+  it("reutiliza un producto existente y conserva su suggestedPrice ajustado a mano", async () => {
+    const tx = txMock();
+    tx.product.findMany.mockResolvedValue([
+      { id: "existente-1", name: "GOOSTER Adultos x 15 Kg.", suggestedPrice: 15000 },
+    ]);
+    tx.categoryVariantDefinition.findMany.mockResolvedValue([]);
+    mockedPrisma.$transaction.mockImplementation(async (fn: (t: unknown) => unknown) => fn(tx));
+
+    const res = fakeRes();
+    const body = {
+      ...applyBody,
+      applyPrices: true,
+      rows: [
+        { position: 0, accion: "import" as const, nombre: "GOOSTER ADULTOS X 15 KG.", precioSinIva: 8795, precioConIva: 10642 },
+      ],
+    };
+    await applyPriceList(fakeReq({ body }), res);
+
+    expect(tx.product.create).not.toHaveBeenCalled();
+    // El reutilizado conserva el sugerido manual (15000), no el recalculado (14190.04).
+    expect(tx.product.updateMany).toHaveBeenCalledWith(
+      { where: { id: "existente-1" }, data: { suggestedPrice: 15000, price: 10642 } },
+    );
+    // La entry de la planilla nueva imprime el valor conservado.
+    const entryData = tx.priceListEntry.create.mock.calls[0][0].data;
+    expect(entryData.suggestedPrice).toBe(15000);
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });
 
