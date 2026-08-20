@@ -18,7 +18,7 @@ describe("buildTra", () => {
     expect(tra).toContain("<service>wsfe</service>");
   });
 
-  it("genera uniqueId numérico y expirationTime posterior a generationTime (TRA de 1 día)", () => {
+  it("genera uniqueId numérico y expirationTime posterior a generationTime (TRA de 12 h)", () => {
     const tra = buildTra("30709706701", "wsfe");
 
     const uniqueId = tra.match(/<uniqueId>(\d+)<\/uniqueId>/)?.[1];
@@ -31,9 +31,10 @@ describe("buildTra", () => {
     const genMs = new Date(generation!).getTime();
     const expMs = new Date(expiration!).getTime();
     expect(expMs).toBeGreaterThan(genMs);
-    // ~24 h (tolerancia: test lento)
-    expect(expMs - genMs).toBeGreaterThan(23 * 3600 * 1000);
-    expect(expMs - genMs).toBeLessThanOrEqual(25 * 3600 * 1000);
+    // ~12 h por defecto (AFIP rechaza el TRA si el vencimiento excede 24 h
+    // por desfase de reloj; 12 h deja margen de sobra)
+    expect(expMs - genMs).toBeGreaterThan(11 * 3600 * 1000);
+    expect(expMs - genMs).toBeLessThanOrEqual(13 * 3600 * 1000);
   });
 
   it("expiración configurable (2 h)", () => {

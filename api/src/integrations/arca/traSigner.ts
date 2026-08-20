@@ -25,6 +25,15 @@ const buildShortUniqueId = (): string =>
 // Argentina no usa DST desde 2009: UTC-3 fijo.
 const BUENOS_AIRES_OFFSET_MS = -3 * 3600 * 1000;
 
+// Duración del TRA por defecto: 12 h. NO usar 24 h exactas: AFIP homo rechaza
+// con `ns1:xml.expirationTime.invalid / vencimiento en más de 24 horas` si por
+// desfase de reloj el expirationTime queda > 24 h respecto al reloj de AFIP.
+// Con 12 h queda margen de sobra y el TA real caduca a las 12 h de todos modos.
+
+// Margen que se resta al generationTime para evitar que AFIP lo vea "en el
+// futuro" por desfase de reloj (ns1:xml.generationTime.invalid). 2 minutos.
+const GENERATION_SKEW_MS = 2 * 60 * 1000;
+
 /** Fecha en hora de Buenos Aires, sin milisegundos ni offset:
  * "YYYY-MM-DDTHH:mm:ss". AFIP valida la hora contra esta zona, NO contra la
  * zona del servidor (que en el VPS es UTC). */
@@ -40,9 +49,13 @@ const formatTraDate = (date: Date): string => {
 export const buildTra = (
   _cuit: string,
   service: string,
-  expirationHours = 24,
+  expirationHours = 12,
 ): string => {
-  const generationTime = new Date();
+  // Margen de seguridad: AFIP rechaza el TRA si el generationTime queda "en el
+  // futuro" respecto al reloj de AFIP (ns1:xml.generationTime.invalid). Por
+  // desfase de reloj entre el servidor y AFIP (aun de unos segundos) conviene
+  // restar unos minutos para que generationTime quede holgadamente en el pasado.
+  const generationTime = new Date(Date.now() - GENERATION_SKEW_MS);
   const expirationTime = new Date(
     generationTime.getTime() + expirationHours * 3600 * 1000,
   );

@@ -84,6 +84,25 @@ describe("parseLoginCmsResponse", () => {
     expect(caught).toBeInstanceOf(ArcaError);
     expect((caught as ArcaError).code).toBe(ARCA_ERROR_CODES.ARCA_AUTH_ERROR);
   });
+
+  it("fault SOAP de WSAA → ArcaError ARCA_AUTH_ERROR con el faultstring real de AFIP", () => {
+    const xml =
+      '<?xml version="1.0"?><soap:Envelope><soap:Body><soap:Fault>' +
+      '<faultcode>ns1:xml.expirationTime.invalid</faultcode>' +
+      "<faultstring>expirationTime posee formato o dato inválido (ej: vencimiento en más de 24 horas)</faultstring>" +
+      "</soap:Fault></soap:Body></soap:Envelope>";
+    let caught: unknown;
+    try {
+      parseLoginCmsResponse(xml);
+    } catch (e: unknown) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(ArcaError);
+    expect((caught as ArcaError).code).toBe(ARCA_ERROR_CODES.ARCA_AUTH_ERROR);
+    expect((caught as ArcaError).message).toContain(
+      "expirationTime posee formato o dato inválido",
+    );
+  });
 });
 
 describe("authenticateWsaa", () => {
