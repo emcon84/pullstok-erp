@@ -24,6 +24,7 @@ import {
   Search,
   ClipboardCheck,
   PackageOpen,
+  Wallet,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 import type { Role } from "@/constants/rolePermissions";
@@ -62,6 +63,7 @@ export const navGroups: NavGroup[] = [
     icon: ShoppingCart,
     items: [
       { to: "/Ventas", label: "Ventas", icon: ShoppingCart, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"] },
+      { to: "/caja", label: "Caja", icon: Wallet, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"] },
       { to: "/presupuestos", label: "Presupuestos", icon: FileText, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
       { to: "/pedidos", label: "Pedidos", icon: ClipboardList, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
       { to: "/facturas", label: "Remitos", icon: Truck, visibleRoles: ["ADMIN", "MANAGEMENT", "CASHIER"] },

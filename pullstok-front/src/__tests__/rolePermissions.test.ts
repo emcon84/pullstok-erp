@@ -3,6 +3,8 @@ import {
   canEditBranchStock,
   resolveScannerBranchMode,
   STOCK_EDIT_ROLES,
+  ROLE_VISIBLE_PATHS,
+  roleAllows,
 } from "../constants/rolePermissions";
 
 /**
@@ -114,5 +116,32 @@ describe("resolveScannerBranchMode", () => {
 
   it("makes SUPERADMIN read-only (mirrors the backend policy)", () => {
     expect(resolveScannerBranchMode("SUPERADMIN", ["b1"])).toEqual({ kind: "readonly" });
+  });
+});
+
+/**
+ * Ruta de caja (spec R5 / sdd/caja-apertura-cierre): "/caja" debe ser visible
+ * solo para ADMIN/MANAGEMENT/VENDEDOR/CASHIER. El backend ya restringe los
+ * endpoints; este es el mirror del sidebar.
+ */
+describe("ROLE_VISIBLE_PATHS /caja", () => {
+  it("exposes /caja to ADMIN, MANAGEMENT, VENDEDOR and CASHIER", () => {
+    expect(ROLE_VISIBLE_PATHS["/caja"]).toEqual([
+      "ADMIN",
+      "MANAGEMENT",
+      "VENDEDOR",
+      "CASHIER",
+    ]);
+  });
+
+  it("roleAllows grants /caja to the four operative+management roles", () => {
+    for (const role of ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"]) {
+      expect(roleAllows(role, "/caja")).toBe(true);
+    }
+  });
+
+  it("roleAllows denies /caja to SUPERADMIN and EMPLOYEE", () => {
+    expect(roleAllows("SUPERADMIN", "/caja")).toBe(false);
+    expect(roleAllows("EMPLOYEE", "/caja")).toBe(false);
   });
 });

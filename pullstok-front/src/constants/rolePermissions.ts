@@ -32,6 +32,7 @@ export const ROLE_VISIBLE_PATHS: Record<string, Role[]> = {
     "EMPLOYEE",
   ],
   "/Ventas": ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"],
+  "/caja": ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"],
   "/Clientes": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/presupuestos": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/pedidos": ["ADMIN", "MANAGEMENT", "VENDEDOR"],

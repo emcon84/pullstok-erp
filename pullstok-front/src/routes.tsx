@@ -110,6 +110,10 @@ const LooseStockAdmin = lazy(() =>
   import("./views/LooseStockAdmin").then((m) => ({ default: m.LooseStockAdmin })),
 );
 
+const CashSessionPage = lazy(() =>
+  import("./views/CashSessionPage").then((m) => ({ default: m.CashSessionPage })),
+);
+
 const BrandingSettings = lazy(() =>
   import("./views/BrandingSettings").then((m) => ({ default: m.BrandingSettings })),
 );
@@ -268,6 +272,7 @@ const AppRoutes = () => (
         <Route path="/pedidos" element={<Orders />} />
         <Route path="/facturas" element={<Comprobations />} />
         <Route path="/Ventas" element={<SalesPage />} />
+        <Route path="/caja" element={<CashSessionPage />} />
         <Route path="/Clientes" element={<Customers />} />
         <Route path="/categorias" element={<Categories />} />
         <Route path="/tienda" element={<Tienda />} />
