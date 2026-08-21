@@ -69,18 +69,23 @@ const asText = (value: unknown): string =>
  */
 export const parseGetPersonaResponse = (xml: string): PadronPersona => {
   const obj = parseXml(xml);
-  const raw =
+  const rawWrapper =
     obj.Envelope?.Body?.getPersonaResponse?.personaReturn ??
     obj.Envelope?.Body?.GetPersonaResponse?.GetPersonaResult ??
     obj.Envelope?.Body?.getPersonaResponse?.GetPersonaResult;
 
-  if (!raw) {
+  if (!rawWrapper) {
     throw new ArcaError(
       ARCA_ERROR_CODES.ARCA_PADRON_ERROR,
       "Respuesta del padrón sin personaReturn",
       502,
     );
   }
+
+  // ARCA (personaServiceA4) anida los datos en personaReturn.persona
+  // (el WSDL define personaReturn = metadata + persona). Toleramos también
+  // la estructura legacy con los campos directos en personaReturn.
+  const raw = rawWrapper.persona ?? rawWrapper;
 
   const idPersona = asText(raw.idPersona);
   const apellido = asText(raw.apellido);
@@ -89,13 +94,13 @@ export const parseGetPersonaResponse = (xml: string): PadronPersona => {
   const displayName =
     razonSocial || [apellido, nombre].filter(Boolean).join(" ") || "";
 
-  const impuestos = asArray(raw.impuesto?.impuesto).map((imp) => ({
+  const impuestos = asArray(raw.impuesto?.impuesto ?? raw.impuesto).map((imp) => ({
     id: Number(imp?.idImpuesto ?? NaN),
     descripcion: asText(imp?.descripcionImpuesto),
     estado: asText(imp?.estado ?? imp?.descripcion ?? ""),
   }));
 
-  const dom = raw.domicilio;
+  const dom = asArray(raw.domicilio)[0];
   const domicilio =
     dom && (dom.direccion || dom.localidad || dom.descripcionProvincia)
       ? {
