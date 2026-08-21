@@ -211,6 +211,12 @@ class AuthService {
             plan: true,
             paidUntil: true,
             isActive: true,
+            // Datos fiscales del emisor (sdd/facturacion-servicios, WS5):
+            // el front los usa para el header del PDF de factura estándar.
+            // Faltaban acá — me() nunca los devolvía aunque se guardaran.
+            taxId: true,
+            taxCondition: true,
+            address: true,
           },
         },
       },
