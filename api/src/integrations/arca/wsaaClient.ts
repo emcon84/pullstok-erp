@@ -80,16 +80,29 @@ export const parseLoginCmsResponse = (xml: string): TicketAcceso => {
       throw new Error("LoginCmsReturn ausente en la respuesta");
     }
     const tokenXml = Buffer.from(String(b64), "base64").toString("utf8");
-    const root = parseXml(tokenXml).authSrc;
-    if (!root?.token || !root?.sign || !root?.cuit) {
+    const tokenObj = parseXml(tokenXml);
+    // Estructura REAL del TA de WSAA (loginTicketResponse con header +
+    // credentials). Toleramos también la variante plana `authSrc` usada en
+    // fixtures/legacy por compatibilidad.
+    const login = tokenObj.loginTicketResponse ?? tokenObj.authSrc;
+    const credentials = login?.credentials ?? {};
+    const token = credentials.token ?? login?.token;
+    const sign = credentials.sign ?? login?.sign;
+    const cuit =
+      login?.cuit ?? String(login?.header?.destination ?? "").match(/CUIT\s+(\d{11})/)?.[1];
+    if (!token || !sign || !cuit) {
       throw new Error("token XML sin token/sign/cuit");
     }
     return {
-      token: String(root.token),
-      sign: String(root.sign),
-      cuit: String(root.cuit),
-      generationTime: new Date(String(root.generationTime)),
-      expirationTime: new Date(String(root.expirationTime)),
+      token: String(token),
+      sign: String(sign),
+      cuit: String(cuit),
+      generationTime: new Date(
+        String(login?.header?.generationTime ?? login?.generationTime),
+      ),
+      expirationTime: new Date(
+        String(login?.header?.expirationTime ?? login?.expirationTime),
+      ),
     };
   } catch (err) {
     throw new ArcaError(

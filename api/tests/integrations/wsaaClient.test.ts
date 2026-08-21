@@ -71,6 +71,28 @@ describe("parseLoginCmsResponse", () => {
     expect(ta.cuit).toBe("30709706701");
     expect(ta.generationTime).toEqual(new Date("2026-08-18T12:00:00-03:00"));
     expect(ta.expirationTime).toEqual(new Date("2026-08-19T12:00:00-03:00"));
+    expect(ta.cuit).toBe("30709706701");
+  });
+
+  it("extrae el CUIT del destination del header (loginTicketResponse real)", () => {
+    // El TA real de AFIP trae el CUIT en <header><destination>CUIT ...</destination>
+    // y token/sign en <credentials>. El parser debe leerlos de ahí.
+    const xml = fs.readFileSync(path.join(FIXTURES, "loginCms_ok.xml"), "utf8");
+    const ta = parseLoginCmsResponse(xml);
+    expect(ta.cuit).toBe("30709706701");
+    expect(ta.token).toBe("token-homo-1234");
+    expect(ta.sign).toBe("sign-homo-abc");
+  });
+
+  it("tolera la estructura legacy authSrc (token/sign/cuit planos)", () => {
+    const b64 = Buffer.from(
+      '<?xml version="1.0"?><authSrc><token>token-legacy</token><sign>sign-legacy</sign><cuit>30709706701</cuit><generationTime>2026-08-18T12:00:00-03:00</generationTime><expirationTime>2026-08-19T12:00:00-03:00</expirationTime></authSrc>',
+      "utf8",
+    ).toString("base64");
+    const xml = `<?xml version="1.0"?><soap:Envelope><soap:Body><loginCmsResponse><loginCmsReturn>${b64}</loginCmsReturn></loginCmsResponse></soap:Body></soap:Envelope>`;
+    const ta = parseLoginCmsResponse(xml);
+    expect(ta.token).toBe("token-legacy");
+    expect(ta.cuit).toBe("30709706701");
   });
 
   it("tolera la variante PascalCase (LoginCmsResponse/LoginCmsReturn)", () => {

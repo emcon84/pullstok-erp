@@ -2,7 +2,7 @@
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <soapenv:Body>
     <ns1:loginCmsResponse xmlns:ns1="http://wsaa.view.sua.dvadac.desein.afip.gov">
-      <ns1:loginCmsReturn>PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPGF1dGhTcmM+Cjx0b2tlbj50b2tlbi1ob21vLTEyMzQ8L3Rva2VuPgo8c2lnbj5zaWduLWhvbW8tYWJjPC9zaWduPgo8Y3VpdD4zMDcwOTcwNjcwMTwvY3VpdD4KPGdlbmVyYXRpb25UaW1lPjIwMjYtMDgtMThUMTI6MDA6MDAtMDM6MDA8L2dlbmVyYXRpb25UaW1lPgo8ZXhwaXJhdGlvblRpbWU+MjAyNi0wOC0xOVQxMjowMDowMC0wMzowMDwvZXhwaXJhdGlvblRpbWU+CjwvYXV0aFNyYz4=</ns1:loginCmsReturn>
+      <ns1:loginCmsReturn>PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48bG9naW5UaWNrZXRSZXNwb25zZSB2ZXJzaW9uPSIxLjAiPjxoZWFkZXI+PHNvdXJjZT5DTj13c2FhaG9tbywgTz1BRklQLCBDPUFSLCBTRVJJQUxOVU1CRVI9Q1VJVCAzMzY5MzQ1MDIzOTwvc291cmNlPjxkZXN0aW5hdGlvbj5DVUlUIDMwNzA5NzA2NzAxIENOPXB1bGxzdG9rdGVzdDwvZGVzdGluYXRpb24+PHVuaXF1ZUlkPjE1NTgxODUxMzc8L3VuaXF1ZUlkPjxnZW5lcmF0aW9uVGltZT4yMDI2LTA4LTE4VDEyOjAwOjAwLTAzOjAwPC9nZW5lcmF0aW9uVGltZT48ZXhwaXJhdGlvblRpbWU+MjAyNi0wOC0xOVQxMjowMDowMC0wMzowMDwvZXhwaXJhdGlvblRpbWU+PC9oZWFkZXI+PGNyZWRlbnRpYWxzPjx0b2tlbj50b2tlbi1ob21vLTEyMzQ8L3Rva2VuPjxzaWduPnNpZ24taG9tby1hYmM8L3NpZ24+PC9jcmVkZW50aWFscz48L2xvZ2luVGlja2V0UmVzcG9uc2U+</ns1:loginCmsReturn>
     </ns1:loginCmsResponse>
   </soapenv:Body>
 </soapenv:Envelope>
