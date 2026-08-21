@@ -196,20 +196,43 @@ export const parseFecaeSolicitarResponse = (xml: string): CaeResult => {
 
 export const parseFeCompUltimoAutorizadoResponse = (xml: string): number => {
   const obj = parseXml(xml);
-  const value =
-    obj.Envelope?.Body?.FECompUltimoAutorizadoResponse?.FECompUltimoAutorizadoResult;
-  if (value === undefined || value === null) {
+  const raw =
+    obj.Envelope?.Body?.FECompUltimoAutorizadoResponse
+      ?.FECompUltimoAutorizadoResult;
+
+  if (raw === undefined || raw === null) {
     throw new ArcaError(
       ARCA_ERROR_CODES.ARCA_PARSE_ERROR,
       "Respuesta FECompUltimoAutorizado sin resultado",
       502,
     );
   }
-  const n = Number(value);
+
+  // El WSDL real define FECompUltimoAutorizadoResult como FERecuperaLastCbteResponse
+  // (objeto con PtoVta/CbteTipo/CbteNro/Errors/Events), NO un número directo
+  // como suponía el fixture legacy. Si AFIP devuelve Errors, fallar con el
+  // mensaje real en vez de un "[object Object]".
+  const errors = Array.isArray(raw.Errors?.Err)
+    ? raw.Errors.Err
+    : raw.Errors?.Err
+      ? [raw.Errors.Err]
+      : [];
+  if (errors.length > 0) {
+    const msg = (errors as Array<{ Code?: unknown; Msg?: unknown }>)
+      .map((e) => `${e.Code} ${e.Msg}`)
+      .join("; ");
+    throw new ArcaError(
+      ARCA_ERROR_CODES.ARCA_REJECTED,
+      `AFIP rechazó FECompUltimoAutorizado: ${msg}`,
+      422,
+    );
+  }
+
+  const n = Number(raw.CbteNro ?? raw);
   if (!Number.isInteger(n) || n < 0) {
     throw new ArcaError(
       ARCA_ERROR_CODES.ARCA_PARSE_ERROR,
-      `FECompUltimoAutorizado inválido: ${value}`,
+      `FECompUltimoAutorizado inválido: ${JSON.stringify(raw)}`,
       502,
     );
   }

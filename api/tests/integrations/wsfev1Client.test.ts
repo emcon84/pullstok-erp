@@ -207,6 +207,40 @@ describe("feCompUltimoAutorizado", () => {
     expect(call.body).toContain("<PtoVta>1</PtoVta>");
   });
 
+  it("lee CbteNro del objeto FERecuperaLastCbteResponse (estructura real del WSDL)", async () => {
+    const xml =
+      '<?xml version="1.0"?><soap:Envelope><soap:Body>' +
+      "<FECompUltimoAutorizadoResponse><FECompUltimoAutorizadoResult>" +
+      "<PtoVta>2</PtoVta><CbteTipo>1</CbteTipo><CbteNro>42</CbteNro>" +
+      "</FECompUltimoAutorizadoResult></FECompUltimoAutorizadoResponse>" +
+      "</soap:Body></soap:Envelope>";
+    soapRequestMock.mockResolvedValue(xml);
+
+    const result = await feCompUltimoAutorizado(CONTEXT, TA, {
+      puntoVenta: 2,
+      tipoCbte: 1,
+    });
+    expect(result).toBe(42);
+  });
+
+  it("Errors de AFIP en FECompUltimoAutorizado → ARCA_REJECTED con el mensaje real", async () => {
+    const xml =
+      '<?xml version="1.0"?><soap:Envelope><soap:Body>' +
+      "<FECompUltimoAutorizadoResponse><FECompUltimoAutorizadoResult>" +
+      "<Errors><Err><Code>601</Code><Msg>El punto de venta no existe</Msg></Err></Errors>" +
+      "</FECompUltimoAutorizadoResult></FECompUltimoAutorizadoResponse>" +
+      "</soap:Body></soap:Envelope>";
+    soapRequestMock.mockResolvedValue(xml);
+
+    const error: unknown = await feCompUltimoAutorizado(CONTEXT, TA, {
+      puntoVenta: 1,
+      tipoCbte: 6,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ArcaError);
+    expect((error as ArcaError).code).toBe(ARCA_ERROR_CODES.ARCA_REJECTED);
+    expect((error as ArcaError).message).toContain("El punto de venta no existe");
+  });
+
   it("buildFeCompUltimoAutorizadoBody lleva Auth + PtoVta + CbteTipo", () => {
     const body = buildFeCompUltimoAutorizadoBody(TA, CONTEXT, { puntoVenta: 1, tipoCbte: 6 });
     expect(body).toContain("<Auth>");

@@ -2,7 +2,11 @@
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
     <FECompUltimoAutorizadoResponse xmlns="http://ar.gov.afip.dif.FEV1/">
-      <FECompUltimoAutorizadoResult>12</FECompUltimoAutorizadoResult>
+      <FECompUltimoAutorizadoResult>
+        <PtoVta>1</PtoVta>
+        <CbteTipo>6</CbteTipo>
+        <CbteNro>12</CbteNro>
+      </FECompUltimoAutorizadoResult>
     </FECompUltimoAutorizadoResponse>
   </soap:Body>
 </soap:Envelope>
