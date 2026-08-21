@@ -130,4 +130,24 @@ describe("getPersona", () => {
     );
     expect((error as ArcaError).httpStatus).toBe(404);
   });
+
+  it("fault SOAP 'No existe persona con ese Id' (HTTP 500) → ARCA_PADRON_NOT_FOUND (404)", async () => {
+    authenticateWsaaMock.mockResolvedValue(TA);
+    soapRequestMock.mockRejectedValue(
+      new ArcaError(
+        ARCA_ERROR_CODES.ARCA_NETWORK_ERROR,
+        'HTTP 500 al llamar https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA4 — <soap:Fault><faultstring>No existe persona con ese Id</faultstring></soap:Fault>',
+        503,
+      ),
+    );
+
+    const error: unknown = await getPersona(CONTEXT, "20201731594").catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(ArcaError);
+    expect((error as ArcaError).code).toBe(
+      ARCA_ERROR_CODES.ARCA_PADRON_NOT_FOUND,
+    );
+    expect((error as ArcaError).httpStatus).toBe(404);
+  });
 });

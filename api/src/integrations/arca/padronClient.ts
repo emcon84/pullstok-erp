@@ -125,13 +125,31 @@ export const getPersona = async (
   // El padrón A4 se consulta con el CUIT que tiene la autorización del
   // servicio (padronCuit). Si no está configurado, cae al cuitEmisor.
   const cuitRepresentada = context.padronCuit ?? context.cuitEmisor;
-  const xml = await soapRequest({
-    url: resolvePadronUrl(context.environment),
-    soapAction: "",
-    body: buildSoapEnvelope(
-      buildGetPersonaBody(ta, cuitRepresentada, cuit),
-    ),
-  });
+  let xml: string;
+  try {
+    xml = await soapRequest({
+      url: resolvePadronUrl(context.environment),
+      soapAction: "",
+      body: buildSoapEnvelope(
+        buildGetPersonaBody(ta, cuitRepresentada, cuit),
+      ),
+    });
+  } catch (err) {
+    // AFIP responde CUIT inexistente como fault SOAP con HTTP 500
+    // ("No existe persona con ese Id"). Mapear a 404 para el front.
+    if (
+      err instanceof ArcaError &&
+      err.code === ARCA_ERROR_CODES.ARCA_NETWORK_ERROR &&
+      /no existe persona|persona con ese id/i.test(err.message)
+    ) {
+      throw new ArcaError(
+        ARCA_ERROR_CODES.ARCA_PADRON_NOT_FOUND,
+        "El CUIT no existe en el padrón de ARCA o no tiene datos públicos",
+        404,
+      );
+    }
+    throw err;
+  }
 
   const obj = parseXml(xml);
   const raw =
