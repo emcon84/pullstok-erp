@@ -9,6 +9,19 @@ afterEach(() => {
   spies.length = 0;
 });
 
+/** Captura las llamadas a doc.rect con tipado que sobrevive a tsc -b strict. */
+const rectCalls = (doc: jsPDF): Array<[number, number, number, number]> => {
+  const calls: Array<[number, number, number, number]> = [];
+  const original = doc.rect.bind(doc);
+  (doc as unknown as { rect: (...a: unknown[]) => void }).rect = (
+    ...args: unknown[]
+  ) => {
+    calls.push(args as [number, number, number, number]);
+    return original(...(args as [number, number, number, number]));
+  };
+  return calls;
+};
+
 describe("code128BSymbols", () => {
   it("codifica Code128B con checksum correcto", () => {
     // "123" → startB(104), '1'(49-32=17), '2'(18), '3'(19).
@@ -36,21 +49,19 @@ describe("code128BSymbols", () => {
 describe("drawCaeBarcode", () => {
   it("dibuja barras que ocupan exactamente el ancho pedido", () => {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const rectSpy = vi.spyOn(doc, "rect");
-    spies.push(rectSpy);
+    const calls = rectCalls(doc);
 
     const width = 68;
     drawCaeBarcode(doc, "123", 10, 50, width);
 
-    const calls = rectSpy.mock.calls;
     // 5 símbolos de 11 módulos (start+3 datos+checksum) + stop de 13 módulos.
     // Barras por símbolo: los 6 dígitos de patrón tienen 3 barras; el stop
     // "2331112" tiene 4 barras → 5*3 + 4 = 19 rect().
     expect(calls.length).toBe(19);
 
-    const xs = calls.map((c) => c[0] as number);
-    const ws = calls.map((c) => c[2] as number);
-    const ys = calls.map((c) => c[1] as number);
+    const xs = calls.map((c) => c[0]);
+    const ws = calls.map((c) => c[2]);
+    const ys = calls.map((c) => c[1]);
 
     // Ninguna barra sale del ancho pedido [10, 10+68].
     expect(Math.min(...xs)).toBeGreaterThanOrEqual(10);

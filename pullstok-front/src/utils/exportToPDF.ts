@@ -383,7 +383,8 @@ export const exportToPDF = async (
     const tableStartY = drawReceptor(doc, pdfData, headerBottom);
     drawTable(doc, pdfData, tableStartY, true);
 
-    const tableEndY = doc.lastAutoTable?.finalY ?? tableStartY + 20;
+    const tableEndY = (doc as unknown as { lastAutoTable?: { finalY: number } })
+      .lastAutoTable?.finalY ?? tableStartY + 20;
     const pageHeight = doc.internal.pageSize.getHeight();
     let caeY = tableEndY + 10;
     if (caeY + CAE_BOX_H > pageHeight - 20) {
