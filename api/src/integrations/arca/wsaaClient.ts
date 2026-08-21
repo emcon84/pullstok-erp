@@ -91,7 +91,12 @@ export const parseLoginCmsResponse = (xml: string): TicketAcceso => {
     const cuit =
       login?.cuit ?? String(login?.header?.destination ?? "").match(/CUIT\s+(\d{11})/)?.[1];
     if (!token || !sign || !cuit) {
-      throw new Error("token XML sin token/sign/cuit");
+      // Diagnóstico: si el XML no matchea la estructura esperada, exponer el
+      // contenido decodificado (recortado) para ver qué devuelve AFIP real.
+      const snippet = tokenXml.slice(0, 600);
+      throw new Error(
+        `token XML sin token/sign/cuit. XML decodificado: ${snippet}`,
+      );
     }
     return {
       token: String(token),
