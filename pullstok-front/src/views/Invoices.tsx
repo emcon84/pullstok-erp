@@ -22,6 +22,9 @@ import {
 } from "../components/hooks/useInvoices";
 import { Invoice, InvoiceStatus, PaymentStatus } from "../models/invoiceModel";
 import { useConfirm } from "../components/hooks/useConfirm";
+import { useQuery } from "@tanstack/react-query";
+import { getMe } from "../services/onboardingService";
+import { useBranding } from "../components/hooks/useBranding";
 import { exportToPDF } from "../utils/exportToPDF";
 
 /**
@@ -70,18 +73,42 @@ const PAYMENT_LABEL: Record<PaymentStatus, string> = {
   OVERDUE: "Vencida",
 };
 
-const buildExport = (invoice: Invoice) => ({
+/** Export fiscal completo (igual que InvoiceDetail): issuer, receptor, CAE y
+ * logo. Sin CAE → el PDF cae al genérico "Comprobante no fiscal" internamente. */
+const buildExport = (
+  invoice: Invoice,
+  organization: { name?: string; taxId?: string | null; taxCondition?: string | null; address?: string | null } | undefined,
+  logoUrl: string | null,
+) => ({
   title: "Factura",
   documentNumber: invoice.number || "Borrador",
   date: formatDate(invoice.issueDate),
   customer: invoice.customer?.name,
+  issuer: {
+    name: organization?.name,
+    taxId: organization?.taxId ?? undefined,
+    taxCondition: organization?.taxCondition ?? undefined,
+    address: organization?.address ?? undefined,
+  },
+  customerTaxId: invoice.customer?.taxId ?? undefined,
+  customerTaxCondition: invoice.customer?.taxCondition ?? undefined,
+  customerAddress: invoice.customer?.address ?? undefined,
   items: invoice.items.map((item) => ({
     quantity: item.quantity,
     name: item.description,
     price: item.unitPrice,
+    taxRate: item.taxRate,
     total: item.lineTotal ?? item.quantity * item.unitPrice,
   })),
+  subtotal: invoice.subtotal,
+  taxAmount: invoice.taxAmount,
   total: invoice.totalAmount,
+  tipoComprobante: invoice.tipoComprobante ?? undefined,
+  puntoVenta: invoice.puntoVenta ?? undefined,
+  cbteNro: invoice.cbteNro ?? undefined,
+  cae: invoice.cae ?? undefined,
+  caeVencimiento: invoice.caeVencimiento ?? undefined,
+  logoUrl,
 });
 
 export const Invoices = () => {
@@ -92,6 +119,8 @@ export const Invoices = () => {
   const { cancelInvoice, loadingCancel } = useCancelInvoice();
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const confirm = useConfirm();
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const { branding } = useBranding();
 
   const handleIssue = async (invoice: Invoice) => {
     const ok = await confirm({
@@ -274,7 +303,11 @@ export const Invoices = () => {
                           variant="ghost"
                           size="icon-sm"
                           title="Exportar PDF"
-                          onClick={() => exportToPDF(buildExport(invoice))}
+                          onClick={() =>
+                            exportToPDF(
+                              buildExport(invoice, me?.organization, branding?.logoUrl ?? null),
+                            )
+                          }
                         >
                           <FileText className="h-4 w-4" />
                         </Button>
