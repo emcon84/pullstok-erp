@@ -17,11 +17,17 @@ import type {
 } from "./types";
 
 const DEFAULT_PADRON_URLS: Record<ArcaEnvironment, string> = {
-  HOMOLOGACION: "https://awshomo.afip.gov.ar/ws/ws_sr_padron_a4/ws_sr_padron_a4.asmx",
-  PRODUCCION: "https://aws.afip.gov.ar/sr-ws-sr-padron-a4/ws_sr_padron_a4.asmx",
+  // ARCA (migración 2025): el padrón A4 dejó de estar en
+  // /ws/ws_sr_padron_a4/ws_sr_padron_a4.asmx (404). Endpoints vigentes según
+  // manual_ws_sr_padron_a4_v1.3 y WSDL real de awshomo.
+  HOMOLOGACION:
+    "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA4",
+  PRODUCCION: "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA4",
 };
 
-const PADRON_SOAP_NS = "http://a4.soap.wsaa.cf.afip.gob.ar/";
+// Namespace del WSDL real (personaServiceA4): cambió con la migración a ARCA
+// (antes http://a4.soap.wsaa.cf.afip.gob.ar/). El SOAPAction del WSDL es "".
+const PADRON_SOAP_NS = "http://a4.soap.ws.server.puc.sr/";
 const PADRON_SERVICE = "ws_sr_padron_a4";
 
 const resolvePadronUrl = (environment: ArcaEnvironment): string => {
@@ -35,17 +41,21 @@ const resolvePadronUrl = (environment: ArcaEnvironment): string => {
 const asArray = <T>(value: T | T[] | undefined): T[] =>
   value === undefined || value === null ? [] : Array.isArray(value) ? value : [value];
 
-/** Body SOAP de getPersona: token/sign/cuitRepresentada + idPersona (CUIT). */
+/** Body SOAP de getPersona: token/sign/cuitRepresentada + idPersona (CUIT).
+ * El WSDL de ARCA (personaServiceA4) usa elementFormDefault="unqualified":
+ * el wrapper getPersona va en el namespace del servicio pero los hijos van
+ * SIN namespace (xmlns=""). Mandarlos con namespace da
+ * "Unmarshalling Error: unexpected element". */
 export const buildGetPersonaBody = (
   ta: TicketAcceso,
   cuitRepresentada: string,
   idPersona: string,
 ): string =>
   `<getPersona xmlns="${PADRON_SOAP_NS}">` +
-  `<token>${ta.token}</token>` +
-  `<sign>${ta.sign}</sign>` +
-  `<cuitRepresentada>${cuitRepresentada}</cuitRepresentada>` +
-  `<idPersona>${idPersona}</idPersona>` +
+  `<token xmlns="">${ta.token}</token>` +
+  `<sign xmlns="">${ta.sign}</sign>` +
+  `<cuitRepresentada xmlns="">${cuitRepresentada}</cuitRepresentada>` +
+  `<idPersona xmlns="">${idPersona}</idPersona>` +
   "</getPersona>";
 
 const asText = (value: unknown): string =>
@@ -117,7 +127,7 @@ export const getPersona = async (
   const cuitRepresentada = context.padronCuit ?? context.cuitEmisor;
   const xml = await soapRequest({
     url: resolvePadronUrl(context.environment),
-    soapAction: `${PADRON_SOAP_NS}GetPersona`,
+    soapAction: "",
     body: buildSoapEnvelope(
       buildGetPersonaBody(ta, cuitRepresentada, cuit),
     ),

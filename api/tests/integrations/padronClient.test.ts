@@ -54,11 +54,11 @@ beforeEach(() => {
 describe("buildGetPersonaBody", () => {
   it("arma el body getPersona con token/sign/cuitRepresentada/idPersona", () => {
     const body = buildGetPersonaBody(TA, CONTEXT.cuitEmisor, "20000000001");
-    expect(body).toContain('xmlns="http://a4.soap.wsaa.cf.afip.gob.ar/"');
-    expect(body).toContain("<token>tk-padron</token>");
-    expect(body).toContain("<sign>sg-padron</sign>");
-    expect(body).toContain("<cuitRepresentada>30709706701</cuitRepresentada>");
-    expect(body).toContain("<idPersona>20000000001</idPersona>");
+    expect(body).toContain('xmlns="http://a4.soap.ws.server.puc.sr/"');
+    expect(body).toContain("<token xmlns=\"\">tk-padron</token>");
+    expect(body).toContain("<sign xmlns=\"\">sg-padron</sign>");
+    expect(body).toContain("<cuitRepresentada xmlns=\"\">30709706701</cuitRepresentada>");
+    expect(body).toContain("<idPersona xmlns=\"\">20000000001</idPersona>");
   });
 });
 
@@ -108,9 +108,9 @@ describe("getPersona", () => {
     expect(soapRequestMock).toHaveBeenCalledTimes(1);
     const call = soapRequestMock.mock.calls[0][0];
     expect(call.url).toBe(
-      "https://awshomo.afip.gov.ar/ws/ws_sr_padron_a4/ws_sr_padron_a4.asmx",
+      "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA4",
     );
-    expect(call.soapAction).toBe("http://a4.soap.wsaa.cf.afip.gob.ar/GetPersona");
+    expect(call.soapAction).toBe("");
     expect(persona.cuit).toBe("20000000001");
     expect(persona.razonSocial).toBe("GOMEZ JUAN CARLOS");
   });
