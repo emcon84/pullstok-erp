@@ -74,6 +74,24 @@ describe("parseLoginCmsResponse", () => {
     expect(ta.cuit).toBe("30709706701");
   });
 
+  it("LoginCmsReturn con XML plano escapado (respuesta real de WSAA) → TA", () => {
+    // AFIP devuelve el loginTicketResponse como TEXTO PLANO (no base64)
+    // escapado dentro del SOAP (&lt;...&gt;). fast-xml-parser lo des-escapó.
+    const xml =
+      '<?xml version="1.0"?><soap:Envelope><soap:Body><loginCmsResponse>' +
+      "<loginCmsReturn>&lt;?xml version=\"1.0\"?&gt;&lt;loginTicketResponse version=\"1.0\"&gt;" +
+      "&lt;header&gt;&lt;destination&gt;SERIALNUMBER=CUIT 20274225964, CN=pullstoktest&lt;/destination&gt;" +
+      "&lt;generationTime&gt;2026-08-18T12:00:00-03:00&lt;/generationTime&gt;" +
+      "&lt;expirationTime&gt;2026-08-19T12:00:00-03:00&lt;/expirationTime&gt;&lt;/header&gt;" +
+      "&lt;credentials&gt;&lt;token&gt;token-plano&lt;/token&gt;&lt;sign&gt;sign-plano&lt;/sign&gt;&lt;/credentials&gt;" +
+      "&lt;/loginTicketResponse&gt;</loginCmsReturn>" +
+      "</loginCmsResponse></soap:Body></soap:Envelope>";
+    const ta = parseLoginCmsResponse(xml);
+    expect(ta.token).toBe("token-plano");
+    expect(ta.sign).toBe("sign-plano");
+    expect(ta.cuit).toBe("20274225964");
+  });
+
   it("extrae el CUIT del destination del header (loginTicketResponse real)", () => {
     // El TA real de AFIP trae el CUIT en <header><destination>CUIT ...</destination>
     // y token/sign en <credentials>. El parser debe leerlos de ahí.

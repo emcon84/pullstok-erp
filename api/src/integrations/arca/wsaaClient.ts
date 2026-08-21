@@ -79,7 +79,13 @@ export const parseLoginCmsResponse = (xml: string): TicketAcceso => {
     if (!b64) {
       throw new Error("LoginCmsReturn ausente en la respuesta");
     }
-    const tokenXml = Buffer.from(String(b64), "base64").toString("utf8");
+    // El LoginCmsReturn de WSAA viene como XML del TA en TEXTO PLANO
+    // (des-escapado por fast-xml-parser desde &lt;...&gt;), NO como base64.
+    // Toleramos también el formato legacy base64 (fixtures/otras versiones).
+    const rawToken = String(b64).trim();
+    const tokenXml = rawToken.startsWith("<")
+      ? rawToken
+      : Buffer.from(rawToken, "base64").toString("utf8");
     const tokenObj = parseXml(tokenXml);
     // Estructura REAL del TA de WSAA (loginTicketResponse con header +
     // credentials). Toleramos también la variante plana `authSrc` usada en
@@ -91,12 +97,7 @@ export const parseLoginCmsResponse = (xml: string): TicketAcceso => {
     const cuit =
       login?.cuit ?? String(login?.header?.destination ?? "").match(/CUIT\s+(\d{11})/)?.[1];
     if (!token || !sign || !cuit) {
-      // Diagnóstico: si el XML no matchea la estructura esperada, exponer el
-      // contenido decodificado (recortado) para ver qué devuelve AFIP real.
-      const snippet = tokenXml.slice(0, 600);
-      throw new Error(
-        `token XML sin token/sign/cuit. XML decodificado: ${snippet}`,
-      );
+      throw new Error("token XML sin token/sign/cuit");
     }
     return {
       token: String(token),
