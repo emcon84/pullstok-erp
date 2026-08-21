@@ -183,17 +183,20 @@ export const InvoiceDetail = () => {
 
   const handleRetryFiscal = () => {
     setActionPending(true);
-    retryInvoiceFiscal(invoice.id, {
-      onSuccess: (emitted) => {
-        if (emitted.cae) {
-          toast.success("CAE obtenido — factura emitida fiscalmente");
-        } else {
-          toast.error("AFIP todavía no otorgó el CAE. Revisá el detalle.");
-        }
+    retryInvoiceFiscal(
+      { id: invoice.id, status: invoice.status },
+      {
+        onSuccess: (emitted) => {
+          if (emitted.cae) {
+            toast.success("CAE obtenido — factura emitida fiscalmente");
+          } else {
+            toast.error("AFIP todavía no otorgó el CAE. Revisá el detalle.");
+          }
+        },
+        onError: (error) => toast.error(error.message),
+        onSettled: () => setActionPending(false),
       },
-      onError: (error) => toast.error(error.message),
-      onSettled: () => setActionPending(false),
-    });
+    );
   };
 
   const handleExportPDF = () => {
@@ -273,6 +276,13 @@ export const InvoiceDetail = () => {
                 Emitir
               </Button>
             </>
+          )}
+          {(invoice.status === "PENDING_CAE" ||
+            (invoice.status === "ISSUED" && !invoice.cae)) && (
+            <Button variant="outline" disabled={busy} onClick={handleRetryFiscal}>
+              <RotateCcw className="h-4 w-4" />
+              {loadingRetry ? "Reintentando..." : "Reintentar emisión fiscal"}
+            </Button>
           )}
           {invoice.status === "ISSUED" && invoice.paymentStatus !== "PAID" && (
             <Button disabled={busy} onClick={handleMarkAsPaid}>

@@ -137,11 +137,17 @@ export const cancelInvoice = async (id: string): Promise<Invoice> => {
   }
 };
 
-/** Reintenta la emisión fiscal de una factura PENDING_CAE (mismo correlativo). */
-export const retryInvoiceFiscal = async (id: string): Promise<Invoice> => {
+/** Reintenta la emisión fiscal. ISSUED sin CAE → issue-fiscal (acepta ISSUED);
+ * PENDING_CAE → retry-fiscal (reutiliza el correlativo reservado). */
+export const retryInvoiceFiscal = async (
+  id: string,
+  status?: string,
+): Promise<Invoice> => {
   try {
+    const endpoint =
+      status === "PENDING_CAE" ? "retry-fiscal" : "issue-fiscal";
     const response = await axios.put<Invoice>(
-      `${API_URL}/invoices/${id}/retry-fiscal`,
+      `${API_URL}/invoices/${id}/${endpoint}`,
       {},
       { headers: authHeaders() },
     );

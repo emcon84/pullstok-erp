@@ -123,8 +123,8 @@ export const useIssueInvoice = () => {
 export const useRetryInvoiceFiscal = () => {
   const queryClient = useQueryClient();
 
-  const mutation = useMutation<Invoice, Error, string>({
-    mutationFn: retryInvoiceFiscal,
+  const mutation = useMutation<Invoice, Error, { id: string; status?: string }>({
+    mutationFn: ({ id, status }) => retryInvoiceFiscal(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },

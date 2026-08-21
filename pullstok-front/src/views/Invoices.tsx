@@ -177,17 +177,20 @@ export const Invoices = () => {
 
   const handleRetryFiscal = (invoice: Invoice) => {
     setPendingActionId(invoice.id);
-    retryInvoiceFiscal(invoice.id, {
-      onSuccess: (emitted) => {
-        if (emitted.cae) {
-          toast.success("CAE obtenido — factura emitida fiscalmente");
-        } else {
-          toast.error("AFIP todavía no otorgó el CAE. Revisá el detalle.");
-        }
+    retryInvoiceFiscal(
+      { id: invoice.id, status: invoice.status },
+      {
+        onSuccess: (emitted) => {
+          if (emitted.cae) {
+            toast.success("CAE obtenido — factura emitida fiscalmente");
+          } else {
+            toast.error("AFIP todavía no otorgó el CAE. Revisá el detalle.");
+          }
+        },
+        onError: (error) => toast.error(error.message),
+        onSettled: () => setPendingActionId(null),
       },
-      onError: (error) => toast.error(error.message),
-      onSettled: () => setPendingActionId(null),
-    });
+    );
   };
 
   if (loadingInvoices) {
@@ -304,7 +307,8 @@ export const Invoices = () => {
                             </Button>
                           </>
                         )}
-                        {invoice.status === "PENDING_CAE" && (
+                        {invoice.status === "PENDING_CAE" ||
+                          (invoice.status === "ISSUED" && !invoice.cae) ? (
                           <Button
                             variant="ghost"
                             size="icon-sm"
@@ -314,7 +318,7 @@ export const Invoices = () => {
                           >
                             <RotateCcw className="h-4 w-4" />
                           </Button>
-                        )}
+                        ) : null}
                         {invoice.status === "ISSUED" && invoice.paymentStatus !== "PAID" && (
                           <Button
                             variant="ghost"
