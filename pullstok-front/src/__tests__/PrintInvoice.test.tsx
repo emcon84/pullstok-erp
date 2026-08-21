@@ -42,7 +42,7 @@ describe("PrintInvoice — comprobante fiscal (CAE presente)", () => {
 
     // Rótulo ORIGINAL + letra + título + número fiscal
     expect(screen.getByText("ORIGINAL")).toBeInTheDocument();
-    expect(screen.getByText("(A)")).toBeInTheDocument();
+    expect(screen.getByText("A")).toBeInTheDocument();
     expect(screen.getByText("FACTURA A")).toBeInTheDocument();
     expect(screen.getByText(/fac-A-0002-00000013/)).toBeInTheDocument();
 
@@ -78,9 +78,9 @@ describe("PrintInvoice — comprobante fiscal (CAE presente)", () => {
     ["Código", "Descripción", "Cantidad", "Precio Unit", "Descuento", "Alícuota %", "Total"].forEach(
       (h) => expect(screen.getByText(h)).toBeInTheDocument(),
     );
-    // 1 ítem real + 4 filas vacías = 5 filas de body
+    // 1 ítem real + 7 filas vacías = 8 filas de body
     const rows = document.querySelectorAll("tbody tr");
-    expect(rows.length).toBe(5);
+    expect(rows.length).toBe(8);
   });
 });
 

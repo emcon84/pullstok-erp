@@ -7,16 +7,20 @@ import { useAfipQrImage } from "@/components/hooks/useAfipQrImage";
  * Comprobante de factura IMPRIMIBLE (patrón print-area + window.print que ya
  * usa el proyecto en PrintPriceList/PrintProductList/PrintBulkPriceList).
  *
- * Layout estándar AFIP/ARCA según el modelo ASCII que definió el usuario:
- * marco exterior completo, franja ORIGINAL, header en 3 columnas separadas
- * (emisor | recuadro con la letra A/B | datos del comprobante), fila del
- * cliente en 2 columnas, tabla de 7 columnas con filas vacías de relleno,
- * fila de pagos con Importe Total, y footer con QR AFIP + CAE.
+ * Layout estándar AFIP/ARCA según el modelo ASCII del usuario:
+ * - Marco exterior completo + franja ORIGINAL.
+ * - Header en 3 columnas: emisor | recuadro con la letra (arriba, chico) |
+ *   datos del comprobante.
+ * - Fila del cliente en 2 columnas.
+ * - Tabla de 7 columnas con MÁRGENES laterales (no toca el marco) y filas
+ *   vacías de relleno.
+ * - Fila de Pagos + Importe Total.
+ * - Footer con QR AFIP + CAE (mt-auto, queda al pie de la hoja).
  *
- * Los campos que el modelo muestra y que aún no existen en el modelo de datos
- * (Ingresos Brutos, Fecha Inicio Actividades, Localidad, Código de producto,
- * Descuento) se renderizan vacíos o se omiten si no vienen — sin agregar
- * schema. Cuando esos datos existan, se completan en los mismos lugares.
+ * El contenedor usa min-h-[264mm] + flex-col + mt-auto para que el
+ * comprobante SIEMPRE ocupe el alto completo de la hoja A4 (el footer queda
+ * abajo aunque haya pocos ítems). Los campos que el modelo muestra y que aún
+ * no existen en el modelo de datos se renderizan vacíos u omitidos.
  */
 const MISSING_LABEL = "(sin datos fiscales)";
 const FISCAL_LEGEND = "Comprobante Autorizado";
@@ -111,8 +115,8 @@ export const PrintInvoice = (data: InvoicePdfData) => {
   );
   const qrDataUrl = useAfipQrImage(qrPayload);
 
-  // Rellenar la tabla con filas vacías hasta mínimo 5 (look de factura real).
-  const minRows = 5;
+  // Rellenar la tabla con filas vacías (look de factura real + llenar hoja).
+  const minRows = 8;
   const tableRows: Array<InvoicePdfData["items"][number] | null> = [
     ...data.items,
   ];
@@ -120,16 +124,16 @@ export const PrintInvoice = (data: InvoicePdfData) => {
 
   return (
     <div className="print-area hidden print:block" aria-hidden="true">
-      <div className="mx-auto max-w-3xl border-2 border-black text-xs leading-relaxed">
+      <div className="mx-auto flex min-h-[264mm] max-w-3xl flex-col border-2 border-black text-xs leading-relaxed">
         {/* Franja ORIGINAL */}
         <div className="border-b-2 border-black py-1 text-center">
           <span className="text-xs font-bold tracking-[0.35em]">ORIGINAL</span>
         </div>
 
-        {/* Header 3 columnas separadas por bordes */}
-        <div className="grid grid-cols-[1fr_auto_1fr]">
+        {/* Header 3 columnas: emisor | letra (arriba, chica) | datos */}
+        <div className="grid grid-cols-[1fr_auto_1fr] border-b-2 border-black">
           {/* Emisor */}
-          <div className="border-r-2 border-black p-3">
+          <div className="p-3">
             {data.logoUrl && (
               <img
                 src={data.logoUrl}
@@ -143,18 +147,20 @@ export const PrintInvoice = (data: InvoicePdfData) => {
             </p>
             <p>Razón Social: {fiscalField(data.issuer?.name)}</p>
             <p>Domicilio: {fiscalField(data.issuer?.address)}</p>
-            {/* Localidad: no existe como campo separado; se omite si no hay */}
+            {/* Localidad: sin dato separado por ahora */}
             <p>Condición IVA: {fiscalField(data.issuer?.taxCondition)}</p>
           </div>
 
-          {/* Recuadro con la letra del comprobante */}
-          <div className="flex w-16 items-center justify-center border-r-2 border-black p-2">
-            <span
+          {/* Recuadro con la letra (arriba, centrado hacia arriba) */}
+          <div className="flex items-start justify-center px-2 pt-2">
+            <div
               data-testid="print-invoice-letter"
-              className="text-[32px] font-bold leading-none"
+              className="flex h-20 w-16 items-center justify-center border-2 border-black"
             >
-              ({comprobanteLetter(data)})
-            </span>
+              <span className="text-5xl font-bold leading-none">
+                {comprobanteLetter(data)}
+              </span>
+            </div>
           </div>
 
           {/* Datos del comprobante */}
@@ -166,14 +172,11 @@ export const PrintInvoice = (data: InvoicePdfData) => {
             <p>Fecha Emisión: {formatDate(data.date)}</p>
             <p>CUIT: {fiscalField(data.issuer?.taxId)}</p>
             {/* Ingresos Brutos / Fecha Inicio Actividades: sin dato por ahora */}
-            {data.issuer?.taxId ? (
-              <p>Ingresos Brutos: {fiscalField(data.issuer.taxId)}</p>
-            ) : null}
           </div>
         </div>
 
-        {/* Fila del cliente */}
-        <div className="grid grid-cols-2 border-t-2 border-black">
+        {/* Fila del cliente (toca el marco) */}
+        <div className="grid grid-cols-2 border-b-2 border-black">
           <div className="border-r-2 border-black p-3">
             <p>
               <span className="font-bold">Cliente:</span>{" "}
@@ -196,105 +199,109 @@ export const PrintInvoice = (data: InvoicePdfData) => {
           </div>
         </div>
 
-        {/* Tabla de items (7 columnas) */}
-        <table className="w-full border-collapse border-t-2 border-black">
-          <thead>
-            <tr>
-              <th className="border border-black px-2 py-1 text-left font-bold uppercase">
-                Código
-              </th>
-              <th className="border border-black px-2 py-1 text-left font-bold uppercase">
-                Descripción
-              </th>
-              <th className="border border-black px-2 py-1 text-right font-bold uppercase">
-                Cantidad
-              </th>
-              <th className="border border-black px-2 py-1 text-right font-bold uppercase">
-                Precio Unit
-              </th>
-              <th className="border border-black px-2 py-1 text-right font-bold uppercase">
-                Descuento
-              </th>
-              <th className="border border-black px-2 py-1 text-right font-bold uppercase">
-                Alícuota %
-              </th>
-              <th className="border border-black px-2 py-1 text-right font-bold uppercase">
-                Total
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {tableRows.map((item, index) =>
-              item ? (
-                <tr key={index}>
-                  <td className="border border-black px-2 py-1 tabular-nums">
-                    {/* Código de producto: sin dato por ahora */}
-                  </td>
-                  <td className="border border-black px-2 py-1">{item.name}</td>
-                  <td className="border border-black px-2 py-1 text-right tabular-nums">
-                    {item.quantity.toLocaleString("es-AR", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td className="border border-black px-2 py-1 text-right tabular-nums">
-                    {formatMoney(item.price)}
-                  </td>
-                  <td className="border border-black px-2 py-1 text-right tabular-nums">
-                    $ 0.00
-                  </td>
-                  <td className="border border-black px-2 py-1 text-right tabular-nums">
-                    {item.taxRate !== undefined
-                      ? `${item.taxRate.toLocaleString("es-AR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}`
-                      : "-"}
-                  </td>
-                  <td className="border border-black px-2 py-1 text-right tabular-nums">
-                    {formatMoney(item.total)}
-                  </td>
-                </tr>
-              ) : (
-                <tr key={`empty-${index}`}>
-                  <td className="border border-black px-2 py-1">&nbsp;</td>
-                  <td className="border border-black px-2 py-1">&nbsp;</td>
-                  <td className="border border-black px-2 py-1">&nbsp;</td>
-                  <td className="border border-black px-2 py-1">&nbsp;</td>
-                  <td className="border border-black px-2 py-1">&nbsp;</td>
-                  <td className="border border-black px-2 py-1">&nbsp;</td>
-                  <td className="border border-black px-2 py-1">&nbsp;</td>
-                </tr>
-              ),
-            )}
-          </tbody>
-        </table>
+        {/* Tabla de items: bloque con márgenes laterales (no toca el marco) */}
+        <div className="flex-1 px-6 py-3">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="border border-black px-2 py-1 text-left font-bold uppercase">
+                  Código
+                </th>
+                <th className="border border-black px-2 py-1 text-left font-bold uppercase">
+                  Descripción
+                </th>
+                <th className="border border-black px-2 py-1 text-right font-bold uppercase">
+                  Cantidad
+                </th>
+                <th className="border border-black px-2 py-1 text-right font-bold uppercase">
+                  Precio Unit
+                </th>
+                <th className="border border-black px-2 py-1 text-right font-bold uppercase">
+                  Descuento
+                </th>
+                <th className="border border-black px-2 py-1 text-right font-bold uppercase">
+                  Alícuota %
+                </th>
+                <th className="border border-black px-2 py-1 text-right font-bold uppercase">
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {tableRows.map((item, index) =>
+                item ? (
+                  <tr key={index}>
+                    <td className="border border-black px-2 py-1 tabular-nums">
+                      {/* Código de producto: sin dato por ahora */}
+                    </td>
+                    <td className="border border-black px-2 py-1">{item.name}</td>
+                    <td className="border border-black px-2 py-1 text-right tabular-nums">
+                      {item.quantity.toLocaleString("es-AR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td className="border border-black px-2 py-1 text-right tabular-nums">
+                      {formatMoney(item.price)}
+                    </td>
+                    <td className="border border-black px-2 py-1 text-right tabular-nums">
+                      $ 0.00
+                    </td>
+                    <td className="border border-black px-2 py-1 text-right tabular-nums">
+                      {item.taxRate !== undefined
+                        ? `${item.taxRate.toLocaleString("es-AR", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}`
+                        : "-"}
+                    </td>
+                    <td className="border border-black px-2 py-1 text-right tabular-nums">
+                      {formatMoney(item.total)}
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={`empty-${index}`}>
+                    <td className="border border-black px-2 py-1">&nbsp;</td>
+                    <td className="border border-black px-2 py-1">&nbsp;</td>
+                    <td className="border border-black px-2 py-1">&nbsp;</td>
+                    <td className="border border-black px-2 py-1">&nbsp;</td>
+                    <td className="border border-black px-2 py-1">&nbsp;</td>
+                    <td className="border border-black px-2 py-1">&nbsp;</td>
+                    <td className="border border-black px-2 py-1">&nbsp;</td>
+                  </tr>
+                ),
+              )}
+            </tbody>
+          </table>
 
-        {/* Fila de pagos / totales */}
-        <div className="grid grid-cols-2 border-t-2 border-black">
-          <div className="border-r-2 border-black p-3">
-            <p className="font-bold">Pagos</p>
-            <p>Efectivo {formatMoney(data.total)}</p>
-          </div>
-          <div className="p-3 text-right">
-            {data.subtotal !== undefined && (
-              <p>
-                Subtotal: <span className="tabular-nums">{formatMoney(data.subtotal)}</span>
+          {/* Fila de pagos / totales (mismo bloque con márgenes) */}
+          <div className="mt-4 grid grid-cols-2 border border-black">
+            <div className="border-r border-black p-3">
+              <p className="font-bold">Pagos</p>
+              <p>Efectivo {formatMoney(data.total)}</p>
+            </div>
+            <div className="p-3 text-right">
+              {data.subtotal !== undefined && (
+                <p>
+                  Subtotal:{" "}
+                  <span className="tabular-nums">{formatMoney(data.subtotal)}</span>
+                </p>
+              )}
+              {data.taxAmount !== undefined && (
+                <p>
+                  IVA:{" "}
+                  <span className="tabular-nums">{formatMoney(data.taxAmount)}</span>
+                </p>
+              )}
+              <p className="font-bold">
+                Importe Total:{" "}
+                <span className="tabular-nums">{formatMoney(data.total)}</span>
               </p>
-            )}
-            {data.taxAmount !== undefined && (
-              <p>
-                IVA: <span className="tabular-nums">{formatMoney(data.taxAmount)}</span>
-              </p>
-            )}
-            <p className="font-bold">
-              Importe Total:{" "}
-              <span className="tabular-nums">{formatMoney(data.total)}</span>
-            </p>
+            </div>
           </div>
         </div>
 
-        {/* Footer CAE */}
+        {/* Footer CAE: mt-auto lo empuja al pie de la hoja */}
         {hasCae ? (
           <div className="grid grid-cols-2 border-t-2 border-black">
             <div className="flex items-center gap-2 border-r-2 border-black p-3">
@@ -333,7 +340,7 @@ export const PrintInvoice = (data: InvoicePdfData) => {
             </div>
           </div>
         ) : (
-          <p className="border-t-2 border-black p-3 text-center text-xs">
+          <p className="mt-auto border-t-2 border-black p-3 text-center text-xs">
             {NON_FISCAL_LEGEND}
           </p>
         )}
