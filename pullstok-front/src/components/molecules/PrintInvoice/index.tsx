@@ -4,23 +4,19 @@ import type { AfipQrPayload } from "@/utils/afipQr";
 import { useAfipQrImage } from "@/components/hooks/useAfipQrImage";
 
 /**
- * Comprobante de factura IMPRIMIBLE (patrón print-area + window.print que ya
- * usa el proyecto en PrintPriceList/PrintProductList/PrintBulkPriceList).
+ * Comprobante de factura IMPRIMIBLE (patrón print-area + window.print).
  *
- * Layout estándar AFIP/ARCA según el modelo ASCII del usuario:
- * - Marco exterior completo + franja ORIGINAL.
- * - Header en 3 columnas: emisor | recuadro con la letra (arriba, chico) |
- *   datos del comprobante.
- * - Fila del cliente en 2 columnas.
- * - Tabla de 7 columnas con MÁRGENES laterales (no toca el marco) y filas
- *   vacías de relleno.
- * - Fila de Pagos + Importe Total.
- * - Footer con QR AFIP + CAE (mt-auto, queda al pie de la hoja).
- *
- * El contenedor usa min-h-[264mm] + flex-col + mt-auto para que el
- * comprobante SIEMPRE ocupe el alto completo de la hoja A4 (el footer queda
- * abajo aunque haya pocos ítems). Los campos que el modelo muestra y que aún
- * no existen en el modelo de datos se renderizan vacíos u omitidos.
+ * Diseño tomado del HTML/CSS de referencia que el usuario entregó
+ * (gemini-code-1787353351555.html, Factura C AFIP):
+ * - Tarjeta 780px con borde 1px negro.
+ * - Franja ORIGINAL centrada.
+ * - Header: recuadro con la letra (position absolute, centrado, abierto
+ *   arriba) + línea divisoria central que baja + columnas emisor/comprobante.
+ * - Nombre del emisor 22px bold centrado.
+ * - Sección cliente en 2 columnas (55/45).
+ * - Tabla de ítems con header #e6e6e6.
+ * - Totales con Pagos a la izquierda e Importe Total a la derecha.
+ * - Footer: QR + AFIP (itálica 20px) | CAE Nro + Fecha Vto CAE.
  */
 const MISSING_LABEL = "(sin datos fiscales)";
 const FISCAL_LEGEND = "Comprobante Autorizado";
@@ -29,8 +25,7 @@ const NON_FISCAL_LEGEND = "Comprobante no fiscal — no válido como factura AFI
 const fiscalField = (value?: string | null) =>
   value && value.trim() ? value : MISSING_LABEL;
 
-/** Normaliza una fecha a DD/MM/YYYY (acepta ISO, Date-parseable o ya
- * formateada). Si no puede parsearse, devuelve el valor crudo. */
+/** Normaliza una fecha a DD/MM/YYYY. */
 const formatDate = (value?: string | null): string => {
   if (!value) return "-";
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
@@ -43,8 +38,7 @@ const formatDate = (value?: string | null): string => {
   return `${dd}/${mm}/${date.getFullYear()}`;
 };
 
-/** Convierte una fecha visible al formato YYYY-MM-DD que exige el JSON del
- * QR fiscal AFIP. Si no puede derivarse, usa la fecha actual. */
+/** Fecha visible → YYYY-MM-DD para el JSON del QR AFIP. */
 const toIsoDate = (value?: string | null): string => {
   const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value ?? "");
   if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
@@ -57,7 +51,7 @@ const toIsoDate = (value?: string | null): string => {
   return new Date().toISOString().slice(0, 10);
 };
 
-/** Número fiscal visible "0002-00000013" (puntoVenta 4 díg. + cbteNro 8 díg.). */
+/** Número fiscal "0002-00000013". */
 const fiscalNumber = (data: InvoicePdfData): string | null =>
   data.puntoVenta != null && data.cbteNro != null
     ? `${String(data.puntoVenta).padStart(4, "0")}-${String(data.cbteNro).padStart(8, "0")}`
@@ -81,16 +75,14 @@ const formatMoney = (n: number | null | undefined) =>
         maximumFractionDigits: 2,
       })}`;
 
-/** Formato "fac-C-00003-00000325" del ejemplo (o el número fiscal simple). */
+/** Formato "fac-C-00003-00000325". */
 const comprobanteRef = (data: InvoicePdfData): string => {
   const letter = comprobanteLetter(data) || "X";
   const num = fiscalNumber(data) ?? data.documentNumber ?? "-";
   return `fac-${letter}-${num}`;
 };
 
-/** Arma el payload del QR fiscal AFIP (RG 4892/2020). Con CAE presente pero
- * datos inválidos (ej. emisor sin CUIT), buildAfipQrUrl lanza y el canvas se
- * omite → fallback a CAE como texto. */
+/** Payload del QR fiscal AFIP (RG 4892/2020). */
 const buildAfipQrPayload = (data: InvoicePdfData): AfipQrPayload => {
   const cuitDigits = data.issuer?.taxId?.replace(/\D/g, "") ?? "";
   const docNroDigits = data.docNroReceptor?.replace(/\D/g, "") ?? "";
@@ -115,238 +107,388 @@ export const PrintInvoice = (data: InvoicePdfData) => {
   );
   const qrDataUrl = useAfipQrImage(qrPayload);
 
-  // Rellenar la tabla con filas vacías (look de factura real + llenar hoja).
-  const minRows = 8;
   const tableRows: Array<InvoicePdfData["items"][number] | null> = [
     ...data.items,
   ];
-  while (tableRows.length < minRows) tableRows.push(null);
+  while (tableRows.length < 6) tableRows.push(null);
 
   return (
     <div className="print-area hidden print:block" aria-hidden="true">
-      <div className="mx-auto flex min-h-[264mm] max-w-3xl flex-col border-2 border-black text-xs leading-relaxed">
+      <div className="factura-card" style={styles.card}>
         {/* Franja ORIGINAL */}
-        <div className="border-b-2 border-black py-1 text-center">
-          <span className="text-xs font-bold tracking-[0.35em]">ORIGINAL</span>
-        </div>
+        <div style={styles.original}>ORIGINAL</div>
 
-        {/* Header 3 columnas: emisor | letra (arriba, chica) | datos */}
-        <div className="grid grid-cols-[1fr_auto_1fr] border-b-2 border-black">
-          {/* Emisor */}
-          <div className="p-3">
-            {data.logoUrl && (
-              <img
-                src={data.logoUrl}
-                alt="Logo"
-                data-testid="print-invoice-logo"
-                className="mb-2 h-12 w-auto max-w-full object-contain"
-              />
-            )}
-            <p className="text-sm font-bold uppercase">
-              {fiscalField(data.issuer?.name)}
-            </p>
-            <p>Razón Social: {fiscalField(data.issuer?.name)}</p>
-            <p>Domicilio: {fiscalField(data.issuer?.address)}</p>
-            {/* Localidad: sin dato separado por ahora */}
-            <p>Condición IVA: {fiscalField(data.issuer?.taxCondition)}</p>
+        {/* Header Principal */}
+        <div style={styles.headerMain}>
+          {/* Recuadro con la letra (centrado, abierto arriba) */}
+          <div data-testid="print-invoice-letter" style={styles.letraBox}>
+            {comprobanteLetter(data)}
           </div>
+          {/* Línea divisoria central */}
+          <div style={styles.lineaCentral} />
 
-          {/* Recuadro con la letra (arriba, centrado hacia arriba) */}
-          <div className="flex items-start justify-center px-2 pt-2">
-            <div
-              data-testid="print-invoice-letter"
-              className="flex h-20 w-16 items-center justify-center border-2 border-black"
-            >
-              <span className="text-5xl font-bold leading-none">
-                {comprobanteLetter(data)}
-              </span>
+          <div style={styles.headerColumns}>
+            {/* Emisor */}
+            <div style={styles.colEmisor}>
+              {data.logoUrl && (
+                <img
+                  src={data.logoUrl}
+                  alt="Logo"
+                  data-testid="print-invoice-logo"
+                  style={{ ...styles.logo, marginBottom: 12 }}
+                />
+              )}
+              <div style={styles.nombreEmisor}>{fiscalField(data.issuer?.name)}</div>
+              <div style={styles.rowInfo}>
+                <span style={styles.lbl}>Razón Social:</span>{" "}
+                {fiscalField(data.issuer?.name)}
+              </div>
+              <div style={styles.rowInfo}>
+                <span style={styles.lbl}>Domicilio:</span>{" "}
+                {fiscalField(data.issuer?.address)}
+              </div>
+              {/* Localidad: sin dato separado por ahora */}
+              <div style={styles.rowInfo}>
+                <span style={styles.lbl}>Condición IVA:</span>{" "}
+                {fiscalField(data.issuer?.taxCondition)}
+              </div>
+            </div>
+
+            {/* Comprobante */}
+            <div style={styles.colComprobante}>
+              <div style={styles.tipoComprobante}>{comprobanteTitle(data)}</div>
+              <div style={styles.rowInfo}>
+                <span style={styles.lbl}>Comprobante:</span> {comprobanteRef(data)}
+              </div>
+              <div style={styles.rowInfo}>
+                <span style={styles.lbl}>Fecha Emisión:</span> {formatDate(data.date)}
+              </div>
+              <br />
+              <div style={styles.rowInfo}>
+                <span style={styles.lbl}>CUIT:</span> {fiscalField(data.issuer?.taxId)}
+              </div>
+              {/* Ingresos Brutos / Fecha Inicio: sin dato por ahora */}
             </div>
           </div>
-
-          {/* Datos del comprobante */}
-          <div className="p-3 text-right">
-            <p className="text-sm font-bold uppercase">
-              {comprobanteTitle(data)}
-            </p>
-            <p>Comprobante: {comprobanteRef(data)}</p>
-            <p>Fecha Emisión: {formatDate(data.date)}</p>
-            <p>CUIT: {fiscalField(data.issuer?.taxId)}</p>
-            {/* Ingresos Brutos / Fecha Inicio Actividades: sin dato por ahora */}
-          </div>
         </div>
 
-        {/* Fila del cliente (toca el marco) */}
-        <div className="grid grid-cols-2 border-b-2 border-black">
-          <div className="border-r-2 border-black p-3">
-            <p>
-              <span className="font-bold">Cliente:</span>{" "}
-              {data.customer || MISSING_LABEL}
-            </p>
-            <p>
-              <span className="font-bold">Domicilio:</span>{" "}
+        {/* Cliente */}
+        <div style={styles.clienteSection}>
+          <div style={{ width: "55%" }}>
+            <div style={styles.rowInfo}>
+              <span style={styles.lbl}>Cliente:</span> {data.customer || MISSING_LABEL}
+            </div>
+            <div style={{ ...styles.rowInfo, marginTop: 8 }}>
+              <span style={styles.lbl}>Domicilio:</span>{" "}
               {fiscalField(data.customerAddress)}
-            </p>
+            </div>
           </div>
-          <div className="p-3">
-            <p>
-              <span className="font-bold">CUIT/DNI:</span>{" "}
-              {fiscalField(data.customerTaxId)}
-            </p>
-            <p>
-              <span className="font-bold">Condición IVA:</span>{" "}
+          <div style={{ width: "45%" }}>
+            <div style={styles.rowInfo}>
+              <span style={styles.lbl}>CUIT/DNI:</span> {fiscalField(data.customerTaxId)}
+            </div>
+            <div style={{ ...styles.rowInfo, marginTop: 8 }}>
+              <span style={styles.lbl}>Condición IVA:</span>{" "}
               {fiscalField(data.customerTaxCondition)}
-            </p>
-          </div>
-        </div>
-
-        {/* Tabla de items: bloque con márgenes laterales (no toca el marco) */}
-        <div className="flex-1 px-6 py-3">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                <th className="border border-black px-2 py-1 text-left font-bold uppercase">
-                  Código
-                </th>
-                <th className="border border-black px-2 py-1 text-left font-bold uppercase">
-                  Descripción
-                </th>
-                <th className="border border-black px-2 py-1 text-right font-bold uppercase">
-                  Cantidad
-                </th>
-                <th className="border border-black px-2 py-1 text-right font-bold uppercase">
-                  Precio Unit
-                </th>
-                <th className="border border-black px-2 py-1 text-right font-bold uppercase">
-                  Descuento
-                </th>
-                <th className="border border-black px-2 py-1 text-right font-bold uppercase">
-                  Alícuota %
-                </th>
-                <th className="border border-black px-2 py-1 text-right font-bold uppercase">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {tableRows.map((item, index) =>
-                item ? (
-                  <tr key={index}>
-                    <td className="border border-black px-2 py-1 tabular-nums">
-                      {/* Código de producto: sin dato por ahora */}
-                    </td>
-                    <td className="border border-black px-2 py-1">{item.name}</td>
-                    <td className="border border-black px-2 py-1 text-right tabular-nums">
-                      {item.quantity.toLocaleString("es-AR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
-                    <td className="border border-black px-2 py-1 text-right tabular-nums">
-                      {formatMoney(item.price)}
-                    </td>
-                    <td className="border border-black px-2 py-1 text-right tabular-nums">
-                      $ 0.00
-                    </td>
-                    <td className="border border-black px-2 py-1 text-right tabular-nums">
-                      {item.taxRate !== undefined
-                        ? `${item.taxRate.toLocaleString("es-AR", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}`
-                        : "-"}
-                    </td>
-                    <td className="border border-black px-2 py-1 text-right tabular-nums">
-                      {formatMoney(item.total)}
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={`empty-${index}`}>
-                    <td className="border border-black px-2 py-1">&nbsp;</td>
-                    <td className="border border-black px-2 py-1">&nbsp;</td>
-                    <td className="border border-black px-2 py-1">&nbsp;</td>
-                    <td className="border border-black px-2 py-1">&nbsp;</td>
-                    <td className="border border-black px-2 py-1">&nbsp;</td>
-                    <td className="border border-black px-2 py-1">&nbsp;</td>
-                    <td className="border border-black px-2 py-1">&nbsp;</td>
-                  </tr>
-                ),
-              )}
-            </tbody>
-          </table>
-
-          {/* Fila de pagos / totales (mismo bloque con márgenes) */}
-          <div className="mt-4 grid grid-cols-2 border border-black">
-            <div className="border-r border-black p-3">
-              <p className="font-bold">Pagos</p>
-              <p>Efectivo {formatMoney(data.total)}</p>
-            </div>
-            <div className="p-3 text-right">
-              {data.subtotal !== undefined && (
-                <p>
-                  Subtotal:{" "}
-                  <span className="tabular-nums">{formatMoney(data.subtotal)}</span>
-                </p>
-              )}
-              {data.taxAmount !== undefined && (
-                <p>
-                  IVA:{" "}
-                  <span className="tabular-nums">{formatMoney(data.taxAmount)}</span>
-                </p>
-              )}
-              <p className="font-bold">
-                Importe Total:{" "}
-                <span className="tabular-nums">{formatMoney(data.total)}</span>
-              </p>
             </div>
           </div>
         </div>
 
-        {/* Footer CAE: mt-auto lo empuja al pie de la hoja */}
+        {/* Tabla de ítems */}
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={{ ...styles.th, width: "10%" }}>Código</th>
+              <th style={{ ...styles.th, width: "35%" }}>Descripción</th>
+              <th style={{ ...styles.th, width: "10%", textAlign: "right" }}>Cantidad</th>
+              <th style={{ ...styles.th, width: "12%", textAlign: "right" }}>Precio Unit</th>
+              <th style={{ ...styles.th, width: "11%", textAlign: "right" }}>Descuento</th>
+              <th style={{ ...styles.th, width: "11%", textAlign: "right" }}>Alícuota %</th>
+              <th style={{ ...styles.th, width: "11%", textAlign: "right" }}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows.map((item, index) =>
+              item ? (
+                <tr key={index}>
+                  <td style={styles.td}>&nbsp;</td>
+                  <td style={styles.td}>{item.name}</td>
+                  <td style={{ ...styles.td, textAlign: "right" }}>
+                    {item.quantity.toLocaleString("es-AR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td style={{ ...styles.td, textAlign: "right" }}>
+                    {formatMoney(item.price)}
+                  </td>
+                  <td style={{ ...styles.td, textAlign: "right" }}>$ 0.00</td>
+                  <td style={{ ...styles.td, textAlign: "right" }}>
+                    {item.taxRate !== undefined
+                      ? `${item.taxRate.toLocaleString("es-AR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      : "-"}
+                  </td>
+                  <td style={{ ...styles.td, textAlign: "right" }}>
+                    {formatMoney(item.total)}
+                  </td>
+                </tr>
+              ) : (
+                <tr key={`empty-${index}`}>
+                  <td style={styles.td}>&nbsp;</td>
+                  <td style={styles.td}>&nbsp;</td>
+                  <td style={styles.td}>&nbsp;</td>
+                  <td style={styles.td}>&nbsp;</td>
+                  <td style={styles.td}>&nbsp;</td>
+                  <td style={styles.td}>&nbsp;</td>
+                  <td style={styles.td}>&nbsp;</td>
+                </tr>
+              ),
+            )}
+          </tbody>
+        </table>
+
+        {/* Totales */}
+        <div style={styles.totales}>
+          <div style={styles.pagosInfo}>
+            Pagos
+            <br />
+            <span style={{ fontWeight: "normal", fontSize: 10 }}>
+              Efectivo {formatMoney(data.total)}
+            </span>
+            {data.subtotal !== undefined && (
+              <>
+                <br />
+                <span style={{ fontWeight: "normal", fontSize: 10 }}>
+                  Subtotal: {formatMoney(data.subtotal)}
+                </span>
+              </>
+            )}
+            {data.taxAmount !== undefined && (
+              <>
+                <br />
+                <span style={{ fontWeight: "normal", fontSize: 10 }}>
+                  IVA: {formatMoney(data.taxAmount)}
+                </span>
+              </>
+            )}
+          </div>
+          <div style={styles.totalMonto}>
+            Importe Total: {formatMoney(data.total)}
+          </div>
+        </div>
+
+        {/* Footer AFIP */}
         {hasCae ? (
-          <div className="grid grid-cols-2 border-t-2 border-black">
-            <div className="flex items-center gap-2 border-r-2 border-black p-3">
+          <div style={styles.afipFooter}>
+            <div style={styles.qrAfipContainer}>
               {qrDataUrl ? (
                 <img
                   src={qrDataUrl}
                   alt="Código QR AFIP"
                   data-testid="print-invoice-qr"
-                  className="h-20 w-20 shrink-0"
+                  style={styles.qrImg}
                 />
               ) : (
                 <span
                   data-testid="print-invoice-cae-fallback"
-                  className="w-20 shrink-0 break-all text-center text-xl font-bold leading-tight"
+                  style={styles.qrFallback}
                 >
                   {data.cae}
                 </span>
               )}
               <div>
-                <p className="font-bold">AFIP</p>
-                <p>{FISCAL_LEGEND}</p>
-                <p className="mt-1 text-[10px]">
-                  Verificá este comprobante en www.afip.gob.ar/fe/qr
-                </p>
+                <div style={styles.afipLogoText}>AFIP</div>
+                <div style={{ fontSize: 9 }}>{FISCAL_LEGEND}</div>
               </div>
             </div>
-            <div className="p-3 text-right">
-              <p>
-                <span className="font-bold">CAE Nro:</span>{" "}
-                <span className="tabular-nums">{data.cae}</span>
-              </p>
-              <p>
-                <span className="font-bold">Fecha Vto CAE:</span>{" "}
+            <div style={styles.caeInfo}>
+              <div>
+                <span style={styles.lbl}>CAE Nro:</span> {data.cae}
+              </div>
+              <div>
+                <span style={styles.lbl}>Fecha Vto CAE:</span>{" "}
                 {formatDate(data.caeVencimiento)}
-              </p>
+              </div>
             </div>
           </div>
         ) : (
-          <p className="mt-auto border-t-2 border-black p-3 text-center text-xs">
-            {NON_FISCAL_LEGEND}
-          </p>
+          <div style={{ ...styles.afipFooter, justifyContent: "center" }}>
+            <span style={{ fontSize: 11, fontWeight: "bold" }}>
+              {NON_FISCAL_LEGEND}
+            </span>
+          </div>
         )}
       </div>
     </div>
   );
+};
+
+const styles = {
+  card: {
+    width: 780,
+    margin: "0 auto",
+    backgroundColor: "#fff",
+    border: "1px solid #000",
+    fontFamily: "Arial, Helvetica, sans-serif",
+    fontSize: 11,
+    color: "#000",
+  } as const,
+  original: {
+    textAlign: "center" as const,
+    fontWeight: "bold" as const,
+    fontSize: 12,
+    padding: "4px 0",
+    borderBottom: "1px solid #000",
+    letterSpacing: 1,
+  },
+  headerMain: {
+    position: "relative" as const,
+    borderBottom: "1px solid #000",
+    minHeight: 180,
+  },
+  letraBox: {
+    position: "absolute" as const,
+    top: 0,
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: 60,
+    height: 60,
+    borderLeft: "1px solid #000",
+    borderRight: "1px solid #000",
+    borderBottom: "1px solid #000",
+    backgroundColor: "#fff",
+    textAlign: "center" as const,
+    fontSize: 32,
+    fontWeight: "bold" as const,
+    lineHeight: "56px",
+    zIndex: 2,
+  },
+  lineaCentral: {
+    position: "absolute" as const,
+    top: 60,
+    left: "50%",
+    bottom: 0,
+    width: 1,
+    backgroundColor: "#000",
+    zIndex: 1,
+  },
+  headerColumns: {
+    display: "flex" as const,
+    width: "100%",
+  },
+  colEmisor: {
+    width: "50%",
+    padding: "15px 20px 10px 15px",
+  },
+  colComprobante: {
+    width: "50%",
+    padding: "15px 15px 10px 40px",
+  },
+  nombreEmisor: {
+    fontSize: 22,
+    fontWeight: "bold" as const,
+    marginBottom: 25,
+    textAlign: "center" as const,
+  },
+  tipoComprobante: {
+    fontSize: 16,
+    fontWeight: "bold" as const,
+    marginBottom: 12,
+    marginLeft: 20,
+  },
+  rowInfo: {
+    marginBottom: 5,
+    lineHeight: 1.3,
+  },
+  lbl: {
+    fontWeight: "bold" as const,
+    display: "inline-block" as const,
+  },
+  logo: {
+    height: 40,
+    width: "auto",
+    maxWidth: "100%",
+    objectFit: "contain" as const,
+  },
+  clienteSection: {
+    borderBottom: "1px solid #000",
+    padding: "8px 15px",
+    display: "flex" as const,
+    flexWrap: "wrap" as const,
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse" as const,
+    marginBottom: 20,
+  },
+  th: {
+    borderBottom: "1px solid #000",
+    borderTop: "1px solid #000",
+    backgroundColor: "#e6e6e6",
+    padding: "4px 6px",
+    textAlign: "left" as const,
+    fontWeight: "bold" as const,
+  },
+  td: {
+    padding: "4px 6px",
+    verticalAlign: "top" as const,
+  },
+  totales: {
+    borderTop: "2px solid #000",
+    borderBottom: "2px solid #000",
+    padding: "8px 15px",
+    display: "flex" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "flex-start" as const,
+    marginTop: 100,
+  },
+  pagosInfo: {
+    fontWeight: "bold" as const,
+  },
+  totalMonto: {
+    fontSize: 14,
+    fontWeight: "bold" as const,
+  },
+  afipFooter: {
+    padding: 15,
+    display: "flex" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+  },
+  qrAfipContainer: {
+    display: "flex" as const,
+    alignItems: "center" as const,
+    gap: 15,
+  },
+  qrImg: {
+    width: 80,
+    height: 80,
+  },
+  qrFallback: {
+    width: 80,
+    height: 80,
+    border: "1px solid #ccc",
+    display: "flex" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    fontSize: 9,
+    color: "#666",
+    textAlign: "center" as const,
+    wordBreak: "break-all" as const,
+  },
+  afipLogoText: {
+    fontWeight: "bold" as const,
+    fontSize: 20,
+    letterSpacing: -1,
+    fontStyle: "italic" as const,
+  },
+  caeInfo: {
+    textAlign: "right" as const,
+    lineHeight: 1.5,
+  },
 };
 
 export default PrintInvoice;
