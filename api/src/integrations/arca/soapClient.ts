@@ -71,9 +71,13 @@ export const soapRequest = async (input: SoapRequestInput): Promise<string> => {
         signal: AbortSignal.timeout(timeoutMs),
       });
       if (!res.ok) {
+        // Incluir el body del fault SOAP para diagnosticar el error real de
+        // AFIP (p.ej. "Unmarshalling Error", "alreadyAuthenticated").
+        const body = await res.text().catch(() => "");
+        const snippet = body.replace(/\s+/g, " ").slice(0, 400);
         throw new ArcaError(
           ARCA_ERROR_CODES.ARCA_NETWORK_ERROR,
-          `HTTP ${res.status} al llamar ${input.url}`,
+          `HTTP ${res.status} al llamar ${input.url}${snippet ? ` — ${snippet}` : ""}`,
           503,
         );
       }
