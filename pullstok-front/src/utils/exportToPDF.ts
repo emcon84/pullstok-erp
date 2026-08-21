@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { drawCaeBarcode } from "./caeBarcode";
+import { drawAfipQr, type AfipQrPayload } from "./afipQr";
 
 interface ExportItem {
   quantity: number;
@@ -30,10 +31,19 @@ interface ExportData {
  * existente necesita cambios.
  *
  * Regla de layout: si data.cae viene presente, se dibuja un comprobante
- * fiscal ESTÁNDAR (estilo AFIP/ARCA: header de emisor con logo, título y
- * número fiscal a la derecha, receptor, tabla, zona CAE con código de
- * barras Code128 y leyenda "Comprobante autorizado por ARCA"). Sin CAE se
- * mantiene el PDF genérico histórico con la leyenda "Comprobante no fiscal".
+ * fiscal ESTÁNDAR (estilo AFIP/ARCA, acercado al diseño real de un
+ * comprobante impreso):
+ *   1. Rótulo "ORIGINAL" centrado arriba de todo.
+ *   2. Header en 3 columnas: emisor (izq) — recuadro con la letra del
+ *      comprobante A/B (centro) — tipo de comprobante + número + fecha
+ *      (der).
+ *   3. Receptor.
+ *   4. Tabla de items.
+ *   5. Zona CAE al pie con código QR AFIP (RG 4892/2020, reemplaza al
+ *      código de barras Code128 histórico) + CAE + vencimiento + leyenda
+ *      "Comprobante autorizado por ARCA".
+ * Sin CAE se mantiene el PDF genérico histórico con la leyenda
+ * "Comprobante no fiscal".
  */
 export interface InvoicePdfIssuer {
   name?: string;
@@ -62,6 +72,11 @@ export interface InvoicePdfData extends ExportData {
   /** CAE otorgado por ARCA. Presente ⇒ layout fiscal estándar. */
   cae?: string | null;
   caeVencimiento?: string | null;
+  /** Tipo de documento del receptor (80=CUIT, 96=DNI, 99=sin identificar).
+   * Requerido por el QR fiscal AFIP (RG 4892/2020); si falta, el QR asume
+   * consumidor final sin identificar (99/0). */
+  docTipoReceptor?: number | null;
+  docNroReceptor?: string | null;
   /** Logo del emisor (AppBranding.logoUrl). Opcional: si no puede cargarse
    * (fetch falla, no es imagen válida, jsdom sin canvas) se omite y se
    * sigue dibujando el comprobante sin logo. */
@@ -76,8 +91,16 @@ const NON_FISCAL_LEGEND = "Comprobante no fiscal — no válido como factura AFI
 
 const CAE_BOX_X = 14;
 const CAE_BOX_W = 300;
-const CAE_BOX_H = 96;
+const CAE_BOX_H = 100;
 const RIGHT_X = 581;
+const LEFT_X = 14;
+/** Recuadro con la letra del comprobante (A/B), centrado entre el bloque
+ * del emisor y el bloque de tipo/número/fecha — igual al diseño real AFIP. */
+const LETTER_BOX_X = 258;
+const LETTER_BOX_W = 62;
+const LETTER_BOX_H = 62;
+/** Tamaño del QR fiscal AFIP dentro de la zona CAE. */
+const QR_SIZE = 66;
 
 const fiscalField = (value?: string | null) =>
   value && value.trim() ? value : MISSING_LABEL;
@@ -100,11 +123,47 @@ const formatDate = (value?: string | null): string => {
   return `${dd}/${mm}/${date.getFullYear()}`;
 };
 
+/** Convierte una fecha visible (DD/MM/YYYY, ya normalizada por formatDate,
+ * o cualquier formato Date-parseable) al formato YYYY-MM-DD que exige el
+ * JSON del QR fiscal AFIP. Si no puede derivarse, usa la fecha actual —
+ * el QR nunca debe romperse por un formato de fecha inesperado. */
+const toIsoDate = (value?: string | null): string => {
+  const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value ?? "");
+  if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
+  if (iso) return value as string;
+  const parsed = value ? new Date(value) : null;
+  if (parsed && !Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return new Date().toISOString().slice(0, 10);
+};
+
 /** Número fiscal visible "0002-00000013" (puntoVenta 4 díg. + cbteNro 8 díg.). */
 const fiscalNumber = (data: InvoicePdfData): string | null =>
   data.puntoVenta != null && data.cbteNro != null
     ? `${String(data.puntoVenta).padStart(4, "0")}-${String(data.cbteNro).padStart(8, "0")}`
     : null;
+
+/** Arma el payload del QR fiscal AFIP (RG 4892/2020) a partir de los datos
+ * del comprobante. drawAfipQr valida los campos obligatorios y lanza si
+ * falta alguno (cuit emisor, ptoVta, tipoCmp, nroCmp o CAE) — el caller
+ * hace el fallback a texto, igual que con el barcode histórico. */
+const buildAfipQrPayload = (data: InvoicePdfData): AfipQrPayload => {
+  const cuitDigits = data.issuer?.taxId?.replace(/\D/g, "") ?? "";
+  const docNroDigits = data.docNroReceptor?.replace(/\D/g, "") ?? "";
+  return {
+    fecha: toIsoDate(data.date),
+    cuit: cuitDigits ? Number(cuitDigits) : NaN,
+    ptoVta: data.puntoVenta ?? NaN,
+    tipoCmp: data.tipoComprobante ? Number(data.tipoComprobante) : NaN,
+    nroCmp: data.cbteNro ?? NaN,
+    importe: data.total,
+    tipoDocRec: data.docTipoReceptor ?? undefined,
+    nroDocRec: docNroDigits ? Number(docNroDigits) : undefined,
+    codAut: data.cae ? Number(data.cae) : NaN,
+  };
+};
 
 const comprobanteTitle = (data: InvoicePdfData): string =>
   data.tipoComprobante === "1"
@@ -112,6 +171,12 @@ const comprobanteTitle = (data: InvoicePdfData): string =>
     : data.tipoComprobante === "6"
       ? "FACTURA B"
       : (data.title || "FACTURA").toUpperCase();
+
+/** Letra del comprobante para el recuadro central del header (A/B). Vacía
+ * si todavía no hay tipoComprobante asignado (no debería ocurrir con CAE
+ * presente, pero no debe romper el layout si pasara). */
+const comprobanteLetter = (data: InvoicePdfData): string =>
+  data.tipoComprobante === "1" ? "A" : data.tipoComprobante === "6" ? "B" : "";
 
 /** Carga una URL de imagen como data URL (blob → FileReader). Devuelve null
  * ante cualquier error (fetch, MIME no-imagen, jsdom sin FileReader real). */
@@ -133,10 +198,12 @@ const loadLogoDataUrl = async (url: string): Promise<string | null> => {
   }
 };
 
-/** Dibuja el logo en la esquina superior izquierda. Devuelve si se dibujó. */
+/** Dibuja el logo en la esquina superior izquierda, a partir de `y`.
+ * Devuelve si se dibujó. */
 const drawLogo = async (
   doc: jsPDF,
-  logoUrl?: string | null,
+  logoUrl: string | null | undefined,
+  y: number,
 ): Promise<boolean> => {
   if (!logoUrl) return false;
   try {
@@ -146,48 +213,87 @@ const drawLogo = async (
     const format =
       mime === "image/png" ? "PNG" : mime === "image/jpeg" ? "JPEG" : undefined;
     if (!format) return false;
-    doc.addImage(dataUrl, format, 14, 14, 42, 42);
+    doc.addImage(dataUrl, format, LEFT_X, y, 42, 42);
     return true;
   } catch {
     return false;
   }
 };
 
-/** Header fiscal: logo + datos del emisor a la izquierda, título y número
- * fiscal a la derecha, línea separadora al pie. Devuelve el Y donde arranca
- * el bloque del receptor. */
-const drawFiscalHeader = (doc: jsPDF, data: InvoicePdfData, hasLogo: boolean): number => {
-  const leftY = hasLogo ? 64 : 14;
+/** Rótulo "ORIGINAL" centrado arriba de todo el comprobante, dentro de un
+ * recuadro delgado — igual al diseño real de las facturas AFIP impresas
+ * (donde el mismo lugar dice "DUPLICADO"/"TRIPLICADO" según la copia).
+ * Devuelve el Y donde puede arrancar el resto del header. */
+const drawOriginalBand = (doc: jsPDF): number => {
+  const width = 90;
+  const height = 14;
+  const x = (RIGHT_X + LEFT_X - width) / 2;
+  const y = 10;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.5);
+  doc.rect(x, y, width, height);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text("ORIGINAL", x + width / 2, y + height / 2 + 3, { align: "center" });
+  return y + height + 8;
+};
+
+/** Header fiscal en 3 columnas: emisor (izq) — recuadro con la letra del
+ * comprobante A/B (centro) — tipo de comprobante, número fiscal y fecha
+ * (der). Línea separadora al pie. Devuelve el Y donde arranca el receptor. */
+const drawFiscalHeader = (
+  doc: jsPDF,
+  data: InvoicePdfData,
+  hasLogo: boolean,
+  topY: number,
+): number => {
+  const leftY = hasLogo ? topY + 50 : topY + 10;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text(fiscalField(data.issuer?.name), 14, leftY);
+  doc.text(fiscalField(data.issuer?.name), LEFT_X, leftY);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(`CUIT: ${fiscalField(data.issuer?.taxId)}`, 14, leftY + 7);
-  doc.text(`Condición IVA: ${fiscalField(data.issuer?.taxCondition)}`, 14, leftY + 12);
-  doc.text(`Domicilio: ${fiscalField(data.issuer?.address)}`, 14, leftY + 17);
+  doc.text(`CUIT: ${fiscalField(data.issuer?.taxId)}`, LEFT_X, leftY + 7);
+  doc.text(`Condición IVA: ${fiscalField(data.issuer?.taxCondition)}`, LEFT_X, leftY + 12);
+  doc.text(`Domicilio: ${fiscalField(data.issuer?.address)}`, LEFT_X, leftY + 17);
+
+  // Recuadro con la letra del comprobante, centrado entre emisor y der.
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.75);
+  doc.rect(LETTER_BOX_X, topY, LETTER_BOX_W, LETTER_BOX_H);
+  const letter = comprobanteLetter(data);
+  if (letter) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(40);
+    doc.text(letter, LETTER_BOX_X + LETTER_BOX_W / 2, topY + LETTER_BOX_H / 2 + 14, {
+      align: "center",
+    });
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text(comprobanteTitle(data), RIGHT_X, 22, { align: "right" });
+  doc.text(comprobanteTitle(data), RIGHT_X, topY + 12, { align: "right" });
   doc.setFontSize(11);
-  doc.text(fiscalNumber(data) ?? data.documentNumber, RIGHT_X, 30, { align: "right" });
+  doc.text(fiscalNumber(data) ?? data.documentNumber, RIGHT_X, topY + 22, {
+    align: "right",
+  });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(`Fecha de emisión: ${data.date}`, RIGHT_X, 37, { align: "right" });
+  doc.text(`Fecha de emisión: ${data.date}`, RIGHT_X, topY + 30, { align: "right" });
   if (data.puntoVenta != null) {
     doc.text(
       `Punto de venta: ${String(data.puntoVenta).padStart(4, "0")}`,
       RIGHT_X,
-      42,
+      topY + 37,
       { align: "right" },
     );
   }
 
-  const headerBottom = Math.max(leftY + 20, 46);
+  const headerBottom = Math.max(leftY + 20, topY + LETTER_BOX_H, topY + 42);
   doc.setDrawColor(0, 0, 0);
-  doc.line(14, headerBottom, RIGHT_X, headerBottom);
+  doc.setLineWidth(0.5);
+  doc.line(LEFT_X, headerBottom, RIGHT_X, headerBottom);
   return headerBottom + 8;
 };
 
@@ -204,8 +310,9 @@ const drawReceptor = (doc: jsPDF, data: InvoicePdfData, y: number): number => {
   return y + 22;
 };
 
-/** Zona CAE al pie: recuadro con CAE, vencimiento y código de barras
- * Code128. Si el barcode falla, se dibuja el CAE como texto grande. */
+/** Zona CAE al pie: recuadro con CAE, vencimiento y código QR fiscal AFIP
+ * (RG 4892/2020). Si el QR no puede generarse (faltan datos obligatorios
+ * del payload), se dibuja el CAE como texto grande en su lugar. */
 const drawCaeZone = (doc: jsPDF, data: InvoicePdfData, y: number): void => {
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.5);
@@ -216,8 +323,19 @@ const drawCaeZone = (doc: jsPDF, data: InvoicePdfData, y: number): void => {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.text(`Vencimiento CAE: ${formatDate(data.caeVencimiento)}`, CAE_BOX_X + 6, y + 16);
+
+  const qrX = CAE_BOX_X + 8;
+  const qrY = y + 24;
   try {
-    drawCaeBarcode(doc, data.cae ?? "", CAE_BOX_X + 8, y + 22, CAE_BOX_W - 16);
+    drawAfipQr(doc, buildAfipQrPayload(data), qrX, qrY, QR_SIZE);
+    const legendX = qrX + QR_SIZE + 12;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("AFIP - Comprobante Autorizado", legendX, qrY + 12);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.text("Verificá este comprobante en", legendX, qrY + 24);
+    doc.text("www.afip.gob.ar/fe/qr", legendX, qrY + 32);
   } catch {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
@@ -378,8 +496,9 @@ export const exportToPDF = async (
   const doc = new jsPDF(hasCae ? { unit: "pt", format: "a4" } : {});
 
   if (hasCae) {
-    const hasLogo = await drawLogo(doc, pdfData.logoUrl);
-    const headerBottom = drawFiscalHeader(doc, pdfData, hasLogo);
+    const bandBottom = drawOriginalBand(doc);
+    const hasLogo = await drawLogo(doc, pdfData.logoUrl, bandBottom);
+    const headerBottom = drawFiscalHeader(doc, pdfData, hasLogo, bandBottom);
     const tableStartY = drawReceptor(doc, pdfData, headerBottom);
     drawTable(doc, pdfData, tableStartY, true);
 

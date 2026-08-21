@@ -109,6 +109,8 @@ const buildExport = (
   cbteNro: invoice.cbteNro ?? undefined,
   cae: invoice.cae ?? undefined,
   caeVencimiento: invoice.caeVencimiento ?? undefined,
+  docTipoReceptor: invoice.docTipoReceptor ?? undefined,
+  docNroReceptor: invoice.docNroReceptor ?? undefined,
   logoUrl,
 });
 

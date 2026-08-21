@@ -33,15 +33,15 @@ vi.mock("jspdf", async (importOriginal) => {
   return { default: MockJsPDF };
 });
 
-// El código de barras se mockea aparte (drawCaeBarcode vive en su propio
-// módulo, caeBarcode.ts) para aislar las aserciones de layout.
-vi.mock("../utils/caeBarcode", () => ({
-  drawCaeBarcode: vi.fn(),
-  code128BSymbols: vi.fn(),
+// El QR fiscal AFIP se mockea aparte (drawAfipQr vive en su propio módulo,
+// afipQr.ts) para aislar las aserciones de layout.
+vi.mock("../utils/afipQr", () => ({
+  drawAfipQr: vi.fn(),
+  buildAfipQrUrl: vi.fn(),
 }));
 
 import { exportToPDF } from "../utils/exportToPDF";
-import { drawCaeBarcode } from "../utils/caeBarcode";
+import { drawAfipQr } from "../utils/afipQr";
 
 const hasText = (needle: string) =>
   textSpy.mock.calls.some((call) => call[0] === needle);
@@ -97,7 +97,8 @@ beforeEach(() => {
   textSpy.mockClear();
   rectSpy.mockClear();
   addImageSpy.mockClear();
-  vi.mocked(drawCaeBarcode).mockClear();
+  vi.mocked(drawAfipQr).mockClear();
+  vi.mocked(drawAfipQr).mockReset();
 });
 
 afterEach(() => {
@@ -114,7 +115,7 @@ describe("exportToPDF genérico (backwards-compatible)", () => {
     expect(
       hasText("Comprobante no fiscal — no válido como factura AFIP"),
     ).toBe(true);
-    expect(drawCaeBarcode).not.toHaveBeenCalled();
+    expect(drawAfipQr).not.toHaveBeenCalled();
     expect(addImageSpy).not.toHaveBeenCalled();
   });
 
@@ -128,16 +129,20 @@ describe("exportToPDF genérico (backwards-compatible)", () => {
       hasText(`Emisor: Mi Empresa S.R.L. — CUIT/Tax ID: 30-12345678-9`),
     ).toBe(true);
     expect(hasText("FACTURA A")).toBe(false);
-    expect(drawCaeBarcode).not.toHaveBeenCalled();
+    expect(drawAfipQr).not.toHaveBeenCalled();
     expect(saveMock).toHaveBeenCalledWith("Factura_0002-00000013.pdf");
   });
 });
 
 describe("exportToPDF fiscal (CAE presente)", () => {
-  it("genera el comprobante estándar: título, número, CAE y barcode", async () => {
+  it("genera el comprobante estándar: rótulo ORIGINAL, letra, título, número, CAE y QR", async () => {
     await exportToPDF(fiscalData);
 
     expect(saveMock).toHaveBeenCalledWith("Factura_0002-00000013.pdf");
+
+    // Rótulo ORIGINAL y recuadro con la letra del comprobante
+    expect(hasText("ORIGINAL")).toBe(true);
+    expect(hasText("A")).toBe(true);
 
     // Header derecho
     expect(hasText("FACTURA A")).toBe(true);
@@ -157,24 +162,53 @@ describe("exportToPDF fiscal (CAE presente)", () => {
     expect(hasText("CAE: 71907643210631")).toBe(true);
     expect(hasText("Vencimiento CAE: 21/11/2026")).toBe(true);
     expect(hasText("Comprobante autorizado por ARCA")).toBe(true);
+    expect(hasText("AFIP - Comprobante Autorizado")).toBe(true);
     expect(
       hasText("Comprobante no fiscal — no válido como factura AFIP"),
     ).toBe(false);
 
-    // Barcode mockeado: recibe el doc y el CAE exacto
-    expect(drawCaeBarcode).toHaveBeenCalledWith(
+    // QR mockeado: recibe el doc, el payload AFIP (RG 4892/2020) armado
+    // desde InvoicePdfData y las coordenadas del recuadro.
+    expect(drawAfipQr).toHaveBeenCalledWith(
       expect.anything(),
-      "71907643210631",
+      expect.objectContaining({
+        fecha: "2026-08-21",
+        cuit: 30123456789,
+        ptoVta: 2,
+        tipoCmp: 1,
+        nroCmp: 13,
+        importe: 121000,
+        codAut: 71907643210631,
+      }),
       expect.any(Number),
       expect.any(Number),
       expect.any(Number),
     );
 
-    // Recuadro de la zona CAE
+    // Recuadro de la zona CAE (y el de la letra del comprobante)
     expect(rectSpy).toHaveBeenCalled();
 
     // Sin logo no se dibuja imagen
     expect(addImageSpy).not.toHaveBeenCalled();
+  });
+
+  it("incluye docTipoReceptor/docNroReceptor en el payload del QR cuando vienen", async () => {
+    await exportToPDF({
+      ...fiscalData,
+      docTipoReceptor: 80,
+      docNroReceptor: "20-98765432-1",
+    });
+
+    expect(drawAfipQr).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        tipoDocRec: 80,
+        nroDocRec: 20987654321,
+      }),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+    );
   });
 
   it("mapea tipoComprobante '6' a FACTURA B", async () => {
@@ -182,6 +216,7 @@ describe("exportToPDF fiscal (CAE presente)", () => {
 
     expect(hasText("FACTURA B")).toBe(true);
     expect(hasText("FACTURA A")).toBe(false);
+    expect(hasText("B")).toBe(true);
   });
 
   it("usa documentNumber como fallback si faltan puntoVenta/cbteNro", async () => {
@@ -204,14 +239,15 @@ describe("exportToPDF fiscal (CAE presente)", () => {
     expect(saveMock).toHaveBeenCalledWith("Factura_0002-00000013.pdf");
   });
 
-  it("CAE no encodable cae al fallback de texto (no rompe)", async () => {
-    vi.mocked(drawCaeBarcode).mockImplementation(() => {
-      throw new Error("CAE vacío");
+  it("QR con payload inválido cae al fallback de texto (no rompe)", async () => {
+    vi.mocked(drawAfipQr).mockImplementation(() => {
+      throw new Error("QR AFIP: CAE inválido");
     });
 
     await exportToPDF({ ...fiscalData, cae: "ABC-123" });
 
     expect(saveMock).toHaveBeenCalledWith("Factura_0002-00000013.pdf");
     expect(hasText("Comprobante autorizado por ARCA")).toBe(true);
+    expect(hasText("ABC-123")).toBe(true);
   });
 });
