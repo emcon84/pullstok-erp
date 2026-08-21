@@ -96,7 +96,14 @@ export const issueInvoice = async (id: string): Promise<Invoice> => {
       {},
       { headers: authHeaders() },
     );
-    return response.data;
+    const data = response.data as Invoice & {
+      fiscalError?: { code?: string; message?: string };
+    };
+    // El backend puede devolver HTTP 200 con la factura en PENDING_CAE y un
+    // fiscalError adjunto (la emisión fiscal falló pero el flujo interno no
+    // se rompe). Si el caller quiere saber si AFIP dio CAE, que revise
+    // invoice.status/cae; acá exponemos el error en el mismo objeto.
+    return data;
   } catch (error) {
     throw new Error(extractErrorMessage(error, "Error al emitir la factura"));
   }

@@ -131,7 +131,18 @@ export const Invoices = () => {
     if (!ok) return;
     setPendingActionId(invoice.id);
     issueInvoice(invoice.id, {
-      onSuccess: () => toast.success("Factura emitida con éxito"),
+      onSuccess: (emitted) => {
+        const fiscalErr = (emitted as Invoice & {
+          fiscalError?: { code?: string; message?: string };
+        })?.fiscalError;
+        if (fiscalErr?.message) {
+          toast.error(`Factura emitida, pero AFIP no otorgó CAE: ${fiscalErr.message}`);
+        } else if (emitted.cae) {
+          toast.success("Factura emitida con éxito");
+        } else {
+          toast.success("Factura emitida (sin CAE todavía)");
+        }
+      },
       onError: (error) => toast.error(error.message),
       onSettled: () => setPendingActionId(null),
     });
