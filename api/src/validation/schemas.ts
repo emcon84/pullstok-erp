@@ -36,6 +36,7 @@ export const updateOrganizationSchema = z.object({
   address: z.string().optional(),
   phone: z.string().optional(),
   taxId: z.string().optional(),
+  taxCondition: z.string().optional(),
   industry: z.enum(["FERRETERIA", "KIOSCO", "INDUMENTARIA", "ALMACEN", "OTHER"]).optional(),
 });
 

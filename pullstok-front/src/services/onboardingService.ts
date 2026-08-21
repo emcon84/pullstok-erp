@@ -88,7 +88,10 @@ export const getMe = async (): Promise<Me> => {
 
 export const updateOrganization = async (
   data: Partial<
-    Pick<Organization, "name" | "address" | "phone" | "taxId" | "industry">
+    Pick<
+      Organization,
+      "name" | "address" | "phone" | "taxId" | "taxCondition" | "industry"
+    >
   >,
 ): Promise<Organization> => {
   try {

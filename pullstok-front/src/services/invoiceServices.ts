@@ -137,6 +137,22 @@ export const cancelInvoice = async (id: string): Promise<Invoice> => {
   }
 };
 
+/** Reintenta la emisión fiscal de una factura PENDING_CAE (mismo correlativo). */
+export const retryInvoiceFiscal = async (id: string): Promise<Invoice> => {
+  try {
+    const response = await axios.put<Invoice>(
+      `${API_URL}/invoices/${id}/retry-fiscal`,
+      {},
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      extractErrorMessage(error, "Error al reintentar la emisión fiscal"),
+    );
+  }
+};
+
 export interface CreateInvoiceFromSaleBody {
   customerId: string;
   dueDate?: string;

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { ArrowLeft, Pencil, FileCheck2, CircleDollarSign, Ban, FileText } from "lucide-react";
+import { ArrowLeft, Pencil, FileCheck2, CircleDollarSign, Ban, FileText, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import {
   useGetInvoiceById,
   useIssueInvoice,
   useMarkInvoiceAsPaid,
+  useRetryInvoiceFiscal,
 } from "../components/hooks/useInvoices";
 import { InvoiceStatus, PaymentStatus, Invoice } from "../models/invoiceModel";
 import { exportToPDF } from "../utils/exportToPDF";
@@ -101,6 +102,7 @@ export const InvoiceDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { invoice, loadingInvoice, errorInvoice } = useGetInvoiceById(id);
   const { issueInvoice, loadingIssue } = useIssueInvoice();
+  const { retryInvoiceFiscal, loadingRetry } = useRetryInvoiceFiscal();
   const { markAsPaid, loadingMarkAsPaid } = useMarkInvoiceAsPaid();
   const { cancelInvoice, loadingCancel } = useCancelInvoice();
   const [actionPending, setActionPending] = useState(false);
@@ -179,6 +181,21 @@ export const InvoiceDetail = () => {
     });
   };
 
+  const handleRetryFiscal = () => {
+    setActionPending(true);
+    retryInvoiceFiscal(invoice.id, {
+      onSuccess: (emitted) => {
+        if (emitted.cae) {
+          toast.success("CAE obtenido — factura emitida fiscalmente");
+        } else {
+          toast.error("AFIP todavía no otorgó el CAE. Revisá el detalle.");
+        }
+      },
+      onError: (error) => toast.error(error.message),
+      onSettled: () => setActionPending(false),
+    });
+  };
+
   const handleExportPDF = () => {
     const customer = invoice.customer;
     const organization = me?.organization;
@@ -218,7 +235,7 @@ export const InvoiceDetail = () => {
     });
   };
 
-  const busy = actionPending || loadingIssue || loadingMarkAsPaid || loadingCancel;
+  const busy = actionPending || loadingIssue || loadingRetry || loadingMarkAsPaid || loadingCancel;
 
   return (
     <div className="space-y-6">
@@ -340,9 +357,18 @@ export const InvoiceDetail = () => {
             La emisión fiscal falló: {invoice.arcaErrorMessage}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            La factura quedó en estado pendiente de CAE. Usá "Reintentar emisión
-            fiscal" para volver a intentarlo con el mismo correlativo.
+            La factura quedó en estado pendiente de CAE. Reintentá la emisión
+            fiscal con el mismo correlativo.
           </p>
+          <Button
+            className="mt-3"
+            variant="outline"
+            disabled={busy}
+            onClick={handleRetryFiscal}
+          >
+            <RotateCcw className="h-4 w-4" />
+            {loadingRetry ? "Reintentando..." : "Reintentar emisión fiscal"}
+          </Button>
         </Card>
       )}
 

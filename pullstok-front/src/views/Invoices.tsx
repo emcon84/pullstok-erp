@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Plus, Eye, Pencil, FileCheck2, CircleDollarSign, Ban, FileText } from "lucide-react";
+import { Plus, Eye, Pencil, FileCheck2, CircleDollarSign, Ban, FileText, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import {
   useIssueInvoice,
   useMarkInvoiceAsPaid,
   useCancelInvoice,
+  useRetryInvoiceFiscal,
 } from "../components/hooks/useInvoices";
 import { Invoice, InvoiceStatus, PaymentStatus } from "../models/invoiceModel";
 import { useConfirm } from "../components/hooks/useConfirm";
@@ -117,6 +118,7 @@ export const Invoices = () => {
   const { issueInvoice, loadingIssue } = useIssueInvoice();
   const { markAsPaid, loadingMarkAsPaid } = useMarkInvoiceAsPaid();
   const { cancelInvoice, loadingCancel } = useCancelInvoice();
+  const { retryInvoiceFiscal, loadingRetry } = useRetryInvoiceFiscal();
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const confirm = useConfirm();
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
@@ -173,6 +175,21 @@ export const Invoices = () => {
     });
   };
 
+  const handleRetryFiscal = (invoice: Invoice) => {
+    setPendingActionId(invoice.id);
+    retryInvoiceFiscal(invoice.id, {
+      onSuccess: (emitted) => {
+        if (emitted.cae) {
+          toast.success("CAE obtenido — factura emitida fiscalmente");
+        } else {
+          toast.error("AFIP todavía no otorgó el CAE. Revisá el detalle.");
+        }
+      },
+      onError: (error) => toast.error(error.message),
+      onSettled: () => setPendingActionId(null),
+    });
+  };
+
   if (loadingInvoices) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -190,7 +207,7 @@ export const Invoices = () => {
   }
 
   const isRowBusy = (id: string) =>
-    pendingActionId === id && (loadingIssue || loadingMarkAsPaid || loadingCancel);
+    pendingActionId === id && (loadingIssue || loadingRetry || loadingMarkAsPaid || loadingCancel);
 
   return (
     <div className="space-y-6">
@@ -286,6 +303,17 @@ export const Invoices = () => {
                               <FileCheck2 className="h-4 w-4" />
                             </Button>
                           </>
+                        )}
+                        {invoice.status === "PENDING_CAE" && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            title="Reintentar emisión fiscal"
+                            disabled={busy}
+                            onClick={() => handleRetryFiscal(invoice)}
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
                         )}
                         {invoice.status === "ISSUED" && invoice.paymentStatus !== "PAID" && (
                           <Button

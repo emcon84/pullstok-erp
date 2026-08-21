@@ -15,6 +15,7 @@ import { getMe } from "../services/onboardingService";
 import { API_URL } from "../constants";
 import { useBranding, useUpdateBranding } from "../components/hooks/useBranding";
 import { AppBrandingForm } from "../components/molecules/AppBrandingForm";
+import { OrganizationFiscalForm } from "../components/molecules/OrganizationFiscalForm";
 import { Loader } from "../components/atoms/loader";
 
 export const BrandingSettings = () => {
@@ -73,6 +74,12 @@ export const BrandingSettings = () => {
         onSave={updateBranding}
         isSaving={isSaving}
       />
+
+      {/* Datos fiscales del emisor — solo ADMIN: el endpoint PATCH /organizations/me
+          es requireRole("ADMIN") (spec: los datos fiscales viajan al PDF de factura) */}
+      {me?.role === "ADMIN" && (
+        <OrganizationFiscalForm organization={me?.organization} />
+      )}
 
       {/* Backup download section — ADMIN only, no plan gating (spec U2, U6) */}
       {me?.role === "ADMIN" && (

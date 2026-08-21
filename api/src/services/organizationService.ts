@@ -11,6 +11,7 @@ class OrganizationService {
       address?: string;
       phone?: string;
       taxId?: string;
+      taxCondition?: string;
       industry?: Industry;
     },
   ) {

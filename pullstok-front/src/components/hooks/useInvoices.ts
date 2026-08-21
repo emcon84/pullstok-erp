@@ -9,6 +9,7 @@ import {
   getInvoices,
   issueInvoice,
   markInvoiceAsPaid,
+  retryInvoiceFiscal,
   updateInvoice,
 } from "../../services/invoiceServices";
 import {
@@ -116,6 +117,22 @@ export const useIssueInvoice = () => {
   return {
     issueInvoice: mutation.mutate,
     loadingIssue: mutation.isPending,
+  };
+};
+
+export const useRetryInvoiceFiscal = () => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation<Invoice, Error, string>({
+    mutationFn: retryInvoiceFiscal,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+
+  return {
+    retryInvoiceFiscal: mutation.mutate,
+    loadingRetry: mutation.isPending,
   };
 };
 
