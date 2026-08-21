@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <LoginCmsResponse xmlns="http://wsaa.view.sua.dvadac.desein.afip.gov">
-      <LoginCmsReturn>PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPGF1dGhTcmM+Cjx0b2tlbj50b2tlbi1ob21vLTEyMzQ8L3Rva2VuPgo8c2lnbj5zaWduLWhvbW8tYWJjPC9zaWduPgo8Y3VpdD4zMDcwOTcwNjcwMTwvY3VpdD4KPGdlbmVyYXRpb25UaW1lPjIwMjYtMDgtMThUMTI6MDA6MDAtMDM6MDA8L2dlbmVyYXRpb25UaW1lPgo8ZXhwaXJhdGlvblRpbWU+MjAyNi0wOC0xOVQxMjowMDowMC0wMzowMDwvZXhwaXJhdGlvblRpbWU+CjwvYXV0aFNyYz4=</LoginCmsReturn>
-    </LoginCmsResponse>
-  </soap:Body>
-</soap:Envelope>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <soapenv:Body>
+    <ns1:loginCmsResponse xmlns:ns1="http://wsaa.view.sua.dvadac.desein.afip.gov">
+      <ns1:loginCmsReturn>PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPGF1dGhTcmM+Cjx0b2tlbj50b2tlbi1ob21vLTEyMzQ8L3Rva2VuPgo8c2lnbj5zaWduLWhvbW8tYWJjPC9zaWduPgo8Y3VpdD4zMDcwOTcwNjcwMTwvY3VpdD4KPGdlbmVyYXRpb25UaW1lPjIwMjYtMDgtMThUMTI6MDA6MDAtMDM6MDA8L2dlbmVyYXRpb25UaW1lPgo8ZXhwaXJhdGlvblRpbWU+MjAyNi0wOC0xOVQxMjowMDowMC0wMzowMDwvZXhwaXJhdGlvblRpbWU+CjwvYXV0aFNyYz4=</ns1:loginCmsReturn>
+    </ns1:loginCmsResponse>
+  </soapenv:Body>
+</soapenv:Envelope>

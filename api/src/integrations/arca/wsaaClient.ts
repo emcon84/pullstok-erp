@@ -56,14 +56,26 @@ export const parseLoginCmsResponse = (xml: string): TicketAcceso => {
     // Si WSAA devuelve un fault SOAP (p.ej. xml.expirationTime.invalid,
     // coe.alreadyAuthenticated), reportar el faultstring real de AFIP en vez
     // de un mensaje genérico que oscurece la causa.
-    const fault = obj.Envelope?.Body?.Fault;
+    const fault = obj.Envelope?.Body?.Fault ?? obj.Envelope?.Body?.fault;
     if (fault) {
       const code = fault.faultcode ?? "desconocido";
       const message = fault.faultstring ?? String(fault.detail ?? "");
       throw new Error(`WSAA fault ${code}: ${message}`);
     }
 
-    const b64 = obj.Envelope?.Body?.LoginCmsResponse?.LoginCmsReturn;
+    // El WSDL de WSAA define el response como `loginCmsResponse` /
+    // `loginCmsReturn` (camelCase). Toleramos también la variante PascalCase
+    // por compatibilidad con proxys/servidores que capitalizan el elemento.
+    const body = obj.Envelope?.Body;
+    const response =
+      body?.loginCmsResponse ??
+      body?.LoginCmsResponse ??
+      body?.loginCmsReturn ??
+      body?.LoginCmsReturn;
+    const b64 =
+      response?.loginCmsReturn ??
+      response?.LoginCmsReturn ??
+      (typeof response === "string" ? response : undefined);
     if (!b64) {
       throw new Error("LoginCmsReturn ausente en la respuesta");
     }

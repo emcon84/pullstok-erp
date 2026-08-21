@@ -73,6 +73,22 @@ describe("parseLoginCmsResponse", () => {
     expect(ta.expirationTime).toEqual(new Date("2026-08-19T12:00:00-03:00"));
   });
 
+  it("tolera la variante PascalCase (LoginCmsResponse/LoginCmsReturn)", () => {
+    const xml = fs.readFileSync(path.join(FIXTURES, "loginCms_ok.xml"), "utf8");
+    const pascal = xml.replace(/loginCmsResponse/g, "LoginCmsResponse").replace(/loginCmsReturn/g, "LoginCmsReturn");
+    const ta = parseLoginCmsResponse(pascal);
+    expect(ta.token).toBe("token-homo-1234");
+  });
+
+  it("tolera LoginCmsReturn directo en el Body (sin wrapper)", () => {
+    const xml =
+      '<?xml version="1.0"?><soap:Envelope><soap:Body>' +
+      "<LoginCmsReturn>PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPGF1dGhTcmM+Cjx0b2tlbj50b2tlbi1ob21vLTEyMzQ8L3Rva2VuPgo8c2lnbj5zaWduLWhvbW8tYWJjPC9zaWduPgo8Y3VpdD4zMDcwOTcwNjcwMTwvY3VpdD4KPGdlbmVyYXRpb25UaW1lPjIwMjYtMDgtMThUMTI6MDA6MDAtMDM6MDA8L2dlbmVyYXRpb25UaW1lPgo8ZXhwaXJhdGlvblRpbWU+MjAyNi0wOC0xOVQxMjowMDowMC0wMzowMDwvZXhwaXJhdGlvblRpbWU+CjwvYXV0aFNyYz4=</LoginCmsReturn>" +
+      "</soap:Body></soap:Envelope>";
+    const ta = parseLoginCmsResponse(xml);
+    expect(ta.token).toBe("token-homo-1234");
+  });
+
   it("LoginCmsReturn inválido (no es XML) → ArcaError ARCA_AUTH_ERROR (502)", () => {
     const xml = "<?xml version=\"1.0\"?><soap:Envelope><soap:Body><LoginCmsResponse><LoginCmsReturn>no-es-base64!!!</LoginCmsReturn></LoginCmsResponse></soap:Body></soap:Envelope>";
     let caught: unknown;
