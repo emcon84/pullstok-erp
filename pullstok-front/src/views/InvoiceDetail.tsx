@@ -26,6 +26,7 @@ import { InvoiceStatus, PaymentStatus, Invoice } from "../models/invoiceModel";
 import { exportToPDF } from "../utils/exportToPDF";
 import { useConfirm } from "../components/hooks/useConfirm";
 import { getMe } from "../services/onboardingService";
+import { useBranding } from "../components/hooks/useBranding";
 
 /**
  * Módulo Facturación de Servicios (sdd/facturacion-servicios, WS4+WS5).
@@ -33,13 +34,16 @@ import { getMe } from "../services/onboardingService";
  * totales y botones de transición de estado (Emitir/Cobrar/Cancelar) según
  * el status actual.
  *
- * PDF "comprobante no fiscal" (WS5): usa la firma extendida de
+ * PDF (WS5): usa la firma extendida de
  * exportToPDF.ts (InvoicePdfData) pasando datos fiscales de emisor y
- * cliente. El emisor (Organization: name/taxId/taxCondition) se lee con
- * useQuery(["me"]) — MISMO queryKey que ProtectedLayout.tsx ya usa para
- * gatear toda la app, así que reutiliza el cache de TanStack Query sin
- * disparar un fetch nuevo a /auth/me en la navegación normal (no se agregó
- * ninguna llamada nueva a auth, solo se lee el cache ya poblado). El
+ * cliente, y los datos ARCA (tipoComprobante/puntoVenta/cbteNro/cae/
+ * caeVencimiento) para el comprobante fiscal estándar cuando la factura ya
+ * fue emitida contra ARCA. El emisor (Organization: name/taxId/taxCondition)
+ * se lee con useQuery(["me"]) — MISMO queryKey que ProtectedLayout.tsx ya
+ * usa para gatear toda la app, así que reutiliza el cache de TanStack Query
+ * sin disparar un fetch nuevo a /auth/me en la navegación normal (no se
+ * agregó ninguna llamada nueva a auth, solo se lee el cache ya poblado). El
+ * logo del emisor viene de useBranding() (AppBranding.logoUrl). El
  * cliente (Customer.taxId/taxCondition/address) viene en `invoice.customer`
  * y la organización (Organization.taxId/taxCondition/address) en
  * `me.organization`; ambos tipos ya declaran estos campos fiscales
@@ -103,6 +107,8 @@ export const InvoiceDetail = () => {
   // Cache compartido con ProtectedLayout.tsx (mismo queryKey ["me"]) — no
   // dispara request nueva, solo lee los datos de organización ya cargados.
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  // Logo del emisor para el comprobante fiscal (AppBranding.logoUrl).
+  const { branding } = useBranding();
 
   if (loadingInvoice) {
     return (
@@ -190,6 +196,14 @@ export const InvoiceDetail = () => {
       subtotal: invoice.subtotal,
       taxAmount: invoice.taxAmount,
       total: invoice.totalAmount,
+      // Datos fiscales ARCA: presentes ⇒ exportToPDF genera el comprobante
+      // fiscal estándar (con CAE y código de barras); ausentes ⇒ PDF genérico.
+      tipoComprobante: invoice.tipoComprobante ?? undefined,
+      puntoVenta: invoice.puntoVenta ?? undefined,
+      cbteNro: invoice.cbteNro ?? undefined,
+      cae: invoice.cae ?? undefined,
+      caeVencimiento: invoice.caeVencimiento ?? undefined,
+      logoUrl: branding?.logoUrl ?? undefined,
     });
   };
 
