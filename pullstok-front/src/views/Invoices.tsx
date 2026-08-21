@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Plus, Eye, Pencil, FileCheck2, CircleDollarSign, Ban, FileText, RotateCcw } from "lucide-react";
+import { Plus, Eye, Pencil, FileCheck2, CircleDollarSign, Ban, FileText, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,12 +26,12 @@ import { useConfirm } from "../components/hooks/useConfirm";
 import { useQuery } from "@tanstack/react-query";
 import { getMe } from "../services/onboardingService";
 import { useBranding } from "../components/hooks/useBranding";
-import { exportToPDF } from "../utils/exportToPDF";
+import { PrintInvoice } from "../components/molecules/PrintInvoice";
 
 /**
  * Módulo Facturación de Servicios (sdd/facturacion-servicios, WS4).
  * Lista de Invoice con acciones por estado: ver/editar (solo DRAFT)/
- * emitir (DRAFT)/cobrar (ISSUED+PENDING)/cancelar (ISSUED)/PDF.
+ * emitir (DRAFT)/cobrar (ISSUED+PENDING)/cancelar (ISSUED)/imprimir.
  * No toca el sidebar (eso es WS3) — se accede por la ruta directa
  * /facturacion.
  */
@@ -74,8 +74,10 @@ const PAYMENT_LABEL: Record<PaymentStatus, string> = {
   OVERDUE: "Vencida",
 };
 
-/** Export fiscal completo (igual que InvoiceDetail): issuer, receptor, CAE y
- * logo. Sin CAE → el PDF cae al genérico "Comprobante no fiscal" internamente. */
+/** Datos del comprobante imprimible (igual que InvoiceDetail): issuer,
+ * receptor, CAE y logo. Sin CAE → PrintInvoice muestra "Comprobante no
+ * fiscal". Los datos se reutilizan para el <PrintInvoice> de la fila
+ * seleccionada. */
 const buildExport = (
   invoice: Invoice,
   organization: { name?: string; taxId?: string | null; taxCondition?: string | null; address?: string | null } | undefined,
@@ -122,9 +124,27 @@ export const Invoices = () => {
   const { cancelInvoice, loadingCancel } = useCancelInvoice();
   const { retryInvoiceFiscal, loadingRetry } = useRetryInvoiceFiscal();
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+  // Factura seleccionada para imprimir: monta su PrintInvoice en un área
+  // print oculta, dispara window.print() y limpia al cerrar el diálogo
+  // (afterprint) para que un Ctrl+P posterior no reimprima un snapshot
+  // stale. Si el usuario cancela sin cerrar el diálogo, el área queda
+  // montada pero invisible (hidden print:block) — no rompe nada.
+  const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null);
   const confirm = useConfirm();
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const { branding } = useBranding();
+
+  const printInvoice = printInvoiceId
+    ? invoices.find((invoice) => invoice.id === printInvoiceId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (!printInvoiceId) return;
+    window.print();
+    const cleanup = () => setPrintInvoiceId(null);
+    window.addEventListener("afterprint", cleanup);
+    return () => window.removeEventListener("afterprint", cleanup);
+  }, [printInvoiceId]);
 
   const handleIssue = async (invoice: Invoice) => {
     const ok = await confirm({
@@ -347,14 +367,10 @@ export const Invoices = () => {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          title="Exportar PDF"
-                          onClick={() =>
-                            exportToPDF(
-                              buildExport(invoice, me?.organization, branding?.logoUrl ?? null),
-                            )
-                          }
+                          title="Imprimir"
+                          onClick={() => setPrintInvoiceId(invoice.id)}
                         >
-                          <FileText className="h-4 w-4" />
+                          <Printer className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -364,6 +380,14 @@ export const Invoices = () => {
             </TableBody>
           </Table>
         </Card>
+      )}
+
+      {/* Comprobante imprimible de la factura seleccionada: área print oculta
+          (hidden print:block) — solo se ve al imprimir. */}
+      {printInvoice && (
+        <PrintInvoice
+          {...buildExport(printInvoice, me?.organization, branding?.logoUrl ?? null)}
+        />
       )}
     </div>
   );

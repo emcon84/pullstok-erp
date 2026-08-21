@@ -1,0 +1,131 @@
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { PrintInvoice } from "@/components/molecules/PrintInvoice";
+import type { InvoicePdfData } from "@/utils/exportToPDF";
+
+const fiscalData: InvoicePdfData = {
+  title: "Factura",
+  documentNumber: "0002-00000013",
+  date: "21/08/2026",
+  customer: "ACME S.A.",
+  issuer: {
+    name: "Mi Empresa S.R.L.",
+    taxId: "30-12345678-9",
+    taxCondition: "IVA Responsable Inscripto",
+    address: "Av. Siempre Viva 123",
+  },
+  customerTaxId: "30-98765432-1",
+  customerTaxCondition: "IVA Responsable Inscripto",
+  customerAddress: "Calle Falsa 456",
+  items: [
+    {
+      quantity: 2,
+      name: "Servicio de consultoría",
+      price: 50000,
+      taxRate: 21,
+      total: 100000,
+    },
+  ],
+  subtotal: 100000,
+  taxAmount: 21000,
+  total: 121000,
+  tipoComprobante: "1",
+  puntoVenta: 2,
+  cbteNro: 13,
+  cae: "71907643210631",
+  caeVencimiento: "2026-11-21",
+};
+
+describe("PrintInvoice — comprobante fiscal (CAE presente)", () => {
+  it("renderiza emisor, receptor, items y totales", () => {
+    render(<PrintInvoice {...fiscalData} />);
+
+    // Rótulo ORIGINAL + letra + título + número fiscal
+    expect(screen.getByText("ORIGINAL")).toBeInTheDocument();
+    expect(screen.getByText("A")).toBeInTheDocument();
+    expect(screen.getByText("FACTURA A")).toBeInTheDocument();
+    expect(screen.getByText("0002-00000013")).toBeInTheDocument();
+    expect(screen.getByText("Punto de venta: 0002")).toBeInTheDocument();
+
+    // Emisor
+    expect(screen.getByText("Mi Empresa S.R.L.")).toBeInTheDocument();
+    expect(screen.getByText("CUIT: 30-12345678-9")).toBeInTheDocument();
+    // Condición IVA aparece en emisor y receptor (mismo valor)
+    expect(
+      screen.getAllByText("Condición IVA: IVA Responsable Inscripto").length,
+    ).toBeGreaterThan(0);
+
+    // Receptor
+    expect(screen.getByText("Cliente: ACME S.A.")).toBeInTheDocument();
+    expect(screen.getByText("CUIT: 30-98765432-1")).toBeInTheDocument();
+
+    // Items y totales
+    expect(screen.getByText("Servicio de consultoría")).toBeInTheDocument();
+    expect(screen.getByText("21%")).toBeInTheDocument();
+    // $ 100.000,00 aparece en el subtotal de la línea y en el total Subtotal
+    expect(screen.getAllByText("$ 100.000,00").length).toBeGreaterThan(0);
+    expect(screen.getByText("$ 21.000,00")).toBeInTheDocument();
+    expect(screen.getByText("$ 121.000,00")).toBeInTheDocument();
+  });
+
+  it("muestra el logo del emisor cuando viene", () => {
+    render(<PrintInvoice {...fiscalData} logoUrl="https://cdn.example/logo.png" />);
+
+    const logo = screen.getByTestId("print-invoice-logo") as HTMLImageElement;
+    expect(logo.src).toBe("https://cdn.example/logo.png");
+  });
+});
+
+describe("PrintInvoice — zona CAE", () => {
+  it("sin canvas (jsdom) cae al fallback: CAE como texto grande, sin romper", () => {
+    render(<PrintInvoice {...fiscalData} />);
+
+    expect(screen.getByText("CAE: 71907643210631")).toBeInTheDocument();
+    expect(screen.getByText("Vencimiento CAE: 21/11/2026")).toBeInTheDocument();
+    expect(screen.getByText("Comprobante autorizado por ARCA")).toBeInTheDocument();
+    expect(screen.getByText(/www\.afip\.gob\.ar\/fe\/qr/)).toBeInTheDocument();
+
+    const fallback = screen.getByTestId("print-invoice-cae-fallback");
+    expect(fallback.textContent).toBe("71907643210631");
+    expect(screen.queryByTestId("print-invoice-qr")).not.toBeInTheDocument();
+  });
+
+  it("con canvas disponible renderiza el QR como <img>", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillStyle: "",
+      fillRect: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue(
+      "data:image/png;base64,FAKEQR",
+    );
+
+    render(<PrintInvoice {...fiscalData} />);
+
+    const qr = screen.getByTestId("print-invoice-qr") as HTMLImageElement;
+    expect(qr.src).toBe("data:image/png;base64,FAKEQR");
+    expect(screen.queryByTestId("print-invoice-cae-fallback")).not.toBeInTheDocument();
+    // El CAE sigue visible como texto en la zona
+    expect(screen.getByText("CAE: 71907643210631")).toBeInTheDocument();
+  });
+});
+
+describe("PrintInvoice — sin CAE", () => {
+  it("muestra la leyenda 'Comprobante no fiscal' y no renderiza la zona CAE", () => {
+    const { cae, caeVencimiento, tipoComprobante, puntoVenta, cbteNro, ...generic } =
+      fiscalData;
+    void cae;
+    void caeVencimiento;
+    void tipoComprobante;
+    void puntoVenta;
+    void cbteNro;
+
+    render(<PrintInvoice {...generic} />);
+
+    expect(
+      screen.getByText("Comprobante no fiscal — no válido como factura AFIP"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Comprobante autorizado por ARCA")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("print-invoice-qr")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("print-invoice-cae-fallback")).not.toBeInTheDocument();
+  });
+});

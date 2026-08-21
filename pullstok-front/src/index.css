@@ -147,6 +147,13 @@
   }
 }
 
+/* Comprobantes fiscales (PrintInvoice): tamaño A4 exacto con margen
+   razonable para todas las áreas imprimibles (planillas y facturas). */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
 /* Print: only show the product list print area */
 @media print {
   body * {

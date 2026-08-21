@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { ArrowLeft, Pencil, FileCheck2, CircleDollarSign, Ban, FileText, RotateCcw } from "lucide-react";
+import { ArrowLeft, Pencil, FileCheck2, CircleDollarSign, Ban, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,8 @@ import {
   useRetryInvoiceFiscal,
 } from "../components/hooks/useInvoices";
 import { InvoiceStatus, PaymentStatus, Invoice } from "../models/invoiceModel";
-import { exportToPDF } from "../utils/exportToPDF";
+import { PrintInvoice } from "../components/molecules/PrintInvoice";
+import type { InvoicePdfData } from "../utils/exportToPDF";
 import { useConfirm } from "../components/hooks/useConfirm";
 import { getMe } from "../services/onboardingService";
 import { useBranding } from "../components/hooks/useBranding";
@@ -35,11 +36,12 @@ import { useBranding } from "../components/hooks/useBranding";
  * totales y botones de transición de estado (Emitir/Cobrar/Cancelar) según
  * el status actual.
  *
- * PDF (WS5): usa la firma extendida de
- * exportToPDF.ts (InvoicePdfData) pasando datos fiscales de emisor y
- * cliente, y los datos ARCA (tipoComprobante/puntoVenta/cbteNro/cae/
- * caeVencimiento) para el comprobante fiscal estándar cuando la factura ya
- * fue emitida contra ARCA. El emisor (Organization: name/taxId/taxCondition)
+ * Impresión (WS5): el comprobante imprimible es el componente PrintInvoice
+ * (patrón print-area + window.print de PrintPriceList/PrintBulkPriceList),
+ * montado SIEMPRE en el DOM con `hidden print:block` y los datos fiscales de
+ * emisor y cliente, más los datos ARCA (tipoComprobante/puntoVenta/cbteNro/
+ * cae/caeVencimiento) para el comprobante fiscal estándar cuando la factura
+ * ya fue emitida contra ARCA. El emisor (Organization: name/taxId/taxCondition)
  * se lee con useQuery(["me"]) — MISMO queryKey que ProtectedLayout.tsx ya
  * usa para gatear toda la app, así que reutiliza el cache de TanStack Query
  * sin disparar un fetch nuevo a /auth/me en la navegación normal (no se
@@ -199,45 +201,40 @@ export const InvoiceDetail = () => {
     );
   };
 
-  const handleExportPDF = () => {
-    const customer = invoice.customer;
-    const organization = me?.organization;
-
-    exportToPDF({
-      title: "Factura",
-      documentNumber: invoice.number || "Borrador",
-      date: formatDate(invoice.issueDate),
-      customer: invoice.customer?.name,
-      issuer: {
-        name: organization?.name,
-        taxId: organization?.taxId ?? undefined,
-        taxCondition: organization?.taxCondition ?? undefined,
-        address: organization?.address ?? undefined,
-      },
-      customerTaxId: customer?.taxId ?? undefined,
-      customerTaxCondition: customer?.taxCondition ?? undefined,
-      customerAddress: customer?.address ?? undefined,
-      items: invoice.items.map((item) => ({
-        quantity: item.quantity,
-        name: item.description,
-        price: item.unitPrice,
-        taxRate: item.taxRate,
-        total: item.lineTotal ?? item.quantity * item.unitPrice,
-      })),
-      subtotal: invoice.subtotal,
-      taxAmount: invoice.taxAmount,
-      total: invoice.totalAmount,
-      // Datos fiscales ARCA: presentes ⇒ exportToPDF genera el comprobante
-      // fiscal estándar (con CAE y código de barras); ausentes ⇒ PDF genérico.
-      tipoComprobante: invoice.tipoComprobante ?? undefined,
-      puntoVenta: invoice.puntoVenta ?? undefined,
-      cbteNro: invoice.cbteNro ?? undefined,
-      cae: invoice.cae ?? undefined,
-      caeVencimiento: invoice.caeVencimiento ?? undefined,
-      docTipoReceptor: invoice.docTipoReceptor ?? undefined,
-      docNroReceptor: invoice.docNroReceptor ?? undefined,
-      logoUrl: branding?.logoUrl ?? undefined,
-    });
+  const printData: InvoicePdfData = {
+    title: "Factura",
+    documentNumber: invoice.number || "Borrador",
+    date: formatDate(invoice.issueDate),
+    customer: invoice.customer?.name,
+    issuer: {
+      name: me?.organization?.name,
+      taxId: me?.organization?.taxId ?? undefined,
+      taxCondition: me?.organization?.taxCondition ?? undefined,
+      address: me?.organization?.address ?? undefined,
+    },
+    customerTaxId: invoice.customer?.taxId ?? undefined,
+    customerTaxCondition: invoice.customer?.taxCondition ?? undefined,
+    customerAddress: invoice.customer?.address ?? undefined,
+    items: invoice.items.map((item) => ({
+      quantity: item.quantity,
+      name: item.description,
+      price: item.unitPrice,
+      taxRate: item.taxRate,
+      total: item.lineTotal ?? item.quantity * item.unitPrice,
+    })),
+    subtotal: invoice.subtotal,
+    taxAmount: invoice.taxAmount,
+    total: invoice.totalAmount,
+    // Datos fiscales ARCA: presentes ⇒ PrintInvoice renderiza el comprobante
+    // fiscal estándar (con CAE y QR); ausentes ⇒ comprobante no fiscal.
+    tipoComprobante: invoice.tipoComprobante ?? undefined,
+    puntoVenta: invoice.puntoVenta ?? undefined,
+    cbteNro: invoice.cbteNro ?? undefined,
+    cae: invoice.cae ?? undefined,
+    caeVencimiento: invoice.caeVencimiento ?? undefined,
+    docTipoReceptor: invoice.docTipoReceptor ?? undefined,
+    docNroReceptor: invoice.docNroReceptor ?? undefined,
+    logoUrl: branding?.logoUrl ?? undefined,
   };
 
   const busy = actionPending || loadingIssue || loadingRetry || loadingMarkAsPaid || loadingCancel;
@@ -303,9 +300,9 @@ export const InvoiceDetail = () => {
               Cancelar
             </Button>
           )}
-          <Button variant="outline" onClick={handleExportPDF}>
-            <FileText className="h-4 w-4" />
-            Exportar PDF
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="h-4 w-4" />
+            Imprimir factura
           </Button>
         </div>
       </div>
@@ -438,6 +435,10 @@ export const InvoiceDetail = () => {
           </>
         )}
       </Card>
+
+      {/* Comprobante imprimible: SIEMPRE montado con los datos actuales
+          (hidden print:block) — el botón solo dispara window.print(). */}
+      <PrintInvoice {...printData} />
     </div>
   );
 };
