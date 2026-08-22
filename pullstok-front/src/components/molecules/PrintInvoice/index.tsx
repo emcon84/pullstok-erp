@@ -59,11 +59,9 @@ const fiscalNumber = (data: InvoicePdfData): string | null =>
     : null;
 
 const comprobanteTitle = (data: InvoicePdfData): string =>
-  data.tipoComprobante === "1"
-    ? "FACTURA A"
-    : data.tipoComprobante === "6"
-      ? "FACTURA B"
-      : (data.title || "FACTURA").toUpperCase();
+  data.tipoComprobante === "1" || data.tipoComprobante === "6"
+    ? "FACTURA"
+    : (data.title || "FACTURA").toUpperCase();
 
 const comprobanteLetter = (data: InvoicePdfData): string =>
   data.tipoComprobante === "1" ? "A" : data.tipoComprobante === "6" ? "B" : "";
@@ -148,8 +146,8 @@ export const PrintInvoice = (data: InvoicePdfData) => {
 
             {/* Comprobante */}
             <div style={styles.colComprobante}>
-              <div style={styles.tipoComprobante}>{comprobanteTitle(data)}</div>
-              <div style={styles.rowInfo}>
+              <div style={styles.tipoComprobante}>
+                {comprobanteTitle(data)}{" "}
                 {fiscalNumber(data) ?? comprobanteRef(data)}
               </div>
               <div style={styles.rowInfo}>

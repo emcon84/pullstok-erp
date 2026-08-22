@@ -43,8 +43,7 @@ describe("PrintInvoice — comprobante fiscal (CAE presente)", () => {
     // Rótulo ORIGINAL + letra + título + número fiscal
     expect(screen.getByText("ORIGINAL")).toBeInTheDocument();
     expect(screen.getByText("A")).toBeInTheDocument();
-    expect(screen.getByText("FACTURA A")).toBeInTheDocument();
-    expect(screen.getByText("0002-00000013")).toBeInTheDocument();
+    expect(screen.getByText("FACTURA 0002-00000013")).toBeInTheDocument();
 
     // Emisor: sin labels — texto de dirección y condición IVA centrado con el logo
     expect(screen.getByText("Av. Siempre Viva 123")).toBeInTheDocument();
