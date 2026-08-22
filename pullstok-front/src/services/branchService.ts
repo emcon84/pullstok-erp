@@ -7,6 +7,8 @@ export interface BranchData {
   address?: string;
   phone?: string;
   isActive: boolean;
+  // Punto de venta fiscal de la sucursal (sdd/sucursales-pv-facturacion).
+  puntoVenta?: number | null;
   createdAt: string;
 }
 
@@ -14,12 +16,14 @@ export interface CreateBranchPayload {
   name: string;
   address?: string;
   phone?: string;
+  puntoVenta?: number;
 }
 
 export interface UpdateBranchPayload {
   name?: string;
   address?: string;
   phone?: string;
+  puntoVenta?: number | null;
 }
 
 const authHeaders = () => ({

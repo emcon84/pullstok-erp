@@ -52,11 +52,13 @@ export const BranchesPage = () => {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
+  const [puntoVenta, setPuntoVenta] = useState("");
 
   const [editBranch, setEditBranch] = useState<BranchData | null>(null);
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editPuntoVenta, setEditPuntoVenta] = useState("");
 
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -66,11 +68,18 @@ export const BranchesPage = () => {
       toast.error("El nombre es requerido");
       return;
     }
+    const pv =
+      puntoVenta.trim() === "" ? undefined : Number(puntoVenta.trim());
+    if (pv != null && (Number.isNaN(pv) || pv < 1 || pv > 9999)) {
+      toast.error("El punto de venta debe estar entre 1 y 9999");
+      return;
+    }
     createBranch(
       {
         name: name.trim(),
         address: address.trim() || undefined,
         phone: phone.trim() || undefined,
+        ...(pv != null ? { puntoVenta: pv } : {}),
       },
       {
         onSuccess: () => {
@@ -78,6 +87,7 @@ export const BranchesPage = () => {
           setName("");
           setAddress("");
           setPhone("");
+          setPuntoVenta("");
           setDialogOpen(false);
           refetch();
         },
@@ -126,6 +136,7 @@ export const BranchesPage = () => {
     setEditName(branch.name);
     setEditAddress(branch.address || "");
     setEditPhone(branch.phone || "");
+    setEditPuntoVenta(branch.puntoVenta != null ? String(branch.puntoVenta) : "");
   };
 
   const handleUpdate = () => {
@@ -134,6 +145,15 @@ export const BranchesPage = () => {
     if (editName !== editBranch.name) data.name = editName || undefined;
     if (editAddress !== (editBranch.address || "")) data.address = editAddress || null;
     if (editPhone !== (editBranch.phone || "")) data.phone = editPhone || null;
+    const currentPv = editBranch.puntoVenta != null ? String(editBranch.puntoVenta) : "";
+    if (editPuntoVenta !== currentPv) {
+      const pv = editPuntoVenta.trim() === "" ? null : Number(editPuntoVenta.trim());
+      if (pv != null && pv !== null && (Number.isNaN(pv) || pv < 1 || pv > 9999)) {
+        toast.error("El punto de venta debe estar entre 1 y 9999");
+        return;
+      }
+      data.puntoVenta = pv;
+    }
 
     if (Object.keys(data).length === 0) {
       setEditBranch(null);
@@ -214,6 +234,18 @@ export const BranchesPage = () => {
                   onChange={(e) => setPhone(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="b-pv">Punto de venta</Label>
+                <Input
+                  id="b-pv"
+                  type="number"
+                  min="1"
+                  max="9999"
+                  placeholder="Ej. 5 (opcional)"
+                  value={puntoVenta}
+                  onChange={(e) => setPuntoVenta(e.target.value)}
+                />
+              </div>
               <Button
                 className="w-full"
                 onClick={handleCreate}
@@ -240,6 +272,7 @@ export const BranchesPage = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
+                <TableHead className="hidden sm:table-cell">Punto de venta</TableHead>
                 <TableHead className="hidden sm:table-cell">Dirección</TableHead>
                 <TableHead className="hidden sm:table-cell">Teléfono</TableHead>
                 <TableHead className="hidden sm:table-cell">Creado</TableHead>
@@ -250,6 +283,9 @@ export const BranchesPage = () => {
               {branches.map((branch) => (
                 <TableRow key={branch.id}>
                   <TableCell className="font-medium">{branch.name}</TableCell>
+                  <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
+                    {branch.puntoVenta ?? "—"}
+                  </TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                     {branch.address || "—"}
                   </TableCell>
@@ -271,6 +307,7 @@ export const BranchesPage = () => {
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label="Editar sucursal"
                         className="h-8 w-8 text-muted-foreground hover:text-primary"
                         onClick={() => openEdit(branch)}
                       >
@@ -323,6 +360,17 @@ export const BranchesPage = () => {
               <Input
                 value={editPhone}
                 onChange={(e) => setEditPhone(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Punto de venta</Label>
+              <Input
+                type="number"
+                min="1"
+                max="9999"
+                placeholder="Ej. 5 (opcional)"
+                value={editPuntoVenta}
+                onChange={(e) => setEditPuntoVenta(e.target.value)}
               />
             </div>
             <Button
