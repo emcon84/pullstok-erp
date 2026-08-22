@@ -46,9 +46,8 @@ describe("PrintInvoice — comprobante fiscal (CAE presente)", () => {
     expect(screen.getByText("FACTURA A")).toBeInTheDocument();
     expect(screen.getByText(/fac-A-0002-00000013/)).toBeInTheDocument();
 
-    // Emisor (nombre en Razón Social; el grande se quitó porque el logo ya lo trae)
-    expect(screen.getAllByText("Mi Empresa S.R.L.").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Razón Social:/)).toBeInTheDocument();
+    // Emisor: el nombre en grande y Razón Social se quitaron (el logo ya lo trae);
+    // quedan Domicilio y Condición IVA (Responsable Inscripto).
     expect(screen.getAllByText(/Domicilio:/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Condición IVA:/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/CUIT:/).length).toBeGreaterThan(0);
@@ -92,6 +91,7 @@ describe("PrintInvoice — zona CAE", () => {
     expect(screen.getByText("Fecha Vto CAE:")).toBeInTheDocument();
     expect(screen.getByText("21/11/2026")).toBeInTheDocument();
     expect(screen.getByText("Comprobante Autorizado")).toBeInTheDocument();
+    expect(screen.getByText("ARCA")).toBeInTheDocument();
 
     const fallback = screen.getByTestId("print-invoice-cae-fallback");
     expect(fallback.textContent).toBe("71907643210631");
@@ -128,7 +128,7 @@ describe("PrintInvoice — sin CAE", () => {
     render(<PrintInvoice {...generic} />);
 
     expect(
-      screen.getByText("Comprobante no fiscal — no válido como factura AFIP"),
+      screen.getByText("Comprobante no fiscal — no válido como factura ARCA"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Comprobante Autorizado")).not.toBeInTheDocument();
     expect(screen.queryByTestId("print-invoice-qr")).not.toBeInTheDocument();

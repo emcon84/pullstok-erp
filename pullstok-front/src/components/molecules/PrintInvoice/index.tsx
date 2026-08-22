@@ -21,7 +21,7 @@ import logoUrl from "@/assets/logo-vertical.png";
  */
 const MISSING_LABEL = "(sin datos fiscales)";
 const FISCAL_LEGEND = "Comprobante Autorizado";
-const NON_FISCAL_LEGEND = "Comprobante no fiscal — no válido como factura AFIP";
+const NON_FISCAL_LEGEND = "Comprobante no fiscal — no válido como factura ARCA";
 
 const fiscalField = (value?: string | null) =>
   value && value.trim() ? value : MISSING_LABEL;
@@ -135,12 +135,8 @@ export const PrintInvoice = (data: InvoicePdfData) => {
                 src={logoUrl}
                 alt="Logo"
                 data-testid="print-invoice-logo"
-                style={{ ...styles.logo, marginBottom: 12 }}
+                style={{ ...styles.logo, marginBottom: 16 }}
               />
-              <div style={styles.rowInfo}>
-                <span style={styles.lbl}>Razón Social:</span>{" "}
-                {fiscalField(data.issuer?.name)}
-              </div>
               <div style={styles.rowInfo}>
                 <span style={styles.lbl}>Domicilio:</span>{" "}
                 {fiscalField(data.issuer?.address)}
@@ -192,9 +188,10 @@ export const PrintInvoice = (data: InvoicePdfData) => {
           </div>
         </div>
 
-        {/* Tabla de ítems */}
-        <table style={styles.table}>
-          <thead>
+        {/* Tabla de ítems — flex:1 para que llene el alto de la hoja */}
+        <div style={styles.tableArea}>
+          <table style={styles.table}>
+            <thead>
             <tr>
               <th style={{ ...styles.th, width: "10%" }}>Código</th>
               <th style={{ ...styles.th, width: "35%" }}>Descripción</th>
@@ -246,7 +243,8 @@ export const PrintInvoice = (data: InvoicePdfData) => {
               ),
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
 
         {/* Totales */}
         <div style={styles.totales}>
@@ -285,7 +283,7 @@ export const PrintInvoice = (data: InvoicePdfData) => {
               {qrDataUrl ? (
                 <img
                   src={qrDataUrl}
-                  alt="Código QR AFIP"
+                  alt="Código QR ARCA"
                   data-testid="print-invoice-qr"
                   style={styles.qrImg}
                 />
@@ -298,7 +296,7 @@ export const PrintInvoice = (data: InvoicePdfData) => {
                 </span>
               )}
               <div>
-                <div style={styles.afipLogoText}>AFIP</div>
+                <div style={styles.afipLogoText}>ARCA</div>
                 <div style={{ fontSize: 9 }}>{FISCAL_LEGEND}</div>
               </div>
             </div>
@@ -334,6 +332,8 @@ const styles = {
     fontFamily: "Arial, Helvetica, sans-serif",
     fontSize: 11,
     color: "#000",
+    display: "flex",
+    flexDirection: "column",
   } as const,
   original: {
     textAlign: "center" as const,
@@ -415,7 +415,13 @@ const styles = {
   table: {
     width: "100%",
     borderCollapse: "collapse" as const,
-    marginBottom: 20,
+  },
+  /* Envuelve la tabla de ítems y la estira para llenar el alto de la hoja,
+     empujando los totales y el footer al final del A4. */
+  tableArea: {
+    flex: 1,
+    display: "flex" as const,
+    flexDirection: "column" as const,
   },
   th: {
     borderBottom: "1px solid #000",
@@ -436,7 +442,6 @@ const styles = {
     display: "flex" as const,
     justifyContent: "space-between" as const,
     alignItems: "flex-start" as const,
-    marginTop: 100,
   },
   pagosInfo: {
     fontWeight: "bold" as const,
