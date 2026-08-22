@@ -170,7 +170,7 @@ describe("InvoiceForm — buscador de productos con autocompletado de precio", (
       loadingCreate: false,
     });
     mockUseCustomers.mockReturnValue({
-      customers: [{ id: "c-1", name: "Juan" }],
+      customers: [{ id: "c-1", name: "Juan", email: "", phone: "" }],
       loadingCustomer: false,
       errorCustomer: null,
     });
@@ -208,7 +208,7 @@ describe("InvoiceForm — buscador de productos con autocompletado de precio", (
       loadingCreate: false,
     });
     mockUseCustomers.mockReturnValue({
-      customers: [{ id: "c-1", name: "Juan" }],
+      customers: [{ id: "c-1", name: "Juan", email: "", phone: "" }],
       loadingCustomer: false,
       errorCustomer: null,
     });

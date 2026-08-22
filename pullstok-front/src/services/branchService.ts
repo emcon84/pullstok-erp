@@ -4,8 +4,8 @@ import { API_URL } from "../constants";
 export interface BranchData {
   id: string;
   name: string;
-  address?: string;
-  phone?: string;
+  address?: string | null;
+  phone?: string | null;
   isActive: boolean;
   // Punto de venta fiscal de la sucursal (sdd/sucursales-pv-facturacion).
   puntoVenta?: number | null;
