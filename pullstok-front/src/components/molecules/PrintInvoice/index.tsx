@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { InvoicePdfData } from "@/utils/exportToPDF";
 import type { AfipQrPayload } from "@/utils/afipQr";
 import { useAfipQrImage } from "@/components/hooks/useAfipQrImage";
+import logoUrl from "@/assets/logo-vertical.png";
 
 /**
  * Comprobante de factura IMPRIMIBLE (patrón print-area + window.print).
@@ -113,7 +114,7 @@ export const PrintInvoice = (data: InvoicePdfData) => {
   while (tableRows.length < 6) tableRows.push(null);
 
   return (
-    <div className="print-area hidden print:block" aria-hidden="true">
+    <div className="print-area print-invoice-area hidden print:block" aria-hidden="true">
       <div className="factura-card" style={styles.card}>
         {/* Franja ORIGINAL */}
         <div style={styles.original}>ORIGINAL</div>
@@ -130,15 +131,12 @@ export const PrintInvoice = (data: InvoicePdfData) => {
           <div style={styles.headerColumns}>
             {/* Emisor */}
             <div style={styles.colEmisor}>
-              {data.logoUrl && (
-                <img
-                  src={data.logoUrl}
-                  alt="Logo"
-                  data-testid="print-invoice-logo"
-                  style={{ ...styles.logo, marginBottom: 12 }}
-                />
-              )}
-              <div style={styles.nombreEmisor}>{fiscalField(data.issuer?.name)}</div>
+              <img
+                src={logoUrl}
+                alt="Logo"
+                data-testid="print-invoice-logo"
+                style={{ ...styles.logo, marginBottom: 12 }}
+              />
               <div style={styles.rowInfo}>
                 <span style={styles.lbl}>Razón Social:</span>{" "}
                 {fiscalField(data.issuer?.name)}
@@ -328,7 +326,8 @@ export const PrintInvoice = (data: InvoicePdfData) => {
 
 const styles = {
   card: {
-    width: 780,
+    width: "100%",
+    minHeight: "273mm",
     margin: "0 auto",
     backgroundColor: "#fff",
     border: "1px solid #000",
@@ -387,12 +386,6 @@ const styles = {
     width: "50%",
     padding: "15px 15px 10px 40px",
   },
-  nombreEmisor: {
-    fontSize: 22,
-    fontWeight: "bold" as const,
-    marginBottom: 25,
-    textAlign: "center" as const,
-  },
   tipoComprobante: {
     fontSize: 16,
     fontWeight: "bold" as const,
@@ -408,7 +401,7 @@ const styles = {
     display: "inline-block" as const,
   },
   logo: {
-    height: 40,
+    height: 48,
     width: "auto",
     maxWidth: "100%",
     objectFit: "contain" as const,

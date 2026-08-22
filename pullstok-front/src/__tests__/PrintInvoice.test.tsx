@@ -46,7 +46,7 @@ describe("PrintInvoice — comprobante fiscal (CAE presente)", () => {
     expect(screen.getByText("FACTURA A")).toBeInTheDocument();
     expect(screen.getByText(/fac-A-0002-00000013/)).toBeInTheDocument();
 
-    // Emisor (nombre aparece en grande + Razón Social)
+    // Emisor (nombre en Razón Social; el grande se quitó porque el logo ya lo trae)
     expect(screen.getAllByText("Mi Empresa S.R.L.").length).toBeGreaterThan(0);
     expect(screen.getByText(/Razón Social:/)).toBeInTheDocument();
     expect(screen.getAllByText(/Domicilio:/).length).toBeGreaterThan(0);
@@ -64,11 +64,11 @@ describe("PrintInvoice — comprobante fiscal (CAE presente)", () => {
     expect(screen.getByText(/Importe Total:/)).toBeInTheDocument();
   });
 
-  it("muestra el logo del emisor cuando viene", () => {
-    render(<PrintInvoice {...fiscalData} logoUrl="https://cdn.example/logo.png" />);
+  it("muestra el logo horizontal del emisor (asset estático de las listas)", () => {
+    render(<PrintInvoice {...fiscalData} />);
 
     const logo = screen.getByTestId("print-invoice-logo") as HTMLImageElement;
-    expect(logo.src).toBe("https://cdn.example/logo.png");
+    expect(logo.src).toContain("logo-vertical.png");
   });
 
   it("tabla con 7 columnas y filas vacías de relleno", () => {

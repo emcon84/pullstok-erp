@@ -170,6 +170,11 @@
     width: 100%;
     padding: 16px;
   }
+  /* La factura fiscal ocupa la hoja A4 completa: sin padding extra, la
+     tarjeta se estira a todo el área imprimible (márgenes del @page). */
+  .print-area.print-invoice-area {
+    padding: 0;
+  }
   /* Impresiones en negro pleno: forzar texto y bordes a negro sólido para
      que no salgan grises/claras (text-muted-foreground y bordes claros). */
   .print-area,
