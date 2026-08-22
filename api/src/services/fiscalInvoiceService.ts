@@ -106,6 +106,44 @@ const asArcaError = (err: unknown): { code: string; message: string } => {
 };
 
 /**
+ * Resuelve el punto de venta efectivo al emitir (sdd/sucursales-pv-facturacion,
+ * R2/R5/R6/R8/R10). Cadena de precedencia:
+ *   invoice.puntoVenta (snapshot congelado) ?? branch.puntoVenta ?? casaCentral.puntoVenta ?? orgDefaultPv
+ *
+ * - El snapshot (invoice.puntoVenta) devuelve frozen PRIMERO y NUNCA re-resuelve
+ *   (R5/R6: el reintento reutiliza el MISMO PV, aunque la config cambie).
+ * - Branch está en TENANT_MODELS (db.ts) → prisma.branch.findFirst recibe el
+ *   organizationId inyectado por la extensión → anti-fuga cross-sucursal (R10).
+ * - Casa central (isHeadquarters=true) es el fallback del branch sin PV (R2).
+ * - Sin casa central → PV global de ArcaSetting (orgDefaultPv) (R2-E3).
+ */
+export const resolvePuntoVenta = async (
+  invoice: { branchId?: string | null; puntoVenta?: number | null },
+  orgDefaultPv: number,
+): Promise<number> => {
+  // Snapshot congelado: si ya hay PV persisted en la invoice, es la verdad.
+  if (invoice.puntoVenta != null) {
+    return invoice.puntoVenta;
+  }
+
+  if (invoice.branchId) {
+    const branch = await prisma.branch.findFirst({ where: { id: invoice.branchId } });
+    if (branch?.puntoVenta != null) {
+      return branch.puntoVenta;
+    }
+  }
+
+  const casaCentral = await prisma.branch.findFirst({
+    where: { isHeadquarters: true },
+  });
+  if (casaCentral?.puntoVenta != null) {
+    return casaCentral.puntoVenta;
+  }
+
+  return orgDefaultPv;
+};
+
+/**
  * Emite fiscalmente una Invoice ISSUED interno (sin CAE) contra ARCA.
  * - Deja la factura en PENDING_CAE con el correlativo reservado ANTES del SOAP.
  * - Corre FECAESolicitar FUERA de la transacción.
@@ -219,11 +257,18 @@ const emitirCore = async (
   const receptor = derived.receptor;
   const tipoCbte = receptor.docTipo === 80 ? "1" : "6";
 
+  // PV efectivo (sdd/sucursales-pv-facturacion R2/R5): el snapshot congelado
+  // de la Invoice manda; si no, la cadena branch ?? casaCentral ?? orgDefault.
+  // El reintento SIEMPRE usa el snapshot (invoice.puntoVenta) — nunca re-resuelve.
+  const pv = await resolvePuntoVenta(invoice, ctx.puntoVenta);
+  // Contexto con el PV efectivo para el SOAP y el request CAE (D2).
+  const ctxPv = { ...ctx, puntoVenta: pv };
+
   // Correlativo: reusar el reservado; si no, reservar vía FECompUltimoAutorizado.
   let cbteNro = invoice.cbteNro as number | null;
   if (cbteNro == null) {
     const last = await client.getLastInvoiceNumber({
-      puntoVenta: ctx.puntoVenta,
+      puntoVenta: pv,
       tipoCbte: Number(tipoCbte),
     });
     cbteNro = last + 1;
@@ -236,7 +281,7 @@ const emitirCore = async (
       data: {
         status: "PENDING_CAE",
         cbteNro,
-        puntoVenta: ctx.puntoVenta,
+        puntoVenta: pv,
         tipoComprobante: tipoCbte,
         docTipoReceptor: receptor.docTipo,
         docNroReceptor: receptor.docNro,
@@ -247,14 +292,14 @@ const emitirCore = async (
       where: {
         organizationId_puntoVenta_tipoCbte: {
           organizationId: ctx.organizationId,
-          puntoVenta: ctx.puntoVenta,
+          puntoVenta: pv,
           tipoCbte,
         },
       },
       update: { lastReserved: cbteNro },
       create: {
         organizationId: ctx.organizationId,
-        puntoVenta: ctx.puntoVenta,
+        puntoVenta: pv,
         tipoCbte,
         lastReserved: cbteNro,
       },
@@ -262,7 +307,7 @@ const emitirCore = async (
   });
 
   // SOAP FUERA de la transacción (timeout ≥ 30 s + retry en la capa).
-  const caeReq = buildCaeRequest(invoice, ctx, cbteNro, tipoCbte, receptor);
+  const caeReq = buildCaeRequest(invoice, ctxPv, cbteNro, tipoCbte, receptor);
 
   let result;
   try {
@@ -275,7 +320,7 @@ const emitirCore = async (
     // factura en PENDING_CAE permanente.
     if (code === ARCA_ERROR_CODES.ARCA_ALREADY_AUTHORIZED) {
       const consulta = await client.consultarComprobante({
-        puntoVenta: ctx.puntoVenta,
+        puntoVenta: pv,
         tipoCbte: Number(tipoCbte),
         cbteNro,
       });

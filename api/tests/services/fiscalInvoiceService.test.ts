@@ -2,6 +2,7 @@ import { prisma, basePrisma } from "../../src/config/db";
 import {
   emitirFiscalmente,
   reintentarFiscalmente,
+  resolvePuntoVenta,
 } from "../../src/services/fiscalInvoiceService";
 import {
   ArcaClientMock,
@@ -16,6 +17,7 @@ import type { ArcaAuthContext } from "../../src/integrations/arca/types";
 jest.mock("../../src/config/db", () => ({
   prisma: {
     invoice: { findFirst: jest.fn(), updateMany: jest.fn() },
+    branch: { findFirst: jest.fn() },
     $transaction: jest.fn(),
   },
   basePrisma: {
@@ -30,6 +32,7 @@ jest.mock("../../src/config/tenantContext", () => ({
 
 const mockedPrisma = prisma as unknown as {
   invoice: { findFirst: jest.Mock; updateMany: jest.Mock };
+  branch: { findFirst: jest.Mock };
   $transaction: jest.Mock;
 };
 const mockedBase = basePrisma as unknown as {
@@ -112,6 +115,10 @@ describe("fiscalInvoiceService.emitirFiscalmente", () => {
     jest.clearAllMocks();
     mock = createArcaClientMock();
     mockedBase.arcaSetting.findUnique.mockResolvedValue(SETTING);
+    // Default: sin sucursal ni casa central con PV → resolvePuntoVenta cae al
+    // PV global de la org (ctx.puntoVenta = 2). Los tests de resolvePuntoVenta
+    // lo sobreescriben con mockImplementation por where.
+    mockedPrisma.branch.findFirst.mockResolvedValue(null);
 
     // updateMany MERGEA su data sobre el estado actual (devuelve la DB mutada).
     mockedPrisma.invoice.updateMany.mockImplementation(({ data }: any) => {
@@ -401,5 +408,209 @@ describe("fiscalInvoiceService.emitirFiscalmente", () => {
       (c: any) => c[0]?.data?.status === "ISSUED",
     );
     expect(issued).toBeUndefined();
+  });
+});
+
+describe("fiscalInvoiceService.resolvePuntoVenta (sdd/sucursales-pv-facturacion R2/R5/R6/R8/R10)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedPrisma.branch.findFirst.mockResolvedValue(null);
+  });
+
+  const setBranch = (rows: {
+    branch?: any;
+    hq?: any;
+  }) => {
+    mockedPrisma.branch.findFirst.mockImplementation(({ where }: any) => {
+      if (where?.isHeadquarters === true) {
+        return Promise.resolve(rows.hq ?? null);
+      }
+      if (where?.id) {
+        return Promise.resolve(rows.branch ?? null);
+      }
+      return Promise.resolve(null);
+    });
+  };
+
+  it("snapshot congelado (invoice.puntoVenta) gana y NO re-resuelve (R5/R6)", async () => {
+    // La sucursal tiene PV=5 pero el snapshot dice 7 → gana el snapshot y ni
+    // siquiera se consulta la sucursal.
+    setBranch({ branch: { id: "b-1", puntoVenta: 5 } });
+
+    const pv = await resolvePuntoVenta(
+      { branchId: "b-1", puntoVenta: 7 },
+      2,
+    );
+
+    expect(pv).toBe(7);
+    expect(mockedPrisma.branch.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("R2-E1: PV de la sucursal resuelve cuando no hay snapshot", async () => {
+    setBranch({ branch: { id: "b-1", puntoVenta: 5 } });
+
+    const pv = await resolvePuntoVenta(
+      { branchId: "b-1", puntoVenta: null },
+      2,
+    );
+
+    expect(pv).toBe(5);
+    // Se consulta la sucursal (scoped a la org), no la casa central.
+    expect(mockedPrisma.branch.findFirst).toHaveBeenCalledTimes(1);
+    expect(mockedPrisma.branch.findFirst).toHaveBeenCalledWith({
+      where: { id: "b-1" },
+    });
+  });
+
+  it("R2-E2: sin PV de sucursal → cae a la casa central (isHeadquarters)", async () => {
+    setBranch({
+      branch: { id: "b-1", puntoVenta: null },
+      hq: { id: "b-hq", isHeadquarters: true, puntoVenta: 3 },
+    });
+
+    const pv = await resolvePuntoVenta(
+      { branchId: "b-1", puntoVenta: null },
+      2,
+    );
+
+    expect(pv).toBe(3);
+    expect(mockedPrisma.branch.findFirst).toHaveBeenCalledWith({
+      where: { isHeadquarters: true },
+    });
+  });
+
+  it("R2-E3: sin casa central → PV global de ArcaSetting (orgDefaultPv)", async () => {
+    setBranch({ branch: { id: "b-1", puntoVenta: null } });
+
+    const pv = await resolvePuntoVenta(
+      { branchId: "b-1", puntoVenta: null },
+      2,
+    );
+
+    expect(pv).toBe(2);
+  });
+
+  it("R8: factura legacy sin branchId → resuelve desde la casa central/ PV org", async () => {
+    setBranch({ hq: { id: "b-hq", isHeadquarters: true, puntoVenta: 3 } });
+
+    const pv = await resolvePuntoVenta(
+      { branchId: null, puntoVenta: null },
+      2,
+    );
+
+    expect(pv).toBe(3);
+    // Solo busca la casa central (no intenta resolver un branch inexistente).
+    expect(mockedPrisma.branch.findFirst).toHaveBeenCalledTimes(1);
+    expect(mockedPrisma.branch.findFirst).toHaveBeenCalledWith({
+      where: { isHeadquarters: true },
+    });
+  });
+});
+
+describe("fiscalInvoiceService.emitirCore + PV resuelto (sdd/sucursales-pv-facturacion R2/R5/R6)", () => {
+  let mock: ArcaClientMock;
+  let currentInvoice: any;
+
+  const setBranchPv = (pv: number | null) => {
+    mockedPrisma.branch.findFirst.mockImplementation(({ where }: any) => {
+      if (where?.isHeadquarters === true) {
+        return Promise.resolve(null);
+      }
+      return Promise.resolve({ id: "b-1", puntoVenta: pv });
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mock = createArcaClientMock();
+    mockedBase.arcaSetting.findUnique.mockResolvedValue(SETTING);
+    mockedPrisma.branch.findFirst.mockResolvedValue(null);
+
+    mockedPrisma.invoice.updateMany.mockImplementation(({ data }: any) => {
+      const merged = { ...data };
+      if (data.arcaAttempts && typeof data.arcaAttempts === "object") {
+        merged.arcaAttempts =
+          (currentInvoice.arcaAttempts ?? 0) + data.arcaAttempts.increment;
+      }
+      currentInvoice = { ...currentInvoice, ...merged };
+      return { count: 1 };
+    });
+    mockedPrisma.invoice.findFirst.mockImplementation(() =>
+      Promise.resolve(currentInvoice),
+    );
+    mockedPrisma.$transaction.mockImplementation(
+      async (fn: (tx: any) => any) => fn({ invoice: { updateMany: mockedPrisma.invoice.updateMany } }),
+    );
+    mockedBase.arcaSequence.upsert.mockResolvedValue({
+      organizationId: "org-1",
+      puntoVenta: 2,
+      tipoCbte: "6",
+      lastReserved: 13,
+    });
+  });
+
+  const setInvoice = (inv: any) => {
+    currentInvoice = inv;
+    mockedPrisma.invoice.findFirst.mockImplementation(() =>
+      Promise.resolve(currentInvoice),
+    );
+  };
+
+  it("emite con el PV de la sucursal en TODA la cadena (getLastInv, snapshot, sequence, CAE)", async () => {
+    setBranchPv(5);
+    setInvoice(
+      makeIssuedInvoice({
+        branchId: "b-1",
+        // customer con CUIT válido → Factura B (DocTipo 99 / 0) para fijar tipoCbte=6.
+        customer: { id: "cust-1", taxId: undefined },
+      }),
+    );
+
+    const getLastSpy = jest.spyOn(mock, "getLastInvoiceNumber");
+    const invoice = (await emitirFiscalmente("inv-1", mock, CTX))!;
+
+    // getLastInvoiceNumber con el PV de la sucursal (no el global de la org).
+    expect(getLastSpy).toHaveBeenCalledWith({ puntoVenta: 5, tipoCbte: 6 });
+    // El snapshot se persiste: updateMany escribe puntoVenta = 5.
+    expect(mockedPrisma.invoice.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ puntoVenta: 5 }),
+      }),
+    );
+    // ArcaSequence keyed por (org, pv=5, tipoCbte).
+    expect(mockedBase.arcaSequence.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId_puntoVenta_tipoCbte: expect.objectContaining({ puntoVenta: 5 }),
+        }),
+        create: expect.objectContaining({ puntoVenta: 5 }),
+      }),
+    );
+    // El request CAE llevó el PV de la sucursal.
+    expect(mock.lastCaeRequest?.puntoVenta).toBe(5);
+    // El estado final quedó con el snapshot.
+    expect(currentInvoice.puntoVenta).toBe(5);
+  });
+
+  it("reintento usa el snapshot (invoice.puntoVenta) y NO re-resuelve aunque la sucursal cambie", async () => {
+    // La sucursal ahora tiene PV=9, pero la invoice ya tiene snapshot PV=5.
+    setBranchPv(9);
+    setInvoice(
+      makePendingInvoice({
+        branchId: "b-1",
+        puntoVenta: 5, // snapshot persistido en el primer issue
+        customer: { id: "cust-1", taxId: undefined },
+      }),
+    );
+
+    const getLastSpy = jest.spyOn(mock, "getLastInvoiceNumber");
+    const invoice = (await reintentarFiscalmente("inv-1", mock, CTX))!;
+
+    // No re-resuelve: el branch (PV=9) NO se consulta, gana el snapshot (5).
+    expect(mockedPrisma.branch.findFirst).not.toHaveBeenCalled();
+    // Correlativo reutilizado (no se llama getLastInvoiceNumber).
+    expect(getLastSpy).not.toHaveBeenCalled();
+    expect(mock.lastCaeRequest?.puntoVenta).toBe(5);
+    expect(currentInvoice.puntoVenta).toBe(5);
   });
 });
