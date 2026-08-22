@@ -4,6 +4,7 @@ import {
   isValidCuit,
   deriveReceptorFiscal,
   mapAlicuotaId,
+  mapCondicionIvaId,
 } from "../../src/services/arcaCalc";
 
 // Helper PURO de cálculo fiscal ARCA (sdd/arca-facturacion-electronica, spec 5):
@@ -201,6 +202,58 @@ describe("deriveReceptorFiscal", () => {
     expect(deriveReceptorFiscal("123456")).toEqual({
       ok: false,
       error: "CUIT_INVALIDO",
+    });
+  });
+});
+
+describe("mapCondicionIvaId (deuda técnica item 3)", () => {
+  it("mapea Responsable Inscripto → 1 (tolerante a acentos/mayúsculas)", () => {
+    expect(mapCondicionIvaId("IVA Responsable Inscripto")).toBe(1);
+    expect(mapCondicionIvaId("responsable inscripto")).toBe(1);
+    expect(mapCondicionIvaId("RESPONSABLE INSCRIPTO")).toBe(1);
+  });
+
+  it("mapea Monotributo → 6", () => {
+    expect(mapCondicionIvaId("Monotributista")).toBe(6);
+    expect(mapCondicionIvaId("Monotributo")).toBe(6);
+  });
+
+  it("mapea Exento / No alcanzado → 4", () => {
+    expect(mapCondicionIvaId("Exento")).toBe(4);
+    expect(mapCondicionIvaId("IVA No alcanzado")).toBe(4);
+  });
+
+  it("mapea Consumidor Final → 5", () => {
+    expect(mapCondicionIvaId("Consumidor Final")).toBe(5);
+  });
+
+  it("sin dato o irreconocible → default 5 (Consumidor Final, seguro)", () => {
+    expect(mapCondicionIvaId(null)).toBe(5);
+    expect(mapCondicionIvaId(undefined)).toBe(5);
+    expect(mapCondicionIvaId("")).toBe(5);
+    expect(mapCondicionIvaId("texto random")).toBe(5);
+  });
+});
+
+describe("deriveReceptorFiscal con condición IVA (deuda técnica item 3)", () => {
+  it("DNI + Responsable Inscripto → condIva 1 (no más clavado en 5)", () => {
+    expect(deriveReceptorFiscal("33444555", "IVA Responsable Inscripto")).toEqual({
+      ok: true,
+      receptor: { docTipo: 96, docNro: "33444555", condicionIvaReceptorId: 1 },
+    });
+  });
+
+  it("DNI + Monotributo → condIva 6", () => {
+    expect(deriveReceptorFiscal("33444555", "Monotributista")).toEqual({
+      ok: true,
+      receptor: { docTipo: 96, docNro: "33444555", condicionIvaReceptorId: 6 },
+    });
+  });
+
+  it("DNI + sin condición → condIva 5 (default seguro, compat)", () => {
+    expect(deriveReceptorFiscal("33444555")).toEqual({
+      ok: true,
+      receptor: { docTipo: 96, docNro: "33444555", condicionIvaReceptorId: 5 },
     });
   });
 });

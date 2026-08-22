@@ -124,6 +124,37 @@ export interface ReceptorFiscal {
   condicionIvaReceptorId: number; // 1=RI, 5=Consumidor Final, 6=Monotributo
 }
 
+/**
+ * Mapea la condición IVA en texto libre del cliente al ID de ARCA
+ * (RG 5616: 1=RI, 4=Exento, 5=Consumidor Final, 6=Monotributista).
+ *
+ * La condición IVA del cliente se carga como texto libre en el front (ej.
+ * "IVA Responsable Inscripto", "Monotributo"). Este helper lo normaliza de
+ * forma tolerante (mayúsculas, acentos, "inscripto/inscripta") y cae al
+ * default seguro (5 = Consumidor Final) cuando no hay dato o no se reconoce.
+ */
+export const mapCondicionIvaId = (
+  condicion?: string | null,
+): number => {
+  const s = (condicion ?? "").trim().toLowerCase();
+  if (!s) return 5; // consumidor final (default seguro)
+
+  const unaccent = s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  // Responsable Inscripto (1)
+  if (/responsable inscrip/.test(unaccent)) return 1;
+  // Monotributista (6)
+  if (/monotribut/.test(unaccent)) return 6;
+  // Exento / No alcanzado (4)
+  if (/exent|no alcanzad|no inscript/.test(unaccent)) return 4;
+  // Consumidor Final (5)
+  if (/consumidor final|final/.test(unaccent)) return 5;
+
+  return 5; // default seguro
+};
+
 export type DeriveReceptorResult =
   | { ok: true; receptor: ReceptorFiscal }
   | { ok: false; error: "CUIT_INVALIDO" };
@@ -132,12 +163,15 @@ export type DeriveReceptorResult =
  * Deriva el receptor fiscal del comprobante (design D5, paso 3):
  * - sin taxId → Factura B consumidor final (99 / "0" / condIva 5)
  * - CUIT válido (11 dígitos + DV) → Factura A (80 / CUIT / condIva 1)
- * - DNI (7-8 dígitos) → Factura B identificada (96 / DNI / condIva 5)
+ * - DNI (7-8 dígitos) → Factura B identificada (96 / DNI / condIva según el
+ *   cliente: RI=1, Monotributo=6, Exento=4, default CF=5) — antes estaba
+ *   clavado en 5 (deuda técnica item 3).
  * - CUIT con DV incorrecto o formato irreconocible → CUIT_INVALIDO (spec 5.4:
  *   el error NO avanza la emisión fiscal).
  */
 export const deriveReceptorFiscal = (
   taxId?: string | null,
+  condicionIva?: string | null,
 ): DeriveReceptorResult => {
   const digits = taxId ? normalizeCuit(taxId) : "";
 
@@ -161,7 +195,11 @@ export const deriveReceptorFiscal = (
   if (digits.length >= 7 && digits.length <= 8) {
     return {
       ok: true,
-      receptor: { docTipo: 96, docNro: digits, condicionIvaReceptorId: 5 },
+      receptor: {
+        docTipo: 96,
+        docNro: digits,
+        condicionIvaReceptorId: mapCondicionIvaId(condicionIva),
+      },
     };
   }
 

@@ -59,7 +59,7 @@ interface InvoiceWithRelations {
   cae: string | null;
   caeVencimiento: Date | null;
   cbteNro: number | null;
-  customer?: { taxId?: string | null } | null;
+  customer?: { taxId?: string | null; taxCondition?: string | null } | null;
   items: { quantity: number; unitPrice: number; taxRate: number }[];
 }
 
@@ -304,7 +304,12 @@ const emitirCore = async (
   opts: { allowPending: boolean },
 ) => {
   // Derivación del receptor (spec 5.4): CUIT inválido NO avanza.
-  const derived = deriveReceptorFiscal(invoice.customer?.taxId);
+  // Se pasa la condición IVA real del cliente para Factura B con DNI (deuda
+  // técnica item 3: antes quedaba hardcodeada a 5 = Consumidor Final).
+  const derived = deriveReceptorFiscal(
+    invoice.customer?.taxId,
+    invoice.customer?.taxCondition,
+  );
   if (!derived.ok) {
     throw new ArcaError(
       ARCA_ERROR_CODES.CUIT_INVALIDO,
