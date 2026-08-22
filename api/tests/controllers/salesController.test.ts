@@ -6,6 +6,7 @@
 import { Request, Response } from "express";
 import salesController from "../../src/controllers/salesController";
 import SaleService from "../../src/services/salesService";
+import { prisma } from "../../src/config/db";
 
 jest.mock("../../src/services/salesService", () => ({
   createSale: jest.fn(),
@@ -22,7 +23,11 @@ jest.mock("../../src/services/salesService", () => ({
 }));
 
 jest.mock("../../src/config/db", () => ({
-  prisma: {},
+  prisma: {
+    sale: { findFirst: jest.fn() },
+    customer: { findFirst: jest.fn() },
+    invoice: { create: jest.fn() },
+  },
   basePrisma: {},
 }));
 
@@ -98,5 +103,86 @@ describe("salesController.createSale", () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({ error: "PAYMENTS_DO_NOT_MATCH_TOTAL" }),
     );
+  });
+});
+
+describe("salesController.createInvoiceFromSale — propaga branchId (sdd/sucursales-pv-facturacion R4)", () => {
+  const mockedPrisma = prisma as unknown as {
+    sale: { findFirst: jest.Mock };
+    customer: { findFirst: jest.Mock };
+    invoice: { create: jest.Mock };
+  };
+
+  const mockRequest = (params: any, body: any = {}) =>
+    ({ params, body } as unknown as Request);
+
+  const mockResponse = () => {
+    const res = {} as Response;
+    res.status = jest.fn().mockReturnValue(res);
+    res.json = jest.fn().mockReturnValue(res);
+    return res;
+  };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it("setea invoice.branchId = sale.branchId y el include agrega branch (R4)", async () => {
+    mockedPrisma.sale.findFirst.mockResolvedValue({
+      id: "s-1",
+      branchId: "b-1",
+      invoice: null,
+      items: [{
+        id: "i-1",
+        name: "Producto",
+        quantity: 1,
+        price: 100,
+        category: "cat",
+      }],
+    });
+    mockedPrisma.customer.findFirst.mockResolvedValue({ id: "cust-1" });
+    mockedPrisma.invoice.create.mockResolvedValue({
+      id: "inv-1",
+      branchId: "b-1",
+      status: "DRAFT",
+    });
+
+    const req = mockRequest({ saleId: "s-1" }, { customerId: "cust-1" });
+    const res = mockResponse();
+
+    await salesController.createInvoiceFromSale(req, res);
+
+    expect(mockedPrisma.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ branchId: "b-1" }),
+        include: expect.objectContaining({ branch: true }),
+      }),
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  it("sale sin branchId → la invoice se crea con branchId null (legacy)", async () => {
+    mockedPrisma.sale.findFirst.mockResolvedValue({
+      id: "s-2",
+      branchId: null,
+      invoice: null,
+      items: [{ id: "i-2", name: "Prod", quantity: 1, price: 50, category: "c" }],
+    });
+    mockedPrisma.customer.findFirst.mockResolvedValue({ id: "cust-1" });
+    mockedPrisma.invoice.create.mockResolvedValue({
+      id: "inv-2",
+      branchId: null,
+      status: "DRAFT",
+    });
+
+    const req = mockRequest({ saleId: "s-2" }, { customerId: "cust-1" });
+    const res = mockResponse();
+
+    await salesController.createInvoiceFromSale(req, res);
+
+    expect(mockedPrisma.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ branchId: null }),
+      }),
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
   });
 });

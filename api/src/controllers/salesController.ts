@@ -9,6 +9,7 @@ import { AuthedRequest } from "../middlewares/authMiddleware";
 const invoiceInclude = {
   items: true,
   customer: true,
+  branch: true,
 } as const;
 
 // Create a new sale
@@ -138,6 +139,9 @@ const createInvoiceFromSale = async (req: Request, res: Response) => {
                 organizationId,
                 customerId: resolvedCustomerId,
                 saleId,
+                // Propaga la sucursal de la venta a la factura (sdd/sucursales-
+                // pv-facturacion R4): hoy se descartaba. null en ventas org-wide.
+                branchId: sale.branchId ?? null,
                 dueDate: dueDate ? new Date(dueDate) : undefined,
                 notes,
                 subtotal,

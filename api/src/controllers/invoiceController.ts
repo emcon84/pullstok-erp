@@ -14,6 +14,7 @@ import type { ArcaAuthContext } from "../integrations/arca/types";
 const invoiceInclude = {
   items: true,
   customer: true,
+  branch: true,
 } as const;
 
 // Deriva paymentStatus=OVERDUE en LECTURA cuando dueDate ya pasó y sigue
@@ -56,13 +57,23 @@ const isArcaEnabled = (setting: any): boolean =>
 const createInvoice = async (req: Request, res: Response) => {
   try {
     const organizationId = requireOrganizationId();
-    const { customerId, items, dueDate, notes } = req.body;
+    const { customerId, items, dueDate, notes, branchId } = req.body;
 
     const customer = await prisma.customer.findFirst({
       where: { id: customerId },
     });
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
+    }
+
+    // Sucursal emisora (sdd/sucursales-pv-facturacion R3, opcional). Si viene,
+    // validar que exista en la org (la extensión multi-tenant scopea Branch) →
+    // branchId inexistente/de otra org → 404 (anti-fuga R10). null = fallback.
+    if (branchId != null) {
+      const branch = await prisma.branch.findFirst({ where: { id: branchId } });
+      if (!branch) {
+        return res.status(404).json({ message: "Sucursal no encontrada" });
+      }
     }
 
     const { items: calculatedItems, subtotal, taxAmount, totalAmount } =
@@ -72,6 +83,7 @@ const createInvoice = async (req: Request, res: Response) => {
       data: {
         organizationId,
         customerId,
+        branchId: branchId ?? null,
         dueDate: dueDate ? new Date(dueDate) : undefined,
         notes,
         subtotal,
@@ -130,7 +142,7 @@ const getInvoiceById = async (req: Request, res: Response) => {
 const updateInvoice = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
-    const { customerId, items, dueDate, notes } = req.body;
+    const { customerId, items, dueDate, notes, branchId } = req.body;
 
     const existing = await prisma.invoice.findFirst({ where: { id } });
     if (!existing) {
@@ -140,6 +152,14 @@ const updateInvoice = async (req: Request, res: Response) => {
       return res
         .status(409)
         .json({ message: "Solo se pueden editar facturas en estado DRAFT" });
+    }
+
+    // Sucursal emisora (opcional). Validar existencia si viene un valor concreto.
+    if (branchId != null) {
+      const branch = await prisma.branch.findFirst({ where: { id: branchId } });
+      if (!branch) {
+        return res.status(404).json({ message: "Sucursal no encontrada" });
+      }
     }
 
     const { items: calculatedItems, subtotal, taxAmount, totalAmount } =
@@ -152,6 +172,7 @@ const updateInvoice = async (req: Request, res: Response) => {
         where: { id },
         data: {
           customerId: customerId ?? existing.customerId,
+          branchId: branchId ?? existing.branchId,
           dueDate: dueDate ? new Date(dueDate) : existing.dueDate,
           notes: notes ?? existing.notes,
           subtotal,

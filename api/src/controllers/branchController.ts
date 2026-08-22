@@ -2,9 +2,41 @@ import { Response } from "express";
 import { prisma } from "../config/db";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
+/**
+ * Valida que el punto de venta no pertenezca a OTRA sucursal ACTIVA de la misma
+ * org (R7). `excludeId` excluye la sucursal que se está editando (update self).
+ * El scope de org lo inyecta la extensión multi-tenant de prisma (Branch está
+ * en TENANT_MODELS) → anti-fuga cross-org; las sucursales INACTIVAS no
+ * colisionan (compartir PV con una inactiva está permitido, E2).
+ */
+const hasActiveDuplicatePv = async (
+  puntoVenta: number,
+  excludeId?: string,
+): Promise<boolean> => {
+  const dup = await prisma.branch.findFirst({
+    where: {
+      puntoVenta,
+      isActive: true,
+      ...(excludeId ? { NOT: { id: excludeId } } : {}),
+    },
+  });
+  return !!dup;
+};
+
 /** ADMIN/MANAGEMENT: crea una sucursal en SU organización. */
 export const createBranch = async (req: AuthedRequest, res: Response) => {
   try {
+    const { puntoVenta } = req.body ?? {};
+    if (puntoVenta != null) {
+      const isDuplicate = await hasActiveDuplicatePv(puntoVenta);
+      if (isDuplicate) {
+        return res.status(409).json({
+          message:
+            "Ya existe una sucursal activa con ese punto de venta",
+        });
+      }
+    }
+
     const branch = await prisma.branch.create({ data: req.body });
     res.status(201).json(branch);
   } catch (error: any) {
@@ -30,6 +62,17 @@ export const listBranches = async (_req: AuthedRequest, res: Response) => {
 /** ADMIN/MANAGEMENT: actualiza una sucursal de SU organización. */
 export const updateBranch = async (req: AuthedRequest, res: Response) => {
   try {
+    const { puntoVenta } = req.body ?? {};
+    if (puntoVenta != null) {
+      const isDuplicate = await hasActiveDuplicatePv(puntoVenta, req.params.id);
+      if (isDuplicate) {
+        return res.status(409).json({
+          message:
+            "Ya existe una sucursal activa con ese punto de venta",
+        });
+      }
+    }
+
     const result = await prisma.branch.updateMany({
       where: { id: req.params.id },
       data: req.body,

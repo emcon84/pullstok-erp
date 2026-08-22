@@ -4,7 +4,10 @@ import invoiceController from "../../src/controllers/invoiceController";
 
 jest.mock("../../src/config/db", () => ({
   prisma: {
-    invoice: { findFirst: jest.fn(), updateMany: jest.fn() },
+    invoice: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn() },
+    customer: { findFirst: jest.fn() },
+    branch: { findFirst: jest.fn() },
+    $transaction: jest.fn(),
   },
   basePrisma: {},
 }));
@@ -23,7 +26,10 @@ jest.mock("../../src/integrations/arca/arcaClient", () => ({
 }));
 
 const mockedPrisma = prisma as unknown as {
-  invoice: { findFirst: jest.Mock; updateMany: jest.Mock };
+  invoice: { findFirst: jest.Mock; updateMany: jest.Mock; create: jest.Mock };
+  customer: { findFirst: jest.Mock };
+  branch: { findFirst: jest.Mock };
+  $transaction: jest.Mock;
 };
 
 const mockRequest = (params: any) => ({ params } as unknown as Request);
@@ -96,5 +102,84 @@ describe("invoiceController.cancelInvoice", () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(mockedPrisma.invoice.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("invoiceController.createInvoice + branchId (sdd/sucursales-pv-facturacion R3)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const mockRequest = (body: any) => ({ body } as unknown as Request);
+
+  it("persiste branchId y el include agrega branch (R3)", async () => {
+    mockedPrisma.customer.findFirst.mockResolvedValue({ id: "cust-1" });
+    mockedPrisma.branch.findFirst.mockResolvedValue({ id: "b-1", name: "Centro" });
+    mockedPrisma.invoice.create.mockResolvedValue({
+      id: "inv-1",
+      status: "DRAFT",
+      customerId: "cust-1",
+      branchId: "b-1",
+      branch: { id: "b-1", name: "Centro" },
+      items: [],
+    });
+
+    const req = mockRequest({
+      customerId: "cust-1",
+      branchId: "b-1",
+      items: [{ description: "Servicio", quantity: 1, unitPrice: 100, taxRate: 21 }],
+    });
+    const res = mockResponse();
+
+    await invoiceController.createInvoice(req, res);
+
+    expect(mockedPrisma.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ branchId: "b-1" }),
+        include: expect.objectContaining({ branch: true }),
+      }),
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  it("branchId de una sucursal que NO existe → 404", async () => {
+    mockedPrisma.customer.findFirst.mockResolvedValue({ id: "cust-1" });
+    mockedPrisma.branch.findFirst.mockResolvedValue(null);
+
+    const req = mockRequest({
+      customerId: "cust-1",
+      branchId: "b-noexiste",
+      items: [{ description: "S", quantity: 1, unitPrice: 100, taxRate: 21 }],
+    });
+    const res = mockResponse();
+
+    await invoiceController.createInvoice(req, res);
+
+    expect(mockedPrisma.invoice.create).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it("sin branchId en el body → la factura se crea con branchId null (fallback)", async () => {
+    mockedPrisma.customer.findFirst.mockResolvedValue({ id: "cust-1" });
+    mockedPrisma.invoice.create.mockResolvedValue({
+      id: "inv-2",
+      status: "DRAFT",
+      customerId: "cust-1",
+      branchId: null,
+      items: [],
+    });
+
+    const req = mockRequest({
+      customerId: "cust-1",
+      items: [{ description: "S", quantity: 1, unitPrice: 100, taxRate: 21 }],
+    });
+    const res = mockResponse();
+
+    await invoiceController.createInvoice(req, res);
+
+    expect(mockedPrisma.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ branchId: null }),
+      }),
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
   });
 });

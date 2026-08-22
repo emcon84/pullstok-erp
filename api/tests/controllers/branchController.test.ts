@@ -292,3 +292,114 @@ describe("Branch Controller", () => {
     });
   });
 });
+
+describe("Branch Controller — validación de PV duplicado entre sucursales activas (R7)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe("createBranch", () => {
+    it("createBranch con PV de una sucursal ACTIVA duplicada → 409 y NO crea (E1)", async () => {
+      mockedPrisma.branch.findFirst.mockResolvedValue({
+        id: "b-1",
+        puntoVenta: 5,
+        isActive: true,
+      });
+
+      const req = mockRequest({}, { name: "Otra", puntoVenta: 5 });
+      const res = mockResponse();
+
+      await createBranch(req, res);
+
+      expect(mockedPrisma.branch.create).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/punto de venta/i) }),
+      );
+    });
+
+    it("createBranch con PV sin duplicado activo → 201", async () => {
+      mockedPrisma.branch.findFirst.mockResolvedValue(null);
+      const created = {
+        id: "b-2",
+        name: "Norte",
+        puntoVenta: 7,
+        isActive: true,
+      };
+      mockedPrisma.branch.create.mockResolvedValue(created);
+
+      const req = mockRequest({}, { name: "Norte", puntoVenta: 7 });
+      const res = mockResponse();
+
+      await createBranch(req, res);
+
+      expect(mockedPrisma.branch.create).toHaveBeenCalledWith({
+        data: { name: "Norte", puntoVenta: 7 },
+      });
+      expect(res.status).toHaveBeenCalledWith(201);
+    });
+
+    it("createBranch con el MISMO PV de una sucursal INACTIVA → permitido (E2)", async () => {
+      // findFirst filtra por isActive:true, así que la inactiva no matchea.
+      mockedPrisma.branch.findFirst.mockResolvedValue(null);
+      const created = { id: "b-3", name: "Centro", puntoVenta: 5, isActive: true };
+      mockedPrisma.branch.create.mockResolvedValue(created);
+
+      const req = mockRequest({}, { name: "Centro", puntoVenta: 5 });
+      const res = mockResponse();
+
+      await createBranch(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(mockedPrisma.branch.create).toHaveBeenCalledWith({
+        data: { name: "Centro", puntoVenta: 5 },
+      });
+    });
+  });
+
+  describe("updateBranch", () => {
+    it("updateBranch a PV usado por OTRA sucursal activa → 409 excluyendo self (E3)", async () => {
+      // findFirst del dup-check devuelve otra branch activa con el mismo PV.
+      mockedPrisma.branch.findFirst.mockResolvedValue({
+        id: "b-otro",
+        puntoVenta: 5,
+        isActive: true,
+      });
+
+      const req = mockRequest({ id: "b-self" }, { puntoVenta: 5 });
+      const res = mockResponse();
+
+      await updateBranch(req, res);
+
+      expect(mockedPrisma.branch.updateMany).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(409);
+      // El dup-check excluye la sucursal que se está editando.
+      expect(mockedPrisma.branch.findFirst).toHaveBeenCalledWith({
+        where: { puntoVenta: 5, isActive: true, NOT: { id: "b-self" } },
+      });
+    });
+
+    it("updateBranch al MISMO PV que ya tiene (self) → permitido", async () => {
+      // dup-check excluye self → null; luego el get del post-update devuelve la branch.
+      mockedPrisma.branch.findFirst.mockResolvedValueOnce(null);
+      mockedPrisma.branch.updateMany.mockResolvedValue({ count: 1 });
+      mockedPrisma.branch.findFirst.mockResolvedValueOnce({
+        id: "b-self",
+        name: "Centro",
+        puntoVenta: 5,
+        isActive: true,
+      });
+
+      const req = mockRequest({ id: "b-self" }, { puntoVenta: 5 });
+      const res = mockResponse();
+
+      await updateBranch(req, res);
+
+      expect(mockedPrisma.branch.updateMany).toHaveBeenCalledWith({
+        where: { id: "b-self" },
+        data: { puntoVenta: 5 },
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+  });
+});
