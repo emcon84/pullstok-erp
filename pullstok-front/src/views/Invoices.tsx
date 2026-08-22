@@ -80,7 +80,7 @@ const PAYMENT_LABEL: Record<PaymentStatus, string> = {
  * seleccionada. */
 const buildExport = (
   invoice: Invoice,
-  organization: { name?: string; taxId?: string | null; taxCondition?: string | null; address?: string | null } | undefined,
+  organization: { name?: string; taxId?: string | null; taxCondition?: string | null; address?: string | null; ingresosBrutos?: string | null; inicioActividades?: string | null } | undefined,
   logoUrl: string | null,
 ) => ({
   title: "Factura",
@@ -92,6 +92,8 @@ const buildExport = (
     taxId: organization?.taxId ?? undefined,
     taxCondition: organization?.taxCondition ?? undefined,
     address: organization?.address ?? undefined,
+    ingresosBrutos: organization?.ingresosBrutos ?? undefined,
+    inicioActividades: organization?.inicioActividades ?? undefined,
   },
   customerTaxId: invoice.customer?.taxId ?? undefined,
   customerTaxCondition: invoice.customer?.taxCondition ?? undefined,

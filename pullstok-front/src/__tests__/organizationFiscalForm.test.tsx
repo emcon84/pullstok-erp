@@ -28,6 +28,8 @@ const baseOrg: Organization = {
   address: "Av. Siempreviva 742",
   taxId: "20-12345678-9",
   taxCondition: "IVA Responsable Inscripto",
+  ingresosBrutos: "20-12345678-9",
+  inicioActividades: "01/01/2000",
   onboardingCompletedAt: null,
 };
 
@@ -60,6 +62,12 @@ describe("OrganizationFiscalForm", () => {
     expect(screen.getByLabelText(/dirección/i)).toHaveValue(
       "Av. Siempreviva 742",
     );
+    expect(screen.getByLabelText(/ingresos brutos/i)).toHaveValue(
+      "20-12345678-9",
+    );
+    expect(screen.getByLabelText(/inicio de actividades/i)).toHaveValue(
+      "01/01/2000",
+    );
   });
 
   it("renders empty fields when the organization has no fiscal data", () => {
@@ -69,6 +77,8 @@ describe("OrganizationFiscalForm", () => {
     expect(screen.getByLabelText(/cuit/i)).toHaveValue("");
     expect(screen.getByLabelText(/condición de iva/i)).toHaveValue("");
     expect(screen.getByLabelText(/dirección/i)).toHaveValue("");
+    expect(screen.getByLabelText(/ingresos brutos/i)).toHaveValue("");
+    expect(screen.getByLabelText(/inicio de actividades/i)).toHaveValue("");
   });
 
   it("calls updateOrganization with the form values on submit", async () => {
@@ -83,6 +93,8 @@ describe("OrganizationFiscalForm", () => {
         taxId: "20-12345678-9",
         taxCondition: "IVA Responsable Inscripto",
         address: "Av. Siempreviva 742",
+        ingresosBrutos: "20-12345678-9",
+        inicioActividades: "01/01/2000",
       });
     });
   });

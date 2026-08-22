@@ -211,6 +211,8 @@ export const InvoiceDetail = () => {
       taxId: me?.organization?.taxId ?? undefined,
       taxCondition: me?.organization?.taxCondition ?? undefined,
       address: me?.organization?.address ?? undefined,
+      ingresosBrutos: me?.organization?.ingresosBrutos ?? undefined,
+      inicioActividades: me?.organization?.inicioActividades ?? undefined,
     },
     customerTaxId: invoice.customer?.taxId ?? undefined,
     customerTaxCondition: invoice.customer?.taxCondition ?? undefined,

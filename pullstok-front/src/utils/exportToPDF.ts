@@ -50,6 +50,8 @@ export interface InvoicePdfIssuer {
   taxId?: string;
   taxCondition?: string;
   address?: string;
+  ingresosBrutos?: string;
+  inicioActividades?: string;
 }
 
 export interface InvoicePdfItem extends ExportItem {

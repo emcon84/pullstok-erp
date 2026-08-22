@@ -217,6 +217,8 @@ class AuthService {
             taxId: true,
             taxCondition: true,
             address: true,
+            ingresosBrutos: true,
+            inicioActividades: true,
           },
         },
       },

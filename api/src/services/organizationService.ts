@@ -12,6 +12,8 @@ class OrganizationService {
       phone?: string;
       taxId?: string;
       taxCondition?: string;
+      ingresosBrutos?: string;
+      inicioActividades?: string;
       industry?: Industry;
     },
   ) {

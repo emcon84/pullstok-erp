@@ -34,6 +34,8 @@ export const OrganizationFiscalForm = ({
     taxId: "",
     taxCondition: "",
     address: "",
+    ingresosBrutos: "",
+    inicioActividades: "",
   });
 
   useEffect(() => {
@@ -43,6 +45,8 @@ export const OrganizationFiscalForm = ({
         taxId: toField(organization.taxId),
         taxCondition: toField(organization.taxCondition),
         address: toField(organization.address),
+        ingresosBrutos: toField(organization.ingresosBrutos),
+        inicioActividades: toField(organization.inicioActividades),
       });
     }
   }, [organization]);
@@ -70,6 +74,8 @@ export const OrganizationFiscalForm = ({
       taxId: form.taxId.trim(),
       taxCondition: form.taxCondition.trim(),
       address: form.address.trim(),
+      ingresosBrutos: form.ingresosBrutos.trim(),
+      inicioActividades: form.inicioActividades.trim(),
     });
   };
 
@@ -109,6 +115,26 @@ export const OrganizationFiscalForm = ({
             value={form.taxCondition}
             onChange={(e) => handleField("taxCondition", e.target.value)}
             placeholder="Ej. IVA Responsable Inscripto"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="ingresosBrutos">Ingresos Brutos</Label>
+          <Input
+            id="ingresosBrutos"
+            value={form.ingresosBrutos}
+            onChange={(e) => handleField("ingresosBrutos", e.target.value)}
+            placeholder="Ej. 20-12345678-3"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="inicioActividades">Inicio de Actividades</Label>
+          <Input
+            id="inicioActividades"
+            value={form.inicioActividades}
+            onChange={(e) => handleField("inicioActividades", e.target.value)}
+            placeholder="Ej. 01/01/2000"
           />
         </div>
 

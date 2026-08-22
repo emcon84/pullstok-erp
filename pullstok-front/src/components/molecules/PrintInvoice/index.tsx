@@ -150,16 +150,23 @@ export const PrintInvoice = (data: InvoicePdfData) => {
             <div style={styles.colComprobante}>
               <div style={styles.tipoComprobante}>{comprobanteTitle(data)}</div>
               <div style={styles.rowInfo}>
-                <span style={styles.lbl}>Comprobante:</span> {comprobanteRef(data)}
+                {fiscalNumber(data) ?? comprobanteRef(data)}
               </div>
               <div style={styles.rowInfo}>
-                <span style={styles.lbl}>Fecha Emisión:</span> {formatDate(data.date)}
+                <span style={styles.lbl}>Fecha de Emisión:</span> {formatDate(data.date)}
               </div>
               <br />
               <div style={styles.rowInfo}>
                 <span style={styles.lbl}>CUIT:</span> {fiscalField(data.issuer?.taxId)}
               </div>
-              {/* Ingresos Brutos / Fecha Inicio: sin dato por ahora */}
+              <div style={styles.rowInfo}>
+                <span style={styles.lbl}>Ingresos Brutos:</span>{" "}
+                {fiscalField(data.issuer?.ingresosBrutos)}
+              </div>
+              <div style={styles.rowInfo}>
+                <span style={styles.lbl}>Inicio de Actividades:</span>{" "}
+                {fiscalField(data.issuer?.inicioActividades)}
+              </div>
             </div>
           </div>
         </div>

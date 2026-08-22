@@ -18,6 +18,8 @@ export interface Organization {
   phone?: string | null;
   taxId?: string | null;
   taxCondition?: string | null;
+  ingresosBrutos?: string | null;
+  inicioActividades?: string | null;
   industry?: Industry;
   onboardingCompletedAt: string | null;
   // Plan/billing (sdd/planes-y-billing): opcionales porque el backend de
@@ -90,7 +92,7 @@ export const updateOrganization = async (
   data: Partial<
     Pick<
       Organization,
-      "name" | "address" | "phone" | "taxId" | "taxCondition" | "industry"
+      "name" | "address" | "phone" | "taxId" | "taxCondition" | "ingresosBrutos" | "inicioActividades" | "industry"
     >
   >,
 ): Promise<Organization> => {

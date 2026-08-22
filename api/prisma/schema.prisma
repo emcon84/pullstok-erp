@@ -76,6 +76,10 @@ model Organization {
   plan                  Plan        @default(BASICO)
   paidUntil             DateTime?
   taxCondition          String?
+  // Datos fiscales del emisor para la factura estándar (Ingresos Brutos e
+  // Inicio de Actividades se muestran debajo del CUIT en el comprobante ARCA).
+  ingresosBrutos        String?
+  inicioActividades     String?
   users                 User[]
   products              Product[]
   providers             Provider[]
