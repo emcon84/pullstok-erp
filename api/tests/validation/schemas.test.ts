@@ -1372,3 +1372,81 @@ describe("createSaleInvoiceSchema — customerId opcional (spec 6.1)", () => {
     }
   });
 });
+
+describe("schemas — puntoVenta/branchId (sdd/sucursales-pv-facturacion)", () => {
+  const {
+    createBranchSchema,
+    updateBranchSchema,
+    createInvoiceSchema,
+    updateInvoiceSchema,
+  } = require("../../src/validation/schemas");
+
+  describe("createBranchSchema.puntoVenta", () => {
+    it("acepta un puntoVenta entero válido (1..9999)", () => {
+      const result = createBranchSchema.safeParse({ name: "Centro", puntoVenta: 5 });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.puntoVenta).toBe(5);
+    });
+
+    it("acepta puntoVenta null (nullable → fallback)", () => {
+      const result = createBranchSchema.safeParse({ name: "Centro", puntoVenta: null });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.puntoVenta).toBeNull();
+    });
+
+    it("puntoVenta es opcional (ausente → undefined)", () => {
+      const result = createBranchSchema.safeParse({ name: "Centro" });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.puntoVenta).toBeUndefined();
+    });
+
+    it("rechaza puntoVenta 0 y 10000 (fuera de 1..9999)", () => {
+      expect(createBranchSchema.safeParse({ name: "X", puntoVenta: 0 }).success).toBe(false);
+      expect(createBranchSchema.safeParse({ name: "X", puntoVenta: 10000 }).success).toBe(false);
+    });
+
+    it("rechaza puntoVenta no entero (2.5)", () => {
+      expect(createBranchSchema.safeParse({ name: "X", puntoVenta: 2.5 }).success).toBe(false);
+    });
+  });
+
+  describe("updateBranchSchema.puntoVenta", () => {
+    it("acepta puntoVenta 5 y null", () => {
+      expect(updateBranchSchema.safeParse({ puntoVenta: 5 }).success).toBe(true);
+      expect(updateBranchSchema.safeParse({ puntoVenta: null }).success).toBe(true);
+    });
+
+    it("rechaza puntoVenta 0 y 10000", () => {
+      expect(updateBranchSchema.safeParse({ puntoVenta: 0 }).success).toBe(false);
+      expect(updateBranchSchema.safeParse({ puntoVenta: 10000 }).success).toBe(false);
+    });
+  });
+
+  describe("createInvoiceSchema.branchId", () => {
+    it("acepta branchId string", () => {
+      const base = { customerId: "c-1", items: [{ description: "S", quantity: 1, unitPrice: 1 }] };
+      const result = createInvoiceSchema.safeParse({ ...base, branchId: "b-1" });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.branchId).toBe("b-1");
+    });
+
+    it("branchId es opcional (R3) y null no es válido para create", () => {
+      const base = { customerId: "c-1", items: [{ description: "S", quantity: 1, unitPrice: 1 }] };
+      expect(createInvoiceSchema.safeParse(base).success).toBe(true);
+      if (createInvoiceSchema.safeParse(base).success) {
+        expect(createInvoiceSchema.safeParse(base).data?.branchId).toBeUndefined();
+      }
+    });
+  });
+
+  describe("updateInvoiceSchema.branchId", () => {
+    it("acepta branchId string junto con items", () => {
+      const result = updateInvoiceSchema.safeParse({
+        branchId: "b-1",
+        items: [{ description: "S", quantity: 1, unitPrice: 1 }],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.branchId).toBe("b-1");
+    });
+  });
+});

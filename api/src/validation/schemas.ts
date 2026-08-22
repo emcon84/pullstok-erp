@@ -457,12 +457,16 @@ export const createInvoiceSchema = z.object({
   items: z.array(invoiceItemSchema).min(1, "La factura debe tener al menos un ítem"),
   dueDate: z.string().min(1).optional(),
   notes: z.string().optional(),
+  // Sucursal emisora (sdd/sucursales-pv-facturacion R3). Opcional: null/ausente
+  // → la emisión cae al fallback (casa central / PV global de ArcaSetting).
+  branchId: z.string().optional(),
 });
 export const updateInvoiceSchema = z.object({
   customerId: z.string().min(1).optional(),
   items: z.array(invoiceItemSchema).min(1, "La factura debe tener al menos un ítem"),
   dueDate: z.string().min(1).optional(),
   notes: z.string().optional(),
+  branchId: z.string().optional(),
 });
 
 // ---------- Facturar desde venta ----------
@@ -559,6 +563,11 @@ export const createBranchSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   address: z.string().optional(),
   phone: z.string().optional(),
+  // Punto de venta fiscal de la sucursal (sdd/sucursales-pv-facturacion R1/R7).
+  // Opcional y nullable: null → fallback (casa central / PV global). 1..9999;
+  // el duplicado entre sucursales ACTIVAS de la misma org se valida app-level
+  // (409, R7) + índice parcial raw en migración.
+  puntoVenta: z.number().int().gte(1).lte(9999).nullable().optional(),
 });
 
 export const updateBranchSchema = createBranchSchema.partial();
