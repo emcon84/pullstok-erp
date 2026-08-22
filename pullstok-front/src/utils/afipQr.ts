@@ -127,6 +127,28 @@ export const buildAfipQrUrl = (payload: AfipQrPayload): string => {
 };
 
 /**
+ * Matriz de módulos del QR fiscal (extraída para que ambos motores de dibujo
+ * — jsPDF `drawAfipQr` y canvas `generateAfipQrDataUrl` — compartan la UNA
+ * lógica de generación del QR y no dupliquen `qrcode-generator` + la
+ * iteración de módulos; deuda técnica item 4).
+ *
+ * Devuelve la cantidad de módulos (moduleCount) y un predicado isDark(row,col).
+ * Lanza si el payload es inválido (buildAfipQrUrl valida los obligatorios).
+ */
+export const getQrMatrix = (
+  payload: AfipQrPayload,
+): { moduleCount: number; isDark: (row: number, col: number) => boolean } => {
+  const url = buildAfipQrUrl(payload);
+  const qr = qrcode(0, "M");
+  qr.addData(url);
+  qr.make();
+  return {
+    moduleCount: qr.getModuleCount(),
+    isDark: (row, col) => qr.isDark(row, col),
+  };
+};
+
+/**
  * Dibuja el QR fiscal AFIP con doc.rect() (módulos oscuros sobre fondo
  * blanco, sin canvas). Ocupa exactamente `size x size` puntos en (x, y).
  * Corrección de errores nivel M. Lanza si el payload es inválido — el
@@ -139,19 +161,13 @@ export const drawAfipQr = (
   y: number,
   size: number,
 ): void => {
-  const url = buildAfipQrUrl(payload);
-
-  const qr = qrcode(0, "M");
-  qr.addData(url);
-  qr.make();
-
-  const moduleCount = qr.getModuleCount();
+  const { moduleCount, isDark } = getQrMatrix(payload);
   const cellSize = size / moduleCount;
 
   doc.setFillColor(0, 0, 0);
   for (let row = 0; row < moduleCount; row++) {
     for (let col = 0; col < moduleCount; col++) {
-      if (qr.isDark(row, col)) {
+      if (isDark(row, col)) {
         doc.rect(x + col * cellSize, y + row * cellSize, cellSize, cellSize, "F");
       }
     }

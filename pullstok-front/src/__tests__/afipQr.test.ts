@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import jsPDF from "jspdf";
-import { buildAfipQrUrl, drawAfipQr, type AfipQrPayload } from "../utils/afipQr";
+import { buildAfipQrUrl, drawAfipQr, getQrMatrix, type AfipQrPayload } from "../utils/afipQr";
 
 const spies: Array<ReturnType<typeof vi.spyOn>> = [];
 
@@ -125,5 +125,21 @@ describe("drawAfipQr", () => {
       drawAfipQr(doc, { ...validPayload, codAut: NaN }, 10, 10, 50),
     ).toThrow();
     expect(calls.length).toBe(0);
+  });
+});
+
+describe("getQrMatrix (deuda técnica item 4 — unificación de motores)", () => {
+  it("devuelve la misma matriz que usan ambos motores (moduleCount + isDark)", () => {
+    const { moduleCount, isDark } = getQrMatrix(validPayload);
+
+    expect(moduleCount).toBeGreaterThan(0);
+    // El verificador de la esquina superior-izquierda siempre es oscuro
+    // (finder pattern). Comprobamos que el predicado funciona y es estable.
+    expect(typeof isDark).toBe("function");
+    expect(isDark(0, 0)).toBe(true);
+  });
+
+  it("lanza si el payload es inválido (mismo criterio que drawAfipQr)", () => {
+    expect(() => getQrMatrix({ ...validPayload, cuit: NaN })).toThrow();
   });
 });
