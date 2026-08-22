@@ -16,6 +16,7 @@ import { API_URL } from "../constants";
 import { useBranding, useUpdateBranding } from "../components/hooks/useBranding";
 import { AppBrandingForm } from "../components/molecules/AppBrandingForm";
 import { OrganizationFiscalForm } from "../components/molecules/OrganizationFiscalForm";
+import { ArcaSettingsForm } from "../components/molecules/ArcaSettingsForm";
 import { Loader } from "../components/atoms/loader";
 
 export const BrandingSettings = () => {
@@ -80,6 +81,9 @@ export const BrandingSettings = () => {
       {me?.role === "ADMIN" && (
         <OrganizationFiscalForm organization={me?.organization} />
       )}
+
+      {/* Configuración ARCA (deuda técnica item 6): antes solo se podía por API */}
+      {me?.role === "ADMIN" && <ArcaSettingsForm />}
 
       {/* Backup download section — ADMIN only, no plan gating (spec U2, U6) */}
       {me?.role === "ADMIN" && (
