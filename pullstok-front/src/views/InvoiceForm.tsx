@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { Loader } from "../components/atoms/loader";
 import { useCustomers } from "../components/hooks/useCustomer";
+import { useBranches } from "../components/hooks/useBranches";
 import {
   useCreateInvoice,
   useGetInvoiceById,
@@ -243,11 +244,13 @@ export const InvoiceForm = () => {
   const isEditing = !!id;
 
   const { customers, loadingCustomer: loadingCustomers } = useCustomers();
+  const { branches, loading: loadingBranches } = useBranches();
   const { invoice, loadingInvoice } = useGetInvoiceById(id);
   const { submitInvoice, loadingCreate } = useCreateInvoice();
   const { editInvoice, loadingUpdate } = useUpdateInvoice();
 
   const [customerId, setCustomerId] = useState("");
+  const [branchId, setBranchId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<InvoiceItemRequest[]>([{ ...emptyItem }]);
@@ -255,6 +258,7 @@ export const InvoiceForm = () => {
   useEffect(() => {
     if (!invoice) return;
     setCustomerId(invoice.customerId ?? "");
+    setBranchId(invoice.branchId ?? "");
     setDueDate(invoice.dueDate ? invoice.dueDate.slice(0, 10) : "");
     setNotes(invoice.notes || "");
     setItems(
@@ -317,6 +321,7 @@ export const InvoiceForm = () => {
 
     const payload = {
       customerId,
+      ...(branchId ? { branchId } : {}),
       dueDate: dueDate || undefined,
       notes: notes || undefined,
       items: validItems,
@@ -398,6 +403,25 @@ export const InvoiceForm = () => {
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="invoice-branch">Sucursal (opcional)</Label>
+            <Select
+              value={branchId}
+              onValueChange={setBranchId}
+              disabled={loadingBranches}
+            >
+              <SelectTrigger id="invoice-branch" aria-label="Sucursal" className="w-full">
+                <SelectValue placeholder="Sin sucursal (usar PV global)" />
+              </SelectTrigger>
+              <SelectContent>
+                {branches?.map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="space-y-2">

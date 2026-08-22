@@ -334,6 +334,12 @@ export const InvoiceDetail = () => {
           <p className="text-xs text-muted-foreground">Vencimiento</p>
           <p className="mt-1 text-sm">{formatDate(invoice.dueDate)}</p>
         </div>
+        {invoice.branch?.name && (
+          <div>
+            <p className="text-xs text-muted-foreground">Sucursal</p>
+            <p className="mt-1 text-sm">{invoice.branch.name}</p>
+          </div>
+        )}
       </Card>
 
       {invoice.cae && (

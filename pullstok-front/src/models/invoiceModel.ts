@@ -43,6 +43,12 @@ export interface InvoiceItem {
   lineTotal?: number; // snapshot del backend: quantity * unitPrice (sin IVA)
 }
 
+/** Sucursal emisora incluida en la Invoice (sdd/sucursales-pv-facturacion R3). */
+export interface InvoiceBranchInfo {
+  id: string;
+  name: string;
+}
+
 export interface Invoice {
   id: string;
   organizationId?: string;
@@ -74,6 +80,10 @@ export interface Invoice {
   docTipoReceptor?: number | null;
   docNroReceptor?: string | null;
   condicionIvaReceptorId?: number | null;
+  // Sucursal emisora (sdd/sucursales-pv-facturacion R3). Opcional: null/ausente
+  // → la emisión cae al fallback (casa central / PV global de ArcaSetting).
+  branchId?: string | null;
+  branch?: InvoiceBranchInfo | null;
 }
 
 export interface InvoiceItemRequest {
@@ -87,6 +97,7 @@ export interface CreateInvoiceRequest {
   customerId?: string;
   dueDate?: string;
   notes?: string;
+  branchId?: string;
   items: InvoiceItemRequest[];
 }
 
@@ -94,5 +105,6 @@ export interface UpdateInvoiceRequest {
   customerId?: string;
   dueDate?: string;
   notes?: string;
+  branchId?: string;
   items?: InvoiceItemRequest[];
 }

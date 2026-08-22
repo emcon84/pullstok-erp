@@ -16,6 +16,10 @@ vi.mock("@/components/hooks/useCustomer", () => ({
   useCustomers: vi.fn(),
 }));
 
+vi.mock("@/components/hooks/useBranches", () => ({
+  useBranches: vi.fn(),
+}));
+
 vi.mock("@/components/hooks/useInvoices", () => ({
   useCreateInvoice: vi.fn(),
   useGetInvoiceById: vi.fn(),
@@ -28,6 +32,7 @@ vi.mock("@/services/priceLists", () => ({
 
 import { InvoiceForm } from "@/views/InvoiceForm";
 import { useCustomers } from "@/components/hooks/useCustomer";
+import { useBranches } from "@/components/hooks/useBranches";
 import {
   useCreateInvoice,
   useGetInvoiceById,
@@ -36,6 +41,7 @@ import {
 import { searchProducts } from "@/services/priceLists";
 
 const mockUseCustomers = vi.mocked(useCustomers);
+const mockUseBranches = vi.mocked(useBranches);
 const mockUseCreateInvoice = vi.mocked(useCreateInvoice);
 const mockUseGetInvoiceById = vi.mocked(useGetInvoiceById);
 const mockUseUpdateInvoice = vi.mocked(useUpdateInvoice);
@@ -50,6 +56,12 @@ describe("InvoiceForm — buscador de productos con autocompletado de precio", (
       customers: [],
       loadingCustomer: false,
       errorCustomer: null,
+    });
+    mockUseBranches.mockReturnValue({
+      branches: [],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
     });
     mockUseCreateInvoice.mockReturnValue({
       submitInvoice: vi.fn(),
@@ -127,5 +139,95 @@ describe("InvoiceForm — buscador de productos con autocompletado de precio", (
     expect(await screen.findByTestId("product-search-empty")).toHaveTextContent(
       "Sin resultados",
     );
+  });
+
+  it("listar sucursales activas como opciones del selector (R3)", async () => {
+    mockUseBranches.mockReturnValue({
+      branches: [
+        { id: "b-1", name: "Centro", isActive: true, createdAt: "" },
+        { id: "b-2", name: "Norte", isActive: true, createdAt: "" },
+      ],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderForm();
+
+    fireEvent.click(
+      await screen.findByRole("combobox", { name: /sucursal/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Centro" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Norte" })).toBeInTheDocument();
+    });
+  });
+
+  it("seleccionar una sucursal activa envía branchId en el payload (R3)", async () => {
+    const submitInvoice = vi.fn();
+    mockUseCreateInvoice.mockReturnValue({
+      submitInvoice,
+      loadingCreate: false,
+    });
+    mockUseCustomers.mockReturnValue({
+      customers: [{ id: "c-1", name: "Juan" }],
+      loadingCustomer: false,
+      errorCustomer: null,
+    });
+    mockUseBranches.mockReturnValue({
+      branches: [{ id: "b-1", name: "Centro", isActive: true, createdAt: "" }],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderForm();
+
+    // Cliente
+    fireEvent.click(await screen.findByRole("combobox", { name: /cliente/i }));
+    fireEvent.click(await screen.findByRole("option", { name: "Juan" }));
+
+    // Sucursal
+    fireEvent.click(await screen.findByRole("combobox", { name: /sucursal/i }));
+    fireEvent.click(await screen.findByRole("option", { name: "Centro" }));
+
+    // Línea con descripción para pasar la validación
+    fireEvent.change(screen.getByLabelText("Buscar producto"), {
+      target: { value: "Servicio" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
+
+    await waitFor(() => expect(submitInvoice).toHaveBeenCalled());
+    expect(submitInvoice.mock.calls[0][0]).toMatchObject({ branchId: "b-1" });
+  });
+
+  it("sin sucursal seleccionada el payload NO incluye branchId (R3-E2)", async () => {
+    const submitInvoice = vi.fn();
+    mockUseCreateInvoice.mockReturnValue({
+      submitInvoice,
+      loadingCreate: false,
+    });
+    mockUseCustomers.mockReturnValue({
+      customers: [{ id: "c-1", name: "Juan" }],
+      loadingCustomer: false,
+      errorCustomer: null,
+    });
+    mockUseBranches.mockReturnValue({
+      branches: [{ id: "b-1", name: "Centro", isActive: true, createdAt: "" }],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderForm();
+
+    fireEvent.click(await screen.findByRole("combobox", { name: /cliente/i }));
+    fireEvent.click(await screen.findByRole("option", { name: "Juan" }));
+    fireEvent.change(screen.getByLabelText("Buscar producto"), {
+      target: { value: "Servicio" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
+
+    await waitFor(() => expect(submitInvoice).toHaveBeenCalled());
+    expect(submitInvoice.mock.calls[0][0]).not.toHaveProperty("branchId");
   });
 });
