@@ -46,17 +46,17 @@ describe("PrintInvoice — comprobante fiscal (CAE presente)", () => {
     expect(screen.getByText("FACTURA A")).toBeInTheDocument();
     expect(screen.getByText(/fac-A-0002-00000013/)).toBeInTheDocument();
 
-    // Emisor: el nombre en grande y Razón Social se quitaron (el logo ya lo trae);
-    // quedan Domicilio y Condición IVA (Responsable Inscripto).
-    expect(screen.getAllByText(/Domicilio:/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Condición IVA:/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/CUIT:/).length).toBeGreaterThan(0);
+    // Emisor: sin labels — texto de dirección y condición IVA centrado con el logo
     expect(screen.getByText("Av. Siempre Viva 123")).toBeInTheDocument();
+    expect(screen.getAllByText("IVA Responsable Inscripto").length).toBeGreaterThan(0);
+    // Los labels quedan solo en el receptor (cliente)
+    expect(screen.getAllByText(/Condición IVA:/).length).toBeGreaterThan(0);
 
     // Receptor
     expect(screen.getByText(/Cliente:/)).toBeInTheDocument();
     expect(screen.getByText(/CUIT\/DNI:/)).toBeInTheDocument();
     expect(screen.getByText("30-98765432-1")).toBeInTheDocument();
+    expect(screen.getAllByText(/Domicilio:/).length).toBeGreaterThan(0);
 
     // Items y totales
     expect(screen.getByText("Servicio de consultoría")).toBeInTheDocument();

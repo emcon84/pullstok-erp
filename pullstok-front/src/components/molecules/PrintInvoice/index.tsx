@@ -138,12 +138,10 @@ export const PrintInvoice = (data: InvoicePdfData) => {
                 style={{ ...styles.logo, marginBottom: 16 }}
               />
               <div style={styles.rowInfo}>
-                <span style={styles.lbl}>Domicilio:</span>{" "}
                 {fiscalField(data.issuer?.address)}
               </div>
               {/* Localidad: sin dato separado por ahora */}
               <div style={styles.rowInfo}>
-                <span style={styles.lbl}>Condición IVA:</span>{" "}
                 {fiscalField(data.issuer?.taxCondition)}
               </div>
             </div>
@@ -325,10 +323,11 @@ export const PrintInvoice = (data: InvoicePdfData) => {
 const styles = {
   card: {
     width: "100%",
-    minHeight: "273mm",
+    minHeight: "272mm",
     margin: "0 auto",
     backgroundColor: "#fff",
     border: "1px solid #000",
+    boxSizing: "border-box",
     fontFamily: "Arial, Helvetica, sans-serif",
     fontSize: 11,
     color: "#000",
@@ -381,6 +380,7 @@ const styles = {
   colEmisor: {
     width: "50%",
     padding: "15px 20px 10px 15px",
+    textAlign: "center" as const,
   },
   colComprobante: {
     width: "50%",
