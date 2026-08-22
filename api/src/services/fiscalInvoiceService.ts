@@ -19,6 +19,7 @@
 // rutas de cert). El ArcaClientMock es un doble real en memoria → unit tests
 // sin red.
 
+import { Prisma } from "@prisma/client";
 import { prisma, basePrisma } from "../config/db";
 import {
   calcArcaAmounts,
@@ -144,6 +145,63 @@ export const resolvePuntoVenta = async (
 };
 
 /**
+ * Reserva el correlativo fiscal de forma ATÓMICA vía ArcaSequence
+ * (fix-correlativo-race). ArcaSequence es el source of truth del número de
+ * comprobante por (org, puntoVenta, tipoCbte).
+ *
+ * - Primera vez que no existe la fila: se inicializa `lastReserved` desde el
+ *   último número usado en AFIP (`getLastInvoiceNumber`), para no colisionar
+ *   con comprobantes ya emitidos (bootstrap/reconciliación).
+ * - Después: solo incrementa. El `UPDATE ... RETURNING` es atómico por fila,
+ *   por lo que dos emisiones concurrentes (misma org+PV+tipo) obtienen valores
+ *   DISTINTOS → nunca dos facturas con el mismo cbteNro.
+ *
+ * Regla D5: esto NO corre SOAP dentro de una transacción DB. Solo se llama a
+ * ARCA en el bootstrap (creación de la fila), fuera de cualquier lock largo.
+ */
+const reservarCorrelativo = async (
+  orgId: string,
+  pv: number,
+  tipoCbte: string,
+  client: ArcaClient,
+): Promise<number> => {
+  // 1. Asegurar la fila del contador. Si se creó ahora (INSERT afectó 1 fila),
+  //    inicializar desde el último número usado en AFIP.
+  const inserted = await basePrisma.$executeRaw(Prisma.sql`
+    INSERT INTO arca_sequences (id, "organizationId", "puntoVenta", "tipoCbte", "lastReserved", "updatedAt")
+    VALUES (gen_random_uuid(), ${orgId}, ${pv}, ${tipoCbte}, 0, now())
+    ON CONFLICT ("organizationId", "puntoVenta", "tipoCbte") DO NOTHING
+  `);
+  if (inserted > 0) {
+    const last = await client.getLastInvoiceNumber({
+      puntoVenta: pv,
+      tipoCbte: Number(tipoCbte),
+    });
+    await basePrisma.$executeRaw(Prisma.sql`
+      UPDATE arca_sequences SET "lastReserved" = ${last}, "updatedAt" = now()
+      WHERE "organizationId" = ${orgId} AND "puntoVenta" = ${pv} AND "tipoCbte" = ${tipoCbte}
+    `);
+  }
+
+  // 2. Incremento atómico + RETURNING (siempre). Única fuente del número.
+  const rows = await basePrisma.$queryRaw<{ lastReserved: number }[]>(Prisma.sql`
+    UPDATE arca_sequences
+    SET "lastReserved" = "lastReserved" + 1, "updatedAt" = now()
+    WHERE "organizationId" = ${orgId} AND "puntoVenta" = ${pv} AND "tipoCbte" = ${tipoCbte}
+    RETURNING "lastReserved"
+  `);
+  const next = rows[0]?.lastReserved;
+  if (next == null) {
+    throw new ArcaError(
+      ARCA_ERROR_CODES.ARCA_NETWORK_ERROR,
+      "No se pudo reservar el correlativo fiscal",
+      500,
+    );
+  }
+  return next;
+};
+
+/**
  * Emite fiscalmente una Invoice ISSUED interno (sin CAE) contra ARCA.
  * - Deja la factura en PENDING_CAE con el correlativo reservado ANTES del SOAP.
  * - Corre FECAESolicitar FUERA de la transacción.
@@ -264,17 +322,22 @@ const emitirCore = async (
   // Contexto con el PV efectivo para el SOAP y el request CAE (D2).
   const ctxPv = { ...ctx, puntoVenta: pv };
 
-  // Correlativo: reusar el reservado; si no, reservar vía FECompUltimoAutorizado.
+  // Correlativo: reusar el reservado (reintento); si no, reservarlo ATÓMICAMENTE
+  // vía ArcaSequence (fix-correlativo-race). Ya NO se usa `last + 1` (era un
+  // read-modify-write sin lock → race condition).
   let cbteNro = invoice.cbteNro as number | null;
   if (cbteNro == null) {
-    const last = await client.getLastInvoiceNumber({
-      puntoVenta: pv,
-      tipoCbte: Number(tipoCbte),
-    });
-    cbteNro = last + 1;
+    cbteNro = await reservarCorrelativo(
+      ctx.organizationId,
+      pv,
+      tipoCbte,
+      client,
+    );
   }
 
-  // Tx CORTA: reserva correlativo ANTES del SOAP + PENDING_CAE (spec 4.1).
+  // Tx CORTA: persiste PENDING_CAE + número reservado ANTES del SOAP (spec 4.1).
+  // El contador ya se incrementó en reservarCorrelativo, así que acá NO se
+  // vuelve a tocar arca_sequences (sería redundante y no atómico).
   await prisma.$transaction(async (tx) => {
     await tx.invoice.updateMany({
       where: { id: invoice.id },
@@ -286,22 +349,6 @@ const emitirCore = async (
         docTipoReceptor: receptor.docTipo,
         docNroReceptor: receptor.docNro,
         condicionIvaReceptorId: receptor.condicionIvaReceptorId,
-      },
-    });
-    await basePrisma.arcaSequence.upsert({
-      where: {
-        organizationId_puntoVenta_tipoCbte: {
-          organizationId: ctx.organizationId,
-          puntoVenta: pv,
-          tipoCbte,
-        },
-      },
-      update: { lastReserved: cbteNro },
-      create: {
-        organizationId: ctx.organizationId,
-        puntoVenta: pv,
-        tipoCbte,
-        lastReserved: cbteNro,
       },
     });
   });

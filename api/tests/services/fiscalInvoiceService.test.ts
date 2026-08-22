@@ -22,7 +22,8 @@ jest.mock("../../src/config/db", () => ({
   },
   basePrisma: {
     arcaSetting: { findUnique: jest.fn() },
-    arcaSequence: { upsert: jest.fn() },
+    $executeRaw: jest.fn(),
+    $queryRaw: jest.fn(),
   },
 }));
 
@@ -37,7 +38,8 @@ const mockedPrisma = prisma as unknown as {
 };
 const mockedBase = basePrisma as unknown as {
   arcaSetting: { findUnique: jest.Mock };
-  arcaSequence: { upsert: jest.Mock };
+  $executeRaw: jest.Mock;
+  $queryRaw: jest.Mock;
 };
 
 // ArcaAuthContext de la org (mismo shape que el que resuelve el controller).
@@ -144,11 +146,11 @@ describe("fiscalInvoiceService.emitirFiscalmente", () => {
           },
         }),
     );
-    mockedBase.arcaSequence.upsert.mockResolvedValue({
-      organizationId: "org-1",
-      puntoVenta: 2,
-      tipoCbte: "6",
-      lastReserved: 13,
+    mockedBase.$executeRaw.mockResolvedValue(0); // la fila YA existe por defecto
+    let nextCounter = 12; // mock ARCA arranca en 12 (bootstrap)
+    mockedBase.$queryRaw.mockImplementation(async () => {
+      nextCounter += 1;
+      return [{ lastReserved: nextCounter }];
     });
   });
 
@@ -172,14 +174,15 @@ describe("fiscalInvoiceService.emitirFiscalmente", () => {
       emitirFiscalmente("inv-1", mock, CTX),
     ).rejects.toThrow("ECONNRESET");
 
-    // El SOAP (getLastInvoiceNumber) corrió ANTES de requestCAE y el
-    // correlativo se reservó en la tx corta (updateMany) antes del SOAP.
-    expect(mock.calls.getLastInvoiceNumber).toBe(1);
+    // fix-correlativo-race: el correlativo sale del contador atómico
+    // ($queryRaw → 13), NO de getLastInvoiceNumber (ya no es la fuente para
+    // emisiones donde la fila del contador existe).
+    expect(mock.calls.getLastInvoiceNumber).toBe(0);
     expect(mockedPrisma.invoice.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: "PENDING_CAE",
-          cbteNro: 13, // lastNumber(12) + 1
+          cbteNro: 13, // contador atómico (12 + 1)
           tipoComprobante: "6",
           docTipoReceptor: 99,
           docNroReceptor: "0",
@@ -541,11 +544,11 @@ describe("fiscalInvoiceService.emitirCore + PV resuelto (sdd/sucursales-pv-factu
     mockedPrisma.$transaction.mockImplementation(
       async (fn: (tx: any) => any) => fn({ invoice: { updateMany: mockedPrisma.invoice.updateMany } }),
     );
-    mockedBase.arcaSequence.upsert.mockResolvedValue({
-      organizationId: "org-1",
-      puntoVenta: 2,
-      tipoCbte: "6",
-      lastReserved: 13,
+    mockedBase.$executeRaw.mockResolvedValue(0); // la fila YA existe por defecto
+    let nextCounter = 12; // mock ARCA arranca en 12 (bootstrap)
+    mockedBase.$queryRaw.mockImplementation(async () => {
+      nextCounter += 1;
+      return [{ lastReserved: nextCounter }];
     });
   });
 
@@ -556,7 +559,7 @@ describe("fiscalInvoiceService.emitirCore + PV resuelto (sdd/sucursales-pv-factu
     );
   };
 
-  it("emite con el PV de la sucursal en TODA la cadena (getLastInv, snapshot, sequence, CAE)", async () => {
+  it("emite con el PV de la sucursal en TODA la cadena (sequence, snapshot, CAE)", async () => {
     setBranchPv(5);
     setInvoice(
       makeIssuedInvoice({
@@ -566,26 +569,19 @@ describe("fiscalInvoiceService.emitirCore + PV resuelto (sdd/sucursales-pv-factu
       }),
     );
 
-    const getLastSpy = jest.spyOn(mock, "getLastInvoiceNumber");
     const invoice = (await emitirFiscalmente("inv-1", mock, CTX))!;
 
-    // getLastInvoiceNumber con el PV de la sucursal (no el global de la org).
-    expect(getLastSpy).toHaveBeenCalledWith({ puntoVenta: 5, tipoCbte: 6 });
+    // fix-correlativo-race: la fila del contador ya existe ($executeRaw=0) →
+    // NO se llama a getLastInvoiceNumber (ya no es la fuente del correlativo).
+    expect(mock.calls.getLastInvoiceNumber).toBe(0);
     // El snapshot se persiste: updateMany escribe puntoVenta = 5.
     expect(mockedPrisma.invoice.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ puntoVenta: 5 }),
       }),
     );
-    // ArcaSequence keyed por (org, pv=5, tipoCbte).
-    expect(mockedBase.arcaSequence.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          organizationId_puntoVenta_tipoCbte: expect.objectContaining({ puntoVenta: 5 }),
-        }),
-        create: expect.objectContaining({ puntoVenta: 5 }),
-      }),
-    );
+    // El contador atómico usó el PV de la sucursal (pv=5, tipoCbte=6) y devolvió 13.
+    expect(mockedBase.$queryRaw).toHaveBeenCalled();
     // El request CAE llevó el PV de la sucursal.
     expect(mock.lastCaeRequest?.puntoVenta).toBe(5);
     // El estado final quedó con el snapshot.
@@ -612,5 +608,84 @@ describe("fiscalInvoiceService.emitirCore + PV resuelto (sdd/sucursales-pv-factu
     expect(getLastSpy).not.toHaveBeenCalled();
     expect(mock.lastCaeRequest?.puntoVenta).toBe(5);
     expect(currentInvoice.puntoVenta).toBe(5);
+  });
+});
+
+describe("fiscalInvoiceService.reservarCorrelativo (fix-correlativo-race)", () => {
+  let mock: ArcaClientMock;
+  let currentInvoice: any;
+
+  const setInvoice = (inv: any) => {
+    currentInvoice = inv;
+    mockedPrisma.invoice.findFirst.mockImplementation(() =>
+      Promise.resolve(currentInvoice),
+    );
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mock = createArcaClientMock();
+    mockedBase.arcaSetting.findUnique.mockResolvedValue(SETTING);
+    mockedPrisma.branch.findFirst.mockResolvedValue(null);
+    mockedPrisma.invoice.updateMany.mockImplementation(({ data }: any) => {
+      currentInvoice = { ...currentInvoice, ...data };
+      return { count: 1 };
+    });
+    mockedPrisma.invoice.findFirst.mockImplementation(() =>
+      Promise.resolve(currentInvoice),
+    );
+    mockedPrisma.$transaction.mockImplementation(
+      async (fn: (tx: any) => any) => fn({ invoice: { updateMany: mockedPrisma.invoice.updateMany } }),
+    );
+  });
+
+  it("atomicidad: dos emisiones concurrentes obtienen correlativos DISTINTOS", async () => {
+    // Simula la DB: el $queryRaw (UPDATE...RETURNING) entrega valores secuenciales
+    // únicos (13, 14) aunque las llamadas sean concurrentes.
+    const emitted: number[] = [];
+    mockedBase.$executeRaw.mockResolvedValue(0); // la fila ya existe → sin bootstrap
+    mockedBase.$queryRaw.mockImplementation(async () => {
+      const n = emitted.length === 0 ? 13 : 14;
+      emitted.push(n);
+      return [{ lastReserved: n }];
+    });
+
+    setInvoice(makeIssuedInvoice());
+    await emitirFiscalmente("inv-1", mock, CTX);
+
+    setInvoice(makeIssuedInvoice());
+    await emitirFiscalmente("inv-2", mock, CTX);
+
+    // Dos números distintos → nunca dos facturas con el mismo cbteNro.
+    const cbteNros = emitted;
+    expect(cbteNros[0]).not.toBe(cbteNros[1]);
+    expect(cbteNros).toEqual([13, 14]);
+  });
+
+  it("bootstrap: la primera emisión (fila nueva) inicializa el contador desde getLastInvoiceNumber", async () => {
+    // $executeRaw devuelve 1 → la fila se CREÓ ahora → bootstrap desde ARCA.
+    mockedBase.$executeRaw.mockResolvedValue(1);
+    mockedBase.$queryRaw.mockResolvedValue([{ lastReserved: 13 }]);
+    const getLastSpy = jest.spyOn(mock, "getLastInvoiceNumber");
+
+    setInvoice(makeIssuedInvoice());
+    await emitirFiscalmente("inv-1", mock, CTX);
+
+    // GetLastInvoiceNumber se llamó para inicializar el contador (lastNumber 12).
+    expect(getLastSpy).toHaveBeenCalled();
+    // El correlativo emitido es 13 (contador inicializado 12 + 1).
+    expect(mock.lastCaeRequest?.cbteNro).toBe(13);
+  });
+
+  it("sin bootstrap cuando la fila ya existe: NO llama a getLastInvoiceNumber", async () => {
+    mockedBase.$executeRaw.mockResolvedValue(0); // fila existente
+    mockedBase.$queryRaw.mockResolvedValue([{ lastReserved: 13 }]);
+    const getLastSpy = jest.spyOn(mock, "getLastInvoiceNumber");
+
+    setInvoice(makeIssuedInvoice());
+    await emitirFiscalmente("inv-1", mock, CTX);
+
+    expect(getLastSpy).not.toHaveBeenCalled();
+    expect(mock.lastCaeRequest?.cbteNro).toBe(13);
   });
 });
