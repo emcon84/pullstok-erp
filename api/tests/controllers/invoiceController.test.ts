@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
-import { prisma } from "../../src/config/db";
+import { prisma, basePrisma } from "../../src/config/db";
 import invoiceController from "../../src/controllers/invoiceController";
+import { ArcaError, ARCA_ERROR_CODES } from "../../src/integrations/arca/types";
 
 jest.mock("../../src/config/db", () => ({
   prisma: {
@@ -9,7 +10,9 @@ jest.mock("../../src/config/db", () => ({
     branch: { findFirst: jest.fn() },
     $transaction: jest.fn(),
   },
-  basePrisma: {},
+  basePrisma: {
+    arcaSetting: { findUnique: jest.fn() },
+  },
 }));
 
 jest.mock("../../src/config/tenantContext", () => ({
@@ -19,6 +22,11 @@ jest.mock("../../src/config/tenantContext", () => ({
 jest.mock("../../src/services/fiscalInvoiceService", () => ({
   emitirFiscalmente: jest.fn(),
   reintentarFiscalmente: jest.fn(),
+}));
+
+jest.mock("../../src/services/secuenceService", () => ({
+  __esModule: true,
+  default: jest.fn().mockResolvedValue(1),
 }));
 
 jest.mock("../../src/integrations/arca/arcaClient", () => ({
@@ -181,5 +189,74 @@ describe("invoiceController.createInvoice + branchId (sdd/sucursales-pv-facturac
       }),
     );
     expect(res.status).toHaveBeenCalledWith(201);
+  });
+});
+
+describe("invoiceController.issueInvoice + fallo fiscal → 202 (deuda técnica item 8)", () => {
+  const mockedBase = basePrisma as unknown as {
+    arcaSetting: { findUnique: jest.Mock };
+  };
+  const { emitirFiscalmente } =
+    jest.requireMock("../../src/services/fiscalInvoiceService") as {
+      emitirFiscalmente: jest.Mock;
+    };
+
+  const ARCA_ENABLED = {
+    enabled: true,
+    cuitEmisor: "30709706701",
+    puntoVenta: 2,
+    environment: "HOMOLOGACION",
+    certPath: "/certs/org-1/wswfev1-HOMOLOGACION.crt",
+    keyPath: "/certs/org-1/wswfev1-HOMOLOGACION.key",
+  };
+
+  const DRAFT_INVOICE = {
+    id: "inv-1",
+    status: "DRAFT",
+    number: null,
+    items: [
+      { id: "i1", description: "S", quantity: 1, unitPrice: 100, taxRate: 21 },
+    ],
+  };
+  const ISSUED_INVOICE = { ...DRAFT_INVOICE, status: "ISSUED", number: "FAC-0001" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedBase.arcaSetting.findUnique.mockResolvedValue(ARCA_ENABLED);
+  });
+
+  it("devuelve 202 (no 200) cuando la factura se emitió pero la fiscal falló", async () => {
+    // $transaction: asemeja issueInvoice (findFirst DRAFT → updateMany → findFirst ISSUED).
+    mockedPrisma.$transaction.mockImplementation(async (fn: any) => {
+      return fn({
+        invoice: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce(DRAFT_INVOICE)
+            .mockResolvedValueOnce(ISSUED_INVOICE),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      });
+    });
+    // El findFirst final (fuera de tx) devuelve la factura ISSUED con CAE null.
+    mockedPrisma.invoice.findFirst.mockResolvedValueOnce(ISSUED_INVOICE);
+    mockedPrisma.invoice.findFirst.mockResolvedValueOnce({
+      ...ISSUED_INVOICE,
+      status: "PENDING_CAE",
+    });
+    // emitirFiscalmente rechaza con ArcaError (la emisión fiscal falló).
+    emitirFiscalmente.mockRejectedValue(
+      new ArcaError(ARCA_ERROR_CODES.ARCA_NETWORK_ERROR, "ECONNRESET", 502),
+    );
+
+    const req = mockRequest({ id: "inv-1" });
+    const res = mockResponse();
+
+    await invoiceController.issueInvoice(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(202);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ fiscalError: expect.anything() }),
+    );
   });
 });

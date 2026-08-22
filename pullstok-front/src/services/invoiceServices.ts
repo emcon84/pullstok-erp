@@ -99,10 +99,10 @@ export const issueInvoice = async (id: string): Promise<Invoice> => {
     const data = response.data as Invoice & {
       fiscalError?: { code?: string; message?: string };
     };
-    // El backend puede devolver HTTP 200 con la factura en PENDING_CAE y un
-    // fiscalError adjunto (la emisión fiscal falló pero el flujo interno no
-    // se rompe). Si el caller quiere saber si AFIP dio CAE, que revise
-    // invoice.status/cae; acá exponemos el error en el mismo objeto.
+    // El backend devuelve 202 cuando la factura quedó PENDING_CAE por fallo
+    // fiscal (deuda técnica item 8). El estado real (status/cae) es la verdad;
+    // el campo fiscalError se mantiene por compatibilidad pero el front ya no
+    // depende de él para decidir.
     return data;
   } catch (error) {
     throw new Error(extractErrorMessage(error, "Error al emitir la factura"));

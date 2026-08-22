@@ -158,13 +158,14 @@ export const Invoices = () => {
     setPendingActionId(invoice.id);
     issueInvoice(invoice.id, {
       onSuccess: (emitted) => {
-        const fiscalErr = (emitted as Invoice & {
-          fiscalError?: { code?: string; message?: string };
-        })?.fiscalError;
-        if (fiscalErr?.message) {
-          toast.error(`Factura emitida, pero AFIP no otorgó CAE: ${fiscalErr.message}`);
-        } else if (emitted.cae) {
+        // Deuda técnica item 8: ya no dependemos del campo fiscalError en el
+        // body; el estado real de la factura (cae/status) dice lo que pasó.
+        if (emitted.cae) {
           toast.success("Factura emitida con éxito");
+        } else if (emitted.status === "PENDING_CAE") {
+          toast.error(
+            "Factura emitida, pero AFIP no otorgó CAE. Usá Reintentar emisión fiscal.",
+          );
         } else {
           toast.success("Factura emitida (sin CAE todavía)");
         }

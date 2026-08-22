@@ -285,8 +285,13 @@ const issueInvoice = async (req: Request, res: Response) => {
           where: { id: invoice.id },
           include: invoiceInclude,
         });
+        // Deuda técnica item 8: cuando la factura se emitió (flujo interno OK)
+        // pero la emisión fiscal falló (quedó PENDING_CAE/ISSUED sin CAE), el
+        // código correcto es 202 Accepted (la operación se aceptó y quedó
+        // pendiente de CAE), NO un 200 con un campo de error. Se mantiene
+        // fiscalError en el body por compatibilidad con el front actual.
         return res
-          .status(200)
+          .status(202)
           .json({ ...withDerivedPaymentStatus(pending!), fiscalError });
       }
     }
