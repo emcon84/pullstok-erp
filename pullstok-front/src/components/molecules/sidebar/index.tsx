@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { logout } from "../../../controllers/authController";
-import { navGroups, filterNavItemsByPlan } from "./navItems";
+import { navGroups, vendorSimpleNav, filterNavItemsByPlan } from "./navItems";
 import { filterNavItemsByRole } from "@/constants/rolePermissions";
 import { usePendingOrdersCount } from "../../hooks/useOrder";
 import { useUnreadMessagesCount } from "../../hooks/useChat";
@@ -102,73 +102,107 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
         </div>
       </div>
 
-      {/* Navegación por grupos */}
+      {/* Navegación: VENDEDOR ve el menú simple plano; el resto agrupado */}
       <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
-        {navGroups.map((group) => {
-          const visibleItems = filterNavItemsByRole(
-            filterNavItemsByPlan(group.items, user?.plan),
-            user?.role,
-          );
-          if (visibleItems.length === 0) return null;
-
-          const isOpen = openGroups.has(group.label);
-          const GroupIcon = group.icon;
-
-          return (
-            <div key={group.label}>
-              <button
-                onClick={() => toggleGroup(group.label)}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <GroupIcon className="h-4 w-4 shrink-0" />
-                <span className="flex-1 text-left">{group.label}</span>
-                <ChevronDown
-                  className={cn(
-                    "h-3.5 w-3.5 shrink-0 transition-transform",
-                    isOpen && "rotate-180",
-                  )}
-                />
-              </button>
-
-              <div
-                className={cn(
-                  "space-y-1 overflow-hidden transition-all",
-                  isOpen ? "mt-1 max-h-96 opacity-100" : "max-h-0 opacity-0",
-                )}
-              >
-                {visibleItems.map(({ to, label, icon: Icon }) => {
-                  const count = badgeCount(to);
-                  return (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      onClick={onNavigate}
-                      className={({ isActive }) =>
-                        cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 pl-9 text-sm font-medium transition-colors",
-                          isActive
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                        )
-                      }
+        {user?.role === "VENDEDOR" ? (
+          <div className="space-y-1">
+            {vendorSimpleNav.map(({ to, label, icon: Icon }) => {
+              const count = badgeCount(to);
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {label}
+                  {count > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="ml-auto h-5 min-w-5 px-1.5 text-xs"
                     >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {label}
-                      {count > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-auto h-5 min-w-5 px-1.5 text-xs"
-                        >
-                          {count}
-                        </Badge>
-                      )}
-                    </NavLink>
-                  );
-                })}
+                      {count}
+                    </Badge>
+                  )}
+                </NavLink>
+              );
+            })}
+          </div>
+        ) : (
+          navGroups.map((group) => {
+            const visibleItems = filterNavItemsByRole(
+              filterNavItemsByPlan(group.items, user?.plan),
+              user?.role,
+            );
+            if (visibleItems.length === 0) return null;
+
+            const isOpen = openGroups.has(group.label);
+            const GroupIcon = group.icon;
+
+            return (
+              <div key={group.label}>
+                <button
+                  onClick={() => toggleGroup(group.label)}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <GroupIcon className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 text-left">{group.label}</span>
+                  <ChevronDown
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0 transition-transform",
+                      isOpen && "rotate-180",
+                    )}
+                  />
+                </button>
+
+                <div
+                  className={cn(
+                    "space-y-1 overflow-hidden transition-all",
+                    isOpen ? "mt-1 max-h-96 opacity-100" : "max-h-0 opacity-0",
+                  )}
+                >
+                  {visibleItems.map(({ to, label, icon: Icon }) => {
+                    const count = badgeCount(to);
+                    return (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        onClick={onNavigate}
+                        className={({ isActive }) =>
+                          cn(
+                            "flex items-center gap-3 rounded-lg px-3 py-2 pl-9 text-sm font-medium transition-colors",
+                            isActive
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          )
+                        }
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        {label}
+                        {count > 0 && (
+                          <Badge
+                            variant="destructive"
+                            className="ml-auto h-5 min-w-5 px-1.5 text-xs"
+                          >
+                            {count}
+                          </Badge>
+                        )}
+                      </NavLink>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </nav>
 
       {/* Usuario + salir */}
