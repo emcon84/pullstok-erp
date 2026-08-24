@@ -12,7 +12,13 @@ function App() {
       <ConfirmProvider>
         <div>
           <AppRoutes />
-          <ToastContainer />
+          <ToastContainer
+            position="bottom-right"
+            theme="dark"
+            newestOnTop
+            closeOnClick
+            draggable={false}
+          />
           <UpdateBanner />
         </div>
       </ConfirmProvider>
