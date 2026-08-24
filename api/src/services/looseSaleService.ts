@@ -96,16 +96,16 @@ export const resolveCellForProduct = async (
  * Errores de dominio (código → controller 422):
  *  - LOOSE_BAG_NOT_FOUND: el producto no existe en la org.
  *  - LOOSE_BAG_NO_WEIGHT: el producto no tiene weightKg > 0 (no se puede abrir).
- *  - LOOSE_BAG_NO_LINE: el producto no tiene celda de la planilla (no hay stock
- *    suelto donde acreditar los kg).
+ *  - LOOSE_LINE_NOT_FOUND: la celda destino (producto suelto) no existe en la
+ *    planilla de la org (la asignación ahora es EXPLÍCITA, no auto-match).
  *  - LOOSE_BAG_INSUFFICIENT_STOCK: sin unidades de bolsa en la sucursal.
  */
 export const openBag = async (
   tx: any,
   orgId: string,
-  input: { productId: string; branchId: string },
+  input: { productId: string; branchId: string; priceKgPriceId: string },
 ): Promise<CellWithNames & { quantity: number }> => {
-  const { productId, branchId } = input;
+  const { productId, branchId, priceKgPriceId } = input;
 
   const product = await tx.product.findFirst({
     where: { id: productId, organizationId: orgId },
@@ -122,12 +122,14 @@ export const openBag = async (
     );
   }
 
-  const cell = await resolveCellForProduct(tx, orgId, productId);
+  // Celda destino buscada EXPLÍCITAMENTE por id (dominio + tenant): el usuario
+  // elige a qué línea de la planilla se acreditan los kg, sin auto-match.
+  const cell = await tx.priceKgPrice.findFirst({
+    where: { id: priceKgPriceId, organizationId: orgId },
+    include: { brand: { select: { name: true } }, type: { select: { name: true } } },
+  });
   if (!cell) {
-    throw looseError(
-      "LOOSE_BAG_NO_LINE",
-      `"${product.name}" no tiene una línea (celda) en la planilla de precios por kg`,
-    );
+    throw looseError("LOOSE_LINE_NOT_FOUND", "La línea suelta destino no existe en la planilla");
   }
 
   // ── Descuento de la bolsa física (stock de sucursal, en UNIDADES) ──

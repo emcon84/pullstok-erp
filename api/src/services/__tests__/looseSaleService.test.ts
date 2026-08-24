@@ -25,7 +25,7 @@ const makeTx = () => ({
   category: { findMany: jest.fn() },
   priceKgBrand: { findMany: jest.fn() },
   priceKgType: { findMany: jest.fn() },
-  priceKgPrice: { findMany: jest.fn() },
+  priceKgPrice: { findMany: jest.fn(), findFirst: jest.fn() },
   productStock: { updateMany: jest.fn() },
   looseStock: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn() },
 });
@@ -104,7 +104,7 @@ describe("resolveCellForProduct", () => {
 });
 
 describe("openBag", () => {
-  const input = { productId: "p-1", branchId: "b-1" };
+  const input = { productId: "p-1", branchId: "b-1", priceKgPriceId: "cell-1" };
 
   it("LOOSE_BAG_NOT_FOUND: producto inexistente", async () => {
     const tx = makeTx();
@@ -124,20 +124,20 @@ describe("openBag", () => {
     expect(tx.productStock.updateMany).not.toHaveBeenCalled();
   });
 
-  it("LOOSE_BAG_NO_LINE: no hay celda de la planilla para el producto", async () => {
+  it("LOOSE_LINE_NOT_FOUND: la celda destino no existe en la planilla", async () => {
     const tx = makeTx();
     tx.product.findFirst.mockResolvedValue(productRow);
-    mockCellResolution(tx, []);
+    tx.priceKgPrice.findFirst.mockResolvedValue(null);
 
     const err: any = await openBag(tx, "org-1", input).catch((e: any) => e);
-    expect(err.code).toBe("LOOSE_BAG_NO_LINE");
+    expect(err.code).toBe("LOOSE_LINE_NOT_FOUND");
     expect(tx.productStock.updateMany).not.toHaveBeenCalled();
   });
 
   it("LOOSE_BAG_INSUFFICIENT_STOCK: sin unidades de bolsa en la sucursal", async () => {
     const tx = makeTx();
     tx.product.findFirst.mockResolvedValue(productRow);
-    mockCellResolution(tx, [cellRow]);
+    tx.priceKgPrice.findFirst.mockResolvedValue(cellRow);
     tx.productStock.updateMany.mockResolvedValue({ count: 0 });
 
     const err: any = await openBag(tx, "org-1", input).catch((e: any) => e);
@@ -149,7 +149,7 @@ describe("openBag", () => {
   it("abre una bolsa: descuenta 1 unidad del ProductStock y crea LooseStock con weightKg", async () => {
     const tx = makeTx();
     tx.product.findFirst.mockResolvedValue(productRow);
-    mockCellResolution(tx, [cellRow]);
+    tx.priceKgPrice.findFirst.mockResolvedValue(cellRow);
     tx.productStock.updateMany.mockResolvedValue({ count: 1 });
     // Sin fila existente → create.
     tx.looseStock.findFirst
@@ -188,7 +188,7 @@ describe("openBag", () => {
   it("abre una bolsa con LooseStock existente: incrementa los kg en vez de crear", async () => {
     const tx = makeTx();
     tx.product.findFirst.mockResolvedValue(productRow);
-    mockCellResolution(tx, [cellRow]);
+    tx.priceKgPrice.findFirst.mockResolvedValue(cellRow);
     tx.productStock.updateMany.mockResolvedValue({ count: 1 });
     tx.looseStock.findFirst
       .mockResolvedValueOnce({ id: "ls-1", priceKgPriceId: "cell-1", branchId: "b-1" })

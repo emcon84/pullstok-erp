@@ -134,7 +134,7 @@ describe("looseStock service — stock suelto de la planilla", () => {
   });
 
   describe("openBag", () => {
-    it("POST /loose-stock/open-bag con { productId, branchId }", async () => {
+    it("POST /loose-stock/open-bag con { productId, branchId, priceKgPriceId }", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 201,
@@ -145,13 +145,17 @@ describe("looseStock service — stock suelto de la planilla", () => {
         }),
       });
 
-      const result = await openBag({ productId: "p1", branchId: "b1" });
+      const result = await openBag({ productId: "p1", branchId: "b1", priceKgPriceId: "c1" });
 
       expect(result.quantity).toBe(12);
       const [url, init] = mockFetch.mock.calls[0];
       expect(url).toContain("/loose-stock/open-bag");
       expect(init.method).toBe("POST");
-      expect(JSON.parse(init.body)).toEqual({ productId: "p1", branchId: "b1" });
+      expect(JSON.parse(init.body)).toEqual({
+        productId: "p1",
+        branchId: "b1",
+        priceKgPriceId: "c1",
+      });
     });
 
     it("LOOSE_* 422 → lanza data.message (sin bolsa/peso/línea)", async () => {
@@ -164,9 +168,9 @@ describe("looseStock service — stock suelto de la planilla", () => {
         }),
       });
 
-      await expect(openBag({ productId: "p1", branchId: "b1" })).rejects.toThrow(
-        "no tiene peso",
-      );
+      await expect(
+        openBag({ productId: "p1", branchId: "b1", priceKgPriceId: "c1" }),
+      ).rejects.toThrow("no tiene peso");
     });
   });
 });

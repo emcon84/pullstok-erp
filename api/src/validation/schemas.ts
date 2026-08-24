@@ -1075,6 +1075,9 @@ export const openBagSchema = z
   .object({
     productId: z.string().min(1, "productId es requerido"),
     branchId: z.string().min(1).optional(),
+    // Celda destino (producto suelto) a la que se acreditan los kg de la bolsa.
+    // Reemplaza el auto-match por nombre (resolveCellForProduct) en la apertura.
+    priceKgPriceId: z.string().min(1, "La celda destino (producto suelto) es requerida"),
   })
   .strip();
 

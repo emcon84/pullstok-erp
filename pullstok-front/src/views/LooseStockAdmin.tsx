@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { PackageOpen, Save, Scale } from "lucide-react";
+import { PackageOpen, Save, Scale, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, type NativeSelectOption } from "@/components/ui/native-select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -14,8 +15,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Loader } from "@/components/atoms/loader";
-import { ProductSelector } from "@/components/molecules/ProductSelector";
 import { useBranches } from "@/components/hooks/useBranches";
 import {
   listLooseStocks,
@@ -24,6 +32,9 @@ import {
   type LooseStockLine,
 } from "@/services/looseStock";
 import { products } from "@/services/productService";
+import { getPriceKgPlan } from "@/services/priceKgPlan";
+import { listPriceKgTypes } from "@/services/priceKgTypes";
+import { listPriceKgBrands } from "@/services/priceKgBrands";
 import type { ProductsProps } from "@/models/productsModel";
 
 const SPECIES_LABELS: Record<string, string> = {
@@ -51,11 +62,19 @@ export const LooseStockAdmin = () => {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  // Picker "Abrir bolsa".
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerProducts, setPickerProducts] = useState<ProductsProps[]>([]);
-  const [loadingPicker, setLoadingPicker] = useState(false);
+  // Diálogo "Abrir bolsa" (una bolsa a la vez, asignación EXPLÍCITA de la
+  // celda de la planilla a la que se acreditan los kg).
+  const [openBagDialogOpen, setOpenBagDialogOpen] = useState(false);
+  const [selectedBagProduct, setSelectedBagProduct] = useState<ProductsProps | null>(null);
+  const [selectedCellId, setSelectedCellId] = useState("");
+  const [bagProducts, setBagProducts] = useState<ProductsProps[]>([]);
+  const [loadingBagProducts, setLoadingBagProducts] = useState(false);
   const [openingBag, setOpeningBag] = useState(false);
+  const [bagSearch, setBagSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [cellQuery, setCellQuery] = useState("");
+  const [cellOptions, setCellOptions] = useState<NativeSelectOption[]>([]);
+  const [loadingCells, setLoadingCells] = useState(false);
   // Guard de búsquedas server-side: descarta respuestas que llegan desordenadas.
   const searchSeq = useRef(0);
 
@@ -113,50 +132,113 @@ export const LooseStockAdmin = () => {
     }
   };
 
-  // Búsqueda server-side del picker: consulta el catálogo COMPLETO (no solo la
+  // Carga en paralelo la planilla + tipos + marcas y arma las opciones de celda
+  // destino ("MARCA · TIPO · Especie" + $/kg). Se corre al abrir el diálogo.
+  const loadCellOptions = useCallback(async () => {
+    setLoadingCells(true);
+    try {
+      const [plan, types, brands] = await Promise.all([
+        getPriceKgPlan(),
+        listPriceKgTypes(),
+        listPriceKgBrands(),
+      ]);
+      const typeById = new Map(types.map((t) => [t.id, t]));
+      const brandById = new Map(brands.map((b) => [b.id, b]));
+      const options: NativeSelectOption[] = plan.map((cell) => {
+        const brandName = brandById.get(cell.brandId)?.name ?? "";
+        const typeName = typeById.get(cell.typeId)?.name ?? "";
+        const speciesLabel = SPECIES_LABELS[cell.species] ?? cell.species;
+        const label = `${brandName} · ${typeName} · ${speciesLabel}${
+          cell.priceKg ? ` — $${cell.priceKg.toLocaleString("es-AR")}/kg` : ""
+        }`;
+        return { value: cell.id, label };
+      });
+      setCellOptions(options);
+    } catch (_err) {
+      toast.error("No se pudieron cargar las líneas de la planilla");
+      setCellOptions([]);
+    } finally {
+      setLoadingCells(false);
+    }
+  }, []);
+
+  // Búsqueda server-side de la BOLSA: consulta el catálogo COMPLETO (no solo la
   // primera página) por nombre, para que productos como "CAT CHOW" que quedan
   // más allá del pageSize inicial se puedan encontrar.
   const handleSearch = useCallback(async (term: string) => {
     const seq = ++searchSeq.current;
-    setLoadingPicker(true);
+    setLoadingBagProducts(true);
     try {
       const data = await products(undefined, term, undefined, 1, 300);
       if (seq !== searchSeq.current) return; // respuesta vieja → descartar
       const items = Array.isArray(data) ? data : (data as any).items ?? [];
-      setPickerProducts(items);
+      setBagProducts(items);
     } catch (_err) {
       if (seq !== searchSeq.current) return;
       toast.error("No se pudieron cargar los productos para abrir la bolsa");
-      setPickerProducts([]);
+      setBagProducts([]);
     } finally {
-      if (seq === searchSeq.current) setLoadingPicker(false);
+      if (seq === searchSeq.current) setLoadingBagProducts(false);
     }
   }, []);
 
-  const handleOpenPicker = async () => {
-    setPickerOpen(true);
-    await handleSearch(""); // carga inicial (invalida búsquedas en vuelo)
+  // Debounce del término de búsqueda (300ms) para no disparar una request por
+  // tecla.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(bagSearch), 300);
+    return () => clearTimeout(t);
+  }, [bagSearch]);
+
+  useEffect(() => {
+    if (openBagDialogOpen) handleSearch(debouncedSearch);
+  }, [debouncedSearch, openBagDialogOpen, handleSearch]);
+
+  const handleOpenBagDialog = () => {
+    setSelectedBagProduct(null);
+    setSelectedCellId("");
+    setBagSearch("");
+    setDebouncedSearch("");
+    setCellQuery("");
+    setOpenBagDialogOpen(true);
+    loadCellOptions();
   };
 
-  const handleConfirmOpenBag = async (selected: { product: ProductsProps }[]) => {
-    const branchId = selectedBranchId;
-    if (!branchId) {
+  const handleOpenChangeDialog = (open: boolean) => {
+    setOpenBagDialogOpen(open);
+    if (!open) {
+      setSelectedBagProduct(null);
+      setSelectedCellId("");
+      setBagSearch("");
+      setCellQuery("");
+    }
+  };
+
+  const handleConfirmOpenBag = async () => {
+    if (!selectedBranchId) {
       toast.error("Seleccioná una sucursal para abrir la bolsa");
       return;
     }
-    if (selected.length === 0) return;
+    if (!selectedBagProduct) {
+      toast.error("Seleccioná una bolsa para abrir");
+      return;
+    }
+    if (!selectedCellId) {
+      toast.error("Seleccioná la línea suelta de destino");
+      return;
+    }
+    const productId = selectedBagProduct._id ?? selectedBagProduct.id;
+    if (!productId) return;
+    const lineLabel =
+      cellOptions.find((o) => o.value === selectedCellId)?.label ?? "";
     setOpeningBag(true);
     try {
-      for (const { product } of selected) {
-        const productId = product._id ?? product.id;
-        if (!productId) continue;
-        await openBag({ productId, branchId });
-      }
-      toast.success(
-        selected.length === 1
-          ? `Bolsa abierta de "${selected[0].product.name}"`
-          : `${selected.length} bolsas abiertas`,
-      );
+      await openBag({
+        productId,
+        branchId: selectedBranchId,
+        priceKgPriceId: selectedCellId,
+      });
+      toast.success(`Bolsa abierta de "${selectedBagProduct.name}" → ${lineLabel}`);
+      setOpenBagDialogOpen(false);
       await load(selectedBranchId);
     } catch (err: any) {
       toast.error(err?.message || "No se pudo abrir la bolsa");
@@ -164,6 +246,11 @@ export const LooseStockAdmin = () => {
       setOpeningBag(false);
     }
   };
+
+  // Celdas filtradas client-side por el texto del input (case-insensitive).
+  const filteredCellOptions = cellOptions.filter((o) =>
+    o.label.toLowerCase().includes(cellQuery.toLowerCase()),
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -184,28 +271,24 @@ export const LooseStockAdmin = () => {
                 <Label htmlFor="loose-branch" className="text-xs">
                   Sucursal
                 </Label>
-                <select
+                <NativeSelect
                   id="loose-branch"
-                  data-testid="loose-branch"
+                  ariaLabel="Sucursal"
                   value={selectedBranchId}
-                  onChange={(e) => setSelectedBranchId(e.target.value)}
-                  className="flex h-9 w-44 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">Todas</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setSelectedBranchId}
+                  options={[
+                    { value: "", label: "Todas" },
+                    ...branches.map((b) => ({ value: b.id, label: b.name })),
+                  ]}
+                  className="w-44"
+                />
               </div>
               <Button
-                onClick={handleOpenPicker}
-                disabled={loadingPicker || openingBag}
+                onClick={handleOpenBagDialog}
                 title="−1 bolsa del producto, +peso en la celda de su planilla"
               >
                 <PackageOpen className="h-4 w-4 mr-2" />
-                {openingBag ? "Abriendo..." : "Abrir bolsa"}
+                Abrir bolsa
               </Button>
             </div>
           </div>
@@ -294,14 +377,137 @@ export const LooseStockAdmin = () => {
         </CardContent>
       </Card>
 
-      <ProductSelector
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        products={pickerProducts}
-        onConfirm={handleConfirmOpenBag}
-        onSearch={handleSearch}
-        searchLoading={loadingPicker}
-      />
+      <Dialog open={openBagDialogOpen} onOpenChange={handleOpenChangeDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Abrir bolsa</DialogTitle>
+            <DialogDescription>
+              Elegí la bolsa (producto) y la línea suelta de destino a la que se
+              acreditan sus kg.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label htmlFor="loose-branch-dialog" className="text-xs">
+                Sucursal
+              </Label>
+              <NativeSelect
+                id="loose-branch-dialog"
+                ariaLabel="Sucursal"
+                value={selectedBranchId}
+                onValueChange={setSelectedBranchId}
+                options={[
+                  { value: "", label: "Todas" },
+                  ...branches.map((b) => ({ value: b.id, label: b.name })),
+                ]}
+                className="w-44"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="loose-bag-search" className="text-xs">
+                Bolsa (producto)
+              </Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="loose-bag-search"
+                  className="pl-9"
+                  placeholder="Buscar producto..."
+                  value={bagSearch}
+                  onChange={(e) => setBagSearch(e.target.value)}
+                />
+              </div>
+              <div className="max-h-52 overflow-y-auto rounded-md border">
+                {loadingBagProducts ? (
+                  <p className="p-4 text-center text-sm text-muted-foreground">
+                    Buscando...
+                  </p>
+                ) : bagProducts.length === 0 ? (
+                  <p className="p-4 text-center text-sm text-muted-foreground">
+                    Sin resultado
+                  </p>
+                ) : (
+                  bagProducts.map((product) => {
+                    const id = product._id ?? product.id ?? "";
+                    const isSel = selectedBagProduct
+                      ? (selectedBagProduct._id ?? selectedBagProduct.id) === id
+                      : false;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setSelectedBagProduct(product)}
+                        className={
+                          isSel
+                            ? "block w-full bg-accent px-3 py-2 text-left text-sm"
+                            : "block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                        }
+                      >
+                        {product.name}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              {selectedBagProduct && (
+                <p className="text-xs text-muted-foreground">
+                  Bolsa elegida: <span className="font-medium">{selectedBagProduct.name}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Producto suelto destino</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Filtrar línea..."
+                  value={cellQuery}
+                  onChange={(e) => setCellQuery(e.target.value)}
+                />
+              </div>
+              {loadingCells ? (
+                <p className="p-4 text-center text-sm text-muted-foreground">
+                  Cargando líneas...
+                </p>
+              ) : filteredCellOptions.length === 0 ? (
+                <p className="p-4 text-center text-sm text-muted-foreground">
+                  Sin resultado
+                </p>
+              ) : (
+                <NativeSelect
+                  id="loose-cell-dialog"
+                  ariaLabel="Producto suelto destino"
+                  value={selectedCellId}
+                  onValueChange={setSelectedCellId}
+                  options={filteredCellOptions}
+                  placeholder="Seleccioná la línea"
+                  className="w-full"
+                />
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => handleOpenChangeDialog(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmOpenBag}
+              disabled={openingBag || loadingBagProducts || loadingCells}
+            >
+              <PackageOpen className="h-4 w-4 mr-2" />
+              {openingBag ? "Abriendo..." : "Abrir bolsa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

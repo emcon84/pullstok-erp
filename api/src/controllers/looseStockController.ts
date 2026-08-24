@@ -26,6 +26,7 @@ const looseCodes422 = [
   "LOOSE_BAG_NOT_FOUND",
   "LOOSE_BAG_NO_WEIGHT",
   "LOOSE_BAG_NO_LINE",
+  "LOOSE_LINE_NOT_FOUND",
   "LOOSE_BAG_INSUFFICIENT_STOCK",
   "LOOSE_STOCK_NOT_FOUND",
   "LOOSE_REQUIRES_BRANCH",
@@ -75,9 +76,10 @@ export const openBagController = async (req: Request, res: Response) => {
   try {
     const organizationId = requireOrganizationId();
     const authed = req as AuthedRequest;
-    const { productId, branchId } = req.body as {
+    const { productId, branchId, priceKgPriceId } = req.body as {
       productId: string;
       branchId?: string;
+      priceKgPriceId: string;
     };
     const { branchId: resolvedBranchId } = await resolveBranchId(
       authed,
@@ -88,6 +90,7 @@ export const openBagController = async (req: Request, res: Response) => {
       openBag(tx, organizationId, {
         productId,
         branchId: resolvedBranchId,
+        priceKgPriceId,
       }),
     );
     return res.status(201).json(result);

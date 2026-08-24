@@ -104,12 +104,14 @@ export const listLooseStocks = async (
 
 /**
  * POST /loose-stock/open-bag — abre una bolsa: −1 unidad en ProductStock de
- * bolsas, +weightKg en LooseStock de la celda (resuelta por el producto).
- * Errores de dominio (LOOSE_*) → 422 { error, message }.
+ * bolsas, +weightKg en LooseStock de la celda destino (priceKgPriceId elegida
+ * explícitamente, ya no hay auto-match por nombre). Errores de dominio
+ * (LOOSE_*) → 422 { error, message }.
  */
 export const openBag = async (payload: {
   productId: string;
   branchId?: string;
+  priceKgPriceId: string;
 }): Promise<OpenBagResult> => {
   const res = await fetch(`${API_URL}/loose-stock/open-bag`, {
     method: "POST",
