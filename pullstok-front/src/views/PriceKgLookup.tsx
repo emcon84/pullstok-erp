@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Search } from "lucide-react";
+import { Search, ShoppingCart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,9 @@ import { getPriceKgPlan } from "@/services/priceKgPlan";
 import type { SaleMode } from "@/components/hooks/useVendorCart";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useCreateSale } from "@/components/hooks/useSales";
+import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
+import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
+import { VendorCartSheet } from "@/components/molecules/VendorCartSheet";
 import type { PaymentInput } from "@/models/cashSessionModel";
 import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
 import {
@@ -93,6 +96,8 @@ export const PriceKgLookup = () => {
   const [cells, setCells] = useState<Record<string, CellPriceEntry>>({});
   const [loading, setLoading] = useState(true);
   const [panelCell, setPanelCell] = useState<CellContext | null>(null);
+  // Carrito de venta suelta: chip flotante + sheet para cerrar el pedido.
+  const [cartOpen, setCartOpen] = useState(false);
 
   const cart = useVendorCart();
   const { createSale } = useCreateSale();
@@ -115,6 +120,19 @@ export const PriceKgLookup = () => {
     return resolveDashboardBranchMode(role, branchIds);
   }, []);
   const branchId = branchMode.kind === "single" ? branchMode.branchId : undefined;
+
+  // Checkout del carrito de venta suelta (mismo patrón que VendorDashboard): el
+  // chip flotante abre el VendorCartSheet y el vendedor puede cerrar el pedido.
+  const checkout = useVendorCheckout({
+    branchId: branchId ?? "",
+    cartOpen,
+    setCartOpen,
+    cartItems: cart.items,
+    clearCart: cart.clearCart,
+    totalAmount: cart.totalAmount,
+  });
+  // Caja OPEN del vendedor (R8/R9): se propaga al confirmar la venta.
+  const { session: currentSession } = useGetCurrentCashSession(branchId);
 
   // Carga inicial paralela de tipos, marcas y planilla. Cualquier error se
   // degrada a listas vacías (la pantalla sigue funcionando con datos parciales).
@@ -357,6 +375,44 @@ export const PriceKgLookup = () => {
         onClose={() => setPanelCell(null)}
         onSellDirect={handleSellDirect}
         onAddToCart={handleAddToCart}
+      />
+
+      {/* Chip flotante del pedido (solo cuando hay items sueltos en el carrito):
+        abre el VendorCartSheet para cerrar/confirmar la venta. */}
+      {cart.itemCount > 0 && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1">
+          <span className="absolute inset-0 -m-3 animate-ping rounded-full bg-primary/20" />
+          <span className="absolute inset-0 -m-6 animate-ping rounded-full bg-primary/10 [animation-delay:300ms]" />
+          <button
+            onClick={() => setCartOpen(true)}
+            className="relative flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 text-primary-foreground shadow-lg hover:bg-primary/90 transition-all active:scale-95 touch-manipulation"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            <span className="font-semibold text-sm">{cart.itemCount}</span>
+            <span className="hidden sm:inline text-sm">
+              — ${cart.totalAmount.toLocaleString("es-AR")}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Sheet del pedido de venta suelta: vender directo o guardar como pedido. */}
+      <VendorCartSheet
+        open={cartOpen}
+        cart={{ items: cart.items, totalAmount: cart.totalAmount }}
+        status={{
+          confirming: checkout.confirming,
+          savingOrder: checkout.savingOrder,
+        }}
+        handlers={{
+          onOpenChange: setCartOpen,
+          updateQty: cart.updateQuantity,
+          remove: cart.removeFromCart,
+          clearCart: cart.clearCart,
+          saveOrder: checkout.handleSaveOrder,
+          confirmSale: checkout.handleConfirmSale,
+        }}
+        cashSessionId={currentSession?.id}
       />
     </div>
   );
