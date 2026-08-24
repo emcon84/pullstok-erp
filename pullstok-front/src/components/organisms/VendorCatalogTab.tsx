@@ -251,6 +251,7 @@ export const VendorCatalogTab = ({
         setSaleMode={setSaleMode}
         amount={amount}
         setAmount={setAmount}
+        allowLoose={false}
         onDirectSale={handleDirectSale}
         onAddToCart={confirmAddToCart}
         onClose={closeQtyModal}

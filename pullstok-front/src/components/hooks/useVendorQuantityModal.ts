@@ -52,10 +52,11 @@ export function useVendorQuantityModal({
   }, [searchInputRef]);
 
   const openQtyModal = useCallback((product: DataItem) => {
-    // Default to POR_PESO if product is loose-eligible; else BOLSA_CERRADA.
-    const isLoose = (product.priceKgSuelto ?? 0) > 0;
-    setQty(isLoose ? 0.01 : 1);
-    setSaleMode(isLoose ? "POR_PESO" : "BOLSA_CERRADA");
+    // El modal de esta hook es el flujo "Por unidad": vende SOLO bolsa cerrada.
+    // El suelto (por kilo / por monto) pertenece únicamente a la tab "Suelto"
+    // (PriceKgProductPanel), así que acá el modo SIEMPRE arranca en BOLSA_CERRADA.
+    setQty(1);
+    setSaleMode("BOLSA_CERRADA");
     setAmount(0);
     setQtyModal({ product });
   }, []);
@@ -68,16 +69,12 @@ export function useVendorQuantityModal({
   const confirmAddToCart = useCallback(() => {
     if (!qtyModal) return;
     const stock = branchQty(qtyModal.product);
-    const actualQty =
-      saleMode === "POR_MONTO"
-        ? amount
-        : qty;
     const priceKgSuelto = qtyModal.product.priceKgSuelto ?? null;
-    addToCart(qtyModal.product, actualQty, branchId, stock, saleMode, priceKgSuelto);
+    addToCart(qtyModal.product, qty, branchId, stock, "BOLSA_CERRADA", priceKgSuelto);
     toast.success(`"${qtyModal.product.name}" agregado al pedido`);
     setQtyModal(null);
     releaseSearchFocus();
-  }, [qtyModal, qty, amount, saleMode, addToCart, branchId, releaseSearchFocus]);
+  }, [qtyModal, qty, addToCart, branchId, releaseSearchFocus]);
 
   // ── Direct sale from showroom modal (1-tap single product sale) ──
   // Recibe payments ya finalizados (default EFECTIVO por el total) desde el
@@ -95,10 +92,8 @@ export function useVendorQuantityModal({
       toast.error("Producto sin stock");
       return;
     }
-    const actualQty =
-      saleMode === "POR_MONTO"
-        ? amount
-        : qty;
+    const price = Number(p.price ?? 0);
+    const actualQty = qty;
     setDirectSelling(true);
     try {
       const cart: CartItem[] = [
@@ -107,21 +102,14 @@ export function useVendorQuantityModal({
             _id: (p._id || p.id) as string,
             id: (p._id || p.id) as string,
             name: p.name,
-            price: saleMode !== "BOLSA_CERRADA"
-              ? (p.priceKgSuelto ?? Number(p.price ?? 0))
-              : Number(p.price ?? 0),
+            price,
             quantity: stock,
             description: "",
             category: "",
           },
           quantity: actualQty,
-          totalPrice:
-            saleMode === "POR_MONTO"
-              ? amount
-              : (saleMode === "POR_PESO"
-                  ? (p.priceKgSuelto ?? Number(p.price ?? 0))
-                  : Number(p.price ?? 0)) * actualQty,
-          saleMode,
+          totalPrice: price * actualQty,
+          saleMode: "BOLSA_CERRADA",
         },
       ];
       // Default EFECTIVO por el total cuando el call no declara medio (R7).
@@ -138,7 +126,7 @@ export function useVendorQuantityModal({
     } finally {
       setDirectSelling(false);
     }
-  }, [qtyModal, qty, amount, saleMode, createSale, releaseSearchFocus]);
+  }, [qtyModal, qty, createSale, releaseSearchFocus]);
 
   return {
     qtyModal,

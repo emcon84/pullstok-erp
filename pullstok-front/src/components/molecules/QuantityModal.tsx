@@ -28,6 +28,7 @@ interface QuantityModalProps {
   setSaleMode: Dispatch<SetStateAction<SaleMode>>;
   amount: number;
   setAmount: Dispatch<SetStateAction<number>>;
+  allowLoose?: boolean;
   onDirectSale: (payments: PaymentInput[]) => void;
   onAddToCart: () => void;
   onClose: () => void;
@@ -51,28 +52,33 @@ export const QuantityModal = ({
   setSaleMode,
   amount,
   setAmount,
+  allowLoose = true,
   onDirectSale,
   onAddToCart,
   onClose,
 }: QuantityModalProps) => {
-  const isLoose = (product?.priceKgSuelto ?? 0) > 0;
+  const isLoose = allowLoose && (product?.priceKgSuelto ?? 0) > 0;
+  // En el contexto "Por unidad" (allowLoose=false) se vende SOLO bolsa
+  // cerrada: el modo viene del padre pero se lo fuerza acá para que el
+  // suelto (por kilo/monto) jamás se ofrezca.
+  const effectiveSaleMode: SaleMode = allowLoose ? saleMode : "BOLSA_CERRADA";
   const priceKgSuelto = product?.priceKgSuelto ?? null;
   // kg preview (POR_MONTO only)
   const kgPreview =
-    saleMode === "POR_MONTO" && priceKgSuelto && amount > 0
+    effectiveSaleMode === "POR_MONTO" && priceKgSuelto && amount > 0
       ? round2(amount / priceKgSuelto)
       : null;
 
   // Price to display: POR_PESO / POR_MONTO shows priceKgSuelto; BOLSA shows unit price.
   const displayPrice =
-    saleMode === "BOLSA_CERRADA"
+    effectiveSaleMode === "BOLSA_CERRADA"
       ? Number(product?.price ?? 0)
       : (priceKgSuelto ?? 0);
 
   const total =
-    saleMode === "POR_MONTO"
+    effectiveSaleMode === "POR_MONTO"
       ? amount
-      : round2(displayPrice * (saleMode === "POR_PESO" ? qty : qty));
+      : round2(displayPrice * (effectiveSaleMode === "POR_PESO" ? qty : qty));
 
   // Display stock per mode: ProductStock.quantity es SIEMPRE en unidades
   // (bolsas) tras la migración a stock por bolsas. El suelto en kg vive en
@@ -82,7 +88,7 @@ export const QuantityModal = ({
   // effectiveMax: bolsas para BOLSA_CERRADA; para POR_PESO/POR_MONTO también
   // son unidades (bolsas) tras la migración.
   const effectiveMax =
-    saleMode === "BOLSA_CERRADA" ? maxBags : maxStock;
+    effectiveSaleMode === "BOLSA_CERRADA" ? maxBags : maxStock;
 
   // When switching to BOLSA_CERRADA from loose, reset qty to 1 bag.
   const setModeAndQty = (mode: SaleMode) => {
@@ -135,9 +141,9 @@ export const QuantityModal = ({
                 <button
                   key={mode}
                   type="button"
-                  aria-pressed={saleMode === mode}
+                  aria-pressed={effectiveSaleMode === mode}
                   className={`flex-1 text-xs font-medium py-1.5 px-2 rounded-md transition-colors ${
-                    saleMode === mode
+                    effectiveSaleMode === mode
                       ? "bg-background shadow-sm text-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
@@ -155,7 +161,7 @@ export const QuantityModal = ({
           )}
 
           {/* POR_PESO: kg input (2dp, max=decimal stock) */}
-          {saleMode === "POR_PESO" && (
+          {effectiveSaleMode === "POR_PESO" && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="kgInput">Kilogramos</Label>
@@ -195,7 +201,7 @@ export const QuantityModal = ({
           )}
 
           {/* POR_MONTO: amount input + live kg preview */}
-          {saleMode === "POR_MONTO" && (
+          {effectiveSaleMode === "POR_MONTO" && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="amountInput">Monto ($)</Label>
@@ -239,7 +245,7 @@ export const QuantityModal = ({
           )}
 
           {/* BOLSA_CERRADA: int stepper unchanged */}
-          {saleMode === "BOLSA_CERRADA" && (
+          {effectiveSaleMode === "BOLSA_CERRADA" && (
             <>
               <p className="text-sm text-muted-foreground">
                 Stock disponible:{" "}
@@ -299,7 +305,7 @@ export const QuantityModal = ({
 
           {/* Action buttons */}
           <div className="flex flex-col gap-2 pt-2">
-            {saleMode !== "BOLSA_CERRADA" && (
+            {effectiveSaleMode !== "BOLSA_CERRADA" && (
               <p className="text-lg font-bold text-center">
                 ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
               </p>
@@ -311,8 +317,8 @@ export const QuantityModal = ({
               disabled={
                 directSelling ||
                 maxStock <= 0 ||
-                (saleMode === "POR_MONTO" && amount <= 0) ||
-                (saleMode === "POR_PESO" && qty <= 0)
+                (effectiveSaleMode === "POR_MONTO" && amount <= 0) ||
+                (effectiveSaleMode === "POR_PESO" && qty <= 0)
               }
             >
               <ShoppingCart className="h-4 w-4 mr-2" />
@@ -327,8 +333,8 @@ export const QuantityModal = ({
               onClick={onAddToCart}
               disabled={
                 directSelling ||
-                (saleMode === "POR_MONTO" && amount <= 0) ||
-                (saleMode === "POR_PESO" && qty <= 0)
+                (effectiveSaleMode === "POR_MONTO" && amount <= 0) ||
+                (effectiveSaleMode === "POR_PESO" && qty <= 0)
               }
             >
               <Plus className="h-4 w-4 mr-2" />
