@@ -164,4 +164,30 @@ describe("createSaleSchema payments + cashSessionId", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts an optional discountPct between 0 and 100", () => {
+    expect(
+      createSaleSchema.safeParse({ products: validProducts, discountPct: 10 }).success,
+    ).toBe(true);
+    expect(
+      createSaleSchema.safeParse({ products: validProducts, discountPct: 0 }).success,
+    ).toBe(true);
+    expect(
+      createSaleSchema.safeParse({ products: validProducts, discountPct: 100 }).success,
+    ).toBe(true);
+  });
+
+  it("rejects discountPct out of range (sdd/venta-descuento)", () => {
+    expect(
+      createSaleSchema.safeParse({ products: validProducts, discountPct: -1 }).success,
+    ).toBe(false);
+    expect(
+      createSaleSchema.safeParse({ products: validProducts, discountPct: 101 }).success,
+    ).toBe(false);
+  });
+
+  it("accepts sale without discountPct (backward-compat = 0)", () => {
+    const result = createSaleSchema.safeParse({ products: validProducts });
+    expect(result.success).toBe(true);
+  });
 });

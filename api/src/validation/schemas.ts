@@ -320,6 +320,14 @@ export const createSaleSchema = z.object({
     }),
   // CashSession a la que se asocia la venta (sdd/caja-apertura-cierre R8).
   cashSessionId: z.string().min(1).optional(),
+  // Descuento porcentual a nivel venta (sdd/venta-descuento): 0..100. Ausente
+  // = 0 = sin descuento (backward-compat). El server materializa el monto en $
+  // y repondera totalAmount = subtotal − descuento.
+  discountPct: z.coerce
+    .number()
+    .min(0, "El descuento no puede ser menor a 0")
+    .max(100, "El descuento no puede superar el 100%")
+    .optional(),
 });
 
 // ---------- Caja (sdd/caja-apertura-cierre) ----------

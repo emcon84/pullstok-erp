@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { PaymentSection } from "../PaymentSection";
 import { usePayments } from "../../hooks/usePayments";
 import { ProductSelector } from "../ProductSelector";
@@ -28,7 +29,8 @@ import { Customer } from "../../../models/customerModel";
 import { CartItem } from "../../../models/salesModel";
 import { Order } from "../../../models/orderModel";
 import { Budget } from "../../../models/budgetModel";
-import type { PaymentInput } from "../../../models/cashSessionModel";
+import { type PaymentInput } from "../../../models/cashSessionModel";
+import { round2 } from "@/lib/money";
 import { toast } from "react-toastify";
 
 const selectClass =
@@ -60,6 +62,7 @@ interface SalesDrawerProps {
     budgetId?: string,
     payments?: PaymentInput[],
     cashSessionId?: string,
+    discountPct?: number,
   ) => void;
 }
 
@@ -89,11 +92,20 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
   const [selectedBudget, setSelectedBudget] = useState("");
   const [isProductSelectorOpen, setIsProductSelectorOpen] = useState(false);
 
-  // ── Medios de pago (R6-R8, R10): selector de método + vuelto ──
-  // La lógica de payments/cashReceived/vuelto vive en usePayments; al confirmar
-  // se pasan payments (finalize) y cashSessionId a onConfirm.
-  const totalAmount = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+  // ── Descuento porcentual a nivel venta (sdd/venta-descuento) ──
+  // El admin/vendedor ingresa un % (0..100); el descuento en $ se materializa
+  // con round2 y totalAmount (subtotal − descuento) alimenta el vuelto, el
+  // saldo restante (addPayment) y el payload de payments (R7).
+  const [discountPct, setDiscountPct] = useState(0);
+  const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+  const discountAmount = round2((subtotal * discountPct) / 100);
+  const totalAmount = round2(subtotal - discountAmount);
   const pay = usePayments(totalAmount);
+
+  const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = Number(e.target.value);
+    setDiscountPct(Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0);
+  };
 
   const tabs: { key: Mode; label: string }[] = [
     { key: "products", label: "Productos" },
@@ -204,6 +216,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
       selectedBudget,
       pay.finalize(),
       cashSessionId,
+      discountPct,
     );
     resetState();
     setShowConfirm(false);
@@ -411,11 +424,40 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
               </div>
             )}
 
-            <div className="mb-4 flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total</span>
-              <span className="text-xl font-bold tabular-nums">
-                ${totalAmount.toLocaleString("es-AR")}
-              </span>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <Label htmlFor="sd-discount" className="shrink-0">
+                Descuento (%)
+              </Label>
+              <Input
+                id="sd-discount"
+                type="number"
+                min={0}
+                max={100}
+                step="1"
+                value={discountPct}
+                onChange={handleDiscountChange}
+                className="w-28"
+              />
+            </div>
+            <div className="mb-4 space-y-1 text-sm">
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Subtotal</span>
+                <span className="tabular-nums">
+                  ${subtotal.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Descuento</span>
+                <span className="tabular-nums">
+                  −${discountAmount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Total</span>
+                <span className="text-xl font-bold tabular-nums">
+                  ${totalAmount.toLocaleString("es-AR")}
+                </span>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button

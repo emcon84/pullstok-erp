@@ -35,7 +35,7 @@ export function useVendorCheckout({
 
   // ── Confirm sale ──
   const handleConfirmSale = useCallback(
-    async (payments?: PaymentInput[], cashSessionId?: string) => {
+    async (payments?: PaymentInput[], cashSessionId?: string, discountPct?: number) => {
       if (cartItems.length === 0) return;
       setConfirming(true);
       try {
@@ -63,7 +63,7 @@ export function useVendorCheckout({
           loosePriceId: i.loosePriceId,
           looseName: i.looseName,
         }));
-        await createSale({ cart, payments, cashSessionId });
+        await createSale({ cart, payments, cashSessionId, discountPct });
         clearCart();
         setCartOpen(false);
         toast.success("Pedido confirmado y vendido");

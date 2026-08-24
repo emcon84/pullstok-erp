@@ -15,8 +15,8 @@ const invoiceInclude = {
 // Create a new sale
 const createSale = async (req: AuthedRequest, res: Response) => {
     try {
-        const { products, orderId, payments, cashSessionId } = req.body;
-        const sale = await SaleService.createSale({ products, orderId, payments, cashSessionId }, req.user!.id, req.user!.role);
+        const { products, orderId, payments, cashSessionId, discountPct } = req.body;
+        const sale = await SaleService.createSale({ products, orderId, payments, cashSessionId, discountPct }, req.user!.id, req.user!.role);
         res.status(201).json(sale);
     } catch (error: any) {
         // 422 para errores de dominio del flujo suelto (B-06 amendment /

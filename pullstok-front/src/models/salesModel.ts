@@ -33,6 +33,10 @@ export interface SaleRequest {
   payments?: { method: PaymentMethod; amount: number }[];
   /** Id de la caja OPEN del vendedor (R8/R9). */
   cashSessionId?: string;
+  /** Descuento porcentual a nivel venta (0..100). Ausente = 0 = sin descuento
+   *  (backward-compat). El backend materializa el monto en $ y repondera el
+   *  total = subtotal − descuento. */
+  discountPct?: number;
 }
 
 export interface Sale {
@@ -60,6 +64,9 @@ export interface Sale {
     price: number;
   }[];
   totalAmount: number;
+  /** Descuento aplicado a la venta en $ (backend). Backward-compat: undefined
+   *  en ventas legacy sin descuento. */
+  discount?: number;
   saleDate: string;
   createdAt?: string;
   __v?: number;

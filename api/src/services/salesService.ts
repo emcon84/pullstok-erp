@@ -34,6 +34,10 @@ interface ISaleRequest {
   // Sesión de caja a la que se asocia la venta (R8). Para VENDEDOR/CASHIER el
   // server la resuelve de la sesión OPEN; para gestión se acepta del request.
   cashSessionId?: string;
+  // Descuento porcentual a nivel venta (sdd/venta-descuento): 0..100. Ausente
+  // = 0 = sin descuento (backward-compat). El server materializa el monto en $
+  // (discount) y repondera totalAmount = subtotal − discount.
+  discountPct?: number;
 }
 
 const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: string) => {
@@ -319,6 +323,15 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       totalAmount += lineTotal;
     }
 
+    // ── Descuento porcentual a nivel venta (sdd/venta-descuento) ──
+    // El vendedor ingresa un % (0..100); el server materializa el monto en $
+    // con round2 y repondera totalAmount al valor FINAL (ya descontado). Se
+    // calcula acá (sobre el subtotal de items) para que la validación de
+    // payments (Σ == total) y la persistencia usen el total descontado.
+    const discountPct = Math.min(100, Math.max(0, saleRequest.discountPct ?? 0));
+    const discountAmount = round2((totalAmount * discountPct) / 100);
+    totalAmount = round2(totalAmount - discountAmount);
+
     // ── Order validation (same as before) ──
     if (orderId) {
       const order = await tx.order.findFirst({ where: { id: orderId } });
@@ -352,6 +365,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       data: {
         organizationId,
         totalAmount,
+        discount: discountAmount,
         ...(sellerBranchId ? { branchId: sellerBranchId } : {}),
         ...(orderId ? { orderId } : {}),
         // Venta asociada a la caja abierta (R8); null en ventas legacy/admin.

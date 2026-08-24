@@ -112,6 +112,7 @@ describe("VendorCartSheet — medios de pago (R6-R8, R10)", () => {
     expect(confirmSale).toHaveBeenCalledWith(
       [{ method: "EFECTIVO", amount: 200 }],
       "cs-1",
+      0,
     );
   });
 
@@ -137,6 +138,30 @@ describe("VendorCartSheet — medios de pago (R6-R8, R10)", () => {
     expect(confirmSale).toHaveBeenCalledWith(
       [{ method: "TARJETA_CREDITO", amount: 200 }],
       "cs-1",
+      0,
+    );
+  });
+
+  it("aplica descuento % al total (subtotal − descuento) y lo propaga a confirmSale", () => {
+    const confirmSale = vi.fn();
+    renderSheet(confirmSale);
+
+    // Total = 200 (subtotal), 10% → descuento 20 → total 180.
+    fireEvent.change(screen.getByLabelText("Descuento (%)"), {
+      target: { value: "10" },
+    });
+
+    // El total mostrado pasa de 200 a 180.
+    expect(screen.getByText("Descuento")).toBeInTheDocument();
+    expect(screen.getByText("−$20,00")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Vender directo"));
+
+    // El EFECTIVO default usa el total DESCONTADO (180) y se propaga el 10%.
+    expect(confirmSale).toHaveBeenCalledWith(
+      [{ method: "EFECTIVO", amount: 180 }],
+      "cs-1",
+      10,
     );
   });
 });

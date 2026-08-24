@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { toast } from "react-toastify";
 import { Minus, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -12,6 +15,7 @@ import type { VendorCartItem, SaleMode } from "@/components/hooks/useVendorCart"
 import { usePayments } from "@/components/hooks/usePayments";
 import { PaymentSection } from "@/components/molecules/PaymentSection";
 import type { PaymentInput } from "@/models/cashSessionModel";
+import { round2 } from "@/lib/money";
 
 interface VendorCartData {
   items: VendorCartItem[];
@@ -34,7 +38,7 @@ interface VendorCartHandlers {
   remove: (productId: string, saleMode?: SaleMode, loosePriceId?: string) => void;
   clearCart: () => void;
   saveOrder: () => void;
-  confirmSale: (payments?: PaymentInput[], cashSessionId?: string) => void;
+  confirmSale: (payments?: PaymentInput[], cashSessionId?: string, discountPct?: number) => void;
 }
 
 interface VendorCartSheetProps {
@@ -64,18 +68,31 @@ export const VendorCartSheet = ({
   handlers,
   cashSessionId,
 }: VendorCartSheetProps) => {
+  // ── Descuento porcentual a nivel venta (sdd/venta-descuento) ──
+  // El vendedor ingresa un % (0..100); el descuento en $ se materializa acá con
+  // round2 y `total` (subtotal − descuento) es lo que alimenta el cálculo del
+  // vuelto, el saldo restante (addPayment) y el payload de payments (R7).
+  const [discountPct, setDiscountPct] = useState<number>(0);
+  const subtotal = cart.totalAmount;
+  const discountAmount = round2((subtotal * discountPct) / 100);
+  const total = round2(subtotal - discountAmount);
+
   // ── Medios de pago (R6-R8, R10): selector de método + vuelto ──
   // La lógica de payments/cashReceived/vuelto vive en usePayments; al confirmar
-  // se pasa el payload final (finalize) + cashSessionId.
-  const total = cart.totalAmount;
+  // se pasa el payload final (finalize) + cashSessionId + discountPct.
   const pay = usePayments(total);
 
   const handleConfirm = () => {
-    // Payload final: los payments declarados deben sumar el total (R7). Si no
-    // se declaró nada (o solo se ingresó efectivo recibido sin método), se
-    // declara EFECTIVO por el total. El vuelto (recibido - total) NO se
-    // persiste — R10.
-    handlers.confirmSale(pay.finalize(), cashSessionId);
+    // Payload final: los payments declarados deben sumar el total DESCONTADO
+    // (R7). Si no se declaró nada (o solo se ingresó efectivo recibido sin
+    // método), se declara EFECTIVO por el total. El vuelto (recibido - total)
+    // NO se persiste — R10.
+    handlers.confirmSale(pay.finalize(), cashSessionId, discountPct);
+  };
+
+  const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = Number(e.target.value);
+    setDiscountPct(Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0);
   };
 
   return (
@@ -114,13 +131,43 @@ export const VendorCartSheet = ({
               ))}
             </div>
 
-            {/* Footer: payment + total + actions */}
+            {/* Footer: discount + totals + payment + actions */}
             <div className="border-t pt-4 space-y-3 mt-2 pb-2">
-              <div className="flex items-center justify-between text-lg font-bold">
-                <span>Total</span>
-                <span className="tabular-nums">
-                  ${cart.totalAmount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                </span>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="cart-discount" className="shrink-0">
+                  Descuento (%)
+                </Label>
+                <Input
+                  id="cart-discount"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="1"
+                  value={discountPct}
+                  onChange={handleDiscountChange}
+                  className="w-28"
+                />
+              </div>
+
+              <div className="space-y-1 text-sm">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">
+                    ${subtotal.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Descuento</span>
+                  <span className="tabular-nums">
+                    −${discountAmount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-lg font-bold">
+                  <span>Total</span>
+                  <span className="tabular-nums">
+                    ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
 
               <PaymentSection

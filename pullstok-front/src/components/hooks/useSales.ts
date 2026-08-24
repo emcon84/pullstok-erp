@@ -9,9 +9,9 @@ export const useCreateSale = () => {
   const mutation = useMutation<
     void,
     Error,
-    { cart: CartItem[]; orderId?: string; payments?: PaymentInput[]; cashSessionId?: string }
+    { cart: CartItem[]; orderId?: string; payments?: PaymentInput[]; cashSessionId?: string; discountPct?: number }
   >({
-    mutationFn: async ({ cart, orderId, payments, cashSessionId }) => {
+    mutationFn: async ({ cart, orderId, payments, cashSessionId, discountPct }) => {
       const saleRequest = {
         products: cart.map((item) => {
           const saleMode: SaleMode = item.saleMode ?? "BOLSA_CERRADA";
@@ -41,6 +41,7 @@ export const useCreateSale = () => {
         }),
         payments,
         cashSessionId,
+        discountPct,
       };
       await createSale(saleRequest, orderId);
     },
