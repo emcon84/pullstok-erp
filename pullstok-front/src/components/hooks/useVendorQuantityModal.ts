@@ -84,49 +84,57 @@ export function useVendorQuantityModal({
   // handleDirectSale() sin argumentos, así que acá se defaultea a EFECTIVO por
   // el total si no viene ningún medio declarado (mismo criterio R7 que el resto
   // de los flujos).
-  const handleDirectSale = useCallback(async (payments?: PaymentInput[]) => {
-    if (!qtyModal) return;
-    const p = qtyModal.product;
-    const stock = branchQty(p);
-    if (stock <= 0) {
-      toast.error("Producto sin stock");
-      return;
-    }
-    const price = Number(p.price ?? 0);
-    const actualQty = qty;
-    setDirectSelling(true);
-    try {
-      const cart: CartItem[] = [
-        {
-          product: {
-            _id: (p._id || p.id) as string,
-            id: (p._id || p.id) as string,
-            name: p.name,
-            price,
-            quantity: stock,
-            description: "",
-            category: "",
+  const handleDirectSale = useCallback(
+    async (payments?: PaymentInput[], discountPct: number = 0) => {
+      if (!qtyModal) return;
+      const p = qtyModal.product;
+      const stock = branchQty(p);
+      if (stock <= 0) {
+        toast.error("Producto sin stock");
+        return;
+      }
+      const price = Number(p.price ?? 0);
+      const actualQty = qty;
+      setDirectSelling(true);
+      try {
+        const totalPrice = round2(price * actualQty);
+        const cart: CartItem[] = [
+          {
+            product: {
+              _id: (p._id || p.id) as string,
+              id: (p._id || p.id) as string,
+              name: p.name,
+              price,
+              quantity: stock,
+              description: "",
+              category: "",
+            },
+            quantity: actualQty,
+            totalPrice,
+            saleMode: "BOLSA_CERRADA",
           },
-          quantity: actualQty,
-          totalPrice: price * actualQty,
-          saleMode: "BOLSA_CERRADA",
-        },
-      ];
-      // Default EFECTIVO por el total cuando el call no declara medio (R7).
-      const finalPayments =
-        payments && payments.length > 0
-          ? payments
-          : [{ method: "EFECTIVO" as const, amount: round2(cart[0].totalPrice) }];
-      await createSale({ cart, payments: finalPayments });
-      toast.success(`Venta directa realizada (${actualQty}x "${p.name}")`);
-      setQtyModal(null);
-      releaseSearchFocus();
-    } catch (err: any) {
-      toast.error(err?.message || "Error al realizar la venta directa");
-    } finally {
-      setDirectSelling(false);
-    }
-  }, [qtyModal, qty, createSale, releaseSearchFocus]);
+        ];
+        // Descuento % a nivel venta (sdd/venta-descuento): el EFECTIVO default
+        // usa el total DESCONTADO. discountPct=0 → comportamiento previo.
+        const safePct = Math.max(0, Math.min(100, Number(discountPct) || 0));
+        const discountedTotal = round2(totalPrice - (totalPrice * safePct) / 100);
+        // Default EFECTIVO por el total cuando el call no declara medio (R7).
+        const finalPayments =
+          payments && payments.length > 0
+            ? payments
+            : [{ method: "EFECTIVO" as const, amount: discountedTotal }];
+        await createSale({ cart, payments: finalPayments, discountPct: safePct });
+        toast.success(`Venta directa realizada (${actualQty}x "${p.name}")`);
+        setQtyModal(null);
+        releaseSearchFocus();
+      } catch (err: any) {
+        toast.error(err?.message || "Error al realizar la venta directa");
+      } finally {
+        setDirectSelling(false);
+      }
+    },
+    [qtyModal, qty, createSale, releaseSearchFocus],
+  );
 
   return {
     qtyModal,

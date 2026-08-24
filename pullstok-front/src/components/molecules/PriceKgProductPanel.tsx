@@ -55,6 +55,7 @@ interface PriceKgProductPanelProps {
     mode: SaleMode,
     amount: number,
     payments: PaymentInput[],
+    discountPct?: number,
   ) => void | Promise<void>;
   onAddToCart: (qty: number, mode: SaleMode, amount: number) => void;
 }
@@ -145,6 +146,8 @@ export const PriceKgProductPanel = ({
   const [qtyStr, setQtyStr] = useState("0.01");
   const [amountStr, setAmountStr] = useState("0");
   const [selling, setSelling] = useState(false);
+  // Descuento % a nivel venta (sdd/venta-descuento).
+  const [discountPct, setDiscountPct] = useState(0);
 
   const cellPrice = cell?.priceKg ?? null;
   const lineName = cell
@@ -192,6 +195,10 @@ export const PriceKgProductPanel = ({
         ? round2(cellPrice * qty)
         : 0;
 
+  // Descuento % a nivel venta: total = subtotal − subtotal*pct/100 (round2).
+  const discountAmount = round2((total * discountPct) / 100);
+  const discountedTotal = round2(total - discountAmount);
+
   // Stock suelto CARGADO y en CERO con sucursal: el backend rechaza la venta
   // (salesService: looseStock.quantity < kg → "Stock suelto insuficiente"),
   // así que se bloquea VENDER y se avisa. Sin sucursal / sin lectura → null →
@@ -206,7 +213,7 @@ export const PriceKgProductPanel = ({
     (mode === "POR_MONTO" && amount <= 0);
 
   // Medio de pago de la venta suelta (R6-R8, R10).
-  const pay = usePayments(total);
+  const pay = usePayments(discountedTotal);
 
   const handleSell = async () => {
     if (sellDisabled) return;
@@ -217,6 +224,7 @@ export const PriceKgProductPanel = ({
         mode,
         amount,
         pay.finalize(),
+        discountPct,
       );
     } finally {
       setSelling(false);
@@ -390,6 +398,51 @@ export const PriceKgProductPanel = ({
               </>
             )}
 
+            {/* Descuento % a nivel venta */}
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="pp-discount" className="shrink-0">
+                Descuento (%)
+              </Label>
+              <Input
+                id="pp-discount"
+                type="number"
+                min={0}
+                max={100}
+                step="1"
+                value={discountPct}
+                onChange={(e) => {
+                  const raw = Number(e.target.value);
+                  setDiscountPct(
+                    Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0,
+                  );
+                }}
+                className="w-28"
+              />
+            </div>
+
+            <div className="space-y-1 text-sm">
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Subtotal</span>
+                <span className="tabular-nums">
+                  ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              {discountAmount > 0 && (
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Descuento</span>
+                  <span className="tabular-nums">
+                    −${discountAmount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-lg font-bold">
+                <span>Total</span>
+                <span className="tabular-nums">
+                  ${discountedTotal.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
             <PaymentSection
               idPrefix="pp"
               payments={pay.payments}
@@ -399,19 +452,19 @@ export const PriceKgProductPanel = ({
               setCashReceived={pay.setCashReceived}
               addPayment={pay.addPayment}
               clearPayments={pay.clearPayments}
-              total={total}
+              total={discountedTotal}
             />
 
             {/* Acciones */}
             <div className="flex flex-col gap-2 pt-2">
               <p className="text-lg font-bold text-center">
-                ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                ${discountedTotal.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
               </p>
               <Button className="w-full" size="lg" disabled={sellDisabled} onClick={handleSell}>
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 {selling
                   ? "Procesando venta..."
-                  : `Vender directo ($${total.toLocaleString("es-AR", {
+                  : `Vender directo ($${discountedTotal.toLocaleString("es-AR", {
                       minimumFractionDigits: 2,
                     })})`}
               </Button>

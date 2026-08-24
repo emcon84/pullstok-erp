@@ -114,6 +114,7 @@ describe("PriceKgProductPanel — modal de venta suelta por celda", () => {
       "POR_PESO",
       0,
       [{ method: "EFECTIVO", amount: 23000 }],
+      0,
     );
   });
 
@@ -130,6 +131,7 @@ describe("PriceKgProductPanel — modal de venta suelta por celda", () => {
       "POR_MONTO",
       4600,
       [{ method: "EFECTIVO", amount: 4600 }],
+      0,
     );
   });
 

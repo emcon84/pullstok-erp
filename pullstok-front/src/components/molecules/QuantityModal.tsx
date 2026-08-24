@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { Minus, Plus, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ interface QuantityModalProps {
   amount: number;
   setAmount: Dispatch<SetStateAction<number>>;
   allowLoose?: boolean;
-  onDirectSale: (payments: PaymentInput[]) => void;
+  onDirectSale: (payments: PaymentInput[], discountPct?: number) => void;
   onAddToCart: () => void;
   onClose: () => void;
 }
@@ -80,6 +80,11 @@ export const QuantityModal = ({
       ? amount
       : round2(displayPrice * (effectiveSaleMode === "POR_PESO" ? qty : qty));
 
+  // Descuento % a nivel venta (sdd/venta-descuento): total = subtotal − pct.
+  const [discountPct, setDiscountPct] = useState(0);
+  const discountAmount = round2((total * discountPct) / 100);
+  const discountedTotal = round2(total - discountAmount);
+
   // Display stock per mode: ProductStock.quantity es SIEMPRE en unidades
   // (bolsas) tras la migración a stock por bolsas. El suelto en kg vive en
   // LooseStock y se muestra en el panel de celdas / Stock suelto.
@@ -101,7 +106,7 @@ export const QuantityModal = ({
   };
 
   // Medio de pago de la venta directa (R6-R8, R10).
-  const pay = usePayments(total);
+  const pay = usePayments(discountedTotal);
 
   return (
     <Dialog open={!!product} onOpenChange={(open) => !open && onClose()}>
@@ -291,6 +296,51 @@ export const QuantityModal = ({
             </>
           )}
 
+          {/* Descuento % a nivel venta */}
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="qm-discount" className="shrink-0">
+              Descuento (%)
+            </Label>
+            <Input
+              id="qm-discount"
+              type="number"
+              min={0}
+              max={100}
+              step="1"
+              value={discountPct}
+              onChange={(e) => {
+                const raw = Number(e.target.value);
+                setDiscountPct(
+                  Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0,
+                );
+              }}
+              className="w-28"
+            />
+          </div>
+
+          <div className="space-y-1 text-sm">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Subtotal</span>
+              <span className="tabular-nums">
+                ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Descuento</span>
+                <span className="tabular-nums">
+                  −${discountAmount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-lg font-bold">
+              <span>Total</span>
+              <span className="tabular-nums">
+                ${discountedTotal.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
           <PaymentSection
             idPrefix="qm"
             payments={pay.payments}
@@ -300,20 +350,20 @@ export const QuantityModal = ({
             setCashReceived={pay.setCashReceived}
             addPayment={pay.addPayment}
             clearPayments={pay.clearPayments}
-            total={total}
+            total={discountedTotal}
           />
 
           {/* Action buttons */}
           <div className="flex flex-col gap-2 pt-2">
             {effectiveSaleMode !== "BOLSA_CERRADA" && (
               <p className="text-lg font-bold text-center">
-                ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                ${discountedTotal.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
               </p>
             )}
             <Button
               className="w-full"
               size="lg"
-              onClick={() => onDirectSale(pay.finalize())}
+              onClick={() => onDirectSale(pay.finalize(), discountPct)}
               disabled={
                 directSelling ||
                 maxStock <= 0 ||
@@ -324,7 +374,7 @@ export const QuantityModal = ({
               <ShoppingCart className="h-4 w-4 mr-2" />
               {directSelling
                 ? "Procesando venta..."
-                : `Vender directo ($${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })})`}
+                : `Vender directo ($${discountedTotal.toLocaleString("es-AR", { minimumFractionDigits: 2 })})`}
             </Button>
             <Button
               variant="outline"

@@ -207,6 +207,7 @@ export const PriceKgLookup = () => {
     mode: SaleMode,
     amount: number,
     payments: PaymentInput[],
+    discountPct: number = 0,
   ) => {
     if (!panelCell?.priceKg) return;
     const looseName = [panelCell.brandName, panelCell.typeName]
@@ -214,7 +215,7 @@ export const PriceKgLookup = () => {
       .join(" · ");
     try {
       const item = buildCellSaleItem(panelCell, qty, mode, amount);
-      await createSale({ cart: [item], payments });
+      await createSale({ cart: [item], payments, discountPct });
       const qtyLabel = mode === "POR_PESO" ? `${qty} kg` : `$${amount}`;
       toast.success(`Venta realizada — ${qtyLabel} "${looseName}"`);
       setPanelCell(null);
