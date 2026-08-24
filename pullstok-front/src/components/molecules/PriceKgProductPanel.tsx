@@ -139,6 +139,11 @@ export const PriceKgProductPanel = ({
   const [mode, setMode] = useState<SaleMode>("POR_PESO");
   const [qty, setQty] = useState(0.01);
   const [amount, setAmount] = useState(0);
+  // Texto en vivo del input (permite tipear "0.5" / "0," sin que el controlado
+  // rechace el 0 inicial ni borre el placeholder). La cantidad numérica qty/
+  // amount se deriva al validar.
+  const [qtyStr, setQtyStr] = useState("0.01");
+  const [amountStr, setAmountStr] = useState("0");
   const [selling, setSelling] = useState(false);
 
   const cellPrice = cell?.priceKg ?? null;
@@ -192,7 +197,6 @@ export const PriceKgProductPanel = ({
   // así que se bloquea VENDER y se avisa. Sin sucursal / sin lectura → null →
   // "—" y se permite (lo resuelve el backend).
   const noLooseStock = !!branchId && looseStockKg === 0;
-  const effectiveMax = looseStockKg ?? undefined;
 
   const sellDisabled =
     !cellPrice ||
@@ -295,8 +299,13 @@ export const PriceKgProductPanel = ({
                   }`}
                   onClick={() => {
                     setMode(m);
-                    if (m === "POR_PESO") setQty(0.01);
-                    else setAmount(0);
+                    if (m === "POR_PESO") {
+                      setQty(0.01);
+                      setQtyStr("0.01");
+                    } else {
+                      setAmount(0);
+                      setAmountStr("0");
+                    }
                   }}
                 >
                   {LOOSE_MODE_LABELS[m]}
@@ -310,16 +319,19 @@ export const PriceKgProductPanel = ({
                   <Label htmlFor="panelKg">Kilogramos</Label>
                   <Input
                     id="panelKg"
-                    type="number"
-                    step="0.01"
-                    min={0.01}
-                    max={effectiveMax}
-                    value={qty || ""}
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={qtyStr}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => {
-                      const v = parseFloat(e.target.value);
-                      if (!isNaN(v) && v >= 0.01) setQty(v);
-                      else if (e.target.value === "") setQty(0);
+                      const raw = e.target.value.trim();
+                      const v = parseFloat(raw.replace(",", "."));
+                      if (raw === "" || /^[\d.,]*$/.test(raw)) {
+                        setQtyStr(raw);
+                        if (!isNaN(v) && v >= 0.01) setQty(v);
+                        else if (raw === "") setQty(0);
+                      }
                     }}
                     placeholder="0.00"
                   />
@@ -340,15 +352,19 @@ export const PriceKgProductPanel = ({
                   <Label htmlFor="panelAmount">Monto ($)</Label>
                   <Input
                     id="panelAmount"
-                    type="number"
-                    step="0.01"
-                    min={0.01}
-                    value={amount || ""}
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={amountStr}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => {
-                      const v = parseFloat(e.target.value);
-                      if (!isNaN(v) && v > 0) setAmount(v);
-                      else if (e.target.value === "") setAmount(0);
+                      const raw = e.target.value.trim();
+                      const v = parseFloat(raw.replace(",", "."));
+                      if (raw === "" || /^[\d.,]*$/.test(raw)) {
+                        setAmountStr(raw);
+                        if (!isNaN(v) && v > 0) setAmount(v);
+                        else if (raw === "") setAmount(0);
+                      }
                     }}
                     placeholder="0.00"
                   />
