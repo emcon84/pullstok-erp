@@ -224,16 +224,15 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
       }
 
       const variantOptionIds = Object.values(variantSelections).filter(Boolean);
-      // Venta suelta (lleva peso en kg) → NO se redondea el precio de la bolsa.
-      // Bolsa cerrada (sin peso) → se redondea al múltiplo de 100 más cercano.
+      // Precio de BOLSA CERRADA >= 500 → múltiplo de 100; < 500 se conserva.
+      // NO se toca priceKgSuelto (el precio por kg de venta suelta).
       const parsedWeightKg = parseFloat(weightKg);
-      const isLoose = !Number.isNaN(parsedWeightKg) && parsedWeightKg > 0;
       const priceValue = parseFloat(price) || 0;
       const payload: ProductPayload = {
         name,
         code: code || undefined,
         description: description || undefined,
-        price: isLoose ? priceValue : roundBolsaPrice(priceValue),
+        price: priceValue >= 500 ? roundBolsaPrice(priceValue) : priceValue,
         image: imgUrl,
         variantOptionIds,
       };

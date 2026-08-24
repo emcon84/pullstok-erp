@@ -36,6 +36,12 @@ interface StepProductsProps {
   onBack: () => void;
 }
 
+/** Precio de BOLSA CERRADA >= 500 → múltiplo de 100; < 500 se conserva. */
+const resolveBolsaPrice = (raw: string): number => {
+  const v = parseFloat(raw || "0");
+  return v >= 500 ? roundBolsaPrice(v) : v;
+};
+
 export const StepProducts = ({ onBack }: StepProductsProps) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [variants, setVariants] = useState<VariantDefinition[]>([]);
@@ -113,7 +119,7 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
       const variantOptionIds = Object.values(variantSelections).filter(Boolean);
       await createProduct({
         name,
-        price: roundBolsaPrice(parseFloat(price || "0")),
+        price: resolveBolsaPrice(price),
         quantity: parseInt(quantity || "0", 10),
         categoryId,
         variantOptionIds,
@@ -152,7 +158,7 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
         const variantOptionIds = Object.values(variantSelections).filter(Boolean);
         await createProduct({
           name,
-          price: roundBolsaPrice(parseFloat(price || "0")),
+          price: resolveBolsaPrice(price),
           quantity: parseInt(quantity || "0", 10),
           categoryId,
           variantOptionIds,

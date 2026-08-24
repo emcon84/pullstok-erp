@@ -114,15 +114,14 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
       // Build variantOptionIds from selections
       const variantOptionIds = Object.values(variantSelections).filter(Boolean);
 
-      // Bolsa cerrada (sin precio por kg) → redondea a múltiplo de 100.
-      // Venta suelta (priceKgSuelto > 0) → no se toca el precio de la bolsa.
+      // Precio de BOLSA CERRADA >= 500 → múltiplo de 100; < 500 se conserva.
+      // NO se toca priceKgSuelto (el precio por kg de venta suelta).
       const priceValue = parseFloat(selectedData.price?.toString() || "0");
-      const isLoose = Number(selectedData.priceKgSuelto ?? 0) > 0;
 
       const productData: any = {
         ...selectedData,
         image: imageUrl,
-        price: isLoose ? priceValue : roundBolsaPrice(priceValue),
+        price: priceValue >= 500 ? roundBolsaPrice(priceValue) : priceValue,
         quantity: parseInt(selectedData.quantity?.toString() || "0"),
         variantOptionIds,
       };

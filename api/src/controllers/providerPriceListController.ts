@@ -27,7 +27,7 @@ import { InvalidPDFException, PDFParse } from "pdf-parse";
 import { runWithTenant, requireOrganizationId } from "../config/tenantContext";
 import type { AuthedRequest } from "../middlewares/authMiddleware";
 import { prisma } from "../config/db";
-import { round2 } from "../utils/money";
+import { round2, roundBolsaPriceIfHigh } from "../utils/money";
 import {
   buildCatalogIndex,
   computeSuggestedPrice,
@@ -503,7 +503,7 @@ async function applyPriceListCore(
         const product = await tx.product.create({
           data: {
             name: r.nombre,
-            price: round2(r.precioConIva),
+            price: roundBolsaPriceIfHigh(round2(r.precioConIva)),
             quantity: 0,
             categoryId: null,
             organizationId,
@@ -578,7 +578,7 @@ async function applyPriceListCore(
         ),
       };
       if (applyPrices && r.precioConIva != null) {
-        data.price = round2(r.precioConIva);
+        data.price = roundBolsaPriceIfHigh(round2(r.precioConIva));
         priceUpdated++;
       }
       if (providerId) data.providerId = providerId;

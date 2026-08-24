@@ -12,3 +12,19 @@
  */
 export const round2 = (n: number): number =>
   Math.round((n + Number.EPSILON) * 100) / 100;
+
+/**
+ * Precio de venta de BOLSA CERRADA (unidad/pack): redondea al múltiplo de 100
+ * más cercano. NO se aplica a venta suelta (precio por kg) ni a suggestedPrice.
+ */
+export const roundBolsaPrice = (n: number): number =>
+  Math.round(n / 100) * 100;
+
+/**
+ * Redondea el precio de bolsa solo cuando el precio es >= 500. Debajo del
+ * umbral se conserva tal cual (el user eligió este piso para no saltar
+ * accesorios baratos). Guarda igual a la del frontend (roundBolsaPrice en
+ * pullstok-front/src/lib/money.ts).
+ */
+export const roundBolsaPriceIfHigh = (n: number): number =>
+  n >= 500 ? roundBolsaPrice(n) : n;

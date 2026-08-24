@@ -59,10 +59,10 @@ export const QuickPriceModal = ({ open, onClose, product }: QuickPriceModalProps
     }
     setSaving(true);
     try {
-      // Bolsa cerrada (sin precio por kg) → redondea a múltiplo de 100.
-      // Venta suelta (priceKgSuelto > 0) → no se toca el precio de la bolsa.
-      const isLoose = (kgValue ?? Number(product.priceKgSuelto ?? 0)) > 0;
-      const finalPrice = isLoose ? value : roundBolsaPrice(value);
+      // Precio de BOLSA CERRADA >= 500 → múltiplo de 100; < 500 se conserva.
+      // NO se toca priceKgSuelto (el precio por kg de venta suelta): si el
+      // user lo cargó, gana sobre el cálculo automático (kgValue en el body).
+      const finalPrice = value >= 500 ? roundBolsaPrice(value) : value;
       await updateProduct({
         _id: id,
         price: finalPrice,

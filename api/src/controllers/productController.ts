@@ -11,6 +11,7 @@ import {
   recomputeForBulkPriceUpdate,
   recomputeForCsvImport,
 } from "../services/priceLooseService";
+import { roundBolsaPriceIfHigh } from "../utils/money";
 import { requireOrganizationId } from "../config/tenantContext";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
@@ -742,6 +743,12 @@ const updateProduct = async (req: Request, res: Response) => {
   try {
     const { variantOptionIds, ...data } = req.body;
 
+    // Precio de BOLSA CERRADA >= 500 → múltiplo de 100; < 500 se conserva.
+    // NO se toca priceKgSuelto (venta por kg) ni suggestedPrice.
+    if (data.price !== undefined && data.price !== null) {
+      data.price = roundBolsaPriceIfHigh(Number(data.price));
+    }
+
     // Manual per-kg price override (decisión #201): an explicit number fixes
     // the value by hand (priceKgSueltoManual=true, recompute skips it); null
     // returns to the automatic computation (flag=false); absent = untouched.
@@ -1212,7 +1219,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
         categoryPercentages: catPctMap,
         globalPct,
       });
-      const newPrice = computeNewPrice(oldPrice, effectivePercentage);
+      const newPrice = roundBolsaPriceIfHigh(computeNewPrice(oldPrice, effectivePercentage));
       return {
         id: p.id,
         name: p.name,
@@ -1286,7 +1293,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
           });
           return {
             id: r.id,
-            newPrice: computeNewPrice(Number(r.price), effective),
+            newPrice: roundBolsaPriceIfHigh(computeNewPrice(Number(r.price), effective)),
           };
         });
         await Promise.all(
