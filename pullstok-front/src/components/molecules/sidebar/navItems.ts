@@ -107,8 +107,7 @@ export const navItems: NavItem[] = navGroups.flatMap((g) => g.items);
 // simple, así que en vez de los acordeones PRODUCTOS/VENTAS/etc. se muestran
 // links directos con labels claros orientados a la venta de mostrador.
 export const vendorSimpleNav: NavItem[] = [
-  { to: "/dashboard", label: "Vender por unidad", icon: LayoutDashboard },
-  { to: "/consultar-precios", label: "Vender suelto", icon: Search },
+  { to: "/dashboard", label: "Vender", icon: ShoppingCart },
   { to: "/pedidos", label: "Pedidos", icon: ClipboardList },
   { to: "/Ventas", label: "Ventas", icon: ShoppingCart },
   { to: "/presupuestos", label: "Presupuestos", icon: FileText },
