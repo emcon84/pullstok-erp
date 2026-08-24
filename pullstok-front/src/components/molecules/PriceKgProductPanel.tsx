@@ -315,6 +315,7 @@ export const PriceKgProductPanel = ({
                     min={0.01}
                     max={effectiveMax}
                     value={qty || ""}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => {
                       const v = parseFloat(e.target.value);
                       if (!isNaN(v) && v >= 0.01) setQty(v);
@@ -343,6 +344,7 @@ export const PriceKgProductPanel = ({
                     step="0.01"
                     min={0.01}
                     value={amount || ""}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => {
                       const v = parseFloat(e.target.value);
                       if (!isNaN(v) && v > 0) setAmount(v);
