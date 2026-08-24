@@ -202,7 +202,10 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
           err.code = "LOOSE_LINE_NOT_FOUND";
           throw err;
         }
-        lineQuantity = round2(quantity / unitPrice); // kg = round2(amount ÷ unitPrice)
+        // kg = amount ÷ unitPrice. El kg se usa SOLO para descontar stock suelto
+        // (LooseStock); NO define el total de la línea. El monto declarado es
+        // autoritativo: "por monto" es ese monto, sin recalcular desde el kg.
+        lineQuantity = quantity / unitPrice; // kg = amount ÷ unitPrice (stock)
         linePrice = unitPrice; // snapshot congelado (B-04)
       }
 
@@ -298,8 +301,12 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         }
       }
 
-      // Per-line total: round2 en el límite (D2). POR_MONTO ya viene resuelto
-      // como kg × priceKgSuelto (B-07) → round2 de nuevo no cambia nada.
+      // Per-line total: POR_MONTO usa el MONTO declarado (autoritativo, no se
+      // recalcula desde el kg); BOLSA/POR_PESO usan kg × unitPrice con round2.
+      const lineTotal =
+        saleMode === "POR_MONTO"
+          ? round2(quantity) // "por monto" = el monto, sin cálculo
+          : round2(lineQuantity * linePrice);
       saleItems.push({
         productId: isLoose ? null : product!.id,
         loosePriceId: isLoose && cell ? cell.id : null,
@@ -309,7 +316,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         price: linePrice,
         saleMode,
       });
-      totalAmount += round2(lineQuantity * linePrice);
+      totalAmount += lineTotal;
     }
 
     // ── Order validation (same as before) ──
