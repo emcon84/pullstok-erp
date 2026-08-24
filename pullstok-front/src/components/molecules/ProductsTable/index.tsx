@@ -36,6 +36,10 @@ import { useDeleteProduct } from "../../hooks/useProducts";
 import { useConfirm } from "../../hooks/useConfirm";
 import { API_URL } from "../../../constants";
 import { DataItem } from "../../../types";
+import {
+  unitStock,
+  stockUnitLabel,
+} from "../../hooks/vendorCatalogHelpers";
 
 const PAGE_SIZE = 8;
 const LOW_STOCK = 5;
@@ -63,18 +67,14 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
   const { deleteProduct, loading } = useDeleteProduct();
   const confirm = useConfirm();
 
+  // branchMode (filtro por sucursal): stocks[0] es ESA sucursal (unidades); si
+  // no hay fila se muestra 0 (es lo real de la sucursal, NO el legacy). En modo
+  // global (sin branchId) la API NO adjunta stocks, así que se usa unitStock,
+  // que convierte products.quantity (kg legacy) a bolsas.
   const branchQty = (p: DataItem) =>
     branchMode
       ? Number(p.stocks?.[0]?.quantity ?? 0)
-      : Number(p.stocks?.[0]?.quantity ?? p.quantity);
-
-  // ProductStock.quantity es SIEMPRE en unidades (bolsas) tras la migración a
-  // stock por bolsas. El stock suelto en kg (LooseStock) se muestra aparte, en
-  // el panel de celdas / Stock suelto.
-  const stockUnitLabel = (_p: DataItem) => {
-    void _p;
-    return "u.";
-  };
+      : unitStock(p);
 
   const sorted = [...products].sort((a, b) => {
     const aQty = branchQty(a);

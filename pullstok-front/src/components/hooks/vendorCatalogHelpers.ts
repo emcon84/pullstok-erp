@@ -11,6 +11,22 @@ export const branchQty = (p: DataItem) =>
   Number(p.stocks?.[0]?.quantity ?? 0);
 
 /**
+ * Stock de un producto de bolsa en UNIDADES (bolsas). La fuente principal
+ * SIEMPRE es ProductStock de la sucursal (`p.stocks[0].quantity`, ya en
+ * unidades); `products.quantity` es la columna legacy en KG y se usa SOLO como
+ * fallback/placeholder cuando no hay stock de sucursal, convertido a bolsas.
+ * No toca el flujo de venta suelta (LooseStock en kg, se muestra aparte).
+ */
+export const unitStock = (p: DataItem): number => {
+  const branchQtyVal = p.stocks?.[0]?.quantity;
+  // ProductStock (unidades) es autoritativo: si existe un valor (incluso 0) se
+  // usa sin conversión.
+  if (branchQtyVal != null) return Number(branchQtyVal);
+  // Fallback legacy: products.quantity (kg) → round(kg / peso de la bolsa).
+  return Math.round((Number(p.quantity) || 0) / (Number(p.weightKg) || 1));
+};
+
+/**
  * Unidad de stock para el badge: ProductStock.quantity es SIEMPRE en unidades
  * (bolsas) tras la migración a stock por bolsas. El stock suelto en kg
  * (LooseStock) se muestra aparte, en el panel de celdas / Stock suelto.

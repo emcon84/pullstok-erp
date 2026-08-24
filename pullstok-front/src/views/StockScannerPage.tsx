@@ -14,6 +14,7 @@ import { Camera, CameraOff, Plus, Minus, Search, Link2, X, Barcode, Copy, ArrowL
 import { ProductDrawer } from "@/components/molecules/ProductDrawer";
 import { useProductStock } from "@/components/hooks/useProductStock";
 import { useBranches } from "@/components/hooks/useBranches";
+import { unitStock } from "@/components/hooks/vendorCatalogHelpers";
 import { resolveScannerBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
 import type { DataItem } from "@/types";
@@ -32,6 +33,7 @@ type BarcodeDetectorClass = {
 interface Product {
   id: string; name: string; code: string; barcode: string; price: number;
   quantity: number; description: string | null;
+  weightKg?: number; priceKgSuelto?: number;
   category: { name: string } | null; categoryId?: string;
   variantAssignments?: { option: { id: string; value: string; variantId?: string; variant: { name: string } } }[];
 }
@@ -127,7 +129,8 @@ export const StockScannerPage = () => {
   useEffect(() => {
     if (effectiveQty !== undefined) setDisplayQty(effectiveQty);
   }, [effectiveQty, effectiveBranchId]);
-  const shownQty = displayQty ?? product?.quantity ?? 0;
+  const shownQty =
+    displayQty ?? (product ? unitStock(product as unknown as DataItem) : 0);
 
   // Editing requires a known branch AND its current quantity: writing a
   // +/- step without the real value could store a wrong number.
