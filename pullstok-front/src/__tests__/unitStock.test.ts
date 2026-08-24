@@ -10,6 +10,7 @@ describe("unitStock — stock de bolsa en unidades", () => {
     // Ej. del enunciado: producto "… X 15 KG" con 99 bolsas en la sucursal.
     const p: DataItem = {
       name: "PURINA 15KG",
+      price: 0,
       quantity: 1500, // kg legacy
       weightKg: 15,
       stocks: [{ quantity: 99 }],
@@ -20,6 +21,7 @@ describe("unitStock — stock de bolsa en unidades", () => {
   it("con una fila de stock en 0 usa 0 (real de la sucursal), no el legacy", () => {
     const p: DataItem = {
       name: "PURINA 15KG",
+      price: 0,
       quantity: 1500, // kg legacy
       weightKg: 15,
       stocks: [{ quantity: 0 }],
@@ -30,6 +32,7 @@ describe("unitStock — stock de bolsa en unidades", () => {
   it("sin stock de sucursal convierte el legacy en bolsas: round(quantity / weightKg)", () => {
     const p: DataItem = {
       name: "PURINA 15KG",
+      price: 0,
       quantity: 1500,
       weightKg: 15,
     };
@@ -37,12 +40,12 @@ describe("unitStock — stock de bolsa en unidades", () => {
   });
 
   it("si falta weightKg divide por 1 (no rompe; queda como esté)", () => {
-    const p: DataItem = { name: "X", quantity: 1500 };
+    const p: DataItem = { name: "X", price: 0, quantity: 1500 };
     expect(unitStock(p)).toBe(1500);
   });
 
   it("redondea el resultado (nunca muestra bolsas fraccionarias)", () => {
-    const p: DataItem = { name: "X", quantity: 100, weightKg: 15 };
+    const p: DataItem = { name: "X", price: 0, quantity: 100, weightKg: 15 };
     expect(unitStock(p)).toBe(7); // Math.round(6.66)
   });
 
@@ -51,6 +54,7 @@ describe("unitStock — stock de bolsa en unidades", () => {
     // física en el contexto BOLSA_CERRADA: su stock es ProductStock (unidades).
     const p: DataItem = {
       name: "PURINA 15KG",
+      price: 0,
       quantity: 1500,
       weightKg: 15,
       priceKgSuelto: 9200,
@@ -66,7 +70,7 @@ describe("helpers de stock relacionados", () => {
   });
 
   it("branchQty se mantiene como acceso a ProductStock (unidades)", () => {
-    const p: DataItem = { name: "X", stocks: [{ quantity: 42 }] };
+    const p: DataItem = { name: "X", price: 0, quantity: 0, stocks: [{ quantity: 42 }] };
     expect(branchQty(p)).toBe(42);
   });
 });
