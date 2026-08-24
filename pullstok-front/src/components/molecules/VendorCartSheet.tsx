@@ -1,11 +1,7 @@
-import { useState } from "react";
 import { toast } from "react-toastify";
 import { Minus, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
 import {
   Sheet,
   SheetContent,
@@ -13,12 +9,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { VendorCartItem, SaleMode } from "@/components/hooks/useVendorCart";
-import {
-  PAYMENT_METHODS,
-  PAYMENT_METHOD_LABELS,
-  type PaymentMethod,
-  type PaymentInput,
-} from "@/models/cashSessionModel";
+import { usePayments } from "@/components/hooks/usePayments";
+import { PaymentSection } from "@/components/molecules/PaymentSection";
+import type { PaymentInput } from "@/models/cashSessionModel";
 
 interface VendorCartData {
   items: VendorCartItem[];
@@ -64,8 +57,6 @@ const formatQty = (item: VendorCartItem): string => {
   return item.quantity.toFixed(2);
 };
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
 export const VendorCartSheet = ({
   open,
   cart,
@@ -74,51 +65,17 @@ export const VendorCartSheet = ({
   cashSessionId,
 }: VendorCartSheetProps) => {
   // ── Medios de pago (R6-R8, R10): selector de método + vuelto ──
-  // payments[] y cashReceived son estado local; el vuelto (solo EFECTIVO, no se
-  // persiste — R10) es un cálculo del cliente. Al confirmar se pasa el payload
-  // payments + cashSessionId.
-  const [payments, setPayments] = useState<PaymentInput[]>([]);
-  const [cashReceived, setCashReceived] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("EFECTIVO");
-
+  // La lógica de payments/cashReceived/vuelto vive en usePayments; al confirmar
+  // se pasa el payload final (finalize) + cashSessionId.
   const total = cart.totalAmount;
-  const received = Number(cashReceived) || 0;
-  const vuelto = round2(received - total);
-
-  const sumPayments = () => round2(payments.reduce((s, p) => s + p.amount, 0));
-
-  const handleAddPayment = () => {
-    // Declara en el método seleccionado el saldo que falta para cubrir el total.
-    const remaining = round2(total - sumPayments());
-    if (remaining <= 0) return;
-    setPayments((prev) => {
-      const existing = prev.find((p) => p.method === selectedMethod);
-      if (existing) {
-        return prev.map((p) =>
-          p.method === selectedMethod
-            ? { ...p, amount: round2(p.amount + remaining) }
-            : p,
-        );
-      }
-      return [...prev, { method: selectedMethod, amount: remaining }];
-    });
-  };
-
-  const handleClearPayments = () => {
-    setPayments([]);
-    setCashReceived("");
-  };
+  const pay = usePayments(total);
 
   const handleConfirm = () => {
     // Payload final: los payments declarados deben sumar el total (R7). Si no
     // se declaró nada (o solo se ingresó efectivo recibido sin método), se
     // declara EFECTIVO por el total. El vuelto (recibido - total) NO se
     // persiste — R10.
-    let finalPayments = payments;
-    if (payments.length === 0) {
-      finalPayments = [{ method: "EFECTIVO", amount: round2(total) }];
-    }
-    handlers.confirmSale(finalPayments, cashSessionId);
+    handlers.confirmSale(pay.finalize(), cashSessionId);
   };
 
   return (
@@ -167,21 +124,22 @@ export const VendorCartSheet = ({
               </div>
 
               <PaymentSection
-                payments={payments}
-                selectedMethod={selectedMethod}
-                setSelectedMethod={setSelectedMethod}
-                cashReceived={cashReceived}
-                setCashReceived={setCashReceived}
-                addPayment={handleAddPayment}
-                clearPayments={handleClearPayments}
+                idPrefix="pay"
+                payments={pay.payments}
+                selectedMethod={pay.selectedMethod}
+                setSelectedMethod={pay.setSelectedMethod}
+                cashReceived={pay.cashReceived}
+                setCashReceived={pay.setCashReceived}
+                addPayment={pay.addPayment}
+                clearPayments={pay.clearPayments}
                 total={total}
               />
 
-              {vuelto > 0 && (
+              {pay.vuelto > 0 && (
                 <div className="flex items-center justify-between rounded-lg bg-emerald-50 p-2 text-sm">
                   <span>Vuelto</span>
                   <span className="font-bold tabular-nums">
-                    ${vuelto.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                    ${pay.vuelto.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               )}
@@ -231,96 +189,6 @@ export const VendorCartSheet = ({
     </Sheet>
   );
 };
-
-function PaymentSection({
-  payments,
-  selectedMethod,
-  setSelectedMethod,
-  cashReceived,
-  setCashReceived,
-  addPayment,
-  clearPayments,
-  total,
-}: {
-  payments: PaymentInput[];
-  selectedMethod: PaymentMethod;
-  setSelectedMethod: (m: PaymentMethod) => void;
-  cashReceived: string;
-  setCashReceived: (v: string) => void;
-  addPayment: () => void;
-  clearPayments: () => void;
-  total: number;
-}) {
-  const sum = round2(payments.reduce((s, p) => s + p.amount, 0));
-  return (
-    <div className="space-y-3 rounded-lg bg-muted/40 p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Medio de pago</span>
-        {payments.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearPayments}>
-            Limpiar
-          </Button>
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        <div className="flex-1 space-y-1.5">
-          <Label htmlFor="pay-method">Método</Label>
-          <NativeSelect
-            id="pay-method"
-            value={selectedMethod}
-            onValueChange={(v) => setSelectedMethod(v as PaymentMethod)}
-            options={PAYMENT_METHODS.map((m) => ({
-              value: m,
-              label: PAYMENT_METHOD_LABELS[m],
-            }))}
-          />
-        </div>
-        <div className="flex-1 space-y-1.5">
-          <Label htmlFor="pay-cash">Efectivo recibido</Label>
-          <Input
-            id="pay-cash"
-            type="number"
-            min={0}
-            step="0.01"
-            placeholder={total.toFixed(2)}
-            value={cashReceived}
-            onChange={(e) => setCashReceived(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={addPayment}
-        disabled={!cashReceived || Number(cashReceived) <= 0}
-      >
-        Agregar pago ({PAYMENT_METHOD_LABELS[selectedMethod]})
-      </Button>
-
-      {payments.length > 0 && (
-        <div className="space-y-1 text-sm">
-          {payments.map((p, i) => (
-            <div key={i} className="flex items-center justify-between">
-              <span>{PAYMENT_METHOD_LABELS[p.method]}</span>
-              <span className="tabular-nums">
-                ${p.amount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          ))}
-          <div className="flex items-center justify-between border-t pt-1 font-semibold">
-            <span>Total pagado</span>
-            <span className="tabular-nums">
-              ${sum.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Cart item row ──
 

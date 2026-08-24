@@ -101,14 +101,20 @@ describe("PriceKgProductPanel — modal de venta suelta por celda", () => {
     expect(await screen.findByText("1.00 kg")).toBeInTheDocument();
   });
 
-  it("'Vender directo' llama onSellDirect(qty, modo, monto)", () => {
+  it("'Vender directo' llama onSellDirect(qty, modo, monto, payments default)", () => {
     const onSellDirect = vi.fn();
     renderPanel({ onSellDirect });
     fireEvent.change(screen.getByLabelText("Kilogramos"), {
       target: { value: "2.5" },
     });
     fireEvent.click(screen.getByRole("button", { name: /vender directo/i }));
-    expect(onSellDirect).toHaveBeenCalledWith(2.5, "POR_PESO", 0);
+    // 2.5 kg × $9.200 = $23.000 → default EFECTIVO por el total (R7).
+    expect(onSellDirect).toHaveBeenCalledWith(
+      2.5,
+      "POR_PESO",
+      0,
+      [{ method: "EFECTIVO", amount: 23000 }],
+    );
   });
 
   it("'Vender directo' en modo monto manda qty 0 y el monto", async () => {
@@ -119,7 +125,12 @@ describe("PriceKgProductPanel — modal de venta suelta por celda", () => {
       target: { value: "4600" },
     });
     fireEvent.click(screen.getByRole("button", { name: /vender directo/i }));
-    expect(onSellDirect).toHaveBeenCalledWith(0, "POR_MONTO", 4600);
+    expect(onSellDirect).toHaveBeenCalledWith(
+      0,
+      "POR_MONTO",
+      4600,
+      [{ method: "EFECTIVO", amount: 4600 }],
+    );
   });
 
   it("'Agregar al pedido' llama onAddToCart(qty, modo, monto)", () => {

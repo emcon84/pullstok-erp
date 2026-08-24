@@ -12,8 +12,11 @@ import {
 } from "@/components/ui/dialog";
 import { imgSrc } from "@/components/hooks/vendorCatalogHelpers";
 import { round2 } from "@/lib/money";
+import { usePayments } from "@/components/hooks/usePayments";
+import { PaymentSection } from "@/components/molecules/PaymentSection";
 import type { DataItem } from "@/types";
 import type { SaleMode } from "@/components/hooks/useVendorCart";
+import type { PaymentInput } from "@/models/cashSessionModel";
 
 interface QuantityModalProps {
   product: DataItem | null;
@@ -25,7 +28,7 @@ interface QuantityModalProps {
   setSaleMode: Dispatch<SetStateAction<SaleMode>>;
   amount: number;
   setAmount: Dispatch<SetStateAction<number>>;
-  onDirectSale: () => void;
+  onDirectSale: (payments: PaymentInput[]) => void;
   onAddToCart: () => void;
   onClose: () => void;
 }
@@ -90,6 +93,9 @@ export const QuantityModal = ({
       setQty(0.01);
     }
   };
+
+  // Medio de pago de la venta directa (R6-R8, R10).
+  const pay = usePayments(total);
 
   return (
     <Dialog open={!!product} onOpenChange={(open) => !open && onClose()}>
@@ -279,6 +285,18 @@ export const QuantityModal = ({
             </>
           )}
 
+          <PaymentSection
+            idPrefix="qm"
+            payments={pay.payments}
+            selectedMethod={pay.selectedMethod}
+            setSelectedMethod={pay.setSelectedMethod}
+            cashReceived={pay.cashReceived}
+            setCashReceived={pay.setCashReceived}
+            addPayment={pay.addPayment}
+            clearPayments={pay.clearPayments}
+            total={total}
+          />
+
           {/* Action buttons */}
           <div className="flex flex-col gap-2 pt-2">
             {saleMode !== "BOLSA_CERRADA" && (
@@ -289,7 +307,7 @@ export const QuantityModal = ({
             <Button
               className="w-full"
               size="lg"
-              onClick={onDirectSale}
+              onClick={() => onDirectSale(pay.finalize())}
               disabled={
                 directSelling ||
                 maxStock <= 0 ||

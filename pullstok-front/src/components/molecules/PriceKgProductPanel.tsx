@@ -12,8 +12,11 @@ import {
 } from "@/components/ui/dialog";
 import { getLooseStock } from "@/services/looseStock";
 import { round2 } from "@/lib/money";
+import { usePayments } from "@/components/hooks/usePayments";
+import { PaymentSection } from "@/components/molecules/PaymentSection";
 import type { PriceKgSpecies } from "@/services/priceKgTypes";
 import type { SaleMode } from "@/components/hooks/useVendorCart";
+import type { PaymentInput } from "@/models/cashSessionModel";
 
 // Mismo helper que looseSaleService.looseLineName: "MARCA · TIPO" (sin el
 // " · " cuando falta una de las dos partes).
@@ -51,6 +54,7 @@ interface PriceKgProductPanelProps {
     qty: number,
     mode: SaleMode,
     amount: number,
+    payments: PaymentInput[],
   ) => void | Promise<void>;
   onAddToCart: (qty: number, mode: SaleMode, amount: number) => void;
 }
@@ -197,11 +201,19 @@ export const PriceKgProductPanel = ({
     (mode === "POR_PESO" && qty <= 0) ||
     (mode === "POR_MONTO" && amount <= 0);
 
+  // Medio de pago de la venta suelta (R6-R8, R10).
+  const pay = usePayments(total);
+
   const handleSell = async () => {
     if (sellDisabled) return;
     setSelling(true);
     try {
-      await onSellDirect(mode === "POR_MONTO" ? 0 : qty, mode, amount);
+      await onSellDirect(
+        mode === "POR_MONTO" ? 0 : qty,
+        mode,
+        amount,
+        pay.finalize(),
+      );
     } finally {
       setSelling(false);
     }
@@ -359,6 +371,18 @@ export const PriceKgProductPanel = ({
                 {stockLine}
               </>
             )}
+
+            <PaymentSection
+              idPrefix="pp"
+              payments={pay.payments}
+              selectedMethod={pay.selectedMethod}
+              setSelectedMethod={pay.setSelectedMethod}
+              cashReceived={pay.cashReceived}
+              setCashReceived={pay.setCashReceived}
+              addPayment={pay.addPayment}
+              clearPayments={pay.clearPayments}
+              total={total}
+            />
 
             {/* Acciones */}
             <div className="flex flex-col gap-2 pt-2">

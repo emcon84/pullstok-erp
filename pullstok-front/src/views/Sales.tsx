@@ -34,6 +34,7 @@ import { toast } from "react-toastify";
 import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
 import { CartItem, Sale } from "../models/salesModel";
+import type { PaymentInput } from "../models/cashSessionModel";
 
 const TAX_CONDITIONS = [
   "Responsable Inscripto",
@@ -191,9 +192,17 @@ export const SalesPage = () => {
     cart: CartItem[],
     _customerId?: string,
     orderId?: string,
+    _budgetId?: string,
+    payments?: PaymentInput[],
+    cashSessionId?: string,
   ) => {
     try {
-      await createSale({ cart, orderId: orderId || undefined });
+      await createSale({
+        cart,
+        orderId: orderId || undefined,
+        payments,
+        cashSessionId,
+      });
       toast.success("Venta creada con éxito");
       setIsOpen(false);
     } catch (error) {

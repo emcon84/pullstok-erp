@@ -3,8 +3,10 @@ import type { RefObject } from "react";
 import { toast } from "react-toastify";
 import { useCreateSale } from "./useSales";
 import { branchQty } from "./vendorCatalogHelpers";
+import { round2 } from "@/lib/money";
 import type { DataItem } from "../../types";
 import type { CartItem } from "../../models/salesModel";
+import type { PaymentInput } from "../../models/cashSessionModel";
 import type { SaleMode } from "./useVendorCart";
 
 interface UseVendorQuantityModalParams {
@@ -78,7 +80,14 @@ export function useVendorQuantityModal({
   }, [qtyModal, qty, amount, saleMode, addToCart, branchId, releaseSearchFocus]);
 
   // ── Direct sale from showroom modal (1-tap single product sale) ──
-  const handleDirectSale = useCallback(async () => {
+  // Recibe payments ya finalizados (default EFECTIVO por el total) desde el
+  // QuantityModal. NO se manda cashSessionId: el backend lo auto-resuelve para
+  // VENDEDOR/CASHIER.
+  // payments es OPCIONAL: el atajo de teclado "V" (useVendorKeyboard) llama
+  // handleDirectSale() sin argumentos, así que acá se defaultea a EFECTIVO por
+  // el total si no viene ningún medio declarado (mismo criterio R7 que el resto
+  // de los flujos).
+  const handleDirectSale = useCallback(async (payments?: PaymentInput[]) => {
     if (!qtyModal) return;
     const p = qtyModal.product;
     const stock = branchQty(p);
@@ -115,7 +124,12 @@ export function useVendorQuantityModal({
           saleMode,
         },
       ];
-      await createSale({ cart });
+      // Default EFECTIVO por el total cuando el call no declara medio (R7).
+      const finalPayments =
+        payments && payments.length > 0
+          ? payments
+          : [{ method: "EFECTIVO" as const, amount: round2(cart[0].totalPrice) }];
+      await createSale({ cart, payments: finalPayments });
       toast.success(`Venta directa realizada (${actualQty}x "${p.name}")`);
       setQtyModal(null);
       releaseSearchFocus();

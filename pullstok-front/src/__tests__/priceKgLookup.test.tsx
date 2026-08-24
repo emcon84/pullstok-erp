@@ -260,6 +260,34 @@ describe("PriceKgLookup — consulta de precios por kilo", () => {
     );
   });
 
+  it("vender directo manda payments default EFECTIVO por el total (R7)", async () => {
+    renderView();
+    await searchAcme();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /abrir venta suelta.*acme.*adulto.*perro/i,
+      }),
+    );
+    await screen.findByRole("heading", { name: "Acme · Adulto" });
+
+    // Pide 2 kg y vende directo desde la celda: no se declara ningún método →
+    // el payload debe traer EFECTIVO por el total (round2(2500 * 2) = 5000).
+    fireEvent.change(screen.getByLabelText("Kilogramos"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /vender directo/i }));
+
+    await waitFor(() => {
+      expect(mockCreateSale).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payments: [{ method: "EFECTIVO", amount: 5000 }],
+        }),
+        undefined,
+      );
+    });
+  });
+
   it("con sucursal y stock suelto en 0: aviso y vender deshabilitado", async () => {
     // VENDEDOR con sucursal → branchId resuelto; stock suelto 0 kg → el panel
     // bloquea la venta (el backend rechazaría "stock suelto insuficiente").

@@ -33,6 +33,7 @@ import { ModalContentUploadCsv } from "../components/molecules/GenericModal/Moda
 import { useGetBudgets } from "../components/hooks/useBudget";
 import { useOrders } from "../components/hooks/useOrder";
 import { CartItem } from "../models/salesModel";
+import type { PaymentInput } from "../models/cashSessionModel";
 import { toast } from "react-toastify";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -192,9 +193,17 @@ export const Dashboard = () => {
     cart: CartItem[],
     _customerId?: string,
     orderId?: string,
+    _budgetId?: string,
+    payments?: PaymentInput[],
+    cashSessionId?: string,
   ) => {
     try {
-      await createSale({ cart, orderId: orderId || undefined });
+      await createSale({
+        cart,
+        orderId: orderId || undefined,
+        payments,
+        cashSessionId,
+      });
       toast.success("Venta creada con éxito");
     } catch (error) {
       toast.error("Error al crear la venta");

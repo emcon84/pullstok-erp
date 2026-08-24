@@ -18,6 +18,7 @@ import { getPriceKgPlan } from "@/services/priceKgPlan";
 import type { SaleMode } from "@/components/hooks/useVendorCart";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useCreateSale } from "@/components/hooks/useSales";
+import type { PaymentInput } from "@/models/cashSessionModel";
 import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
 import {
   PriceKgProductPanel,
@@ -187,6 +188,7 @@ export const PriceKgLookup = () => {
     qty: number,
     mode: SaleMode,
     amount: number,
+    payments: PaymentInput[],
   ) => {
     if (!panelCell?.priceKg) return;
     const looseName = [panelCell.brandName, panelCell.typeName]
@@ -194,7 +196,7 @@ export const PriceKgLookup = () => {
       .join(" · ");
     try {
       const item = buildCellSaleItem(panelCell, qty, mode, amount);
-      await createSale({ cart: [item] });
+      await createSale({ cart: [item], payments });
       const qtyLabel = mode === "POR_PESO" ? `${qty} kg` : `$${amount}`;
       toast.success(`Venta realizada — ${qtyLabel} "${looseName}"`);
       setPanelCell(null);

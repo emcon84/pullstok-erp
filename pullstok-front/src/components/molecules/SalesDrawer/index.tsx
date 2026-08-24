@@ -19,8 +19,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import { PaymentSection } from "../PaymentSection";
+import { usePayments } from "../../hooks/usePayments";
 import { ProductSelector } from "../ProductSelector";
 import { DocTable } from "../DocTable";
 import { ProductsProps } from "../../../models/productsModel";
@@ -28,20 +28,13 @@ import { Customer } from "../../../models/customerModel";
 import { CartItem } from "../../../models/salesModel";
 import { Order } from "../../../models/orderModel";
 import { Budget } from "../../../models/budgetModel";
-import {
-  PAYMENT_METHODS,
-  PAYMENT_METHOD_LABELS,
-  type PaymentMethod,
-  type PaymentInput,
-} from "../../../models/cashSessionModel";
+import type { PaymentInput } from "../../../models/cashSessionModel";
 import { toast } from "react-toastify";
 
 const selectClass =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
 type Mode = "products" | "order" | "budget";
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 interface SalesDrawerProps {
   isOpen: boolean;
@@ -97,39 +90,10 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
   const [isProductSelectorOpen, setIsProductSelectorOpen] = useState(false);
 
   // ── Medios de pago (R6-R8, R10): selector de método + vuelto ──
-  // payments[] y cashReceived son estado local; el vuelto (solo EFECTIVO, no se
-  // persiste — R10) es un cálculo del cliente. Al confirmar se pasan payments y
-  // cashSessionId a onConfirm.
-  const [payments, setPayments] = useState<PaymentInput[]>([]);
-  const [cashReceived, setCashReceived] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("EFECTIVO");
-
+  // La lógica de payments/cashReceived/vuelto vive en usePayments; al confirmar
+  // se pasan payments (finalize) y cashSessionId a onConfirm.
   const totalAmount = cart.reduce((sum, item) => sum + item.totalPrice, 0);
-  const received = Number(cashReceived) || 0;
-  const vuelto = round2(received - totalAmount);
-  const sumPayments = () => round2(payments.reduce((s, p) => s + p.amount, 0));
-
-  const handleAddPayment = () => {
-    // Declara en el método seleccionado el saldo que falta para cubrir el total.
-    const remaining = round2(totalAmount - sumPayments());
-    if (remaining <= 0) return;
-    setPayments((prev) => {
-      const existing = prev.find((p) => p.method === selectedMethod);
-      if (existing) {
-        return prev.map((p) =>
-          p.method === selectedMethod
-            ? { ...p, amount: round2(p.amount + remaining) }
-            : p,
-        );
-      }
-      return [...prev, { method: selectedMethod, amount: remaining }];
-    });
-  };
-
-  const handleClearPayments = () => {
-    setPayments([]);
-    setCashReceived("");
-  };
+  const pay = usePayments(totalAmount);
 
   const tabs: { key: Mode; label: string }[] = [
     { key: "products", label: "Productos" },
@@ -205,8 +169,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
     setSelectedOrder("");
     setSelectedBudget("");
     setMode("products");
-    setPayments([]);
-    setCashReceived("");
+    pay.reset();
   };
 
   const validate = () => {
@@ -234,16 +197,12 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
     // se declaró nada, se declara EFECTIVO por el total. El vuelto (recibido -
     // total) NO se persiste — R10. cashSessionId se propaga tal cual (undefined
     // para ventas legacy/admin sin caja abierta → backward-compat).
-    let finalPayments = payments;
-    if (payments.length === 0) {
-      finalPayments = [{ method: "EFECTIVO", amount: round2(totalAmount) }];
-    }
     onConfirm(
       cart,
       selectedCustomer,
       selectedOrder,
       selectedBudget,
-      finalPayments,
+      pay.finalize(),
       cashSessionId,
     );
     resetState();
@@ -431,21 +390,23 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
 
           <div className="border-t p-5">
             <PaymentSection
-              payments={payments}
-              selectedMethod={selectedMethod}
-              setSelectedMethod={setSelectedMethod}
-              cashReceived={cashReceived}
-              setCashReceived={setCashReceived}
-              addPayment={handleAddPayment}
-              clearPayments={handleClearPayments}
+              idPrefix="sd-pay"
+              payments={pay.payments}
+              selectedMethod={pay.selectedMethod}
+              setSelectedMethod={pay.setSelectedMethod}
+              cashReceived={pay.cashReceived}
+              setCashReceived={pay.setCashReceived}
+              addPayment={pay.addPayment}
+              clearPayments={pay.clearPayments}
               total={totalAmount}
+              className="mb-4"
             />
 
-            {vuelto > 0 && (
+            {pay.vuelto > 0 && (
               <div className="mb-4 flex items-center justify-between rounded-lg bg-emerald-50 p-2 text-sm">
                 <span>Vuelto</span>
                 <span className="font-bold tabular-nums">
-                  ${vuelto.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  ${pay.vuelto.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
                 </span>
               </div>
             )}
@@ -501,92 +462,4 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
   );
 };
 
-function PaymentSection({
-  payments,
-  selectedMethod,
-  setSelectedMethod,
-  cashReceived,
-  setCashReceived,
-  addPayment,
-  clearPayments,
-  total,
-}: {
-  payments: PaymentInput[];
-  selectedMethod: PaymentMethod;
-  setSelectedMethod: (m: PaymentMethod) => void;
-  cashReceived: string;
-  setCashReceived: (v: string) => void;
-  addPayment: () => void;
-  clearPayments: () => void;
-  total: number;
-}) {
-  const sum = round2(payments.reduce((s, p) => s + p.amount, 0));
-  return (
-    <div className="mb-4 space-y-3 rounded-lg bg-muted/40 p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Medio de pago</span>
-        {payments.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearPayments}>
-            Limpiar
-          </Button>
-        )}
-      </div>
 
-      <div className="flex gap-2">
-        <div className="flex-1 space-y-1.5">
-          <Label htmlFor="sd-pay-method">Método</Label>
-          <NativeSelect
-            id="sd-pay-method"
-            value={selectedMethod}
-            onValueChange={(v) => setSelectedMethod(v as PaymentMethod)}
-            options={PAYMENT_METHODS.map((m) => ({
-              value: m,
-              label: PAYMENT_METHOD_LABELS[m],
-            }))}
-          />
-        </div>
-        <div className="flex-1 space-y-1.5">
-          <Label htmlFor="sd-pay-cash">Efectivo recibido</Label>
-          <Input
-            id="sd-pay-cash"
-            type="number"
-            min={0}
-            step="0.01"
-            placeholder={total.toFixed(2)}
-            value={cashReceived}
-            onChange={(e) => setCashReceived(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={addPayment}
-        disabled={!cashReceived || Number(cashReceived) <= 0}
-      >
-        Agregar pago ({PAYMENT_METHOD_LABELS[selectedMethod]})
-      </Button>
-
-      {payments.length > 0 && (
-        <div className="space-y-1 text-sm">
-          {payments.map((p, i) => (
-            <div key={i} className="flex items-center justify-between">
-              <span>{PAYMENT_METHOD_LABELS[p.method]}</span>
-              <span className="tabular-nums">
-                ${p.amount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          ))}
-          <div className="flex items-center justify-between border-t pt-1 font-semibold">
-            <span>Total pagado</span>
-            <span className="tabular-nums">
-              ${sum.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

@@ -28,6 +28,7 @@ import { useCustomers } from "../components/hooks/useCustomer";
 import { usePorducts } from "../components/hooks/useProducts";
 import { useCreateSale } from "../components/hooks/useSales";
 import { CartItem } from "../models/salesModel";
+import type { PaymentInput } from "../models/cashSessionModel";
 import { Pagination } from "../components/molecules/pagination";
 import { DocumentCard } from "../components/molecules/DocumentCard";
 import { Loader } from "../components/atoms/loader";
@@ -104,9 +105,21 @@ export const Orders: React.FC = () => {
     setSaleDrawerOpen(true);
   };
 
-  const handleConfirmSaleFromOrder = (cart: CartItem[]) => {
+  const handleConfirmSaleFromOrder = (
+    cart: CartItem[],
+    _customerId?: string,
+    orderId?: string,
+    _budgetId?: string,
+    payments?: PaymentInput[],
+    cashSessionId?: string,
+  ) => {
     createSale(
-      { cart, orderId: saleOrderId || undefined },
+      {
+        cart,
+        orderId: saleOrderId || orderId || undefined,
+        payments,
+        cashSessionId,
+      },
       {
         onSuccess: () => toast.success("Venta creada desde el pedido"),
         onError: () => toast.error("No se pudo crear la venta"),
