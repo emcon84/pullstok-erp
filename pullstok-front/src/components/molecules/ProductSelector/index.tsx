@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Search, Minus, Plus, ImageIcon, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Minus, Plus, ImageIcon, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,17 @@ interface ProductSelectorProps {
   onOpenChange: (open: boolean) => void;
   products: ProductsProps[];
   onConfirm: (selectedProducts: SelectedProduct[]) => void;
+  /**
+   * Búsqueda SERVER-SIDE (opcional): si se pasa, el buscador debouncea el término
+   * y llama acá para re-fetchear sobre TODO el catálogo. Sin este prop el
+   * componente filtra client-side sobre `products` (backward-compat, p. ej.
+   * SalesDrawer). El catálogo de una org puede superar el pageSize inicial, así
+   * que cargar solo la primera página e ir a la búsqueda client-side es un bug:
+   * productos fuera de esa página (como "CAT CHOW") nunca se encuentran.
+   */
+  onSearch?: (term: string) => void | Promise<void>;
+  /** Estado de la búsqueda server-side (muestra un spinner en la lista). */
+  searchLoading?: boolean;
 }
 
 const imgSrc = (image?: string) =>
@@ -37,15 +48,34 @@ export const ProductSelector = ({
   onOpenChange,
   products,
   onConfirm,
+  onSearch,
+  searchLoading = false,
 }: ProductSelectorProps) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debounced, setDebounced] = useState("");
   const [selected, setSelected] = useState<Map<string, SelectedProduct>>(
     new Map(),
   );
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  // Debounce del término (300ms) para no disparar una request por tecla.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Búsqueda server-side: cuando hay onSearch y el término debounced cambia,
+  // se re-fetchea sobre el catálogo completo. Sin onSearch no se dispara nada.
+  useEffect(() => {
+    if (onSearch) onSearch(debounced);
+  }, [debounced, onSearch]);
+
+  // Con búsqueda server-side el listado `products` ya viene filtrado; sin ella
+  // (backward-compat) filtra client-side.
+  const filtered = onSearch
+    ? products
+    : products.filter((p) =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
 
   const toggle = (product: ProductsProps) => {
     const id = product._id || product.id || "";
@@ -98,7 +128,13 @@ export const ProductSelector = ({
         </div>
 
         <div className="flex-1 space-y-1 overflow-y-auto p-2">
-          {filtered.length === 0 && (
+          {searchLoading && (
+            <div className="flex items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Buscando...</span>
+            </div>
+          )}
+          {!searchLoading && filtered.length === 0 && (
             <p className="p-6 text-center text-sm text-muted-foreground">
               No se encontraron productos.
             </p>

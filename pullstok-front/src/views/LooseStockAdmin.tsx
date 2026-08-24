@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { PackageOpen, Save, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,8 @@ export const LooseStockAdmin = () => {
   const [pickerProducts, setPickerProducts] = useState<ProductsProps[]>([]);
   const [loadingPicker, setLoadingPicker] = useState(false);
   const [openingBag, setOpeningBag] = useState(false);
+  // Guard de búsquedas server-side: descarta respuestas que llegan desordenadas.
+  const searchSeq = useRef(0);
 
   // Preselecciona la única sucursal cuando la org tiene exactamente una.
   useEffect(() => {
@@ -111,22 +113,29 @@ export const LooseStockAdmin = () => {
     }
   };
 
-  const handleOpenPicker = async () => {
-    setPickerOpen(true);
+  // Búsqueda server-side del picker: consulta el catálogo COMPLETO (no solo la
+  // primera página) por nombre, para que productos como "CAT CHOW" que quedan
+  // más allá del pageSize inicial se puedan encontrar.
+  const handleSearch = useCallback(async (term: string) => {
+    const seq = ++searchSeq.current;
     setLoadingPicker(true);
     try {
-      // Productos con peso cargado para abrir bolsa. El picker busca por nombre
-      // despues (client-side); abrir la bolsa descuenta 1 unidad y acredita el
-      // weightKg del producto en la celda de la planilla.
-      const data = await products(undefined, "", undefined, 1, 300);
+      const data = await products(undefined, term, undefined, 1, 300);
+      if (seq !== searchSeq.current) return; // respuesta vieja → descartar
       const items = Array.isArray(data) ? data : (data as any).items ?? [];
       setPickerProducts(items);
     } catch (_err) {
+      if (seq !== searchSeq.current) return;
       toast.error("No se pudieron cargar los productos para abrir la bolsa");
       setPickerProducts([]);
     } finally {
-      setLoadingPicker(false);
+      if (seq === searchSeq.current) setLoadingPicker(false);
     }
+  }, []);
+
+  const handleOpenPicker = async () => {
+    setPickerOpen(true);
+    await handleSearch(""); // carga inicial (invalida búsquedas en vuelo)
   };
 
   const handleConfirmOpenBag = async (selected: { product: ProductsProps }[]) => {
@@ -290,6 +299,8 @@ export const LooseStockAdmin = () => {
         onOpenChange={setPickerOpen}
         products={pickerProducts}
         onConfirm={handleConfirmOpenBag}
+        onSearch={handleSearch}
+        searchLoading={loadingPicker}
       />
     </div>
   );
