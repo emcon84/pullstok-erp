@@ -170,6 +170,15 @@ export const CashSessionPage = () => {
     [session, soldByMethod],
   );
 
+  // Caja compartida por sucursal: solo quien la abrió (cashierId) o un rol de
+  // gestión puede cerrarla. El resto la ve (detalle en vivo) pero no la cierra.
+  const canClose = useMemo(() => {
+    if (!session) return false;
+    const role = currentUser?.role;
+    if (role === "ADMIN" || role === "MANAGEMENT") return true;
+    return !!currentUser?.id && session.cashierId === currentUser?.id;
+  }, [session, currentUser]);
+
   if (loadingSession) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -196,6 +205,7 @@ export const CashSessionPage = () => {
           session={session}
           soldByMethod={soldByMethod}
           expectedAmount={expectedAmount}
+          canClose={canClose}
           onClose={() => setArqueoOpen(true)}
         />
       ) : (
@@ -310,11 +320,13 @@ function OpenSessionPanel({
   session,
   soldByMethod,
   expectedAmount,
+  canClose,
   onClose,
 }: {
   session: NonNullable<ReturnType<typeof useGetCurrentCashSession>["session"]>;
   soldByMethod: Record<string, number>;
   expectedAmount: number;
+  canClose: boolean;
   onClose: () => void;
 }) {
   return (
@@ -357,9 +369,15 @@ function OpenSessionPanel({
         </CardContent>
       </Card>
 
-      <Button size="lg" onClick={onClose}>
-        Cerrar / Arqueo
-      </Button>
+      {canClose ? (
+        <Button size="lg" onClick={onClose}>
+          Cerrar / Arqueo
+        </Button>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Solo quien la abrió o gestión pueden cerrarla.
+        </p>
+      )}
     </div>
   );
 }

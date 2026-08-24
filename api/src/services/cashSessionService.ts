@@ -20,6 +20,41 @@ const OPERATIVE_ROLES = ["CASHIER", "VENDEDOR"];
 const isGestión = (role?: string) => !!role && GESTION_ROLES.includes(role);
 const isOperative = (role?: string) => !!role && OPERATIVE_ROLES.includes(role);
 
+/**
+ * Resuelve la sucursal de un operativo (CASHIER/VENDEDOR) desde su asignación:
+ * exactamente una. Si 0 o >1 → INVALID_BRANCH. Lo usan apertura, current, getOne
+ * y list (la caja es compartida por sucursal: el operativo ve/vende en la caja
+ * de SU sucursal, sin importar quién la abrió).
+ */
+const resolveOperativeBranch = async (
+  userId: string | undefined,
+): Promise<string> => {
+  if (!userId) {
+    const err: any = new Error("branchId es requerido para esta operación");
+    err.code = "INVALID_BRANCH";
+    throw err;
+  }
+  const assignments = await basePrisma.branchAssignment.findMany({
+    where: { userId },
+    select: { branchId: true },
+  });
+  if (assignments.length === 0) {
+    const err: any = new Error(
+      "No tenés una sucursal asignada. Contactá a un administrador.",
+    );
+    err.code = "INVALID_BRANCH";
+    throw err;
+  }
+  if (assignments.length > 1) {
+    const err: any = new Error(
+      "Tenés múltiples sucursales asignadas. Seleccioná una para esta operación.",
+    );
+    err.code = "INVALID_BRANCH";
+    throw err;
+  }
+  return assignments[0].branchId;
+};
+
 /** Resuelve la sucursal de apertura: asignada (operativos) o explícita (gestión). */
 const resolveBranchForOpen = async (
   userId: string | undefined,
@@ -27,25 +62,7 @@ const resolveBranchForOpen = async (
   bodyBranchId?: string,
 ): Promise<string> => {
   if (userId && isOperative(role)) {
-    const assignments = await basePrisma.branchAssignment.findMany({
-      where: { userId },
-      select: { branchId: true },
-    });
-    if (assignments.length === 0) {
-      const err: any = new Error(
-        "No tenés una sucursal asignada. Contactá a un administrador.",
-      );
-      err.code = "INVALID_BRANCH";
-      throw err;
-    }
-    if (assignments.length > 1) {
-      const err: any = new Error(
-        "Tenés múltiples sucursales asignadas. Seleccioná una para abrir la caja.",
-      );
-      err.code = "INVALID_BRANCH";
-      throw err;
-    }
-    return assignments[0].branchId;
+    return resolveOperativeBranch(userId);
   }
   if (!bodyBranchId) {
     const err: any = new Error("branchId es requerido para esta operación");
@@ -76,15 +93,16 @@ const openCash = async (
 
   const branchId = await resolveBranchForOpen(userId, role, input.branchId);
 
-  // Una sola caja OPEN por (branch, cashier) → validación de service para
-  // mensaje limpio (el índice único parcial `cash_session_single_open` es la
-  // garantía de DB anti-race, no regenerable por Prisma).
+  // Una sola caja OPEN por sucursal (compartida) → validación de service para
+  // mensaje limpio (el índice único parcial `cash_session_single_open` por
+  // branchId es la garantía de DB anti-race, no regenerable por Prisma).
+  // cashierId sigue siendo quién la abrió (auditoría), no quién puede vender.
   const existing = await prisma.cashSession.findFirst({
-    where: { branchId, cashierId: userId, status: "OPEN" },
+    where: { branchId, status: "OPEN" },
   });
   if (existing) {
     const err: any = new Error(
-      "Ya tenés una caja abierta en esta sucursal. Cerrá la actual antes de abrir otra.",
+      "Ya hay una caja abierta en esta sucursal. Cerrá la actual antes de abrir otra.",
     );
     err.code = "CASH_SESSION_ALREADY_OPEN";
     throw err;
@@ -164,12 +182,16 @@ const getCurrent = async (
   role?: string,
   branchId?: string,
 ) => {
-  // Gestión puede consultar por sucursal explícita; operativos solo la propia.
+  // Caja compartida por sucursal: la sesión OPEN se resuelve por branch.
+  // Gestión puede consultar por sucursal explícita; operativos ven la de SU
+  // sucursal (asignación) aunque no la hayan abierto ellos.
   const where: Record<string, unknown> = { status: "OPEN" };
-  if (isGestión(role) && branchId) {
-    where.branchId = branchId;
+  if (branchId) {
+    where.branchId = branchId;               // gestión con sucursal u operativo con sucursal
+  } else if (isOperative(role)) {
+    where.branchId = await resolveOperativeBranch(userId); // operativo sin branchId → asignación
   } else {
-    where.cashierId = userId;
+    where.cashierId = userId;                // gestión sin sucursal → su propia (edge)
   }
   return prisma.cashSession.findFirst({
     where,
@@ -178,12 +200,11 @@ const getCurrent = async (
 };
 
 const getOne = async (id: string, userId?: string, role?: string) => {
-  // Operativos solo ven sus propias cajas → scope por cashierId (no se filtra
-  // por dueño después, se escopa en la query para no filtrar existencia).
-  // Gestión ve todas (scope org auto de la extensión).
+  // Caja compartida: los operativos solo ven cajas de SU sucursal (asignación),
+  // no solo las que abrieron. Gestión ve todas (scope org auto de la extensión).
   const where: Record<string, unknown> = { id };
   if (!isGestión(role)) {
-    where.cashierId = userId;
+    where.branchId = await resolveOperativeBranch(userId);
   }
   const session = await prisma.cashSession.findFirst({
     where,
@@ -205,10 +226,12 @@ interface ListQuery {
 const list = async (query: ListQuery, userId?: string, role?: string) => {
   const where: Record<string, unknown> = {};
   if (query.status) where.status = query.status;
-  if (query.branchId) where.branchId = query.branchId;
-  // Operativos ven solo sus propias cajas; gestión ve todas (scope org auto).
+  // Operativos ven las cajas de su sucursal (compartida); gestión filtra por
+  // branchId opcional o ve todas (scope org auto).
   if (!isGestión(role)) {
-    where.cashierId = userId;
+    where.branchId = await resolveOperativeBranch(userId);
+  } else if (query.branchId) {
+    where.branchId = query.branchId;
   }
   return prisma.cashSession.findMany({
     where,

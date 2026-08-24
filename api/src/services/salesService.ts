@@ -86,8 +86,10 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
   // (backward-compat) o con el cashSessionId explícito del request.
   let resolvedCashSessionId: string | null = null;
   if (sellerBranchId && userId && (role === "VENDEDOR" || role === "CASHIER")) {
+    // Caja compartida por sucursal: se vende en la caja OPEN de la sucursal,
+    // sin importar quién la abrió (cashierId es auditoría, no gate).
     const openSession = await prisma.cashSession.findFirst({
-      where: { branchId: sellerBranchId, cashierId: userId, status: "OPEN" },
+      where: { branchId: sellerBranchId, status: "OPEN" },
       select: { id: true },
     });
     if (!openSession) {

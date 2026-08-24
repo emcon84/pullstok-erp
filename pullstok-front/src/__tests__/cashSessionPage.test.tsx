@@ -103,12 +103,13 @@ describe("CashSessionPage — con sesión OPEN", () => {
     vi.clearAllMocks();
     localStorage.setItem(
       "user",
-      JSON.stringify({ role: "CASHIER", branchIds: ["b1"] }),
+      JSON.stringify({ role: "CASHIER", branchIds: ["b1"], id: "u1" }),
     );
     mockCurrent.mockReturnValue({
       session: {
         id: "cs-1",
         status: "OPEN",
+        cashierId: "u1",
         openingAmount: 5000,
         openedAt: "2026-08-20T12:00:00.000Z",
         payments: [
@@ -155,5 +156,23 @@ describe("CashSessionPage — con sesión OPEN", () => {
     // "Esperado (efectivo)" aparece en el panel de saldo y en el modal.
     expect(screen.getAllByText("Esperado (efectivo)").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Efectivo")).toBeInTheDocument();
+  });
+
+  it("muestra el botón cerrar solo si el usuario abrió la caja o es gestión", () => {
+    renderPage();
+    // Sesión abierta por el usuario actual (cashierId === user.id) → cierre ok.
+    expect(screen.getAllByText("Cerrar / Arqueo").length).toBeGreaterThan(0);
+  });
+
+  it("oculta cerrar a un cajero que no abrió la caja (compartida)", () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ role: "CASHIER", branchIds: ["b1"], id: "otro-1" }),
+    );
+    renderPage();
+    expect(screen.queryByText("Cerrar / Arqueo")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Solo quien la abrió o gestión pueden cerrarla."),
+    ).toBeInTheDocument();
   });
 });
