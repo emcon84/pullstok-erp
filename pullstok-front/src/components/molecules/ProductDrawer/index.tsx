@@ -27,6 +27,7 @@ import type { BranchStockInfo } from "@/services/productService";
 import { canEditBranchStock } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
 import { API_URL } from "@/constants";
+import { roundBolsaPrice } from "@/lib/money";
 import type { DataItem } from "@/types";
 
 interface ProductDrawerProps {
@@ -223,11 +224,16 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
       }
 
       const variantOptionIds = Object.values(variantSelections).filter(Boolean);
+      // Venta suelta (lleva peso en kg) → NO se redondea el precio de la bolsa.
+      // Bolsa cerrada (sin peso) → se redondea al múltiplo de 100 más cercano.
+      const parsedWeightKg = parseFloat(weightKg);
+      const isLoose = !Number.isNaN(parsedWeightKg) && parsedWeightKg > 0;
+      const priceValue = parseFloat(price) || 0;
       const payload: ProductPayload = {
         name,
         code: code || undefined,
         description: description || undefined,
-        price: parseFloat(price) || 0,
+        price: isLoose ? priceValue : roundBolsaPrice(priceValue),
         image: imgUrl,
         variantOptionIds,
       };
@@ -238,8 +244,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         payload.quantity = parseInt(quantity) || 0;
       }
       // Loose-sale fields (A-02): weightKg always sent, bulkFactor optional (null = org default).
-      const parsedWeightKg = parseFloat(weightKg);
-      payload.weightKg = !isNaN(parsedWeightKg) && parsedWeightKg > 0 ? parsedWeightKg : null;
+      payload.weightKg = !Number.isNaN(parsedWeightKg) && parsedWeightKg > 0 ? parsedWeightKg : null;
       const parsedFactor = parseFloat(bulkFactor);
       payload.bulkFactor = !isNaN(parsedFactor) && parsedFactor > 0 ? parsedFactor : null;
 

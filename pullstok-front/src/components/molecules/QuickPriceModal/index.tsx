@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateProduct } from "../../../services/productService";
+import { roundBolsaPrice } from "../../../lib/money";
 import { DataItem } from "../../../types";
 
 interface QuickPriceModalProps {
@@ -58,9 +59,13 @@ export const QuickPriceModal = ({ open, onClose, product }: QuickPriceModalProps
     }
     setSaving(true);
     try {
+      // Bolsa cerrada (sin precio por kg) → redondea a múltiplo de 100.
+      // Venta suelta (priceKgSuelto > 0) → no se toca el precio de la bolsa.
+      const isLoose = (kgValue ?? Number(product.priceKgSuelto ?? 0)) > 0;
+      const finalPrice = isLoose ? value : roundBolsaPrice(value);
       await updateProduct({
         _id: id,
-        price: value,
+        price: finalPrice,
         priceKgSuelto: kgValue,
       } as unknown as DataItem);
       queryClient.invalidateQueries();

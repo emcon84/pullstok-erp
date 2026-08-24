@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { ProductCsvUploadForm } from "../../components/molecules/ProductCsvUploadForm";
 import { createProduct } from "../../services/productService";
+import { roundBolsaPrice } from "../../lib/money";
 import {
   Category,
   VariantDefinition,
@@ -112,7 +113,7 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
       const variantOptionIds = Object.values(variantSelections).filter(Boolean);
       await createProduct({
         name,
-        price: parseFloat(price || "0"),
+        price: roundBolsaPrice(parseFloat(price || "0")),
         quantity: parseInt(quantity || "0", 10),
         categoryId,
         variantOptionIds,
@@ -151,7 +152,7 @@ export const StepProducts = ({ onBack }: StepProductsProps) => {
         const variantOptionIds = Object.values(variantSelections).filter(Boolean);
         await createProduct({
           name,
-          price: parseFloat(price || "0"),
+          price: roundBolsaPrice(parseFloat(price || "0")),
           quantity: parseInt(quantity || "0", 10),
           categoryId,
           variantOptionIds,

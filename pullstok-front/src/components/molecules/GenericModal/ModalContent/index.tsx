@@ -15,6 +15,7 @@ import { ProductsProps } from "../../../../models/productsModel";
 import { useCreateProduct } from "../../../hooks/useProducts";
 import { DataItem } from "../../../../types";
 import { updateProduct } from "../../../../services/productService";
+import { roundBolsaPrice } from "../../../../lib/money";
 import {
   Category,
   VariantDefinition,
@@ -113,10 +114,15 @@ export const ModalContent: React.FC<ModalEditContentProps> = ({
       // Build variantOptionIds from selections
       const variantOptionIds = Object.values(variantSelections).filter(Boolean);
 
+      // Bolsa cerrada (sin precio por kg) → redondea a múltiplo de 100.
+      // Venta suelta (priceKgSuelto > 0) → no se toca el precio de la bolsa.
+      const priceValue = parseFloat(selectedData.price?.toString() || "0");
+      const isLoose = Number(selectedData.priceKgSuelto ?? 0) > 0;
+
       const productData: any = {
         ...selectedData,
         image: imageUrl,
-        price: parseFloat(selectedData.price?.toString() || "0"),
+        price: isLoose ? priceValue : roundBolsaPrice(priceValue),
         quantity: parseInt(selectedData.quantity?.toString() || "0"),
         variantOptionIds,
       };
