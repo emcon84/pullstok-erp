@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
-import { usePayments } from "@/components/hooks/usePayments";
 import { usePanelKeyboard } from "@/components/hooks/usePanelKeyboard";
-import { PaymentSection } from "@/components/molecules/PaymentSection";
+import { PaymentModal } from "@/components/molecules/PaymentModal";
 import { CartItemRow, stepQty } from "@/components/molecules/CartItemRow";
 import type { PaymentInput } from "@/models/cashSessionModel";
 import { round2 } from "@/lib/money";
@@ -74,7 +73,9 @@ export const VendorOrderPanel = ({
   const discountAmount = round2((subtotal * discountPct) / 100);
   const total = round2(subtotal - discountAmount);
 
-  const pay = usePayments(total);
+  // Vender abre el modal de confirmación de pago (no vende de una).
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const openPayment = useCallback(() => setPaymentOpen(true), []);
 
   // ── Navegación por teclado dentro del panel (roving focus ↑/↓) ──
   const asideRef = useRef<HTMLElement>(null);
@@ -114,19 +115,14 @@ export const VendorOrderPanel = ({
     };
   }, [apiRef, focusFirstControl]);
 
-  const handleConfirm = () => {
-    confirmSale(pay.finalize(), cashSessionId, discountPct);
-  };
-
-  // P guarda el pedido y V vende — también dentro del panel (como en el listado).
-  // Se llama acá (después de handleConfirm) para pasar la referencia ya definida.
+  // P guarda el pedido (saveOrder) y V abre el modal de pago (openPayment).
   usePanelKeyboard({
     panelRef: asideRef,
     getFocusables,
     onExitToGrid: () => onExitToGrid?.(),
     onStepQty: handleStepQty,
     onSaveOrder: saveOrder,
-    onConfirmSale: handleConfirm,
+    onConfirmSale: openPayment,
   });
 
   const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,6 +139,7 @@ export const VendorOrderPanel = ({
   };
 
   return (
+    <>
     <aside
       ref={asideRef}
       className={
@@ -247,29 +244,6 @@ export const VendorOrderPanel = ({
               </div>
             </div>
 
-            <PaymentSection
-              idPrefix="pay"
-              payments={pay.payments}
-              selectedMethod={pay.selectedMethod}
-              setSelectedMethod={pay.setSelectedMethod}
-              cashReceived={pay.cashReceived}
-              setCashReceived={pay.setCashReceived}
-              addPayment={pay.addPayment}
-              clearPayments={pay.clearPayments}
-              total={total}
-              amountInput={pay.amountInput}
-              setAmountInput={pay.setAmountInput}
-            />
-
-            {pay.vuelto > 0 && (
-              <div className="flex items-center justify-between rounded-lg bg-emerald-50 p-2 text-sm">
-                <span>Vuelto</span>
-                <span className="font-bold tabular-nums">
-                  ${money(pay.vuelto)}
-                </span>
-              </div>
-            )}
-
             <div className="flex flex-col gap-2 pt-1">
               <div className="flex gap-2">
                 <Button
@@ -289,7 +263,7 @@ export const VendorOrderPanel = ({
               <Button
                 className="w-full"
                 size="lg"
-                onClick={handleConfirm}
+                onClick={openPayment}
                 disabled={
                   status.confirming || status.savingOrder || cart.items.length === 0
                 }
@@ -301,5 +275,14 @@ export const VendorOrderPanel = ({
         </>
       )}
     </aside>
+    <PaymentModal
+      open={paymentOpen}
+      onOpenChange={setPaymentOpen}
+      total={total}
+      cashSessionId={cashSessionId}
+      discountPct={discountPct}
+      confirmSale={confirmSale}
+    />
+    </>
   );
 };
