@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
+import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -75,6 +76,12 @@ export const PaymentModal = ({
   const updateMethod = (i: number, m: PaymentMethod) =>
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, method: m } : r)));
 
+  // Quita una fila; nunca deja el modal sin filas (siempre queda la primera).
+  const removeRow = (i: number) =>
+    setRows((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
+  const removeLastRow = () =>
+    setRows((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
+
   const focusRow = (i: number) => {
     const el = inputRefs.current[i];
     if (!el) return;
@@ -84,9 +91,26 @@ export const PaymentModal = ({
 
   const confirm = () => {
     const payments: PaymentInput[] = rows
-      .map((r) => ({ method: r.method, amount: round2(parseFloat(r.amount.replace(",", ".")) || 0) }))
+      .map((r) => ({
+        method: r.method,
+        amount: round2(parseFloat(r.amount.replace(",", ".")) || 0),
+      }))
       .filter((p) => p.amount > 0);
-    confirmSale(payments.length > 0 ? payments : undefined, cashSessionId, discountPct);
+    const paid = round2(payments.reduce((s, p) => s + p.amount, 0));
+    // Los pagos declarados deben sumar el total a cobrar; si no, se rechaza.
+    if (Math.abs(paid - total) > 0.01) {
+      toast.error(
+        paid < total
+          ? `Falta ${money(round2(total - paid))} para cubrir el total`
+          : `Los pagos superan el total por ${money(round2(paid - total))}`,
+      );
+      return;
+    }
+    if (payments.length === 0) {
+      toast.error("Ingresá al menos una forma de pago");
+      return;
+    }
+    confirmSale(payments, cashSessionId, discountPct);
     onOpenChange(false);
   };
 
@@ -109,6 +133,14 @@ export const PaymentModal = ({
         e.preventDefault();
         e.stopPropagation();
         addRow();
+        return;
+      }
+      // "-": quita la última forma de pago (hasta que quede solo la primera).
+      const isRemove = e.key === "-" || e.code === "NumpadSubtract";
+      if (isRemove) {
+        e.preventDefault();
+        e.stopPropagation();
+        removeLastRow();
         return;
       }
       // Teclas 1..N: saltar a editar esa fila (solo cuando no se está tipeando
@@ -183,6 +215,17 @@ export const PaymentModal = ({
                   className="w-28 text-right"
                   placeholder="0"
                 />
+                {rows.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-muted-foreground"
+                    onClick={() => removeRow(i)}
+                    aria-label={`Quitar forma de pago ${i + 1}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
             ))}
           </div>
