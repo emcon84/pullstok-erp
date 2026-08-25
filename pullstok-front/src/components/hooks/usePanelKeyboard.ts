@@ -10,6 +10,10 @@ interface PanelKeyboardOptions {
   onExitToGrid: () => void;
   /** +/− sobre la cantidad de un ítem del pedido (lineKey identifica la línea). */
   onStepQty?: (lineKey: string, delta: 1 | -1) => void;
+  /** Tecla P: guardar pedido (funciona dentro del panel). */
+  onSaveOrder?: () => void;
+  /** Tecla V: vender el pedido (funciona dentro del panel). */
+  onConfirmSale?: () => void;
 }
 
 /**
@@ -29,11 +33,25 @@ export function usePanelKeyboard({
   getFocusables,
   onExitToGrid,
   onStepQty,
+  onSaveOrder,
+  onConfirmSale,
 }: PanelKeyboardOptions) {
-  const optsRef = useRef({ getFocusables, onExitToGrid, onStepQty });
+  const optsRef = useRef({
+    getFocusables,
+    onExitToGrid,
+    onStepQty,
+    onSaveOrder,
+    onConfirmSale,
+  });
 
   useEffect(() => {
-    optsRef.current = { getFocusables, onExitToGrid, onStepQty };
+    optsRef.current = {
+      getFocusables,
+      onExitToGrid,
+      onStepQty,
+      onSaveOrder,
+      onConfirmSale,
+    };
   });
 
   useEffect(() => {
@@ -66,6 +84,20 @@ export function usePanelKeyboard({
             optsRef.current.onStepQty?.(lineKey, delta);
           }
         }
+        return;
+      }
+
+      // ── P: guardar pedido · V: vender (también dentro del panel) ──
+      if ((key === "p" || key === "P") && optsRef.current.onSaveOrder) {
+        e.preventDefault();
+        e.stopPropagation();
+        optsRef.current.onSaveOrder();
+        return;
+      }
+      if ((key === "v" || key === "V") && optsRef.current.onConfirmSale) {
+        e.preventDefault();
+        e.stopPropagation();
+        optsRef.current.onConfirmSale();
         return;
       }
 

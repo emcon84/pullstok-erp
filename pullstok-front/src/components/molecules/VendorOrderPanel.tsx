@@ -103,13 +103,6 @@ export const VendorOrderPanel = ({
     [cart.items, cart.updateQuantity],
   );
 
-  usePanelKeyboard({
-    panelRef: asideRef,
-    getFocusables,
-    onExitToGrid: () => onExitToGrid?.(),
-    onStepQty: handleStepQty,
-  });
-
   const focusFirstControl = useCallback(() => {
     getFocusables()[0]?.focus();
   }, [getFocusables]);
@@ -124,6 +117,17 @@ export const VendorOrderPanel = ({
   const handleConfirm = () => {
     confirmSale(pay.finalize(), cashSessionId, discountPct);
   };
+
+  // P guarda el pedido y V vende — también dentro del panel (como en el listado).
+  // Se llama acá (después de handleConfirm) para pasar la referencia ya definida.
+  usePanelKeyboard({
+    panelRef: asideRef,
+    getFocusables,
+    onExitToGrid: () => onExitToGrid?.(),
+    onStepQty: handleStepQty,
+    onSaveOrder: saveOrder,
+    onConfirmSale: handleConfirm,
+  });
 
   const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.trim();
