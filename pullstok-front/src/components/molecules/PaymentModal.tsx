@@ -64,10 +64,11 @@ export const PaymentModal = ({
   const remaining = round2(total - sum);
 
   const addRow = useCallback(() => {
+    const cur = rowsRef.current;
+    const paid = cur.reduce((s, r) => s + (parseFloat(r.amount.replace(",", ".")) || 0), 0);
     const nextMethod =
-      PAYMENT_METHODS.find((m) => !rowsRef.current.some((r) => r.method === m)) ??
-      "EFECTIVO";
-    const nextAmount = String(rowsRef.current.length === 0 ? total : round2(total - sum));
+      PAYMENT_METHODS.find((m) => !cur.some((r) => r.method === m)) ?? "EFECTIVO";
+    const nextAmount = String(cur.length === 0 ? total : round2(total - paid));
     setRows((prev) => [...prev, { method: nextMethod, amount: nextAmount }]);
   }, [total]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -90,7 +91,8 @@ export const PaymentModal = ({
   };
 
   const confirm = () => {
-    const payments: PaymentInput[] = rows
+    const cur = rowsRef.current;
+    const payments: PaymentInput[] = cur
       .map((r) => ({
         method: r.method,
         amount: round2(parseFloat(r.amount.replace(",", ".")) || 0),
@@ -114,6 +116,11 @@ export const PaymentModal = ({
     onOpenChange(false);
   };
 
+  // Ref con los handlers más recientes: la escucha global (que no se re-registra
+  // al cambiar las filas) siempre llama al estado actual, no a closures viejos.
+  const handlersRef = useRef({ confirm, addRow, removeLastRow, focusRow });
+  handlersRef.current = { confirm, addRow, removeLastRow, focusRow };
+
   // Teclado del modal (escucha global en fase CAPTURE, como el panel):
   // V vende, + agrega fila, 1..N saltan a editar esa fila, ↑/↓ navegan.
   useEffect(() => {
@@ -125,14 +132,14 @@ export const PaymentModal = ({
       if (e.key === "v" || e.key === "V") {
         e.preventDefault();
         e.stopPropagation();
-        confirm();
+        handlersRef.current.confirm();
         return;
       }
       const isAdd = e.key === "+" || e.key === "=" || e.code === "NumpadAdd";
       if (isAdd) {
         e.preventDefault();
         e.stopPropagation();
-        addRow();
+        handlersRef.current.addRow();
         return;
       }
       // "-": quita la última forma de pago (hasta que quede solo la primera).
@@ -140,7 +147,7 @@ export const PaymentModal = ({
       if (isRemove) {
         e.preventDefault();
         e.stopPropagation();
-        removeLastRow();
+        handlersRef.current.removeLastRow();
         return;
       }
       // Teclas 1..N: saltar a editar esa fila (solo cuando no se está tipeando
@@ -150,7 +157,7 @@ export const PaymentModal = ({
         if (idx < rowsRef.current.length) {
           e.preventDefault();
           e.stopPropagation();
-          focusRow(idx);
+          handlersRef.current.focusRow(idx);
         }
         return;
       }
