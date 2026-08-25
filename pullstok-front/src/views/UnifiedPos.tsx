@@ -105,56 +105,61 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
       {/* ── Columna izquierda: header + tabs + contenido ── */}
-      <div className="min-w-0 space-y-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Nueva venta</h1>
-          <p className="text-sm text-muted-foreground">
-            Vendé por unidad o suelto desde el mismo pedido
-          </p>
+      <div className="min-w-0 space-y-4 lg:flex lg:h-[calc(100vh-2rem)] lg:flex-col lg:space-y-0">
+        <div className="space-y-4 lg:shrink-0">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Nueva venta</h1>
+            <p className="text-sm text-muted-foreground">
+              Vendé por unidad o suelto desde el mismo pedido
+            </p>
+          </div>
+
+          {/* ── Segmented tabs ── */}
+          <div className="flex w-fit gap-1 rounded-lg bg-muted p-1">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "flex-1 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors",
+                  tab === t.id
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* ── Segmented tabs ── */}
-        <div className="flex w-fit gap-1 rounded-lg bg-muted p-1">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              aria-pressed={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "flex-1 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors",
-                tab === t.id
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* ── Pestaña activa (scroll vertical en desktop para que todo quede
+             en pantalla y la lista se desplace internamente) ── */}
+        <div className="min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+          {tab === "unidad" ? (
+            <VendorCatalogTab
+              branchId={branchId}
+              cart={cart}
+              onSaveOrder={checkout.handleSaveOrder}
+              onConfirmSale={openPayment}
+              onEnterPanel={focusPanelFirst}
+              onToggleTab={toggleTab}
+              registerGridApi={registerGridApi}
+            />
+          ) : (
+            <LooseSellTab
+              branchId={branchId}
+              cart={cart}
+              onSaveOrder={checkout.handleSaveOrder}
+              onConfirmSale={openPayment}
+              onEnterPanel={focusPanelFirst}
+              onToggleTab={toggleTab}
+              registerGridApi={registerGridApi}
+            />
+          )}
         </div>
-
-        {/* ── Pestaña activa ── */}
-        {tab === "unidad" ? (
-          <VendorCatalogTab
-            branchId={branchId}
-            cart={cart}
-            onSaveOrder={checkout.handleSaveOrder}
-            onConfirmSale={openPayment}
-            onEnterPanel={focusPanelFirst}
-            onToggleTab={toggleTab}
-            registerGridApi={registerGridApi}
-          />
-        ) : (
-          <LooseSellTab
-            branchId={branchId}
-            cart={cart}
-            onSaveOrder={checkout.handleSaveOrder}
-            onConfirmSale={openPayment}
-            onEnterPanel={focusPanelFirst}
-            onToggleTab={toggleTab}
-            registerGridApi={registerGridApi}
-          />
-        )}
       </div>
 
       {/* ── Columna derecha: panel de pedido SIEMPRE visible ── */}
