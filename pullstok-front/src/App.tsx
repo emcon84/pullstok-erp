@@ -13,7 +13,7 @@ function App() {
         <div>
           <AppRoutes />
           <ToastContainer
-            position="bottom-right"
+            position="bottom-left"
             theme="dark"
             newestOnTop
             closeOnClick
