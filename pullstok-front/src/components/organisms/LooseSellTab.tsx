@@ -17,7 +17,7 @@ import { listLooseStocks } from "@/services/looseStock";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useVendorRowsKeyboard } from "@/components/hooks/useVendorRowsKeyboard";
 import { LooseSellTable, type LooseCellRow } from "@/components/molecules/LooseSellTable";
-import { parseDecimal } from "@/components/hooks/vendorRowHelpers";
+import { parseDecimal, scrollRowIntoView } from "@/components/hooks/vendorRowHelpers";
 import { cn } from "@/lib/utils";
 
 type VendorCart = ReturnType<typeof useVendorCart>;
@@ -346,24 +346,15 @@ export const LooseSellTab = ({
   };
 
   // ── Navegación ──
-  // Auto-scroll manual de la fila activa sobre el contenedor de la planilla
-  // (scrollRef): scrollIntoView no es confiable con tablas anidadas.
+  // Desplaza el ancestro scrolleable real para que la fila activa quede visible.
   useEffect(() => {
-    const container = scrollRef.current;
     const el = rowRefs.current[selectedIndex];
-    if (!container || !el) return;
-    const cRect = container.getBoundingClientRect();
-    const eRect = el.getBoundingClientRect();
-    if (eRect.top < cRect.top) {
-      container.scrollTop += eRect.top - cRect.top - 24;
-    } else if (eRect.bottom > cRect.bottom) {
-      container.scrollTop += eRect.bottom - cRect.bottom + 24;
-    }
+    if (el) scrollRowIntoView(el);
   }, [selectedIndex]);
 
   useEffect(() => {
     if (selectedIndex >= 0) {
-      inputRefs.current[selectedIndex]?.focus();
+      inputRefs.current[selectedIndex]?.focus({ preventScroll: true });
     }
   }, [selectedIndex]);
 
@@ -376,7 +367,7 @@ export const LooseSellTab = ({
 
   // ── Vuelta desde el panel (←): enfocar la planilla ──
   const focusSelectedRow = useCallback(() => {
-    if (selectedIndex >= 0) inputRefs.current[selectedIndex]?.focus();
+    if (selectedIndex >= 0) inputRefs.current[selectedIndex]?.focus({ preventScroll: true });
     else if (rows.length > 0) setSelectedIndex(0);
   }, [selectedIndex, rows.length]);
 

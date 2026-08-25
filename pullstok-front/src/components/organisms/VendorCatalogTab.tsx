@@ -60,10 +60,10 @@ export const VendorCatalogTab = ({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // El scroll del `selectedIndex` ya lo hace useVendorCatalog (itemRefs). Acá
-  // solo movemos el FOCO al input de la fila activa cuando cambia la selección.
+  // solo movemos el FOCO al input (preventScroll: el scroll lo maneja el hook).
   useEffect(() => {
     if (catalog.selectedIndex >= 0) {
-      inputRefs.current[catalog.selectedIndex]?.focus();
+      inputRefs.current[catalog.selectedIndex]?.focus({ preventScroll: true });
     }
   }, [catalog.selectedIndex]);
 
@@ -175,7 +175,7 @@ export const VendorCatalogTab = ({
   // enfoca). Garantiza que ← desde el panel siempre vuelva a la planilla.
   const focusSelectedRow = useCallback(() => {
     if (catalog.selectedIndex >= 0) {
-      inputRefs.current[catalog.selectedIndex]?.focus();
+      inputRefs.current[catalog.selectedIndex]?.focus({ preventScroll: true });
     } else if (catalog.items.length > 0) {
       catalog.setSelectedIndex(0);
     }

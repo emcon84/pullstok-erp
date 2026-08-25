@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useInfiniteProducts, useProductFacets } from "./useProducts";
 import { readStoredFilter } from "./vendorCatalogHelpers";
+import { scrollRowIntoView } from "./vendorRowHelpers";
 
 /**
  * Dominio del catálogo del vendor: búsqueda con debounce, listado paginado +
@@ -65,20 +66,11 @@ export function useVendorCatalog(branchId: string) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, loadMore]);
 
-  // Auto-scroll de la fila activa al navegar con flechas o L. Se hace de forma
-  // manual sobre el contenedor de la lista (scrollRef) porque scrollIntoView no
-  // es confiable con tablas anidadas: mantiene la fila visible con un margen.
+  // Auto-scroll de la fila activa al navegar con flechas o L: desplaza el
+  // ancestro scrolleable real para que la fila quede visible con margen.
   useEffect(() => {
-    const container = scrollRef.current;
     const el = itemRefs.current[selectedIndex];
-    if (!container || !el) return;
-    const cRect = container.getBoundingClientRect();
-    const eRect = el.getBoundingClientRect();
-    if (eRect.top < cRect.top) {
-      container.scrollTop += eRect.top - cRect.top - 24;
-    } else if (eRect.bottom > cRect.bottom) {
-      container.scrollTop += eRect.bottom - cRect.bottom + 24;
-    }
+    if (el) scrollRowIntoView(el);
   }, [selectedIndex]);
 
   const resetSelection = useCallback(() => {
