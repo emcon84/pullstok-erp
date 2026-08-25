@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { round2 } from "@/lib/money";
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { PaymentSection } from "@/components/molecules/PaymentSection";
-import { usePayments } from "@/components/hooks/usePayments";
-import type { PaymentInput } from "@/models/cashSessionModel";
+  PAYMENT_METHODS,
+  PAYMENT_METHOD_LABELS,
+  type PaymentInput,
+  type PaymentMethod,
+} from "@/models/cashSessionModel";
 
 interface PaymentModalProps {
   open: boolean;
@@ -26,17 +26,18 @@ interface PaymentModalProps {
   ) => void;
 }
 
+type PayRow = { method: PaymentMethod; amount: string };
+
 const money = (n: number) =>
   n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
 
 /**
- * Modal de confirmación de pago del POS vendedor (venta-descuento).
- * Se abre al tocar Vender: arranca con EFECTIVO y el monto autocompletado con
- * el total (no hay que tipear nada para una venta en efectivo por el total).
- * Permite DESGLOSAR (efectivo + tarjeta + ...) y confirma la venta.
- *
- * Teclado: Enter en "Confirmar venta" (enfocado al abrir) genera la venta;
- * ↑/↓ navegan entre los controles; Esc / Cancelar cierran sin vender.
+ * Modal de pago del POS vendedor. Simple y rápido:
+ * - Una fila por método de pago (efectivo, tarjeta, ...), numerada.
+ * - La primera fila arranca en EFECTIVO con el monto precargado al total.
+ * - "+" (botón o tecla) agrega otra forma; Enter también agrega una fila.
+ * - ↑/↓ navegan entre los montos; las teclas 1..N saltan a editar esa fila.
+ * - "VENDER" (o tecla V) confirma la venta.
  */
 export const PaymentModal = ({
   open,
@@ -46,57 +47,88 @@ export const PaymentModal = ({
   discountPct,
   confirmSale,
 }: PaymentModalProps) => {
-  const pay = usePayments(total);
+  const [rows, setRows] = useState<PayRow[]>([{ method: "EFECTIVO", amount: "" }]);
   const contentRef = useRef<HTMLDivElement>(null);
-  // Ref para leer el estado de pago más reciente desde el listener global.
-  const payRef = useRef(pay);
-  payRef.current = pay;
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
 
-  // Al abrir: resetea los pagos y autocompleta "Efectivo recibido" con el total
-  // (vuelto 0 por defecto → efectivo por el total sin tipear nada).
+  // Al abrir: arranca con UNA fila (EFECTIVO) con el monto precargado al total.
   useEffect(() => {
     if (!open) return;
-    pay.reset();
-    pay.setCashReceived(String(total));
-  }, [open, total]); // eslint-disable-line react-hooks/exhaustive-deps
+    setRows([{ method: "EFECTIVO", amount: String(total) }]);
+  }, [open, total]);
 
-  // Foco al botón "Confirmar venta" al abrir (Enter = vender directo).
-  useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => {
-      contentRef.current?.querySelector<HTMLButtonElement>("[data-confirm]")?.focus();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [open]);
+  const sum = rows.reduce((s, r) => s + (parseFloat(r.amount.replace(",", ".")) || 0), 0);
+  const remaining = round2(total - sum);
 
-  const getFocusables = useCallback(() => {
-    const root = contentRef.current;
-    if (!root) return [];
-    return Array.from(
-      root.querySelectorAll<HTMLElement>(
-        "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
-      ),
-    ).filter((el) => el.getClientRects().length > 0);
-  }, []);
+  const addRow = useCallback(() => {
+    const nextMethod =
+      PAYMENT_METHODS.find((m) => !rowsRef.current.some((r) => r.method === m)) ??
+      "EFECTIVO";
+    const nextAmount = String(rowsRef.current.length === 0 ? total : round2(total - sum));
+    setRows((prev) => [...prev, { method: nextMethod, amount: nextAmount }]);
+  }, [total]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Roving focus + atajos del modal con escucha global en fase CAPTURE (misma
-  // mecánica que el panel): ↑/↓ mueven el foco entre los controles; "+" agrega
-  // el pago de la forma seleccionada con el monto autocompletado al saldo.
+  const updateAmount = (i: number, v: string) =>
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, amount: v } : r)));
+  const updateMethod = (i: number, m: PaymentMethod) =>
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, method: m } : r)));
+
+  const focusRow = (i: number) => {
+    const el = inputRefs.current[i];
+    if (!el) return;
+    el.focus();
+    el.select();
+  };
+
+  const confirm = () => {
+    const payments: PaymentInput[] = rows
+      .map((r) => ({ method: r.method, amount: round2(parseFloat(r.amount.replace(",", ".")) || 0) }))
+      .filter((p) => p.amount > 0);
+    confirmSale(payments.length > 0 ? payments : undefined, cashSessionId, discountPct);
+    onOpenChange(false);
+  };
+
+  // Teclado del modal (escucha global en fase CAPTURE, como el panel):
+  // V vende, + agrega fila, 1..N saltan a editar esa fila, ↑/↓ navegan.
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const active = document.activeElement;
       if (!contentRef.current || !contentRef.current.contains(active)) return;
-      const isAdd = e.key === "+" || e.key === "=" || e.code === "NumpadAdd";
-      if (isAdd) {
-        const amt = parseFloat((payRef.current.amountInput || "").replace(",", "."));
-        payRef.current.addPayment(Number.isFinite(amt) && amt > 0 ? amt : undefined);
+
+      if (e.key === "v" || e.key === "V") {
         e.preventDefault();
         e.stopPropagation();
+        confirm();
+        return;
+      }
+      const isAdd = e.key === "+" || e.key === "=" || e.code === "NumpadAdd";
+      if (isAdd) {
+        e.preventDefault();
+        e.stopPropagation();
+        addRow();
+        return;
+      }
+      // Teclas 1..N: saltar a editar esa fila (solo cuando no se está tipeando
+      // en un input, para que los dígitos del monto no se intercepten).
+      if (/^[1-9]$/.test(e.key) && !(active instanceof HTMLInputElement)) {
+        const idx = Number(e.key) - 1;
+        if (idx < rowsRef.current.length) {
+          e.preventDefault();
+          e.stopPropagation();
+          focusRow(idx);
+        }
         return;
       }
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-      const els = getFocusables();
+      const root = contentRef.current;
+      const els = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+        ),
+      ).filter((el) => el.getClientRects().length > 0);
       const idx = els.indexOf(active as HTMLElement);
       if (idx < 0) return;
       e.preventDefault();
@@ -106,64 +138,76 @@ export const PaymentModal = ({
     };
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [open, getFocusables]);
-
-  const handleConfirm = () => {
-    confirmSale(pay.finalize(), cashSessionId, discountPct);
-    onOpenChange(false);
-  };
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <div ref={contentRef} className="space-y-4">
-          <DialogHeader>
-            <DialogTitle>Medio de pago</DialogTitle>
-          </DialogHeader>
+      <DialogContent className="sm:max-w-sm">
+        <div ref={contentRef} className="space-y-4 text-center">
+          <DialogTitle className="text-center text-lg font-semibold">
+            MEDIO DE PAGO
+          </DialogTitle>
 
-          <p className="text-sm text-muted-foreground">
-            Total a cobrar:{" "}
-            <strong className="font-semibold tabular-nums">
-              ${money(total)}
-            </strong>
-          </p>
+          {/* ── Filas de método + monto ── */}
+          <div className="space-y-2">
+            {rows.map((row, i) => (
+              <div key={i} className="flex items-center justify-center gap-2">
+                <span className="w-4 text-right text-sm font-semibold text-muted-foreground">
+                  {i + 1}
+                </span>
+                <NativeSelect
+                  value={row.method}
+                  onValueChange={(v) => updateMethod(i, v as PaymentMethod)}
+                  options={PAYMENT_METHODS.map((m) => ({
+                    value: m,
+                    label: PAYMENT_METHOD_LABELS[m],
+                  }))}
+                />
+                <Input
+                  ref={(el) => {
+                    inputRefs.current[i] = el;
+                  }}
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={row.amount}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) => updateAmount(i, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      addRow();
+                    }
+                  }}
+                  className="w-28 text-right"
+                  placeholder="0"
+                />
+              </div>
+            ))}
+          </div>
 
-          <PaymentSection
-            idPrefix="modal-pay"
-            payments={pay.payments}
-            selectedMethod={pay.selectedMethod}
-            setSelectedMethod={pay.setSelectedMethod}
-            cashReceived={pay.cashReceived}
-            setCashReceived={pay.setCashReceived}
-            addPayment={pay.addPayment}
-            clearPayments={pay.clearPayments}
-            total={total}
-            amountInput={pay.amountInput}
-            setAmountInput={pay.setAmountInput}
-          />
+          {/* ── Agregar otra forma de pago ── */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={addRow}
+            disabled={remaining <= 0}
+          >
+            <Plus className="h-4 w-4" /> Agregar forma de pago
+          </Button>
 
-          <p className="text-xs text-muted-foreground">
-            Usá <kbd className="rounded border bg-muted px-1 py-0.5 font-mono text-[10px]">+</kbd> para
-            agregar la forma de pago seleccionada ·{" "}
-            <kbd className="rounded border bg-muted px-1 py-0.5 font-mono text-[10px]">Enter</kbd> en
-            "Confirmar venta" vende.
-          </p>
+          {/* ── Total a cobrar ── */}
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground">total a cobrar</p>
+            <p className="text-3xl font-bold tabular-nums">${money(total)}</p>
+          </div>
 
-          {pay.vuelto > 0 && (
-            <div className="flex items-center justify-between rounded-lg bg-emerald-50 p-2 text-sm">
-              <span>Vuelto</span>
-              <span className="font-bold tabular-nums">${money(pay.vuelto)}</span>
-            </div>
-          )}
-
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancelar</Button>
-            </DialogClose>
-            <Button data-confirm onClick={handleConfirm}>
-              Confirmar venta
-            </Button>
-          </DialogFooter>
+          {/* ── Vender ── */}
+          <Button className="w-full" size="lg" onClick={confirm}>
+            VENDER
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
