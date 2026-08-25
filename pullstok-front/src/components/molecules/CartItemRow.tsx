@@ -15,7 +15,7 @@ const formatQty = (item: VendorCartItem): string => {
 };
 
 /** Incremento/decremento seguro según el modo de la línea. */
-const stepQty = (item: VendorCartItem, delta: 1 | -1): number => {
+export const stepQty = (item: VendorCartItem, delta: 1 | -1): number => {
   const isBolsa = (item.saleMode ?? "BOLSA_CERRADA") === "BOLSA_CERRADA";
   if (isBolsa) return Math.max(1, Math.round(item.quantity) + delta);
   return Math.max(0, Math.round((item.quantity + delta * 0.01) * 100) / 100);
@@ -38,7 +38,10 @@ export const CartItemRow = ({ item, onUpdateQty, onRemove }: CartItemRowProps) =
   const isLoose = mode === "POR_PESO" || mode === "POR_MONTO";
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+    <div
+      data-line-key={`${item.productId}::${item.saleMode ?? "BOLSA_CERRADA"}::${item.loosePriceId ?? "bolsa"}`}
+      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"
+    >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <p className="text-sm font-medium truncate">{item.name}</p>

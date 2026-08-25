@@ -6,28 +6,34 @@ interface PanelKeyboardOptions {
   panelRef: RefObject<HTMLElement>;
   /** Devuelve los controles focusables del panel, en orden de tabulación. */
   getFocusables: () => HTMLElement[];
-  /** Se llama al pulsar ↑ en el primer control: volver al listado. */
+  /** Se llama al volver al listado (←, o ↑ en el primer control). */
   onExitToGrid: () => void;
+  /** +/− sobre la cantidad de un ítem del pedido (lineKey identifica la línea). */
+  onStepQty?: (lineKey: string, delta: 1 | -1) => void;
 }
 
 /**
  * Roving focus del PANEL DE PEDIDO del POS vendedor.
  *
- * Cuando el foco está DENTRO del panel, las flechas ↑/↓ navegan entre sus
- * controles (items, descuento, medios de pago, botones). No interfiere con el
- * listado (esa zona tiene su propio hook). El salto listado → panel lo dispara
- * el hook del listado (↓ en la última fila); el retorno usa ↑ en el primer
- * control del panel. Los controles fuera de vista no se visitan.
+ * Cuando el foco está DENTRO del panel:
+ * - ↑/↓ navegan entre los controles (items, descuento, medios de pago, botones).
+ * - ← vuelve al listado (o ↑ en el primer control).
+ * - +/− ajustan la cantidad del ítem del pedido sobre el que está el foco
+ *   (solo dentro de una fila de ítem marcada con `data-line-key`).
+ *
+ * No interfiere con el listado (esa zona usa su propio hook). El salto
+ * listado → panel lo dispara la flecha → del hook del listado.
  */
 export function usePanelKeyboard({
   panelRef,
   getFocusables,
   onExitToGrid,
+  onStepQty,
 }: PanelKeyboardOptions) {
-  const optsRef = useRef({ getFocusables, onExitToGrid });
+  const optsRef = useRef({ getFocusables, onExitToGrid, onStepQty });
 
   useEffect(() => {
-    optsRef.current = { getFocusables, onExitToGrid };
+    optsRef.current = { getFocusables, onExitToGrid, onStepQty };
   });
 
   useEffect(() => {
@@ -36,13 +42,48 @@ export function usePanelKeyboard({
       const active = document.activeElement;
       // Solo actúa si el foco está dentro del panel.
       if (!panel || !panel.contains(active)) return;
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+
+      const key = e.key;
+
+      // ── +/− : ajustar la cantidad del ítem bajo el foco ──
+      const isStep =
+        key === "+" ||
+        key === "=" ||
+        e.code === "NumpadAdd" ||
+        key === "-" ||
+        e.code === "NumpadSubtract";
+      if (isStep) {
+        const lineEl = (active as HTMLElement).closest?.(
+          "[data-line-key]",
+        ) as HTMLElement | null;
+        if (lineEl) {
+          const lineKey = lineEl.getAttribute("data-line-key");
+          if (lineKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            const delta: 1 | -1 =
+              key === "-" || e.code === "NumpadSubtract" ? -1 : 1;
+            optsRef.current.onStepQty?.(lineKey, delta);
+          }
+        }
+        return;
+      }
+
+      if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "ArrowLeft") return;
+
+      // ── ← : volver al listado (el panel es la columna derecha) ──
+      if (key === "ArrowLeft") {
+        e.preventDefault();
+        e.stopPropagation();
+        optsRef.current.onExitToGrid();
+        return;
+      }
 
       const els = optsRef.current.getFocusables();
       const idx = els.indexOf(active as HTMLElement);
       if (idx < 0) return; // el foco está en un elemento no listado (no navegar)
 
-      if (e.key === "ArrowDown") {
+      if (key === "ArrowDown") {
         if (idx < els.length - 1) {
           e.preventDefault();
           e.stopPropagation();

@@ -202,7 +202,6 @@ export const VendorCatalogTab = ({
     searchInputRef: catalog.searchInputRef,
     containerRef: rootRef,
     hasRows: catalog.items.length > 0,
-    rowCount: catalog.items.length,
     selectedIndex: catalog.selectedIndex,
     moveDown: () => catalog.moveSelection(1),
     moveUp: () => catalog.moveSelection(-1),

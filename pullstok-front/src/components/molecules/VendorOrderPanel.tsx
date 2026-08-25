@@ -8,7 +8,7 @@ import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { usePayments } from "@/components/hooks/usePayments";
 import { usePanelKeyboard } from "@/components/hooks/usePanelKeyboard";
 import { PaymentSection } from "@/components/molecules/PaymentSection";
-import { CartItemRow } from "@/components/molecules/CartItemRow";
+import { CartItemRow, stepQty } from "@/components/molecules/CartItemRow";
 import type { PaymentInput } from "@/models/cashSessionModel";
 import { round2 } from "@/lib/money";
 import { clampPct } from "@/components/hooks/vendorRowHelpers";
@@ -88,10 +88,26 @@ export const VendorOrderPanel = ({
     ).filter((el) => el.getClientRects().length > 0);
   }, []);
 
+  // +/− de teclado sobre un ítem del pedido: mapea el lineKey a la línea del
+  // carrito y ajusta su cantidad (misma regla de paso según el modo).
+  const handleStepQty = useCallback(
+    (lineKey: string, delta: 1 | -1) => {
+      const item = cart.items.find(
+        (i) =>
+          `${i.productId}::${i.saleMode ?? "BOLSA_CERRADA"}::${i.loosePriceId ?? "bolsa"}` ===
+          lineKey,
+      );
+      if (!item) return;
+      cart.updateQuantity(item.productId, stepQty(item, delta), item.saleMode, item.loosePriceId);
+    },
+    [cart.items, cart.updateQuantity],
+  );
+
   usePanelKeyboard({
     panelRef: asideRef,
     getFocusables,
     onExitToGrid: () => onExitToGrid?.(),
+    onStepQty: handleStepQty,
   });
 
   const focusFirstControl = useCallback(() => {

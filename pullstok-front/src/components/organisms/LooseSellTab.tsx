@@ -393,7 +393,6 @@ export const LooseSellTab = ({
     searchInputRef: searchRef,
     containerRef: rootRef,
     hasRows: rows.length > 0,
-    rowCount: rows.length,
     selectedIndex,
     moveDown: () => moveSelection(1),
     moveUp: () => moveSelection(-1),

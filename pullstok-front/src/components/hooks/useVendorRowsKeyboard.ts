@@ -13,8 +13,6 @@ export interface VendorRowsKeyboardOptions {
   containerRef?: RefObject<HTMLElement>;
   /** ¿Hay filas para navegar? Si no, las teclas de navegación son no-op. */
   hasRows: boolean;
-  /** Total de filas: para detectar la última y saltar al panel. */
-  rowCount: number;
   selectedIndex: number;
   /** Baja una fila (la tab se encarga de mover el índice + enfocar la fila). */
   moveDown: () => void;
@@ -40,7 +38,7 @@ export interface VendorRowsKeyboardOptions {
  * tablas con INPUT INLINE de cantidad. Reemplaza la navegación basada en
  * modal: ↑/↓ mueven la fila activa (roving focus) aunque el foco esté en un
  * input de cantidad, +/− ajustan la cantidad de la fila activa y Enter la
- * agrega al pedido. En la última fila, ↓ salta al panel de pedido.
+ * agrega al pedido. La flecha → salta al panel de pedido.
  *
  * Solo actúa cuando el foco está dentro del listado (containerRef). Si el foco
  * está en el panel de pedido, este hook queda mudo.
@@ -91,19 +89,22 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
         return;
       }
 
-      // ── Flecha abajo: baja una fila; en la última salta al panel ──
+      // ── Flecha abajo: baja una fila ──
       if (key === "ArrowDown") {
         if (o.hasRows) {
-          const isLast = o.selectedIndex >= o.rowCount - 1;
-          if (isLast && o.onEnterPanel) {
-            e.preventDefault();
-            e.stopPropagation();
-            o.onEnterPanel();
-          } else {
-            e.preventDefault();
-            e.stopPropagation();
-            o.moveDown();
-          }
+          e.preventDefault();
+          e.stopPropagation();
+          o.moveDown();
+        }
+        return;
+      }
+
+      // ── Flecha derecha: salta al panel de pedido ──
+      if (key === "ArrowRight") {
+        if (o.onEnterPanel) {
+          e.preventDefault();
+          e.stopPropagation();
+          o.onEnterPanel();
         }
         return;
       }
