@@ -17,7 +17,7 @@ import { listLooseStocks } from "@/services/looseStock";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useVendorRowsKeyboard } from "@/components/hooks/useVendorRowsKeyboard";
 import { LooseSellTable, type LooseCellRow } from "@/components/molecules/LooseSellTable";
-import { parseDecimal, scrollRowIntoView } from "@/components/hooks/vendorRowHelpers";
+import { parseDecimal } from "@/components/hooks/vendorRowHelpers";
 import { cn } from "@/lib/utils";
 
 type VendorCart = ReturnType<typeof useVendorCart>;
@@ -346,10 +346,18 @@ export const LooseSellTab = ({
   };
 
   // ── Navegación ──
-  // Desplaza el ancestro scrolleable real para que la fila activa quede visible.
+  // Auto-scroll manual de la fila activa sobre el contenedor de la planilla.
   useEffect(() => {
+    const container = scrollRef.current;
     const el = rowRefs.current[selectedIndex];
-    if (el) scrollRowIntoView(el);
+    if (!container || !el) return;
+    const cRect = container.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+    if (eRect.top < cRect.top) {
+      container.scrollTop += eRect.top - cRect.top - 24;
+    } else if (eRect.bottom > cRect.bottom) {
+      container.scrollTop += eRect.bottom - cRect.bottom + 24;
+    }
   }, [selectedIndex]);
 
   useEffect(() => {
@@ -472,7 +480,7 @@ export const LooseSellTab = ({
       </div>
 
       {/* ── Zona de la planilla: scrollea internamente en desktop ── */}
-      <div ref={scrollRef} className="min-h-0 lg:flex-1 lg:overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 lg:flex-1 lg:overflow-y-auto lg:max-h-[calc(100vh-280px)]">
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader />
