@@ -135,9 +135,9 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           </div>
         </div>
 
-        {/* ── Pestaña activa (scroll vertical en desktop para que todo quede
-             en pantalla y la lista se desplace internamente) ── */}
-        <div className="min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+        {/* ── Pestaña activa. En desktop la columna queda fija y es la LISTA la
+             que scrollea internamente (buscador/filtros fijos arriba) ── */}
+        <div className="min-h-0 lg:flex-1 lg:flex lg:flex-col lg:pr-1">
           {tab === "unidad" ? (
             <VendorCatalogTab
               branchId={branchId}

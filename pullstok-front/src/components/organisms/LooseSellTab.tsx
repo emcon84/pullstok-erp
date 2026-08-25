@@ -424,7 +424,8 @@ export const LooseSellTab = ({
   });
 
   return (
-    <div ref={rootRef} className="mx-auto max-w-4xl space-y-6">
+    <div ref={rootRef} className="mx-auto max-w-4xl space-y-6 min-h-0 lg:flex lg:w-full lg:flex-1 lg:flex-col lg:space-y-0">
+      <div className="space-y-4 lg:shrink-0">
       {/* Buscador protagonista: input grande con lupa */}
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -469,7 +470,10 @@ export const LooseSellTab = ({
           ))}
         </div>
       </div>
+      </div>
 
+      {/* ── Zona de la planilla: scrollea internamente en desktop ── */}
+      <div className="min-h-0 lg:flex-1 lg:overflow-y-auto">
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader />
@@ -495,6 +499,7 @@ export const LooseSellTab = ({
           mode={saleMode}
         />
       )}
+      </div>
     </div>
   );
 };

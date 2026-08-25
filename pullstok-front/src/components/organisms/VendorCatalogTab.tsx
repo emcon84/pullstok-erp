@@ -327,9 +327,9 @@ export const VendorCatalogTab = ({
   }
 
   return (
-    <div ref={rootRef} className="space-y-4">
-      {/* ── Search + filters (sticky) ── */}
-      <div className="sticky top-16 lg:top-0 z-20 space-y-4 border-b bg-background px-4 pb-3 pt-3 sm:px-6 lg:px-8">
+    <div ref={rootRef} className="space-y-4 min-h-0 lg:flex lg:flex-1 lg:flex-col lg:space-y-0">
+      {/* ── Search + filters (fijos arriba; la lista scrollea debajo) ── */}
+      <div className="z-20 space-y-4 border-b bg-background px-4 pb-3 pt-3 sm:px-6 lg:px-8 lg:shrink-0">
         <VendorSearchBar
           value={catalog.filter}
           onChange={handleSearchChange}
@@ -353,57 +353,60 @@ export const VendorCatalogTab = ({
         />
       </div>
 
-      {/* ── Product grid ── */}
-      {catalog.items.length === 0 ? (
-        <div className="py-12 text-center space-y-3">
-          <p className="text-muted-foreground">
-            {catalog.filter || catalog.categoryFilter || catalog.titleFilter
-              ? "Sin resultados con estos filtros."
-              : "No hay productos."}
-          </p>
-          {(catalog.filter || catalog.categoryFilter || catalog.titleFilter) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                catalog.setFilter("");
-                catalog.setCategoryFilter("");
-                catalog.setTitleFilter(null);
-              }}
-            >
-              Limpiar filtros
-            </Button>
-          )}
-        </div>
-      ) : (
-        <ProductTable
-          items={catalog.items}
-          cartItems={cart.items}
-          selectedIndex={catalog.selectedIndex}
-          registerRow={catalog.registerRow}
-          onRowClick={handleRowClick}
-          onOpenDrawer={openDrawer}
-          onAssignBarcode={handleAssignBarcode}
-          inlineQty={inlineQty}
-        />
-      )}
+      {/* ── Zona de la lista: scrollea internamente en desktop ── */}
+      <div className="min-h-0 lg:flex-1 lg:overflow-y-auto">
+        {/* ── Product grid ── */}
+        {catalog.items.length === 0 ? (
+          <div className="py-12 text-center space-y-3">
+            <p className="text-muted-foreground">
+              {catalog.filter || catalog.categoryFilter || catalog.titleFilter
+                ? "Sin resultados con estos filtros."
+                : "No hay productos."}
+            </p>
+            {(catalog.filter || catalog.categoryFilter || catalog.titleFilter) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  catalog.setFilter("");
+                  catalog.setCategoryFilter("");
+                  catalog.setTitleFilter(null);
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            )}
+          </div>
+        ) : (
+          <ProductTable
+            items={catalog.items}
+            cartItems={cart.items}
+            selectedIndex={catalog.selectedIndex}
+            registerRow={catalog.registerRow}
+            onRowClick={handleRowClick}
+            onOpenDrawer={openDrawer}
+            onAssignBarcode={handleAssignBarcode}
+            inlineQty={inlineQty}
+          />
+        )}
 
-      {/* ── Infinite scroll: sentinel + "load more" footer ── */}
-      {catalog.hasNextPage && (
-        <div className="flex items-center justify-center py-6">
-          {catalog.isFetchingNextPage ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader />
-              <span>Cargando más…</span>
-            </div>
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              Desplazate para cargar más productos
-            </span>
-          )}
-        </div>
-      )}
-      <div ref={catalog.sentinelRef} className="h-1" aria-hidden="true" />
+        {/* ── Infinite scroll: sentinel + "load more" footer ── */}
+        {catalog.hasNextPage && (
+          <div className="flex items-center justify-center py-6">
+            {catalog.isFetchingNextPage ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader />
+                <span>Cargando más…</span>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                Desplazate para cargar más productos
+              </span>
+            )}
+          </div>
+        )}
+        <div ref={catalog.sentinelRef} className="h-1" aria-hidden="true" />
+      </div>
 
       {/* ── Product Drawer (stock across all branches) ── */}
       <ProductDrawer
