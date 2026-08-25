@@ -48,6 +48,9 @@ export const PaymentModal = ({
 }: PaymentModalProps) => {
   const pay = usePayments(total);
   const contentRef = useRef<HTMLDivElement>(null);
+  // Ref para leer el estado de pago más reciente desde el listener global.
+  const payRef = useRef(pay);
+  payRef.current = pay;
 
   // Al abrir: resetea los pagos y autocompleta "Efectivo recibido" con el total
   // (vuelto 0 por defecto → efectivo por el total sin tipear nada).
@@ -76,15 +79,34 @@ export const PaymentModal = ({
     ).filter((el) => el.getClientRects().length > 0);
   }, []);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-    const els = getFocusables();
-    const idx = els.indexOf(document.activeElement as HTMLElement);
-    if (idx < 0) return;
-    e.preventDefault();
-    if (e.key === "ArrowDown" && idx < els.length - 1) els[idx + 1]?.focus();
-    if (e.key === "ArrowUp" && idx > 0) els[idx - 1]?.focus();
-  };
+  // Roving focus + atajos del modal con escucha global en fase CAPTURE (misma
+  // mecánica que el panel): ↑/↓ mueven el foco entre los controles; "+" agrega
+  // el pago de la forma seleccionada con el monto autocompletado al saldo.
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const active = document.activeElement;
+      if (!contentRef.current || !contentRef.current.contains(active)) return;
+      const isAdd = e.key === "+" || e.key === "=" || e.code === "NumpadAdd";
+      if (isAdd) {
+        const amt = parseFloat((payRef.current.amountInput || "").replace(",", "."));
+        payRef.current.addPayment(Number.isFinite(amt) && amt > 0 ? amt : undefined);
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      const els = getFocusables();
+      const idx = els.indexOf(active as HTMLElement);
+      if (idx < 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "ArrowDown" && idx < els.length - 1) els[idx + 1]?.focus();
+      if (e.key === "ArrowUp" && idx > 0) els[idx - 1]?.focus();
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [open, getFocusables]);
 
   const handleConfirm = () => {
     confirmSale(pay.finalize(), cashSessionId, discountPct);
@@ -93,7 +115,7 @@ export const PaymentModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onKeyDown={handleKeyDown} className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <div ref={contentRef} className="space-y-4">
           <DialogHeader>
             <DialogTitle>Medio de pago</DialogTitle>
@@ -119,6 +141,13 @@ export const PaymentModal = ({
             amountInput={pay.amountInput}
             setAmountInput={pay.setAmountInput}
           />
+
+          <p className="text-xs text-muted-foreground">
+            Usá <kbd className="rounded border bg-muted px-1 py-0.5 font-mono text-[10px]">+</kbd> para
+            agregar la forma de pago seleccionada ·{" "}
+            <kbd className="rounded border bg-muted px-1 py-0.5 font-mono text-[10px]">Enter</kbd> en
+            "Confirmar venta" vende.
+          </p>
 
           {pay.vuelto > 0 && (
             <div className="flex items-center justify-between rounded-lg bg-emerald-50 p-2 text-sm">

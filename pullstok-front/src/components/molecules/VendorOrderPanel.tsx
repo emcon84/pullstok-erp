@@ -41,6 +41,9 @@ interface VendorOrderPanelProps {
   apiRef?: React.MutableRefObject<VendorOrderPanelApi | null>;
   /** Se llama al salir del panel por teclado (↑ primer control → listado). */
   onExitToGrid?: () => void;
+  /** Estado del modal de pago (lo controla UnifiedPos para abrirlo desde V). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 const money = (n: number) =>
@@ -62,6 +65,8 @@ export const VendorOrderPanel = ({
   className,
   apiRef,
   onExitToGrid,
+  open,
+  onOpenChange,
 }: VendorOrderPanelProps) => {
   // ── Descuento % a nivel venta. Estado como STRING (el patrón correcto: type
   // text + inputMode decimal + onFocus select + clamp 0..100). type="number"
@@ -72,10 +77,6 @@ export const VendorOrderPanel = ({
   const subtotal = cart.totalAmount;
   const discountAmount = round2((subtotal * discountPct) / 100);
   const total = round2(subtotal - discountAmount);
-
-  // Vender abre el modal de confirmación de pago (no vende de una).
-  const [paymentOpen, setPaymentOpen] = useState(false);
-  const openPayment = useCallback(() => setPaymentOpen(true), []);
 
   // ── Navegación por teclado dentro del panel (roving focus ↑/↓) ──
   const asideRef = useRef<HTMLElement>(null);
@@ -122,7 +123,7 @@ export const VendorOrderPanel = ({
     onExitToGrid: () => onExitToGrid?.(),
     onStepQty: handleStepQty,
     onSaveOrder: saveOrder,
-    onConfirmSale: openPayment,
+    onConfirmSale: () => onOpenChange(true),
   });
 
   const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -263,7 +264,7 @@ export const VendorOrderPanel = ({
               <Button
                 className="w-full"
                 size="lg"
-                onClick={openPayment}
+                onClick={() => onOpenChange(true)}
                 disabled={
                   status.confirming || status.savingOrder || cart.items.length === 0
                 }
@@ -276,8 +277,8 @@ export const VendorOrderPanel = ({
       )}
     </aside>
     <PaymentModal
-      open={paymentOpen}
-      onOpenChange={setPaymentOpen}
+      open={open}
+      onOpenChange={onOpenChange}
       total={total}
       cashSessionId={cashSessionId}
       discountPct={discountPct}

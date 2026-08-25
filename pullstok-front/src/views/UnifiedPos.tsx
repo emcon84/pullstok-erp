@@ -29,6 +29,10 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("unidad");
 
+  // Modal de pago: lo abre la tecla V (listado y panel) y el botón Vender.
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const openPayment = useCallback(() => setPaymentOpen(true), []);
+
   // Carrito ÚNICO de todo el POS (compartido entre ambas pestañas vía props).
   const cart = useVendorCart();
   const checkout = useVendorCheckout({
@@ -135,7 +139,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             branchId={branchId}
             cart={cart}
             onSaveOrder={checkout.handleSaveOrder}
-            onConfirmSale={checkout.handleConfirmSale}
+            onConfirmSale={openPayment}
             onEnterPanel={focusPanelFirst}
             onToggleTab={toggleTab}
             registerGridApi={registerGridApi}
@@ -145,7 +149,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             branchId={branchId}
             cart={cart}
             onSaveOrder={checkout.handleSaveOrder}
-            onConfirmSale={checkout.handleConfirmSale}
+            onConfirmSale={openPayment}
             onEnterPanel={focusPanelFirst}
             onToggleTab={toggleTab}
             registerGridApi={registerGridApi}
@@ -165,6 +169,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         cashSessionId={currentSession?.id}
         apiRef={panelApiRef}
         onExitToGrid={exitToGrid}
+        open={paymentOpen}
+        onOpenChange={setPaymentOpen}
         className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]"
       />
     </div>
