@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { RefObject } from "react";
-import { Search } from "lucide-react";
+import { Search, X, CircleHelp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { DataItem } from "@/types";
 
@@ -12,6 +14,18 @@ interface VendorSearchBarProps {
   inputRef: RefObject<HTMLInputElement>;
 }
 
+const SHORTCUTS: [string, string][] = [
+  ["/", "Buscador"],
+  ["↓/Enter", "Ir a Lista"],
+  ["↑/↓", "Navegar"],
+  ["Enter", "Elegir"],
+  ["+ / −", "Cantidad"],
+  ["→", "Pedido"],
+  ["T", "Cambiar tab"],
+  ["V", "Vender"],
+  ["P", "Guardar pedido"],
+];
+
 export const VendorSearchBar = ({
   value,
   onChange,
@@ -19,65 +33,77 @@ export const VendorSearchBar = ({
   items,
   onOpenQty,
   inputRef,
-}: VendorSearchBarProps) => (
-  <>
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        ref={inputRef}
-        className="pl-10 text-lg h-12"
-        placeholder="Buscar por nombre, código, categoría o variante... [/]"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-            // Dejamos que el handler global navegue (↑/↓ son de la lista global)
-            return;
-          }
-          if (e.key === "Enter") {
-            // Si ya hay un ítem seleccionado con ↓, abrir ese; si no, el primero.
-            e.preventDefault();
-            if (selectedIndex >= 0 && selectedIndex < items.length) {
-              onOpenQty(items[selectedIndex]);
-            } else if (items.length > 0) {
-              onOpenQty(items[0]);
-            }
-            return;
-          }
-          if (e.key === "Escape") {
-            e.preventDefault();
-            inputRef.current?.blur();
-          }
-        }}
-      />
-    </div>
+}: VendorSearchBarProps) => {
+  const [showHelp, setShowHelp] = useState(false);
 
-    {/* Legend de atajos de teclado */}
-    <div className="hidden sm:flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground pt-0.5">
-      <span className="font-semibold text-foreground">Atajos:</span>
-      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">/</kbd>
-      <span>Buscador</span>
-      <span className="text-muted-foreground/40">•</span>
-      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">↓/Enter</kbd>
-      <span>Ir a Lista</span>
-      <span className="text-muted-foreground/40">•</span>
-      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">↑/↓</kbd>
-      <span>Navegar</span>
-      <span className="text-muted-foreground/40">•</span>
-      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">Enter</kbd>
-      <span>Elegir</span>
-      <span className="text-muted-foreground/40">•</span>
-      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">V</kbd>
-      <span>Vender</span>
-      <span className="text-muted-foreground/40">•</span>
-      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">P</kbd>
-      <span>Guardar</span>
-      <span className="text-muted-foreground/40">•</span>
-      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">→</kbd>
-      <span>Pedido</span>
-      <span className="text-muted-foreground/40">•</span>
-      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">T</kbd>
-      <span>Tab</span>
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            ref={inputRef}
+            className="pl-10 pr-10 text-lg h-12"
+            placeholder="Buscar por nombre, código, categoría o variante... [/]"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (selectedIndex >= 0 && selectedIndex < items.length) {
+                  onOpenQty(items[selectedIndex]);
+                } else if (items.length > 0) {
+                  onOpenQty(items[0]);
+                }
+                return;
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                inputRef.current?.blur();
+                setShowHelp(false);
+              }
+            }}
+          />
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Ayuda de atajos de teclado"
+            onClick={() => setShowHelp((s) => !s)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <CircleHelp className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Ayuda de atajos (popover) */}
+      {showHelp && (
+        <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-lg border bg-popover p-3 shadow-lg">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground">
+              Atajos
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={() => setShowHelp(false)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+          <div className="space-y-1.5">
+            {SHORTCUTS.map(([key, label]) => (
+              <div key={key} className="flex items-center justify-between gap-3 text-xs">
+                <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                  {key}
+                </kbd>
+                <span className="text-muted-foreground">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
-  </>
-);
+  );
+};

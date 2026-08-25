@@ -347,7 +347,7 @@ export const LooseSellTab = ({
   useEffect(() => {
     if (selectedIndex >= 0) {
       rowRefs.current[selectedIndex]?.scrollIntoView({
-        block: "nearest",
+        block: "center",
         behavior: "smooth",
       });
     }

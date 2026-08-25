@@ -63,11 +63,12 @@ export function useVendorCatalog(branchId: string) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, loadMore]);
 
-  // Auto-scroll selected row into view when navigating with arrow keys or L
+  // Auto-scroll selected row into view when navigating with arrow keys or L.
+  // "center" mantiene la fila activa centrada en la vista así siempre se ve.
   useEffect(() => {
     if (selectedIndex >= 0 && itemRefs.current[selectedIndex]) {
       itemRefs.current[selectedIndex]?.scrollIntoView({
-        block: "nearest",
+        block: "center",
         behavior: "smooth",
       });
     }
