@@ -16,8 +16,10 @@ vi.mock("@/components/hooks/useVendorCheckout", () => ({
 vi.mock("@/components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
 }));
-vi.mock("@/components/molecules/VendorCartSheet", () => ({
-  VendorCartSheet: () => <div data-testid="cart-sheet" />,
+vi.mock("@/components/molecules/VendorOrderPanel", () => ({
+  VendorOrderPanel: ({ cart }: { cart?: { itemCount?: number } }) => (
+    <div data-testid="order-panel">{cart?.itemCount ?? 0}</div>
+  ),
 }));
 
 import { UnifiedPos } from "@/views/UnifiedPos";
@@ -87,23 +89,18 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
     expect(screen.queryByTestId("catalog-tab")).not.toBeInTheDocument();
   });
 
-  it("con items en el carrito muestra un único FAB y el sheet de cierre", () => {
+  it("muestra el panel de pedido siempre visible y refleja la cantidad del carrito", () => {
     renderPos({
       itemCount: 3,
       totalAmount: 5000,
       items: [{ productId: "p1" }],
     });
 
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText(/5\.000/)).toBeInTheDocument();
-    expect(screen.queryAllByTestId("cart-sheet")).toHaveLength(1);
-
-    // El FAB abriría el sheet (control compartido, un solo estado).
-    fireEvent.click(screen.getByRole("button", { name: /5\.000/ }));
+    expect(screen.getByTestId("order-panel")).toHaveTextContent("3");
   });
 
-  it("sin items no muestra el FAB flotante", () => {
+  it("con el carrito vacío el panel de pedido se muestra igualmente (sin FAB)", () => {
     renderPos();
-    expect(screen.queryByText("$")).not.toBeInTheDocument();
+    expect(screen.getByTestId("order-panel")).toHaveTextContent("0");
   });
 });

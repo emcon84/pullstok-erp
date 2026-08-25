@@ -9,8 +9,11 @@ import type { PaymentInput } from "../../models/cashSessionModel";
 
 interface UseVendorCheckoutParams {
   branchId: string;
-  cartOpen: boolean;
-  setCartOpen: (v: boolean) => void;
+  /** Visibilidad del sheet legacy (VendorDashboard/PriceKgLookup). El POS
+   *  unificado (UnifiedPos) ya no usa drawer: el panel queda siempre montado,
+   *  así que no pasa estos y no cierra nada. */
+  cartOpen?: boolean;
+  setCartOpen?: (v: boolean) => void;
   cartItems: VendorCartItem[];
   clearCart: () => void;
   totalAmount: number;
@@ -18,8 +21,9 @@ interface UseVendorCheckoutParams {
 
 /**
  * Checkout del vendor: confirmación de la venta del carrito y guardado como
- * pedido pendiente. La visibilidad del sheet (cartOpen/setCartOpen) se recibe
- * de afuera: acá sólo se cierra tras confirmar o guardar.
+ * pedido pendiente. La visibilidad del sheet (cartOpen/setCartOpen) es
+ * opcional: el POS unificado mantiene un panel fijo y no la usa; los views
+ * legacy (VendorDashboard/PriceKgLookup) la pasan y cierran tras confirmar.
  */
 export function useVendorCheckout({
   branchId,
@@ -65,7 +69,7 @@ export function useVendorCheckout({
         }));
         await createSale({ cart, payments, cashSessionId, discountPct });
         clearCart();
-        setCartOpen(false);
+        setCartOpen?.(false);
         toast.success("Pedido confirmado y vendido");
       } catch (err: any) {
         toast.error(err?.message || "Error al confirmar el pedido");
@@ -73,7 +77,7 @@ export function useVendorCheckout({
         setConfirming(false);
       }
     },
-    [cartItems, createSale, clearCart, setCartOpen],
+    [cartItems, createSale, clearCart],
   );
 
   // ── Save cart as Pending Order ──
@@ -96,14 +100,14 @@ export function useVendorCheckout({
     submitOrder(orderPayload, {
       onSuccess: () => {
         clearCart();
-        setCartOpen(false);
+        setCartOpen?.(false);
         toast.success("Pedido guardado — confirmá la venta desde Pedidos");
       },
       onError: (err) => {
         toast.error(err?.message || "Error al guardar el pedido");
       },
     });
-  }, [cartItems, totalAmount, branchId, submitOrder, clearCart, setCartOpen]);
+  }, [cartItems, totalAmount, branchId, submitOrder, clearCart]);
 
   return {
     confirming,

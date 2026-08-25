@@ -1,21 +1,21 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { toast } from "react-toastify";
 import { Loader } from "@/components/atoms/loader";
 import { ProductDrawer } from "@/components/molecules/ProductDrawer";
 import { FilterChips } from "@/components/molecules/FilterChips";
 import { VendorSearchBar } from "@/components/molecules/VendorSearchBar";
 import { ProductTable } from "@/components/molecules/ProductTable";
-import { QuantityModal } from "@/components/molecules/QuantityModal";
 import { useVendorCatalog } from "@/components/hooks/useVendorCatalog";
-import { useVendorQuantityModal } from "@/components/hooks/useVendorQuantityModal";
-import { useVendorKeyboard } from "@/components/hooks/useVendorKeyboard";
+import { useVendorRowsKeyboard } from "@/components/hooks/useVendorRowsKeyboard";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import {
   branchQty,
   VENDOR_FILTER_KEY,
   type StoredFilter,
 } from "@/components/hooks/vendorCatalogHelpers";
+import { parseDecimal, formatBolsaQty } from "@/components/hooks/vendorRowHelpers";
 import type { DataItem } from "@/types";
 
 type VendorCart = ReturnType<typeof useVendorCart>;
@@ -25,60 +25,180 @@ interface VendorCatalogTabProps {
   cart: VendorCart;
   onSaveOrder: () => void;
   onConfirmSale: () => void;
-  onOpenCart: (open: boolean) => void;
 }
 
 /**
- * Tab "Por unidad" del POS unificado: el catálogo de bolsas (búsqueda + facets +
- * tabla + modal de cantidad + venta directa 1-tap). Reusa los mismos hooks que
- * VendorDashboard, pero el carrito/checkout/FAB viven arriba (UnifiedPos) para
- * compartir el MISMO carrito con la tab "Suelto". Propietario del teclado
- * (C/P/V): solo está montada mientras la tab está activa.
+ * Tab "Por unidad" del POS unificado: catálogo de bolsas con carga INLINE (sin
+ * modal). Cada fila tiene un input de cantidad (↑/↓ navegan con roving focus,
+ * +/− lo ajustan y Enter/click lo agrega al pedido). Reusa los mismos hooks
+ * que VendorDashboard, pero el carrito/checkout viven arriba (UnifiedPos) para
+ * compartir el MISMO carrito con la tab "Suelto". Dueño del teclado (P/V).
  */
 export const VendorCatalogTab = ({
   branchId,
   cart,
   onSaveOrder,
   onConfirmSale,
-  onOpenCart,
 }: VendorCatalogTabProps) => {
   const navigate = useNavigate();
   const catalog = useVendorCatalog(branchId);
-  const {
-    qtyModal,
-    qty,
-    setQty,
-    directSelling,
-    saleMode,
-    setSaleMode,
-    amount,
-    setAmount,
-    openQtyModal,
-    closeQtyModal,
-    confirmAddToCart,
-    handleDirectSale,
-  } = useVendorQuantityModal({
-    branchId,
-    searchInputRef: catalog.searchInputRef,
-    addToCart: cart.addToCart,
-  });
 
-  useVendorKeyboard({
-    qtyModal,
-    qty,
-    setQty,
-    items: catalog.items,
-    selectedIndex: catalog.selectedIndex,
-    setSelectedIndex: catalog.setSelectedIndex,
+  // ── Cantidades inline (string por fila, sync desde el carrito) ──
+  const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
+  // Refs de los inputs de cantidad para el foco (roving) y del carrito para el
+  // sync de valores (los ítems en el carrito muestran su cantidad al input).
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // El scroll del `selectedIndex` ya lo hace useVendorCatalog (itemRefs). Acá
+  // solo movemos el FOCO al input de la fila activa cuando cambia la selección.
+  useEffect(() => {
+    if (catalog.selectedIndex >= 0) {
+      inputRefs.current[catalog.selectedIndex]?.focus();
+    }
+  }, [catalog.selectedIndex]);
+
+  // Sync: los items BOLSA_CERRADA del carrito muestran SU cantidad en el input
+  // (la fuente de verdad del pedido). Los que no están, arrancan en "1".
+  useEffect(() => {
+    setQtyByKey((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const it of cart.items) {
+        if ((it.saleMode ?? "BOLSA_CERRADA") !== "BOLSA_CERRADA") continue;
+        const key = it.productId;
+        const s = String(formatBolsaQty(it.quantity));
+        if (next[key] !== s) {
+          next[key] = s;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [cart.items]);
+
+  const keyOf = useCallback((p: DataItem) => (p._id || p.id) || "", []);
+
+  const bolsaItemFor = useCallback(
+    (p: DataItem) =>
+      cart.items.find(
+        (i) =>
+          i.productId === keyOf(p) &&
+          (i.saleMode ?? "BOLSA_CERRADA") === "BOLSA_CERRADA",
+      ),
+    [cart.items, keyOf],
+  );
+
+  const setQtyFor = useCallback(
+    (index: number, value: string) => {
+      const p = catalog.items[index];
+      if (!p) return;
+      if (value === "" || /^\d*$/.test(value)) {
+        setQtyByKey((prev) => ({ ...prev, [keyOf(p)]: value }));
+      }
+    },
+    [catalog.items, keyOf],
+  );
+
+  const qtyValue = useCallback(
+    (index: number) => {
+      const p = catalog.items[index];
+      return p ? (qtyByKey[keyOf(p)] ?? "1") : "1";
+    },
+    [catalog.items, qtyByKey, keyOf],
+  );
+
+  const increment = useCallback(
+    (index: number) => {
+      const p = catalog.items[index];
+      if (!p) return;
+      const key = keyOf(p);
+      const cur = parseDecimal(qtyByKey[key] ?? "1");
+      const base = Number.isNaN(cur) ? 1 : Math.max(1, Math.round(cur));
+      const stock = branchQty(p);
+      const max = stock > 0 ? stock : Infinity;
+      setQtyByKey((prev) => ({ ...prev, [key]: String(Math.min(max, base + 1)) }));
+    },
+    [catalog.items, qtyByKey, keyOf],
+  );
+
+  const decrement = useCallback(
+    (index: number) => {
+      const p = catalog.items[index];
+      if (!p) return;
+      const key = keyOf(p);
+      const cur = parseDecimal(qtyByKey[key] ?? "1");
+      const base = Number.isNaN(cur) ? 1 : Math.max(1, Math.round(cur));
+      setQtyByKey((prev) => ({ ...prev, [key]: String(Math.max(1, base - 1)) }));
+    },
+    [catalog.items, qtyByKey, keyOf],
+  );
+
+  const commit = useCallback(
+    (index: number) => {
+      const p = catalog.items[index];
+      if (!p) return;
+      const stock = branchQty(p);
+      if (stock <= 0) {
+        toast.error("Producto sin stock");
+        return;
+      }
+      const key = keyOf(p);
+      const cur = parseDecimal(qtyByKey[key] ?? "1");
+      const qty = Number.isNaN(cur) ? 1 : Math.max(1, Math.round(cur));
+      const existing = bolsaItemFor(p);
+      if (existing) {
+        cart.updateQuantity(key, qty);
+      } else {
+        cart.addToCart(p, qty, branchId, stock, "BOLSA_CERRADA");
+      }
+      toast.success(`"${p.name}" agregado al pedido`);
+    },
+    [catalog.items, qtyByKey, keyOf, bolsaItemFor, cart, branchId],
+  );
+
+  const registerInput = useCallback((index: number, el: HTMLInputElement | null) => {
+    inputRefs.current[index] = el;
+  }, []);
+
+  const enabled = useCallback((index: number) => {
+    const p = catalog.items[index];
+    return !!p && branchQty(p) > 0;
+  }, [catalog.items]);
+
+  // Memoizado para no perder el memo de ProductTable en cada tecla del
+  // buscador (el valor de la fila cambia solo al editar su cantidad o al
+  // cambiar el listado).
+  const inlineQty = useMemo(
+    () => ({
+      value: qtyValue,
+      onChange: setQtyFor,
+      onCommit: commit,
+      registerInput,
+      disabled: enabled,
+    }),
+    [qtyValue, setQtyFor, commit, registerInput, enabled],
+  );
+
+  // ── Teclado (↑/↓ +/− Enter) sobre las filas ──
+  useVendorRowsKeyboard({
     searchInputRef: catalog.searchInputRef,
+    hasRows: catalog.items.length > 0,
+    selectedIndex: catalog.selectedIndex,
+    moveDown: () => catalog.moveSelection(1),
+    moveUp: () => catalog.moveSelection(-1),
+    selectFirst: () => catalog.selectFirst(),
+    onIncrement: () => {
+      if (catalog.selectedIndex >= 0) increment(catalog.selectedIndex);
+    },
+    onDecrement: () => {
+      if (catalog.selectedIndex >= 0) decrement(catalog.selectedIndex);
+    },
+    onCommitRow: () => {
+      if (catalog.selectedIndex >= 0) commit(catalog.selectedIndex);
+    },
     cartItems: cart.items,
-    confirmAddToCart,
-    handleDirectSale,
     handleSaveOrder: onSaveOrder,
     handleConfirmSale: onConfirmSale,
-    openQtyModal,
-    branchQty,
-    setCartOpen: onOpenCart,
   });
 
   // ProductDrawer for viewing stock across all branches
@@ -90,52 +210,69 @@ export const VendorCatalogTab = ({
     setDrawerOpen(true);
   }, []);
 
+  const resetSelection = useCallback(() => {
+    catalog.resetSelection();
+    inputRefs.current = [];
+  }, [catalog]);
+
   const handleRowClick = useCallback(
-    (index: number, product: DataItem) => {
+    (index: number) => {
       catalog.setSelectedIndex(index);
-      openQtyModal(product);
     },
-    [catalog.setSelectedIndex, openQtyModal],
+    [catalog.setSelectedIndex],
+  );
+
+  const searchEnter = useCallback(
+    (product: DataItem) => {
+      const idx = catalog.items.findIndex(
+        (p) => (p._id || p.id) === (product._id || product.id),
+      );
+      if (idx >= 0) {
+        catalog.setSelectedIndex(idx);
+        commit(idx);
+      }
+    },
+    [catalog.items, catalog.setSelectedIndex, commit],
   );
 
   const handleSearchChange = useCallback(
     (value: string) => {
       catalog.setFilter(value);
-      catalog.resetSelection();
+      resetSelection();
     },
-    [catalog.setFilter, catalog.resetSelection],
+    [catalog.setFilter, resetSelection],
   );
 
   const handleFilterChange = useCallback(
     (f: string) => {
       catalog.setFilter(f);
-      catalog.resetSelection();
+      resetSelection();
     },
-    [catalog.setFilter, catalog.resetSelection],
+    [catalog.setFilter, resetSelection],
   );
 
   const handleCategoryChange = useCallback(
     (c: string) => {
       catalog.setCategoryFilter(c);
-      catalog.resetSelection();
+      resetSelection();
     },
-    [catalog.setCategoryFilter, catalog.resetSelection],
+    [catalog.setCategoryFilter, resetSelection],
   );
 
   const handleTitleChange = useCallback(
     (key: string | null) => {
       catalog.setTitleFilter(key);
-      catalog.resetSelection();
+      resetSelection();
     },
-    [catalog.setTitleFilter, catalog.resetSelection],
+    [catalog.setTitleFilter, resetSelection],
   );
 
   const handleClearFilters = useCallback(() => {
     catalog.setFilter("");
     catalog.setCategoryFilter("");
     catalog.setTitleFilter(null);
-    catalog.resetSelection();
-  }, [catalog.setFilter, catalog.setCategoryFilter, catalog.setTitleFilter, catalog.resetSelection]);
+    resetSelection();
+  }, [catalog.setFilter, catalog.setCategoryFilter, catalog.setTitleFilter, resetSelection]);
 
   const handleAssignBarcode = useCallback(
     (product: DataItem) => {
@@ -170,7 +307,7 @@ export const VendorCatalogTab = ({
           onChange={handleSearchChange}
           selectedIndex={catalog.selectedIndex}
           items={catalog.items}
-          onOpenQty={openQtyModal}
+          onOpenQty={searchEnter}
           inputRef={catalog.searchInputRef}
         />
         <FilterChips
@@ -217,9 +354,9 @@ export const VendorCatalogTab = ({
           selectedIndex={catalog.selectedIndex}
           registerRow={catalog.registerRow}
           onRowClick={handleRowClick}
-          onOpenQty={openQtyModal}
           onOpenDrawer={openDrawer}
           onAssignBarcode={handleAssignBarcode}
+          inlineQty={inlineQty}
         />
       )}
 
@@ -239,23 +376,6 @@ export const VendorCatalogTab = ({
         </div>
       )}
       <div ref={catalog.sentinelRef} className="h-1" aria-hidden="true" />
-
-      {/* ── Quantity modal ── */}
-      <QuantityModal
-        product={qtyModal?.product ?? null}
-        qty={qty}
-        setQty={setQty}
-        maxStock={qtyModal ? branchQty(qtyModal.product) : 0}
-        directSelling={directSelling}
-        saleMode={saleMode}
-        setSaleMode={setSaleMode}
-        amount={amount}
-        setAmount={setAmount}
-        allowLoose={false}
-        onDirectSale={handleDirectSale}
-        onAddToCart={confirmAddToCart}
-        onClose={closeQtyModal}
-      />
 
       {/* ── Product Drawer (stock across all branches) ── */}
       <ProductDrawer
