@@ -354,7 +354,11 @@ export const VendorCatalogTab = ({
       </div>
 
       {/* ── Zona de la lista: alto fijo + scroll vertical (scrollea la tabla) ── */}
-      <div ref={catalog.scrollRef} className="min-h-0 overflow-y-auto lg:h-[calc(100vh-280px)]">
+      <div
+        ref={catalog.scrollRef}
+        className="min-h-0"
+        style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto" }}
+      >
         {/* ── Product grid ── */}
         {catalog.items.length === 0 ? (
           <div className="py-12 text-center space-y-3">

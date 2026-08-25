@@ -346,11 +346,19 @@ export const LooseSellTab = ({
   };
 
   // ── Navegación ──
-  // La planilla scrollea dentro de su contenedor (alto fijo) para que la fila
-  // activa quede visible al navegar con flechas.
+  // El contenedor (alto fijo) se desplaza por scrollTop para que la fila activa
+  // quede visible al navegar con flechas.
   useEffect(() => {
+    const container = scrollRef.current;
     const el = rowRefs.current[selectedIndex];
-    el?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    if (!container || !el) return;
+    const cRect = container.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+    if (eRect.top < cRect.top) {
+      container.scrollTop += eRect.top - cRect.top - 24;
+    } else if (eRect.bottom > cRect.bottom) {
+      container.scrollTop += eRect.bottom - cRect.bottom + 24;
+    }
   }, [selectedIndex]);
 
   useEffect(() => {
@@ -473,7 +481,11 @@ export const LooseSellTab = ({
       </div>
 
       {/* ── Zona de la planilla: alto fijo + scroll vertical ── */}
-      <div ref={scrollRef} className="min-h-0 overflow-y-auto lg:h-[calc(100vh-280px)]">
+      <div
+        ref={scrollRef}
+        className="min-h-0"
+        style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto" }}
+      >
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader />
