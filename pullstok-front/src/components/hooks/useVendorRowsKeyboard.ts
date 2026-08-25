@@ -26,8 +26,12 @@ export interface VendorRowsKeyboardOptions {
   onDecrement: () => void;
   /** Confirma la fila activa (Enter): la agrega al pedido. */
   onCommitRow: () => void;
-  /** ↓ en la última fila: foco al panel de pedido (opcional). */
+  /** → salta al panel de pedido (opcional). */
   onEnterPanel?: () => void;
+  /** Tecla T: cambiá de tab (Por unidad ↔ Suelto). */
+  onToggleTab?: () => void;
+  /** Tecla M: alterná el modo de venta suelta (por kilo / por monto). */
+  onToggleMode?: () => void;
   cartItems: VendorCartItem[];
   handleSaveOrder: () => void;
   handleConfirmSale: () => void;
@@ -86,6 +90,22 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
         e.stopPropagation();
         o.searchInputRef.current?.blur();
         if (o.hasRows) o.selectFirst();
+        return;
+      }
+
+      // ── Tecla T: cambiar de tab (Por unidad ↔ Suelto) ──
+      if ((key === "t" || key === "T") && !isSearchFocused && o.onToggleTab) {
+        e.preventDefault();
+        e.stopPropagation();
+        o.onToggleTab();
+        return;
+      }
+
+      // ── Tecla M: alternar modo de venta suelta (por kilo / por monto) ──
+      if ((key === "m" || key === "M") && !isSearchFocused && o.onToggleMode) {
+        e.preventDefault();
+        e.stopPropagation();
+        o.onToggleMode();
         return;
       }
 

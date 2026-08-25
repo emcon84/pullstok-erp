@@ -56,6 +56,11 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     [],
   );
 
+  // Tecla T: alterna entre "Por unidad" y "Suelto".
+  const toggleTab = useCallback(() => {
+    setTab((t) => (t === "unidad" ? "suelto" : "unidad"));
+  }, []);
+
   const tabs: { id: Tab; label: string }[] = [
     { id: "unidad", label: "Por unidad" },
     { id: "suelto", label: "Suelto" },
@@ -100,6 +105,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             onSaveOrder={checkout.handleSaveOrder}
             onConfirmSale={checkout.handleConfirmSale}
             onEnterPanel={focusPanelFirst}
+            onToggleTab={toggleTab}
             registerGridApi={registerGridApi}
           />
         ) : (
@@ -109,6 +115,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             onSaveOrder={checkout.handleSaveOrder}
             onConfirmSale={checkout.handleConfirmSale}
             onEnterPanel={focusPanelFirst}
+            onToggleTab={toggleTab}
             registerGridApi={registerGridApi}
           />
         )}

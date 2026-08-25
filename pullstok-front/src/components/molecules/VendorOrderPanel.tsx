@@ -253,6 +253,8 @@ export const VendorOrderPanel = ({
               addPayment={pay.addPayment}
               clearPayments={pay.clearPayments}
               total={total}
+              amountInput={pay.amountInput}
+              setAmountInput={pay.setAmountInput}
             />
 
             {pay.vuelto > 0 && (

@@ -96,9 +96,11 @@ interface LooseSellTabProps {
   cart: VendorCart;
   onSaveOrder: () => void;
   onConfirmSale: () => void;
-  /** Salta al panel de pedido (↓ en la última fila). */
+  /** → salta al panel de pedido. */
   onEnterPanel?: () => void;
-  /** Registra la función para volver al listado desde el panel (↑). */
+  /** Tecla T: cambia de tab (Por unidad ↔ Suelto). */
+  onToggleTab?: () => void;
+  /** Registra la función para volver al listado desde el panel (←). */
   registerGridApi?: (api: { focusSelectedRow: () => void }) => void;
 }
 
@@ -115,6 +117,7 @@ export const LooseSellTab = ({
   onSaveOrder,
   onConfirmSale,
   onEnterPanel,
+  onToggleTab,
   registerGridApi,
 }: LooseSellTabProps) => {
   const searchRef = useRef<HTMLInputElement>(null);
@@ -138,6 +141,11 @@ export const LooseSellTab = ({
   // Cada modo guarda su cantidad por separado (una celda puede tener una línea
   // POR_PESO y otra POR_MONTO en el mismo pedido — claves de merge distintas).
   const modeKey = (cellKey: string) => `${cellKey}::${saleMode}`;
+
+  // Tecla M: alterna entre por kilo / por monto.
+  const toggleMode = useCallback(() => {
+    setSaleMode((m) => (m === "POR_PESO" ? "POR_MONTO" : "POR_PESO"));
+  }, []);
 
   // ── Carga inicial paralela de tipos, marcas, planilla y stock suelto ──
   useEffect(() => {
@@ -358,10 +366,11 @@ export const LooseSellTab = ({
     inputRefs.current[index] = el;
   };
 
-  // ── Vuelta desde el panel (↑): enfocar la fila activa de la planilla ──
+  // ── Vuelta desde el panel (←): enfocar la planilla ──
   const focusSelectedRow = useCallback(() => {
     if (selectedIndex >= 0) inputRefs.current[selectedIndex]?.focus();
-  }, [selectedIndex]);
+    else if (rows.length > 0) setSelectedIndex(0);
+  }, [selectedIndex, rows.length]);
 
   useEffect(() => {
     registerGridApi?.({ focusSelectedRow });
@@ -407,6 +416,8 @@ export const LooseSellTab = ({
       if (selectedIndex >= 0) commit(selectedIndex);
     },
     onEnterPanel,
+    onToggleTab,
+    onToggleMode: toggleMode,
     cartItems: cart.items,
     handleSaveOrder: onSaveOrder,
     handleConfirmSale: onConfirmSale,

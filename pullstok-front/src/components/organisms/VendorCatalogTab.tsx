@@ -25,9 +25,11 @@ interface VendorCatalogTabProps {
   cart: VendorCart;
   onSaveOrder: () => void;
   onConfirmSale: () => void;
-  /** Salta al panel de pedido (↓ en la última fila). */
+  /** → salta al panel de pedido. */
   onEnterPanel?: () => void;
-  /** Registra la función para volver al listado desde el panel (↑). */
+  /** Tecla T: cambia de tab (Por unidad ↔ Suelto). */
+  onToggleTab?: () => void;
+  /** Registra la función para volver al listado desde el panel (←). */
   registerGridApi?: (api: { focusSelectedRow: () => void }) => void;
 }
 
@@ -44,6 +46,7 @@ export const VendorCatalogTab = ({
   onSaveOrder,
   onConfirmSale,
   onEnterPanel,
+  onToggleTab,
   registerGridApi,
 }: VendorCatalogTabProps) => {
   const navigate = useNavigate();
@@ -167,12 +170,16 @@ export const VendorCatalogTab = ({
     inputRefs.current[index] = el;
   }, []);
 
-  // ── Vuelta desde el panel (↑): enfocar la fila activa del listado ──
+  // ── Vuelta desde el panel (←): enfocar el listado ──
+  // Si hay fila activa la enfoca; si no, selecciona la primera (el efecto la
+  // enfoca). Garantiza que ← desde el panel siempre vuelva a la planilla.
   const focusSelectedRow = useCallback(() => {
     if (catalog.selectedIndex >= 0) {
       inputRefs.current[catalog.selectedIndex]?.focus();
+    } else if (catalog.items.length > 0) {
+      catalog.setSelectedIndex(0);
     }
-  }, [catalog.selectedIndex]);
+  }, [catalog.selectedIndex, catalog.items.length, catalog.setSelectedIndex]);
 
   useEffect(() => {
     registerGridApi?.({ focusSelectedRow });
@@ -216,6 +223,7 @@ export const VendorCatalogTab = ({
       if (catalog.selectedIndex >= 0) commit(catalog.selectedIndex);
     },
     onEnterPanel,
+    onToggleTab,
     cartItems: cart.items,
     handleSaveOrder: onSaveOrder,
     handleConfirmSale: onConfirmSale,
