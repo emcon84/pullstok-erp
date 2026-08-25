@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useInfiniteProducts, useProductFacets } from "./useProducts";
 import { readStoredFilter } from "./vendorCatalogHelpers";
+import { scrollRowInContainer } from "./vendorRowHelpers";
 
 /**
  * Dominio del catálogo del vendor: búsqueda con debounce, listado paginado +
@@ -65,19 +66,12 @@ export function useVendorCatalog(branchId: string) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, loadMore]);
 
-  // Auto-scroll de la fila activa al navegar con flechas o L: el contenedor
-  // (alto fijo) se desplaza por scrollTop para que la fila quede visible.
+  // Auto-scroll de la fila activa al navegar con flechas o L: desplaza el
+  // contenedor de la lista por offsetTop (a prueba de anidamiento).
   useEffect(() => {
     const container = scrollRef.current;
-    const el = itemRefs.current[selectedIndex];
-    if (!container || !el) return;
-    const cRect = container.getBoundingClientRect();
-    const eRect = el.getBoundingClientRect();
-    if (eRect.top < cRect.top) {
-      container.scrollTop += eRect.top - cRect.top - 24;
-    } else if (eRect.bottom > cRect.bottom) {
-      container.scrollTop += eRect.bottom - cRect.bottom + 24;
-    }
+    const row = itemRefs.current[selectedIndex];
+    if (container && row) scrollRowInContainer(container, row);
   }, [selectedIndex]);
 
   const resetSelection = useCallback(() => {

@@ -17,7 +17,7 @@ import { listLooseStocks } from "@/services/looseStock";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useVendorRowsKeyboard } from "@/components/hooks/useVendorRowsKeyboard";
 import { LooseSellTable, type LooseCellRow } from "@/components/molecules/LooseSellTable";
-import { parseDecimal } from "@/components/hooks/vendorRowHelpers";
+import { parseDecimal, scrollRowInContainer } from "@/components/hooks/vendorRowHelpers";
 import { cn } from "@/lib/utils";
 
 type VendorCart = ReturnType<typeof useVendorCart>;
@@ -346,19 +346,12 @@ export const LooseSellTab = ({
   };
 
   // ── Navegación ──
-  // El contenedor (alto fijo) se desplaza por scrollTop para que la fila activa
-  // quede visible al navegar con flechas.
+  // Desplaza el contenedor de la planilla por offsetTop (a prueba de anidamiento)
+  // para que la fila activa quede visible al navegar con flechas.
   useEffect(() => {
     const container = scrollRef.current;
-    const el = rowRefs.current[selectedIndex];
-    if (!container || !el) return;
-    const cRect = container.getBoundingClientRect();
-    const eRect = el.getBoundingClientRect();
-    if (eRect.top < cRect.top) {
-      container.scrollTop += eRect.top - cRect.top - 24;
-    } else if (eRect.bottom > cRect.bottom) {
-      container.scrollTop += eRect.bottom - cRect.bottom + 24;
-    }
+    const row = rowRefs.current[selectedIndex];
+    if (container && row) scrollRowInContainer(container, row);
   }, [selectedIndex]);
 
   useEffect(() => {
@@ -484,7 +477,7 @@ export const LooseSellTab = ({
       <div
         ref={scrollRef}
         className="min-h-0"
-        style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto" }}
+        style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto", position: "relative" }}
       >
       {loading ? (
         <div className="flex justify-center py-16">

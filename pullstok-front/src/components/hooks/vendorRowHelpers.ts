@@ -19,6 +19,35 @@ export const formatBolsaQty = (qty: number): number =>
   Math.max(1, Math.round(qty));
 
 /**
+ * Scrollea `container` para que `row` quede visible (con margen de 24px).
+ * Es a prueba de anidamiento: suma los `offsetTop` de la fila subiendo por
+ * `offsetParent` hasta el contenedor. El contenedor debe tener `position:
+ * relative` para que la cadena de offsetParent cierre. Si no se alcanza,
+ * cae a scrollIntoView.
+ */
+export const scrollRowInContainer = (container: HTMLElement, row: HTMLElement) => {
+  let top = 0;
+  let node: HTMLElement | null = row;
+  let guard = 0;
+  while (node && node !== container && node !== document.body && guard < 20) {
+    top += node.offsetTop;
+    node = node.offsetParent as HTMLElement | null;
+    guard++;
+  }
+  if (node !== container) {
+    row.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  const bottom = top + row.offsetHeight;
+  const viewH = container.clientHeight;
+  if (top < container.scrollTop) {
+    container.scrollTop = Math.max(0, top - 24);
+  } else if (bottom > container.scrollTop + viewH) {
+    container.scrollTop = bottom - viewH + 24;
+  }
+};
+
+/**
  * Scrollea el ancestro scrolleable REAL más cercano a `el` para que quede
  * visible (con margen de 24px). Es más confiable que scrollIntoView con tablas
  * anidadas: sube por el DOM hasta encontrar un contenedor que realmente scrollee

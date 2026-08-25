@@ -357,7 +357,7 @@ export const VendorCatalogTab = ({
       <div
         ref={catalog.scrollRef}
         className="min-h-0"
-        style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto" }}
+        style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto", position: "relative" }}
       >
         {/* ── Product grid ── */}
         {catalog.items.length === 0 ? (
