@@ -65,19 +65,11 @@ export function useVendorCatalog(branchId: string) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, loadMore]);
 
-  // Auto-scroll de la fila activa al navegar con flechas o L: desplaza el
-  // contenedor de la lista (scrollRef) para que la fila quede visible con margen.
+  // Auto-scroll de la fila activa al navegar con flechas o L: la tabla scrollea
+  // dentro de su contenedor (alto fijo) para que la fila quede visible.
   useEffect(() => {
-    const container = scrollRef.current;
     const el = itemRefs.current[selectedIndex];
-    if (!container || !el) return;
-    const cRect = container.getBoundingClientRect();
-    const eRect = el.getBoundingClientRect();
-    if (eRect.top < cRect.top) {
-      container.scrollTop += eRect.top - cRect.top - 24;
-    } else if (eRect.bottom > cRect.bottom) {
-      container.scrollTop += eRect.bottom - cRect.bottom + 24;
-    }
+    el?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   }, [selectedIndex]);
 
   const resetSelection = useCallback(() => {
