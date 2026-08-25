@@ -37,6 +37,8 @@ interface LooseSellTableProps {
   qty: (index: number) => string;
   onQtyChange: (index: number, value: string) => void;
   onCommit: (index: number) => void;
+  /** Modo de venta suelta: por kilo (kg) o por monto ($). */
+  mode: "POR_PESO" | "POR_MONTO";
 }
 
 const SPECIES_LABEL: Record<PriceKgSpecies, string> = {
@@ -67,6 +69,7 @@ export const LooseSellTable = memo(
     qty,
     onQtyChange,
     onCommit,
+    mode,
   }: LooseSellTableProps) => (
     <Card className="overflow-hidden p-0">
       <Table>
@@ -77,7 +80,9 @@ export const LooseSellTable = memo(
             <TableHead>Especie</TableHead>
             <TableHead className="text-right">Precio/kg</TableHead>
             <TableHead className="text-right">Stock</TableHead>
-            <TableHead className="w-[150px] text-right">Cantidad</TableHead>
+            <TableHead className="w-[150px] text-right">
+              {mode === "POR_PESO" ? "Cantidad (kg)" : "Monto ($)"}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -141,7 +146,8 @@ export const LooseSellTable = memo(
                         }
                       }}
                       disabled={noStock}
-                      className="h-8 w-16 text-center"
+                      placeholder={mode === "POR_PESO" ? "kg" : "$"}
+                      className={cn("h-8 text-center", mode === "POR_PESO" ? "w-16" : "w-24")}
                     />
                     <Button
                       size="icon"

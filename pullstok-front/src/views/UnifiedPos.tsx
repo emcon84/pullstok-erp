@@ -41,7 +41,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   ];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
       {/* ── Columna izquierda: header + tabs + contenido ── */}
       <div className="min-w-0 space-y-4">
         <div>

@@ -301,7 +301,7 @@ export const VendorCatalogTab = ({
   return (
     <div className="space-y-4">
       {/* ── Search + filters (sticky) ── */}
-      <div className="sticky top-16 lg:top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 space-y-4 border-b bg-background px-4 pb-3 pt-3 sm:px-6 lg:px-8">
+      <div className="sticky top-16 lg:top-0 z-20 space-y-4 border-b bg-background px-4 pb-3 pt-3 sm:px-6 lg:px-8">
         <VendorSearchBar
           value={catalog.filter}
           onChange={handleSearchChange}
