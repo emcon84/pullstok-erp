@@ -63,8 +63,11 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
       const key = e.key;
       const active = document.activeElement;
       const isSearchFocused = o.searchInputRef.current === active;
+      // El foco por defecto (body = ningún input enfocado) cuenta como "en el
+      // listado", para que P/V/T/M/L funcionen al cargar el POS. El buscador ya
+      // no tiene autoFocus: se enfoca con / y ahí sí se escribe.
       const inGrid = o.containerRef?.current
-        ? o.containerRef.current.contains(active)
+        ? o.containerRef.current.contains(active) || active === document.body
         : true;
       const hasActiveRow = o.selectedIndex >= 0 && o.hasRows;
 

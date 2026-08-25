@@ -49,7 +49,6 @@ export const VendorSearchBar = ({
             inputRef.current?.blur();
           }
         }}
-        autoFocus
       />
     </div>
 
@@ -69,10 +68,16 @@ export const VendorSearchBar = ({
       <span>Elegir</span>
       <span className="text-muted-foreground/40">•</span>
       <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">V</kbd>
-      <span>Venta directa</span>
+      <span>Vender</span>
       <span className="text-muted-foreground/40">•</span>
       <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">P</kbd>
-      <span>Guardar pedido</span>
+      <span>Guardar</span>
+      <span className="text-muted-foreground/40">•</span>
+      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">→</kbd>
+      <span>Pedido</span>
+      <span className="text-muted-foreground/40">•</span>
+      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono shadow-sm">T</kbd>
+      <span>Tab</span>
     </div>
   </>
 );

@@ -430,7 +430,6 @@ export const LooseSellTab = ({
         <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={searchRef}
-          autoFocus
           aria-label="Buscar marca"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
