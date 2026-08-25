@@ -32,13 +32,16 @@ type PayRow = { method: PaymentMethod; amount: string };
 const money = (n: number) =>
   n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
 
+const parseAmt = (v: string) => parseFloat(v.replace(",", ".")) || 0;
+
 /**
- * Modal de pago del POS vendedor. Simple y rápido:
- * - Una fila por método de pago (efectivo, tarjeta, ...), numerada.
- * - La primera fila arranca en EFECTIVO con el monto precargado al total.
- * - "+" (botón o tecla) agrega otra forma; Enter también agrega una fila.
- * - ↑/↓ navegan entre los montos; las teclas 1..N saltan a editar esa fila.
- * - "VENDER" (o tecla V) confirma la venta.
+ * Modal de pago del POS vendedor.
+ * - La primera fila (EFECTIVO) es el "saldo": se recalcula sola como
+ *   total − suma de las demás formas; es de solo lectura.
+ * - "+" (botón o tecla) agrega otra forma; el foco va al SELECT nuevo, y al
+ *   elegir el método pasa al INPUT de esa fila para cargar el monto.
+ * - Enter agrega una fila; "-" quita la última; 1..N saltan a editar una fila;
+ *   ↑/↓ navegan; "V" (o VENDER) confirma (si el total encaja).
  */
 export const PaymentModal = ({
   open,
@@ -53,31 +56,44 @@ export const PaymentModal = ({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+  // Índice de la fila cuyo SELECT hay que enfocar tras agregarla.
+  const pendingSelectFocus = useRef<number | null>(null);
 
-  // Al abrir: arranca con UNA fila (EFECTIVO) con el monto precargado al total.
+  // Al abrir: arranca con UNA fila (EFECTIVO) por el total.
   useEffect(() => {
     if (!open) return;
     setRows([{ method: "EFECTIVO", amount: String(total) }]);
   }, [open, total]);
 
-  const sum = rows.reduce((s, r) => s + (parseFloat(r.amount.replace(",", ".")) || 0), 0);
-  const remaining = round2(total - sum);
+  // Saldo de la primera fila: total − suma de los métodos adicionales.
+  const extrasSum = rows
+    .slice(1)
+    .reduce((s, r) => s + parseAmt(r.amount), 0);
+  const balance = round2(total - extrasSum);
 
   const addRow = useCallback(() => {
     const cur = rowsRef.current;
-    const paid = cur.reduce((s, r) => s + (parseFloat(r.amount.replace(",", ".")) || 0), 0);
     const nextMethod =
       PAYMENT_METHODS.find((m) => !cur.some((r) => r.method === m)) ?? "EFECTIVO";
-    const nextAmount = String(cur.length === 0 ? total : round2(total - paid));
-    setRows((prev) => [...prev, { method: nextMethod, amount: nextAmount }]);
-  }, [total]); // eslint-disable-line react-hooks/exhaustive-deps
+    setRows((prev) => [...prev, { method: nextMethod, amount: "" }]);
+    pendingSelectFocus.current = cur.length; // índice de la fila nueva
+  }, []);
 
   const updateAmount = (i: number, v: string) =>
-    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, amount: v } : r)));
-  const updateMethod = (i: number, m: PaymentMethod) =>
-    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, method: m } : r)));
+    setRows((prev) =>
+      prev.map((r, idx) => (idx === i ? { ...r, amount: v } : r)),
+    );
 
-  // Quita una fila; nunca deja el modal sin filas (siempre queda la primera).
+  const updateMethod = (i: number, m: PaymentMethod) => {
+    setRows((prev) =>
+      prev.map((r, idx) => (idx === i ? { ...r, method: m } : r)),
+    );
+    // Al elegir el método, foco al input de esa fila para cargar el monto.
+    const el = inputRefs.current[i];
+    el?.focus();
+    el?.select();
+  };
+
   const removeRow = (i: number) =>
     setRows((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
   const removeLastRow = () =>
@@ -92,14 +108,17 @@ export const PaymentModal = ({
 
   const confirm = () => {
     const cur = rowsRef.current;
-    const payments: PaymentInput[] = cur
-      .map((r) => ({
-        method: r.method,
-        amount: round2(parseFloat(r.amount.replace(",", ".")) || 0),
-      }))
-      .filter((p) => p.amount > 0);
+    const extras = cur.slice(1).map((r) => ({
+      method: r.method,
+      amount: round2(parseAmt(r.amount)),
+    }));
+    const extrasSumNow = round2(extras.reduce((s, p) => s + p.amount, 0));
+    const bal = round2(total - extrasSumNow);
+    const payments: PaymentInput[] = [
+      { method: cur[0].method, amount: Math.max(0, bal) },
+      ...extras.filter((p) => p.amount > 0),
+    ];
     const paid = round2(payments.reduce((s, p) => s + p.amount, 0));
-    // Los pagos declarados deben sumar el total a cobrar; si no, se rechaza.
     if (Math.abs(paid - total) > 0.01) {
       toast.error(
         paid < total
@@ -108,21 +127,27 @@ export const PaymentModal = ({
       );
       return;
     }
-    if (payments.length === 0) {
-      toast.error("Ingresá al menos una forma de pago");
-      return;
-    }
     confirmSale(payments, cashSessionId, discountPct);
     onOpenChange(false);
   };
 
-  // Ref con los handlers más recientes: la escucha global (que no se re-registra
-  // al cambiar las filas) siempre llama al estado actual, no a closures viejos.
-  const handlersRef = useRef({ confirm, addRow, removeLastRow, focusRow });
-  handlersRef.current = { confirm, addRow, removeLastRow, focusRow };
+  // Handlers más recientes para la escucha global (que no se re-registra).
+  const handlersRef = useRef({ confirm, addRow, removeLastRow, removeRow, focusRow });
+  handlersRef.current = { confirm, addRow, removeLastRow, removeRow, focusRow };
+
+  // Tras agregar una fila, foco al SELECT nuevo.
+  useEffect(() => {
+    if (pendingSelectFocus.current === null) return;
+    const idx = pendingSelectFocus.current;
+    pendingSelectFocus.current = null;
+    const el = contentRef.current?.querySelector<HTMLElement>(
+      `[data-pay-select="${idx}"] button, [data-pay-select="${idx}"] select`,
+    );
+    el?.focus();
+  }, [rows]);
 
   // Teclado del modal (escucha global en fase CAPTURE, como el panel):
-  // V vende, + agrega fila, 1..N saltan a editar esa fila, ↑/↓ navegan.
+  // V vende, + agrega fila, - quita la última, 1..N saltan a editar, ↑/↓ navegan.
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -142,7 +167,6 @@ export const PaymentModal = ({
         handlersRef.current.addRow();
         return;
       }
-      // "-": quita la última forma de pago (hasta que quede solo la primera).
       const isRemove = e.key === "-" || e.code === "NumpadSubtract";
       if (isRemove) {
         e.preventDefault();
@@ -150,8 +174,7 @@ export const PaymentModal = ({
         handlersRef.current.removeLastRow();
         return;
       }
-      // Teclas 1..N: saltar a editar esa fila (solo cuando no se está tipeando
-      // en un input, para que los dígitos del monto no se intercepten).
+      // Teclas 1..N: saltar a editar esa fila (solo cuando no se está tipeando).
       if (/^[1-9]$/.test(e.key) && !(active instanceof HTMLInputElement)) {
         const idx = Number(e.key) - 1;
         if (idx < rowsRef.current.length) {
@@ -194,14 +217,16 @@ export const PaymentModal = ({
                 <span className="w-4 text-right text-sm font-semibold text-muted-foreground">
                   {i + 1}
                 </span>
-                <NativeSelect
-                  value={row.method}
-                  onValueChange={(v) => updateMethod(i, v as PaymentMethod)}
-                  options={PAYMENT_METHODS.map((m) => ({
-                    value: m,
-                    label: PAYMENT_METHOD_LABELS[m],
-                  }))}
-                />
+                <div data-pay-select={i} className="flex-1 min-w-0">
+                  <NativeSelect
+                    value={row.method}
+                    onValueChange={(v) => updateMethod(i, v as PaymentMethod)}
+                    options={PAYMENT_METHODS.map((m) => ({
+                      value: m,
+                      label: PAYMENT_METHOD_LABELS[m],
+                    }))}
+                  />
+                </div>
                 <Input
                   ref={(el) => {
                     inputRefs.current[i] = el;
@@ -209,14 +234,15 @@ export const PaymentModal = ({
                   type="text"
                   inputMode="decimal"
                   autoComplete="off"
-                  value={row.amount}
+                  value={i === 0 ? String(balance) : row.amount}
+                  readOnly={i === 0}
                   onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => updateAmount(i, e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       e.stopPropagation();
-                      addRow();
+                      handlersRef.current.addRow();
                     }
                   }}
                   className="w-28 text-right"
@@ -243,7 +269,7 @@ export const PaymentModal = ({
             size="sm"
             className="w-full"
             onClick={addRow}
-            disabled={remaining <= 0}
+            disabled={balance <= 0}
           >
             <Plus className="h-4 w-4" /> Agregar forma de pago
           </Button>
