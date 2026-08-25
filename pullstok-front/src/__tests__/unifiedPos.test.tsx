@@ -23,6 +23,7 @@ vi.mock("@/components/molecules/VendorOrderPanel", () => ({
 }));
 
 import { UnifiedPos } from "@/views/UnifiedPos";
+import { MemoryRouter } from "react-router-dom";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
@@ -49,12 +50,16 @@ function renderPos(cartOverrides: Record<string, unknown> = {}) {
     handleSaveOrder: vi.fn(),
   } as never);
   vi.mocked(useGetCurrentCashSession).mockReturnValue({
-    session: null,
+    session: { id: "cs-1", status: "OPEN" },
     loading: false,
     error: null,
     refetch: vi.fn(),
   } as never);
-  render(<UnifiedPos branchId="branch-1" />);
+  render(
+    <MemoryRouter>
+      <UnifiedPos branchId="branch-1" />
+    </MemoryRouter>,
+  );
 }
 
 describe("UnifiedPos — POS unificado del vendedor", () => {
