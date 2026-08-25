@@ -10,6 +10,8 @@ import { readStoredFilter } from "./vendorCatalogHelpers";
 export function useVendorCatalog(branchId: string) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const itemRefs = useRef<(HTMLTableRowElement | null)[]>([]);
+  // Contenedor scrolleable de la lista: es el que se desplaza al navegar.
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
 
   // Restaura el filtro guardado al volver del scanner (lee y limpia UNA vez).
@@ -63,14 +65,19 @@ export function useVendorCatalog(branchId: string) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, loadMore]);
 
-  // Auto-scroll selected row into view when navigating with arrow keys or L.
-  // "center" mantiene la fila activa centrada en la vista así siempre se ve.
+  // Auto-scroll de la fila activa al navegar con flechas o L. Se hace de forma
+  // manual sobre el contenedor de la lista (scrollRef) porque scrollIntoView no
+  // es confiable con tablas anidadas: mantiene la fila visible con un margen.
   useEffect(() => {
-    if (selectedIndex >= 0 && itemRefs.current[selectedIndex]) {
-      itemRefs.current[selectedIndex]?.scrollIntoView({
-        block: "center",
-        behavior: "smooth",
-      });
+    const container = scrollRef.current;
+    const el = itemRefs.current[selectedIndex];
+    if (!container || !el) return;
+    const cRect = container.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+    if (eRect.top < cRect.top) {
+      container.scrollTop += eRect.top - cRect.top - 24;
+    } else if (eRect.bottom > cRect.bottom) {
+      container.scrollTop += eRect.bottom - cRect.bottom + 24;
     }
   }, [selectedIndex]);
 
@@ -105,6 +112,7 @@ export function useVendorCatalog(branchId: string) {
   return {
     searchInputRef,
     itemRefs,
+    scrollRef,
     selectedIndex,
     setSelectedIndex,
     filter,

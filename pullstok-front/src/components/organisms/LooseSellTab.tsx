@@ -135,6 +135,8 @@ export const LooseSellTab = ({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const rowRefs = useRef<(HTMLElement | null)[]>([]);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  // Contenedor scrolleable de la planilla: es el que se desplaza al navegar.
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
   // ── Modo de venta suelta: por kilo (POR_PESO, kg) o por monto (POR_MONTO, $) ──
   const [saleMode, setSaleMode] = useState<"POR_PESO" | "POR_MONTO">("POR_PESO");
@@ -344,12 +346,18 @@ export const LooseSellTab = ({
   };
 
   // ── Navegación ──
+  // Auto-scroll manual de la fila activa sobre el contenedor de la planilla
+  // (scrollRef): scrollIntoView no es confiable con tablas anidadas.
   useEffect(() => {
-    if (selectedIndex >= 0) {
-      rowRefs.current[selectedIndex]?.scrollIntoView({
-        block: "center",
-        behavior: "smooth",
-      });
+    const container = scrollRef.current;
+    const el = rowRefs.current[selectedIndex];
+    if (!container || !el) return;
+    const cRect = container.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+    if (eRect.top < cRect.top) {
+      container.scrollTop += eRect.top - cRect.top - 24;
+    } else if (eRect.bottom > cRect.bottom) {
+      container.scrollTop += eRect.bottom - cRect.bottom + 24;
     }
   }, [selectedIndex]);
 
@@ -473,7 +481,7 @@ export const LooseSellTab = ({
       </div>
 
       {/* ── Zona de la planilla: scrollea internamente en desktop ── */}
-      <div className="min-h-0 lg:flex-1 lg:overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 lg:flex-1 lg:overflow-y-auto">
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader />

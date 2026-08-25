@@ -354,7 +354,7 @@ export const VendorCatalogTab = ({
       </div>
 
       {/* ── Zona de la lista: scrollea internamente en desktop ── */}
-      <div className="min-h-0 lg:flex-1 lg:overflow-y-auto">
+      <div ref={catalog.scrollRef} className="min-h-0 lg:flex-1 lg:overflow-y-auto">
         {/* ── Product grid ── */}
         {catalog.items.length === 0 ? (
           <div className="py-12 text-center space-y-3">
