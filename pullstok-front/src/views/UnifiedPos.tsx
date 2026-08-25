@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { VendorCatalogTab } from "@/components/organisms/VendorCatalogTab";
 import { LooseSellTab } from "@/components/organisms/LooseSellTab";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
-import { VendorOrderPanel } from "@/components/molecules/VendorOrderPanel";
+import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecules/VendorOrderPanel";
 import { cn } from "@/lib/utils";
 
 type Tab = "unidad" | "suelto";
@@ -34,6 +34,27 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   });
   // Caja OPEN del vendedor (R8/R9): se propaga al confirmar la venta.
   const { session: currentSession } = useGetCurrentCashSession(branchId);
+
+  // ── Navegación por teclado entre el listado y el panel de pedido ──
+  // El listado (tab) y el panel se registran acá para saltar de zona con las
+  // flechas: ↓ en la última fila → panel; ↑ en el primer control → listado.
+  const panelApiRef = useRef<VendorOrderPanelApi | null>(null);
+  const gridApiRef = useRef<{ focusSelectedRow: () => void } | null>(null);
+
+  const focusPanelFirst = useCallback(() => {
+    panelApiRef.current?.focusFirstControl();
+  }, []);
+
+  const exitToGrid = useCallback(() => {
+    gridApiRef.current?.focusSelectedRow();
+  }, []);
+
+  const registerGridApi = useCallback(
+    (api: { focusSelectedRow: () => void }) => {
+      gridApiRef.current = api;
+    },
+    [],
+  );
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "unidad", label: "Por unidad" },
@@ -78,6 +99,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             cart={cart}
             onSaveOrder={checkout.handleSaveOrder}
             onConfirmSale={checkout.handleConfirmSale}
+            onEnterPanel={focusPanelFirst}
+            registerGridApi={registerGridApi}
           />
         ) : (
           <LooseSellTab
@@ -85,6 +108,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             cart={cart}
             onSaveOrder={checkout.handleSaveOrder}
             onConfirmSale={checkout.handleConfirmSale}
+            onEnterPanel={focusPanelFirst}
+            registerGridApi={registerGridApi}
           />
         )}
       </div>
@@ -99,6 +124,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         saveOrder={checkout.handleSaveOrder}
         confirmSale={checkout.handleConfirmSale}
         cashSessionId={currentSession?.id}
+        apiRef={panelApiRef}
+        onExitToGrid={exitToGrid}
         className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]"
       />
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Loader } from "@/components/atoms/loader";
@@ -96,6 +96,10 @@ interface LooseSellTabProps {
   cart: VendorCart;
   onSaveOrder: () => void;
   onConfirmSale: () => void;
+  /** Salta al panel de pedido (↓ en la última fila). */
+  onEnterPanel?: () => void;
+  /** Registra la función para volver al listado desde el panel (↑). */
+  registerGridApi?: (api: { focusSelectedRow: () => void }) => void;
 }
 
 /**
@@ -110,8 +114,11 @@ export const LooseSellTab = ({
   cart,
   onSaveOrder,
   onConfirmSale,
+  onEnterPanel,
+  registerGridApi,
 }: LooseSellTabProps) => {
   const searchRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [types, setTypes] = useState<PriceKgType[]>([]);
   const [brands, setBrands] = useState<PriceKgBrand[]>([]);
@@ -207,9 +214,8 @@ export const LooseSellTab = ({
   // ── Armado de las filas de la planilla (marcas matcheadas × tipos × especie) ──
   const trimmed = query.trim();
   const rows = useMemo<LooseCellRow[]>(() => {
-    // Sin query no se arma la planilla: la UI pide escribir una marca. El filtro
-    // es por CELDA (marca × tipo × especie + keywords/synonyms), no por marca.
-    if (!trimmed) return [];
+    // Sin query se muestra TODA la planilla. El filtro es por CELDA (marca × tipo
+    // × especie + keywords/synonyms): al escribir, se va acotando en vivo.
     const list: LooseCellRow[] = [];
     for (const b of brands) {
       for (const t of types) {
@@ -352,6 +358,15 @@ export const LooseSellTab = ({
     inputRefs.current[index] = el;
   };
 
+  // ── Vuelta desde el panel (↑): enfocar la fila activa de la planilla ──
+  const focusSelectedRow = useCallback(() => {
+    if (selectedIndex >= 0) inputRefs.current[selectedIndex]?.focus();
+  }, [selectedIndex]);
+
+  useEffect(() => {
+    registerGridApi?.({ focusSelectedRow });
+  }, [focusSelectedRow, registerGridApi]);
+
   const moveSelection = (delta: 1 | -1) => {
     setSelectedIndex((prev) => {
       if (rows.length === 0) return -1;
@@ -376,7 +391,9 @@ export const LooseSellTab = ({
   // ── Teclado (↑/↓ +/− Enter) sobre las filas de la planilla ──
   useVendorRowsKeyboard({
     searchInputRef: searchRef,
+    containerRef: rootRef,
     hasRows: rows.length > 0,
+    rowCount: rows.length,
     selectedIndex,
     moveDown: () => moveSelection(1),
     moveUp: () => moveSelection(-1),
@@ -390,13 +407,14 @@ export const LooseSellTab = ({
     onCommitRow: () => {
       if (selectedIndex >= 0) commit(selectedIndex);
     },
+    onEnterPanel,
     cartItems: cart.items,
     handleSaveOrder: onSaveOrder,
     handleConfirmSale: onConfirmSale,
   });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div ref={rootRef} className="mx-auto max-w-4xl space-y-6">
       {/* Buscador protagonista: input grande con lupa */}
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -415,7 +433,7 @@ export const LooseSellTab = ({
               }
             }
           }}
-          placeholder="Buscá una marca... (ej. Pro Plan, Royal Canin)"
+          placeholder="Filtrá por marca, tipo o especie... (ej. Pro plan perro adulto)"
           className="h-12 pl-10 text-lg"
         />
       </div>
@@ -447,16 +465,12 @@ export const LooseSellTab = ({
         <div className="flex justify-center py-16">
           <Loader />
         </div>
-      ) : trimmed === "" ? (
-        <div className="py-16 text-center">
-          <p className="text-lg text-muted-foreground">
-            Escribí el nombre de una marca para ver sus precios por kilo.
-          </p>
-        </div>
       ) : rows.length === 0 ? (
         <div className="py-16 text-center">
           <p className="text-lg text-muted-foreground">
-            Sin resultados para &quot;{trimmed}&quot;.
+            {trimmed
+              ? `Sin resultados para "${trimmed}".`
+              : "No hay planilla de precios disponible."}
           </p>
         </div>
       ) : (

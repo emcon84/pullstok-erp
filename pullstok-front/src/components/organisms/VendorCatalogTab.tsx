@@ -25,6 +25,10 @@ interface VendorCatalogTabProps {
   cart: VendorCart;
   onSaveOrder: () => void;
   onConfirmSale: () => void;
+  /** Salta al panel de pedido (↓ en la última fila). */
+  onEnterPanel?: () => void;
+  /** Registra la función para volver al listado desde el panel (↑). */
+  registerGridApi?: (api: { focusSelectedRow: () => void }) => void;
 }
 
 /**
@@ -39,9 +43,12 @@ export const VendorCatalogTab = ({
   cart,
   onSaveOrder,
   onConfirmSale,
+  onEnterPanel,
+  registerGridApi,
 }: VendorCatalogTabProps) => {
   const navigate = useNavigate();
   const catalog = useVendorCatalog(branchId);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // ── Cantidades inline (string por fila, sync desde el carrito) ──
   const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
@@ -160,6 +167,17 @@ export const VendorCatalogTab = ({
     inputRefs.current[index] = el;
   }, []);
 
+  // ── Vuelta desde el panel (↑): enfocar la fila activa del listado ──
+  const focusSelectedRow = useCallback(() => {
+    if (catalog.selectedIndex >= 0) {
+      inputRefs.current[catalog.selectedIndex]?.focus();
+    }
+  }, [catalog.selectedIndex]);
+
+  useEffect(() => {
+    registerGridApi?.({ focusSelectedRow });
+  }, [focusSelectedRow, registerGridApi]);
+
   const enabled = useCallback((index: number) => {
     const p = catalog.items[index];
     return !!p && branchQty(p) > 0;
@@ -182,7 +200,9 @@ export const VendorCatalogTab = ({
   // ── Teclado (↑/↓ +/− Enter) sobre las filas ──
   useVendorRowsKeyboard({
     searchInputRef: catalog.searchInputRef,
+    containerRef: rootRef,
     hasRows: catalog.items.length > 0,
+    rowCount: catalog.items.length,
     selectedIndex: catalog.selectedIndex,
     moveDown: () => catalog.moveSelection(1),
     moveUp: () => catalog.moveSelection(-1),
@@ -196,6 +216,7 @@ export const VendorCatalogTab = ({
     onCommitRow: () => {
       if (catalog.selectedIndex >= 0) commit(catalog.selectedIndex);
     },
+    onEnterPanel,
     cartItems: cart.items,
     handleSaveOrder: onSaveOrder,
     handleConfirmSale: onConfirmSale,
@@ -299,7 +320,7 @@ export const VendorCatalogTab = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div ref={rootRef} className="space-y-4">
       {/* ── Search + filters (sticky) ── */}
       <div className="sticky top-16 lg:top-0 z-20 space-y-4 border-b bg-background px-4 pb-3 pt-3 sm:px-6 lg:px-8">
         <VendorSearchBar

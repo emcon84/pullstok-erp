@@ -4,12 +4,17 @@ import { toast } from "react-toastify";
 import type { VendorCartItem } from "./useVendorCart";
 
 export interface VendorRowsKeyboardOptions {
-  /** Input de búsqueda: su foco es el único guard que bloquea las teclas de una
-   *  sola letra (P/V) y Enter, para que se pueda tipear texto sin disparar
-   *  atajos. Las flechas y +/- actúan SIEMPRE (roving focus sobre la tabla). */
+  /** Input de búsqueda. Estas teclas (P/V/L/Enter) se bloquean mientras se
+   *  tipea en él, para poder escribir texto sin disparar atajos. */
   searchInputRef: RefObject<HTMLInputElement>;
+  /** Contenedor del listado (la zona donde vive este teclado). Cuando el foco
+   *  está FUERA (p. ej. en el panel de pedido) el hook no actúa: evita que
+   *  P/V/Enter del listado se disparen desde un input del panel. */
+  containerRef?: RefObject<HTMLElement>;
   /** ¿Hay filas para navegar? Si no, las teclas de navegación son no-op. */
   hasRows: boolean;
+  /** Total de filas: para detectar la última y saltar al panel. */
+  rowCount: number;
   selectedIndex: number;
   /** Baja una fila (la tab se encarga de mover el índice + enfocar la fila). */
   moveDown: () => void;
@@ -23,6 +28,8 @@ export interface VendorRowsKeyboardOptions {
   onDecrement: () => void;
   /** Confirma la fila activa (Enter): la agrega al pedido. */
   onCommitRow: () => void;
+  /** ↓ en la última fila: foco al panel de pedido (opcional). */
+  onEnterPanel?: () => void;
   cartItems: VendorCartItem[];
   handleSaveOrder: () => void;
   handleConfirmSale: () => void;
@@ -33,7 +40,10 @@ export interface VendorRowsKeyboardOptions {
  * tablas con INPUT INLINE de cantidad. Reemplaza la navegación basada en
  * modal: ↑/↓ mueven la fila activa (roving focus) aunque el foco esté en un
  * input de cantidad, +/− ajustan la cantidad de la fila activa y Enter la
- * agrega al pedido. Quita la tecla C (ya no hay drawer/FAB).
+ * agrega al pedido. En la última fila, ↓ salta al panel de pedido.
+ *
+ * Solo actúa cuando el foco está dentro del listado (containerRef). Si el foco
+ * está en el panel de pedido, este hook queda mudo.
  *
  * Registra el listener UNA vez en fase CAPTURE y lee las últimas opciones
  * desde un ref para no re-registrarse en cada render.
@@ -49,7 +59,11 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
     const handleKeyDown = (e: KeyboardEvent) => {
       const o = optionsRef.current;
       const key = e.key;
-      const isSearchFocused = o.searchInputRef.current === document.activeElement;
+      const active = document.activeElement;
+      const isSearchFocused = o.searchInputRef.current === active;
+      const inGrid = o.containerRef?.current
+        ? o.containerRef.current.contains(active)
+        : true;
       const hasActiveRow = o.selectedIndex >= 0 && o.hasRows;
 
       // ── Tecla / o Cmd+K / Ctrl+K: foco al buscador ──
@@ -65,6 +79,9 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
         return;
       }
 
+      // El resto de los atajos del listado solo aplican dentro del listado.
+      if (!inGrid) return;
+
       // ── Tecla L: salta al listado (selecciona la primera fila) ──
       if ((key === "l" || key === "L") && !isSearchFocused) {
         e.preventDefault();
@@ -74,12 +91,19 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
         return;
       }
 
-      // ── Flecha abajo: baja una fila ──
+      // ── Flecha abajo: baja una fila; en la última salta al panel ──
       if (key === "ArrowDown") {
         if (o.hasRows) {
-          e.preventDefault();
-          e.stopPropagation();
-          o.moveDown();
+          const isLast = o.selectedIndex >= o.rowCount - 1;
+          if (isLast && o.onEnterPanel) {
+            e.preventDefault();
+            e.stopPropagation();
+            o.onEnterPanel();
+          } else {
+            e.preventDefault();
+            e.stopPropagation();
+            o.moveDown();
+          }
         }
         return;
       }
@@ -116,17 +140,13 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
 
       // ── Enter: confirma la fila activa al pedido ──
       // Gateado por !isSearchFocused: mientras tipeás en el buscador, Enter lo
-      // maneja el propio VendorSearchBar (no abre modal: commit del activo).
+      // maneja el propio VendorSearchBar (commit del activo).
       if (key === "Enter") {
-        if (!isSearchFocused) {
-          if (hasActiveRow) {
-            e.preventDefault();
-            e.stopPropagation();
-            o.onCommitRow();
-          }
-          return;
+        if (!isSearchFocused && hasActiveRow) {
+          e.preventDefault();
+          e.stopPropagation();
+          o.onCommitRow();
         }
-        // Buscador enfocado: deja que su handler decida (commit del activo).
         return;
       }
 

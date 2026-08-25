@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { ShoppingCart, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,11 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { usePayments } from "@/components/hooks/usePayments";
+import { usePanelKeyboard } from "@/components/hooks/usePanelKeyboard";
 import { PaymentSection } from "@/components/molecules/PaymentSection";
 import { CartItemRow } from "@/components/molecules/CartItemRow";
 import type { PaymentInput } from "@/models/cashSessionModel";
 import { round2 } from "@/lib/money";
 import { clampPct } from "@/components/hooks/vendorRowHelpers";
+
+/** API que el panel expone para entrar por teclado desde el listado. */
+export interface VendorOrderPanelApi {
+  focusFirstControl: () => void;
+}
 
 type VendorCart = ReturnType<typeof useVendorCart>;
 
@@ -32,6 +38,10 @@ interface VendorOrderPanelProps {
   cashSessionId?: string;
   /** Clases extra del contenedor (para el posicionamiento sticky en UnifiedPos). */
   className?: string;
+  /** API para entrar al panel por teclado desde el listado (↓ última fila). */
+  apiRef?: React.MutableRefObject<VendorOrderPanelApi | null>;
+  /** Se llama al salir del panel por teclado (↑ primer control → listado). */
+  onExitToGrid?: () => void;
 }
 
 const money = (n: number) =>
@@ -51,6 +61,8 @@ export const VendorOrderPanel = ({
   confirmSale,
   cashSessionId,
   className,
+  apiRef,
+  onExitToGrid,
 }: VendorOrderPanelProps) => {
   // ── Descuento % a nivel venta. Estado como STRING (el patrón correcto: type
   // text + inputMode decimal + onFocus select + clamp 0..100). type="number"
@@ -63,6 +75,35 @@ export const VendorOrderPanel = ({
   const total = round2(subtotal - discountAmount);
 
   const pay = usePayments(total);
+
+  // ── Navegación por teclado dentro del panel (roving focus ↑/↓) ──
+  const asideRef = useRef<HTMLElement>(null);
+  const getFocusables = useCallback(() => {
+    const root = asideRef.current;
+    if (!root) return [];
+    return Array.from(
+      root.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+      ),
+    ).filter((el) => el.getClientRects().length > 0);
+  }, []);
+
+  usePanelKeyboard({
+    panelRef: asideRef,
+    getFocusables,
+    onExitToGrid: () => onExitToGrid?.(),
+  });
+
+  const focusFirstControl = useCallback(() => {
+    getFocusables()[0]?.focus();
+  }, [getFocusables]);
+
+  useEffect(() => {
+    if (apiRef) apiRef.current = { focusFirstControl };
+    return () => {
+      if (apiRef) apiRef.current = null;
+    };
+  }, [apiRef, focusFirstControl]);
 
   const handleConfirm = () => {
     confirmSale(pay.finalize(), cashSessionId, discountPct);
@@ -83,6 +124,7 @@ export const VendorOrderPanel = ({
 
   return (
     <aside
+      ref={asideRef}
       className={
         "flex flex-col rounded-xl border bg-background shadow-sm " +
         (className ?? "")
