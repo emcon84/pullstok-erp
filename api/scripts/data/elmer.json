@@ -1,0 +1,421 @@
+{
+ "provider": "ELMER",
+ "category": "FARMACIA",
+ "products": [
+  {
+   "lab": "ELMER",
+   "name": "TRAUTIER - 30 Comprimidos",
+   "priceSinIva": 4316
+  },
+  {
+   "lab": "ELMER",
+   "name": "GRISEOFULVINA COMPRIMIDOS - 20 Comprimidos",
+   "priceSinIva": 13400
+  },
+  {
+   "lab": "ELMER",
+   "name": "GRISEOFULVINA CREMA - 1 Pomo x 15gr",
+   "priceSinIva": 4212
+  },
+  {
+   "lab": "ELMER",
+   "name": "CLORANFENICOL VITAMINADO - Frasco x 50 mL.",
+   "priceSinIva": 12475
+  },
+  {
+   "lab": "ELMER",
+   "name": "SULFOPRIM 24 INYECTABLE - Frasco x 50 mL.",
+   "priceSinIva": 14397
+  },
+  {
+   "lab": "ELMER",
+   "name": "SUPRESOR DE CELO COMPRIMIDO - 8 Comprimidos",
+   "priceSinIva": 4937
+  },
+  {
+   "lab": "ELMER",
+   "name": "SUPRESOR DE CELO INYECTABLE - 2 Amp. x 1mL.",
+   "priceSinIva": 10642
+  },
+  {
+   "lab": "ELMER",
+   "name": "SUPRESOR DE CELO INYECTABLE - 1 Amp. x 1mL + 1jga",
+   "priceSinIva": 7840
+  },
+  {
+   "lab": "ELMER",
+   "name": "SUPRESOR DE CELO INYECTABLE - 1 Ampolla x 10mL",
+   "priceSinIva": 16129
+  },
+  {
+   "lab": "ELMER",
+   "name": "PREDNISOLONA COMPRIMIDOS - 10 Comprimidos",
+   "priceSinIva": 4848
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR PUNTA OREJA - Frasco gotero x 5mL",
+   "priceSinIva": 5629
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR POLVO PLUS - Talquera x 100gr",
+   "priceSinIva": 5775
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR SPOT F - Pipeta 0,4mL",
+   "priceSinIva": 5289
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR SPOT FL - Pipeta 1,0mL",
+   "priceSinIva": 5328
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR SPOT PLUS S - Pipeta 0,4mL",
+   "priceSinIva": 5328
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR SPOT PLUS M - Pipeta 1,0mL",
+   "priceSinIva": 5397
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR SPOT PLUS L - Pipeta 2,5mL",
+   "priceSinIva": 5609
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR SPOT PLUS XL - Pipeta 4,0mL",
+   "priceSinIva": 5748
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR SPOT PLUS XXL - Pipeta 6,0mL",
+   "priceSinIva": 5932
+  },
+  {
+   "lab": "ELMER",
+   "name": "PIPERAZINA 100 - Doypack x 100 gr.",
+   "priceSinIva": 21021
+  },
+  {
+   "lab": "ELMER",
+   "name": "PRAZIQUANTEL PLUS 40KG - 4 Comprimidos",
+   "priceSinIva": 2755
+  },
+  {
+   "lab": "ELMER",
+   "name": "VERMICAN - Gotero x 20mL",
+   "priceSinIva": 6282
+  },
+  {
+   "lab": "ELMER",
+   "name": "COLIRIO - Gotero x 5mL",
+   "priceSinIva": 7991
+  },
+  {
+   "lab": "ELMER",
+   "name": "COLIRIO FN - Gotero x 5mL",
+   "priceSinIva": 6974
+  },
+  {
+   "lab": "ELMER",
+   "name": "AUDICUR - Gotero x 20mL",
+   "priceSinIva": 7719
+  },
+  {
+   "lab": "ELMER",
+   "name": "PULGUICIDA & GARRAPATICIDA - Frasco x 250mL",
+   "priceSinIva": 7336
+  },
+  {
+   "lab": "ELMER",
+   "name": "PULGUICIDA & GARRAPATICIDA - Bidón x 5Lt",
+   "priceSinIva": 55034
+  },
+  {
+   "lab": "ELMER",
+   "name": "SHAMPOO CACHORROS ELMER - Frasco x 250mL",
+   "priceSinIva": 7720
+  },
+  {
+   "lab": "ELMER",
+   "name": "SHAMPOO CACHORROS ELMER - Bidon x 5Lt",
+   "priceSinIva": 60039
+  },
+  {
+   "lab": "ELMER",
+   "name": "SHAMPOO ELMER 2 EN 1 - Frasco x 250mL",
+   "priceSinIva": 7720
+  },
+  {
+   "lab": "ELMER",
+   "name": "SHAMPOO ELMER 2 EN 1 - Bidón x 5Lt",
+   "priceSinIva": 55034
+  },
+  {
+   "lab": "ELMER",
+   "name": "POPPY NEGRO - Frasco x 250mL",
+   "priceSinIva": 7720
+  },
+  {
+   "lab": "ELMER",
+   "name": "POPPY BLANCO - Frasco x 250mL",
+   "priceSinIva": 7119
+  },
+  {
+   "lab": "ELMER",
+   "name": "POPPY BLANCO - Bidon x 5Lt",
+   "priceSinIva": 55034
+  },
+  {
+   "lab": "ELMER",
+   "name": "TARZINC - Frasco x 250mL",
+   "priceSinIva": 19293
+  },
+  {
+   "lab": "ELMER",
+   "name": "ACETAZINE 10 COMPRIMIDOS - 10 Comprimidos",
+   "priceSinIva": 7370
+  },
+  {
+   "lab": "ELMER",
+   "name": "ACETAZINE GOTAS - Gotero x 10mL",
+   "priceSinIva": 7085
+  },
+  {
+   "lab": "ELMER",
+   "name": "ACETAZINE INYECTABLE - Frasco x 50mL",
+   "priceSinIva": 19282
+  },
+  {
+   "lab": "ELMER",
+   "name": "POLIVITAMÍNICO HIDRODISPERSABLE - 10 sobres x 250mg",
+   "priceSinIva": 116040
+  },
+  {
+   "lab": "ELMER",
+   "name": "FORTIPET - Estuche x 30 Comprimidos",
+   "priceSinIva": 11568
+  },
+  {
+   "lab": "ELMER",
+   "name": "SUPLEMENTO CÁLCICO MINERAL - Doy pack x 100gr",
+   "priceSinIva": 3135
+  },
+  {
+   "lab": "ELMER",
+   "name": "SUPLEMENTO CÁLCICO MINERAL - Doy pack x 500gr",
+   "priceSinIva": 12119
+  },
+  {
+   "lab": "ELMER",
+   "name": "HÜMMS DENTAL CARE - Roll On x 60mL",
+   "priceSinIva": 4455
+  },
+  {
+   "lab": "ELMER",
+   "name": "HÜMMS PIEL Y MANTO GATOS - Roll On x 60mL",
+   "priceSinIva": 4455
+  },
+  {
+   "lab": "ELMER",
+   "name": "HÜMMS ARTICULACIONES SANAS - Roll On x 60mL",
+   "priceSinIva": 4455
+  },
+  {
+   "lab": "ELMER",
+   "name": "HÜMMS PIEL Y MANTO PERROS - Roll On x 60mL",
+   "priceSinIva": 4455
+  },
+  {
+   "lab": "ELMER",
+   "name": "SANIMAX 5 - 1 Pipeta 5mL",
+   "priceSinIva": 3973
+  },
+  {
+   "lab": "ELMER",
+   "name": "SANIMAX 10 - 1 Pipeta 10mL",
+   "priceSinIva": 4444
+  },
+  {
+   "lab": "ELMER",
+   "name": "PUAJ CONDUCIN - Spray 100mL",
+   "priceSinIva": 6141
+  },
+  {
+   "lab": "ELMER",
+   "name": "NO ACA - Frasco 500cc.",
+   "priceSinIva": 9914
+  },
+  {
+   "lab": "ELMER",
+   "name": "NO ACA - Botella 1Lt.",
+   "priceSinIva": 22050
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR BAÑO LIQUIDO - Frasco 70cc.",
+   "priceSinIva": 8905
+  },
+  {
+   "lab": "ELMER",
+   "name": "HECTOPAR BAÑO LIQUIDO - Frasco 120cc",
+   "priceSinIva": 14590
+  },
+  {
+   "lab": "ELMER",
+   "name": "CEFALEXINA ELMER - 20 Jeringas 10mL.",
+   "priceSinIva": 3675
+  },
+  {
+   "lab": "ELMER",
+   "name": "CEFALEXINA ELMER - 200 Jeringas10mL.",
+   "priceSinIva": 3585
+  },
+  {
+   "lab": "ELMER",
+   "name": "VASECLOX MA - 20 Jeringas 10mL.",
+   "priceSinIva": 3675
+  },
+  {
+   "lab": "ELMER",
+   "name": "VASECLOX MA - 200 Jeringas 10mL.",
+   "priceSinIva": 3585
+  },
+  {
+   "lab": "ELMER",
+   "name": "VASECLOX VS - 20 Jeringas 10mL.",
+   "priceSinIva": 3675
+  },
+  {
+   "lab": "ELMER",
+   "name": "VASECLOX VS - 200 Jeringas 10mL.",
+   "priceSinIva": 3585
+  },
+  {
+   "lab": "ELMER",
+   "name": "SULFOPRIM 24 INYECTABLE - Frasco x 50mL",
+   "priceSinIva": 14397
+  },
+  {
+   "lab": "ELMER",
+   "name": "SULFOPRIM 48 POLVO - Doy Pack x 100 gr.",
+   "priceSinIva": 22341
+  },
+  {
+   "lab": "ELMER",
+   "name": "SULFOPRIM 48 POLVO - Pote x 1 kg.",
+   "priceSinIva": 212796
+  },
+  {
+   "lab": "ELMER",
+   "name": "CEFTIOSIX ELMER LPU - Frasco x 100mL",
+   "priceSinIva": 18868
+  },
+  {
+   "lab": "ELMER",
+   "name": "TILSIX ELMER - Frasco x 50mL",
+   "priceSinIva": 18551
+  },
+  {
+   "lab": "ELMER",
+   "name": "MAIFLOX - Frasco x 1Lt",
+   "priceSinIva": 47799
+  },
+  {
+   "lab": "ELMER",
+   "name": "ANTIDIARREICO LECHONES - Frasco100mL",
+   "priceSinIva": 10229
+  },
+  {
+   "lab": "ELMER",
+   "name": "ANTIDIARREICO LECHONES - Botella x 1Lt.",
+   "priceSinIva": 57551
+  },
+  {
+   "lab": "ELMER",
+   "name": "ANTIDIARREICO TERNEROS - Jeringa x 30 gr.",
+   "priceSinIva": 11699
+  },
+  {
+   "lab": "ELMER",
+   "name": "ANTIDARREICO TERNEROS MULTIDS. - Botella x 1Lt.",
+   "priceSinIva": 84309
+  },
+  {
+   "lab": "ELMER",
+   "name": "TETRAELMER CAPSULAS - 10 Blister x 10 capsulas",
+   "priceSinIva": 39229
+  },
+  {
+   "lab": "ELMER",
+   "name": "FURODEXA INYECTABLE - Frasco x 25ml",
+   "priceSinIva": 9166
+  },
+  {
+   "lab": "ELMER",
+   "name": "ELMER POUR ON - Dosificador x 1lt",
+   "priceSinIva": 45228
+  },
+  {
+   "lab": "ELMER",
+   "name": "ELMER POUR ON - Bidón x 5Lt",
+   "priceSinIva": 195947
+  },
+  {
+   "lab": "ELMER",
+   "name": "PIPERAZINA 100 - 1 sobre x 100gr",
+   "priceSinIva": 21021
+  },
+  {
+   "lab": "ELMER",
+   "name": "VERMICAN FENBENDAZOL - Botella x 1lt",
+   "priceSinIva": 92348
+  },
+  {
+   "lab": "ELMER",
+   "name": "VERMICAN FENBENDAZOL - Bidon x 5Lt",
+   "priceSinIva": 452420
+  },
+  {
+   "lab": "ELMER",
+   "name": "POLIVITAMÍNICO HIDRODISPER. - 10 sobres por 250gr",
+   "priceSinIva": 116040
+  },
+  {
+   "lab": "ELMER",
+   "name": "POLIVITAMÍNICO HIDRODISPER. - 5 sobres por 1Kg",
+   "priceSinIva": 218426
+  },
+  {
+   "lab": "ELMER",
+   "name": "POLIVITAMÍNICO HIDRODISPER. - 10 sobres por 1Kg",
+   "priceSinIva": 265243
+  },
+  {
+   "lab": "ELMER",
+   "name": "ELECTROLITE ULTRA - 10 Monodosis x 50cc",
+   "priceSinIva": 3400
+  },
+  {
+   "lab": "ELMER",
+   "name": "ELECTROLITE ULTRA - 50 Monodosis x 50cc",
+   "priceSinIva": 3328
+  },
+  {
+   "lab": "ELMER",
+   "name": "VERMICAN FENBENDAZOL-Botella x 1lt",
+   "priceSinIva": 30476
+  },
+  {
+   "lab": "ELMER",
+   "name": "VERMICAN FENBENDAZOL-Bidon x 5Lt",
+   "priceSinIva": 141179
+  }
+ ]
+}

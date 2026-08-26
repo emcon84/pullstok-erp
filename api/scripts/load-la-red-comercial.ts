@@ -27,7 +27,10 @@ import path from "path";
 import { basePrisma } from "../src/config/db";
 
 const ORG_SLUG = process.env.LRC_ORG_SLUG || "el-almacen-de-las-mascotas";
-const DATA_PATH = path.resolve(process.cwd(), "./scripts/data/la-red-comercial.json");
+// Helper genérico: cualquier planilla del proveedor en el MISMO formato (JSON con
+// provider/category/products[{lab,name,priceSinIva}]) se corre apuntando LRC_DATA.
+// Default: La Red Comercial.
+const DATA_PATH = path.resolve(process.cwd(), process.env.LRC_DATA || "./scripts/data/la-red-comercial.json");
 
 const VAT = 1.21;
 const round2 = (n: number) => Math.round(n * 100) / 100;
