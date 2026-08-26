@@ -473,11 +473,12 @@ export const LooseSellTab = ({
       </div>
       </div>
 
-      {/* ── Zona de la planilla: alto fijo + scroll vertical ── */}
+      {/* ── Zona de la planilla: toma el espacio sobrante de la columna flex y
+             scrollea internamente (la altura la da el flex, sin números mágicos) ── */}
       <div
         ref={scrollRef}
-        className="min-h-0"
-        style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto", position: "relative" }}
+        className="min-h-0 overflow-y-auto lg:flex-1"
+        style={{ position: "relative" }}
       >
       {loading ? (
         <div className="flex justify-center py-16">

@@ -353,11 +353,12 @@ export const VendorCatalogTab = ({
         />
       </div>
 
-      {/* ── Zona de la lista: alto fijo + scroll vertical (scrollea la tabla) ── */}
+      {/* ── Zona de la lista: toma el espacio sobrante de la columna flex y
+             scrollea internamente (la altura la da el flex, sin números mágicos) ── */}
       <div
         ref={catalog.scrollRef}
-        className="min-h-0"
-        style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto", position: "relative" }}
+        className="min-h-0 overflow-y-auto lg:flex-1"
+        style={{ position: "relative" }}
       >
         {/* ── Product grid ── */}
         {catalog.items.length === 0 ? (

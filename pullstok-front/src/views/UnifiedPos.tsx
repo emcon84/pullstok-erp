@@ -105,7 +105,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
       {/* ── Columna izquierda: header + tabs + contenido ── */}
-      <div className="min-w-0 space-y-4 lg:flex lg:h-[calc(100vh_-_2rem)] lg:flex-col lg:space-y-0">
+      <div className="min-w-0 space-y-4 lg:flex lg:h-[calc(100vh_-_2rem)] lg:flex-col lg:space-y-0 lg:overflow-hidden">
         <div className="space-y-4 lg:shrink-0">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Nueva venta</h1>

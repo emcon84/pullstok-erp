@@ -35,7 +35,7 @@ export const scrollRowInContainer = (container: HTMLElement, row: HTMLElement) =
     guard++;
   }
   if (node !== container) {
-    row.scrollIntoView({ block: "nearest" });
+    scrollRowIntoView(row);
     return;
   }
   const bottom = top + row.offsetHeight;
