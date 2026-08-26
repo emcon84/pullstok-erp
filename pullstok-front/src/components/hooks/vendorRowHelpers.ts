@@ -20,30 +20,22 @@ export const formatBolsaQty = (qty: number): number =>
 
 /**
  * Scrollea `container` para que `row` quede visible (con margen de 24px).
- * Es a prueba de anidamiento: suma los `offsetTop` de la fila subiendo por
- * `offsetParent` hasta el contenedor. El contenedor debe tener `position:
- * relative` para que la cadena de offsetParent cierre. Si no se alcanza,
- * cae a scrollIntoView.
+ * Usa `getBoundingClientRect()` (posición real en el viewport) en vez de
+ * `offsetTop`/`offsetParent`, que con `<table>` devuelven medidas erráticas.
+ * Resta la posición del contenedor a la de la fila, así da el desplazamiento
+ * exacto independientemente del anidamiento. `container` debe ser el elemento
+ * que realmente scrollea.
  */
 export const scrollRowInContainer = (container: HTMLElement, row: HTMLElement) => {
-  let top = 0;
-  let node: HTMLElement | null = row;
-  let guard = 0;
-  while (node && node !== container && node !== document.body && guard < 20) {
-    top += node.offsetTop;
-    node = node.offsetParent as HTMLElement | null;
-    guard++;
-  }
-  if (node !== container) {
-    scrollRowIntoView(row);
-    return;
-  }
-  const bottom = top + row.offsetHeight;
+  const cRect = container.getBoundingClientRect();
+  const rRect = row.getBoundingClientRect();
+  const rowTop = rRect.top - cRect.top;
+  const rowBottom = rRect.bottom - cRect.top;
   const viewH = container.clientHeight;
-  if (top < container.scrollTop) {
-    container.scrollTop = Math.max(0, top - 24);
-  } else if (bottom > container.scrollTop + viewH) {
-    container.scrollTop = bottom - viewH + 24;
+  if (rowTop < 0) {
+    container.scrollTop += rowTop - 24;
+  } else if (rowBottom > viewH) {
+    container.scrollTop += rowBottom - viewH + 24;
   }
 };
 
