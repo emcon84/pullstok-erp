@@ -7,11 +7,23 @@ export interface DateRange {
 
 interface ItemWithCreatedAt {
   createdAt?: string | Date;
+  /** Las ventas (Sale) usan `saleDate` (NO `createdAt`) en el backend. Los
+   *  budgets/orders/receipts sí traen `createdAt`. El getter de fecha cae a
+   *  `saleDate` cuando `createdAt` está ausente. */
+  saleDate?: string | Date;
   totalAmount?: number;
   relatedDocument?: {
     totalAmount?: number;
   };
 }
+
+/** Fecha efectiva de un ítem: createdAt (presupuestos/pedidos/remitos) o
+ *  saleDate (ventas, que no exponen createdAt). */
+const itemDate = (item: ItemWithCreatedAt): Date | null => {
+  const raw = item.createdAt ?? item.saleDate;
+  if (!raw) return null;
+  return new Date(raw);
+};
 
 export const getDateRange = (period: PeriodFilter): DateRange => {
   const now = new Date();
@@ -43,9 +55,9 @@ export const filterByDateRange = <T extends ItemWithCreatedAt>(
   range: DateRange,
 ): T[] => {
   return items.filter((item) => {
-    if (!item.createdAt) return false;
-    const itemDate = new Date(item.createdAt);
-    return itemDate >= range.start && itemDate <= range.end;
+    const itemDateV = itemDate(item);
+    if (!itemDateV) return false;
+    return itemDateV >= range.start && itemDateV <= range.end;
   });
 };
 
@@ -56,8 +68,9 @@ export const groupByPeriod = <T extends ItemWithCreatedAt>(
   const grouped: Record<string, T[]> = {};
 
   items.forEach((item) => {
-    if (!item.createdAt) return;
-    const date = new Date(item.createdAt);
+    const itemDateV = itemDate(item);
+    if (!itemDateV) return;
+    const date = itemDateV;
     let key: string;
 
     switch (period) {
