@@ -113,6 +113,41 @@ export const calculateTotalAmount = <T extends ItemWithCreatedAt>(
   }, 0);
 };
 
+export interface PaymentLike {
+  method: string;
+  amount: number;
+}
+
+export interface PaymentBreakdownRow {
+  method: string;
+  /** Cantidad de líneas de pago con ese método (una venta puede tener varias). */
+  count: number;
+  amount: number;
+}
+
+/**
+ * Agrega el desglose por medio de pago de una lista de ventas. Devuelve una
+ * fila por método (monto total + cantidad de líneas de pago), ordenada por
+ * monto descendente (los métodos que más venden primero). Ignora ventas sin
+ * payments y montos no numéricos.
+ */
+export const sumByPaymentMethod = (
+  items: { payments?: PaymentLike[] }[],
+): PaymentBreakdownRow[] => {
+  const byMethod = new Map<string, { count: number; amount: number }>();
+  for (const item of items) {
+    for (const p of item.payments ?? []) {
+      const cur = byMethod.get(p.method) ?? { count: 0, amount: 0 };
+      cur.count += 1;
+      cur.amount += Number(p.amount) || 0;
+      byMethod.set(p.method, cur);
+    }
+  }
+  return [...byMethod.entries()]
+    .map(([method, v]) => ({ method, count: v.count, amount: Math.round(v.amount * 100) / 100 }))
+    .sort((a, b) => b.amount - a.amount);
+};
+
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",

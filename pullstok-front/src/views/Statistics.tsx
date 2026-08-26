@@ -22,6 +22,7 @@ import {
   calculateTotalAmount,
   formatCurrency,
   formatPeriodLabel,
+  sumByPaymentMethod,
 } from "../utils/statsHelpers";
 import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
@@ -30,6 +31,7 @@ import { useGetBudgets } from "../components/hooks/useBudget";
 import { useOrders } from "../components/hooks/useOrder";
 import { useGetReceipts } from "../components/hooks/useReceipt";
 import { Loader } from "../components/atoms/loader";
+import { PAYMENT_METHOD_LABELS } from "../models/cashSessionModel";
 
 type StatType = "sales" | "budgets" | "orders" | "receipts";
 
@@ -74,6 +76,20 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
       }));
     return { chartData, total: calculateTotalAmount(filtered), count: filtered.length };
   }, [data, period]);
+
+  // Desglose por medio de pago (solo ventas): reusa el MISMO filtro de período
+  // que statsData para que los números cierren con el resto del dashboard.
+  const paymentBreakdown = useMemo(() => {
+    if (type !== "sales" || !data.length) return [];
+    const dateRange = getDateRange(period);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filtered = filterByDateRange(data as any[], dateRange);
+    return sumByPaymentMethod(filtered);
+  }, [data, type, period]);
+
+  const totalPayments = paymentBreakdown.reduce((sum, r) => sum + r.amount, 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const paymentLabel = (m: string) => (PAYMENT_METHOD_LABELS as Record<string, any>)[m] ?? m;
 
   const buildExport = () => ({
     title: `Reporte de ${title}`,
@@ -142,6 +158,53 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
           </p>
         </Card>
       </div>
+
+      {type === "sales" && paymentBreakdown.length > 0 && (
+        <Card className="gap-0 overflow-hidden p-0">
+          <div className="border-b p-4">
+            <h3 className="font-semibold">
+              Ventas por medio de pago
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ¿cómo se vende más?
+              </span>
+            </h3>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Medio de pago</TableHead>
+                <TableHead className="text-right">Cant.</TableHead>
+                <TableHead className="text-right">Monto</TableHead>
+                <TableHead className="text-right">Distribución</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paymentBreakdown.map((r) => (
+                <TableRow key={r.method}>
+                  <TableCell className="font-medium">{paymentLabel(r.method)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.count}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(r.amount)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {totalPayments > 0 ? `${((r.amount / totalPayments) * 100).toFixed(1)}%` : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            {paymentBreakdown.length > 0 && (
+              <TableFooter>
+                <TableRow>
+                  <TableCell className="font-semibold">Total</TableCell>
+                  <TableCell className="text-right font-semibold tabular-nums">
+                    {paymentBreakdown.reduce((s, r) => s + r.count, 0)}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(totalPayments)}</TableCell>
+                  <TableCell className="text-right font-semibold tabular-nums">100%</TableCell>
+                </TableRow>
+              </TableFooter>
+            )}
+          </Table>
+        </Card>
+      )}
 
       <Card className="p-5">
         <StatsChart

@@ -3,6 +3,7 @@ import {
   filterByDateRange,
   groupByPeriod,
   getDateRange,
+  sumByPaymentMethod,
 } from "../utils/statsHelpers";
 
 // Una "venta" del backend: trae saleDate y NO createdAt (el modelo Sale no lo expone).
@@ -37,5 +38,26 @@ describe("groupByPeriod (monthly)", () => {
     );
     expect(Object.keys(grouped)).toEqual(["2026-08"]);
     expect(grouped["2026-08"]).toHaveLength(2);
+  });
+});
+
+describe("sumByPaymentMethod", () => {
+  it("agrega por método y ordena por monto descendente", () => {
+    const res = sumByPaymentMethod([
+      { payments: [{ method: "EFECTIVO", amount: 100 }, { method: "TARJETA_CREDITO", amount: 50 }] },
+      { payments: [{ method: "EFECTIVO", amount: 60 }] },
+    ]);
+    expect(res).toEqual([
+      { method: "EFECTIVO", count: 2, amount: 160 },
+      { method: "TARJETA_CREDITO", count: 1, amount: 50 },
+    ]);
+  });
+
+  it("ignora ventas sin payments y montos no numéricos", () => {
+    const res = sumByPaymentMethod([
+      { payments: [{ method: "QR", amount: "no-numero" as unknown as number }] },
+      {},
+    ]);
+    expect(res).toEqual([{ method: "QR", count: 1, amount: 0 }]);
   });
 });

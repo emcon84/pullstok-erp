@@ -465,6 +465,9 @@ const getAllSales = async (branchId?: string) => {
     where,
     include: {
       items: { include: { product: true } },
+      // Desglose de medios de pago de la venta (R6/R7, sdd/caja-apertura-cierre).
+      // El front lo usa para el dashboard "Ventas por medio de pago".
+      payments: true,
       // Expone si la venta ya tiene factura y su id (para que el front
       // muestre el botón "Facturar" solo cuando invoice === null).
       invoice: { select: { id: true } },

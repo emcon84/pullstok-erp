@@ -74,4 +74,7 @@ export interface Sale {
   orderId?: string;
   /** Presente cuando el backend incluye el select de invoice (getAllSales WS3). */
   invoice?: { id: string } | null;
+  /** Desglose de medios de pago (R6/R7). El backend lo incluye en getAllSales
+   *  para el dashboard "Ventas por medio de pago". Σ amounts == totalAmount. */
+  payments?: { method: PaymentMethod; amount: number }[];
 }
