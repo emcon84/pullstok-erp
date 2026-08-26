@@ -1,0 +1,5319 @@
+{
+ "provider": "LA RED COMERCIAL",
+ "category": "FARMACIA",
+ "count": 1062,
+ "dupes": 0,
+ "zero": 9,
+ "products": [
+  {
+   "lab": "AFFORD",
+   "name": "APTO POLVO X 150 GRS",
+   "priceSinIva": 3413.7720000000004
+  },
+  {
+   "lab": "AFFORD",
+   "name": "APTO X 160 COMP",
+   "priceSinIva": 41133.96
+  },
+  {
+   "lab": "AFFORD",
+   "name": "DENTAL PLAX X 250 ML",
+   "priceSinIva": 2627.5221818181813
+  },
+  {
+   "lab": "AFFORD",
+   "name": "DERMIL CREMA POTE X 50 ML",
+   "priceSinIva": 6639.7614545454535
+  },
+  {
+   "lab": "AFFORD",
+   "name": "DERMIL X 100 COMP",
+   "priceSinIva": 21562.739999999998
+  },
+  {
+   "lab": "AFFORD",
+   "name": "DERMIL X 400 COMP",
+   "priceSinIva": 59368.68
+  },
+  {
+   "lab": "AFFORD",
+   "name": "NOVUL COMPRIMIDOS X 100 COMP",
+   "priceSinIva": 12054.636
+  },
+  {
+   "lab": "AFFORD",
+   "name": "NOVUL COMPRIMIDOS X 400 COMP",
+   "priceSinIva": 33914.16
+  },
+  {
+   "lab": "AFFORD",
+   "name": "NOVUL INYECTABLE 12 FCOS X 1 ML",
+   "priceSinIva": 26883.36
+  },
+  {
+   "lab": "AFFORD",
+   "name": "TRIBIOTIC LA INY X 100 ML",
+   "priceSinIva": 29840.94
+  },
+  {
+   "lab": "AFFORD",
+   "name": "TRIBIOTIC LA INY X 25 ML",
+   "priceSinIva": 10961.9136
+  },
+  {
+   "lab": "ALIMASC",
+   "name": "CAPRILAC X 10 KG",
+   "priceSinIva": 86068.526375
+  },
+  {
+   "lab": "ALIMASC",
+   "name": "CAPRILAC X 25 KG",
+   "priceSinIva": 206559.67775
+  },
+  {
+   "lab": "ALIMASC",
+   "name": "CER-LAC X 10 KG",
+   "priceSinIva": 69105.55962500001
+  },
+  {
+   "lab": "ALIMASC",
+   "name": "GATOLAC X 350 GRS",
+   "priceSinIva": 6301.176625000001
+  },
+  {
+   "lab": "ALIMASC",
+   "name": "MAMADERAS CON LOGO",
+   "priceSinIva": 3806.0236250000007
+  },
+  {
+   "lab": "ALIMASC",
+   "name": "PAPILLA DESTETE X 1,5 KG",
+   "priceSinIva": 10498.759375000001
+  },
+  {
+   "lab": "ALIMASC",
+   "name": "PERROLAC X 500 GRS",
+   "priceSinIva": 8168.219125000001
+  },
+  {
+   "lab": "ALIMASC",
+   "name": "POTRILAC X 10 KG",
+   "priceSinIva": 72518.00425
+  },
+  {
+   "lab": "ATON",
+   "name": "ARTROFEN X 21 COMP",
+   "priceSinIva": 13702.406850000001
+  },
+  {
+   "lab": "ATON",
+   "name": "ATONCILINA LV X 100 ML",
+   "priceSinIva": 25122.1662
+  },
+  {
+   "lab": "ATON",
+   "name": "ATONCILINA LV X 25 ML",
+   "priceSinIva": 8926.7821875
+  },
+  {
+   "lab": "ATON",
+   "name": "ATONIL FRASCO X 100 ML",
+   "priceSinIva": 5661.7810312500005
+  },
+  {
+   "lab": "ATON",
+   "name": "BACTOFAGO 6 AMPOLLAS X 3 ML",
+   "priceSinIva": 6690.60286875
+  },
+  {
+   "lab": "ATON",
+   "name": "CALCIVET FORTE FRASCO X 150 GRS",
+   "priceSinIva": 5005.519875
+  },
+  {
+   "lab": "ATON",
+   "name": "CALCIVET FORTE FRASCO X 250 GRS",
+   "priceSinIva": 6299.2918687500005
+  },
+  {
+   "lab": "ATON",
+   "name": "CALCIVET FRASCO X 50 COMPRIMIDOS",
+   "priceSinIva": 4412.031525
+  },
+  {
+   "lab": "ATON",
+   "name": "DAVITAN C X 60 COMPRIMIDOS",
+   "priceSinIva": 4144.6125
+  },
+  {
+   "lab": "ATON",
+   "name": "DERMOTAL CAJA 6 POMOS X 15 GRS",
+   "priceSinIva": 18195.14626875
+  },
+  {
+   "lab": "ATON",
+   "name": "DERMOTAL POMO X 30 GRS",
+   "priceSinIva": 5175.90320625
+  },
+  {
+   "lab": "ATON",
+   "name": "FORMULA ANTIARTROSICA X 100 ML",
+   "priceSinIva": 14391.27725625
+  },
+  {
+   "lab": "ATON",
+   "name": "INMUNOGAM 5 AMPOLLAS X 5 ML",
+   "priceSinIva": 16482.3454125
+  },
+  {
+   "lab": "ATON",
+   "name": "PROFEDYL 100 MG X 60 COMP",
+   "priceSinIva": 17417.41565625
+  },
+  {
+   "lab": "ATON",
+   "name": "PROFEDYL 25 MG X 60 COMP",
+   "priceSinIva": 7566.16123125
+  },
+  {
+   "lab": "ATON",
+   "name": "PROFEDYL 75 MG X 60 COMP",
+   "priceSinIva": 14035.021200000001
+  },
+  {
+   "lab": "ATON",
+   "name": "PRONAL 6 AMPOLLAS X 1 ML",
+   "priceSinIva": 7713.341826923077
+  },
+  {
+   "lab": "ATON",
+   "name": "TRIDOL ANTIFLOGISTICO 5 FCOS X 10 ML",
+   "priceSinIva": 11224.919081249998
+  },
+  {
+   "lab": "ATON",
+   "name": "VIRACEL 10 AMPOLLAS X 1 ML",
+   "priceSinIva": 10588.223475
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "BIT TRIO 11 A 20 KG (VERDE)",
+   "priceSinIva": 14400
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "BIT TRIO 2 A 4,5 KG (LILA)",
+   "priceSinIva": 10668
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "BIT TRIO 21 A 40 KG (AZUL)",
+   "priceSinIva": 16680
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "BIT TRIO 4,6 A 10 KG (ROJA)",
+   "priceSinIva": 11436
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "BIT TRIO 40 A 60 KG (NEGRA)",
+   "priceSinIva": 24240
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "CEFALEXINA SUSPENSION BECH LAB",
+   "priceSinIva": 6359.01779191617
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "CESNEFIN X 100 COMP (ALB+PRZQ)",
+   "priceSinIva": 24937.566704490007
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "CISTICALM X 60 CAPSULAS",
+   "priceSinIva": 18612.652710000002
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "CONDROVITAL POLVO X 110 GR",
+   "priceSinIva": 15334.1
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "COPROBECH X 100 GRS",
+   "priceSinIva": 12865.56773
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "DEXA 4 MG X 50 ML (BECHLAB)",
+   "priceSinIva": 7354.911504424781
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "DEXASHOK INY X 20 ML (BECHLAB)",
+   "priceSinIva": 11942.60243362832
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "DOXIBECH \"COMPLEX\" 100 MG X 50 COMP",
+   "priceSinIva": 23361.23771942323
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "DOXIBECH \"COMPLEX\" 200 MG X 50 COMP",
+   "priceSinIva": 39246.89491690563
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "DOXIBECH 100 MG X 100 COMP",
+   "priceSinIva": 26714.601769911507
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "DOXIBECH 200 MG X 100 COMP",
+   "priceSinIva": 33584.07079646018
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "ENROMED 100 MG X 100 COMP",
+   "priceSinIva": 16798.201225
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "ENROMED 200 MG X 100 COMP",
+   "priceSinIva": 23890.773756250004
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "ENROMED 50 MG X 100 COMP",
+   "priceSinIva": 12132.029506250004
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "GABALBECH ORAL X 30 ML",
+   "priceSinIva": 15673.35
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "HEMOSPEED X 100 ML",
+   "priceSinIva": 10006.526548672568
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "KETOBECH 200 MG X 100 COMP",
+   "priceSinIva": 26908.41807104001
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "MATERNIL FORT X 250 GR",
+   "priceSinIva": 5266.592920353984
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "METROBECH 250 MG X 50 COMP",
+   "priceSinIva": 14214.656415929207
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "METROBECH 500 MG X 40 COMP",
+   "priceSinIva": 17016.079314159295
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "METROBECH INY 5 MG X 100 ML",
+   "priceSinIva": 9943.417500000001
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "PREDNISOLONA BECHLAB 10 MG X 100 COMP",
+   "priceSinIva": 15469.800000000001
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "PREDNISOLONA BECHLAB 20 MG X 100 COMP",
+   "priceSinIva": 25698.1875
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "PREGALBECH ORAL X 30 ML",
+   "priceSinIva": 15673.35
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "RENAL ADVANCED POLVO X 100 GRS",
+   "priceSinIva": 11092.574336283187
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "RESVITAL OMEGA ANTIOXIDANTE X 120 ML",
+   "priceSinIva": 14647.23451327434
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "SARRI500 SOLUCION ANTISEPTICA X 200 ML",
+   "priceSinIva": 3175.3800000000006
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "TELMIBECH SOL ORAL X 30 ML",
+   "priceSinIva": 15673.35
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "TIOCTIC X 50 COMP",
+   "priceSinIva": 4926.629294812501
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "TOLTRABECH X 10 ML",
+   "priceSinIva": 6997.03125
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "TRANEXBECH X 10 ML",
+   "priceSinIva": 14553.825
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "TRANEXBECH X 20 ML",
+   "priceSinIva": 24629.550000000003
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "TRILOBECH 10 MG X 30 COMP",
+   "priceSinIva": 59894.5875
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "TRILOBECH 30 MG X 30 COMP",
+   "priceSinIva": 95831.34000000001
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "TRILOBECH 5 MG X 30 COMP",
+   "priceSinIva": 35936.7525
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "UROBERRY 10 KG X 60 COMP",
+   "priceSinIva": 10177.5
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "UROBERRY 20 KG X 60 COMP",
+   "priceSinIva": 16623.25
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "URSOMARINA 10 KG X 50 COMP",
+   "priceSinIva": 24060.973785000006
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "URSOMARINA 20 KG X 50 COMP (PERRO MED Y GDE)",
+   "priceSinIva": 40101.6195825
+  },
+  {
+   "lab": "BECHLAB",
+   "name": "URSOMARINA SUSPENSION X 100 ML",
+   "priceSinIva": 10841.45707964602
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ACIENDEL COMUN X 1 LT",
+   "priceSinIva": 39574.89877838057
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ACIENDEL COMUN X 5 LTS",
+   "priceSinIva": 134591.18324628935
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ACIENDEL PLUS X 1 LT",
+   "priceSinIva": 52387.33470663092
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ACIENDEL PLUS X 2.5 LTS",
+   "priceSinIva": 103967.13541778407
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ADAPTADOR MIN-VIT",
+   "priceSinIva": 142919.13258147103
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ARRASA OVINOS X 2,5 LTS",
+   "priceSinIva": 89116.20850094924
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ARRASA X 1 LT",
+   "priceSinIva": 87257.07851136035
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ARRASA X 2,5 LTS",
+   "priceSinIva": 210332.3028221391
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ARRASA X 5 LTS",
+   "priceSinIva": 382563.9068576421
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ASPERSIN X 250 ML",
+   "priceSinIva": 41221.04409643488
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ASPERSIN X 5 LTS",
+   "priceSinIva": 362982.8826945686
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BAGODRYL LIQUIDO X 1 LT",
+   "priceSinIva": 61389.78265621722
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BAGODRYL LIQUIDO X 5 LTS",
+   "priceSinIva": 0
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BAGOMECTINA 1% X 50 ML",
+   "priceSinIva": 10526.592050141993
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BAGOMECTINA 1% X 500 ML",
+   "priceSinIva": 37735.231206864526
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BAGOMECTINA STAR X 500 ML",
+   "priceSinIva": 59840.18999216767
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOABORTOGEN H FRASCO X 25 DS",
+   "priceSinIva": 31377.105551560937
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOABORTOGEN H FRASCO X 50 DS",
+   "priceSinIva": 62755.030103117286
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOCARBOGEN X 50 DS",
+   "priceSinIva": 4636.75451948872
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOCLOSTRIGEN J5 FRASCO X 25 DS",
+   "priceSinIva": 12787.430837481294
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOCLOSTRIGEN J5 FRASCO X 60 DS",
+   "priceSinIva": 30693.110009936765
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOENTEROTEC X 20 DS",
+   "priceSinIva": 10952.149120486149
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOESTROGEN X 100 ML",
+   "priceSinIva": 24723.56236154805
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOFASIOLEX 10% BIDON 2.5 LTS",
+   "priceSinIva": 255342.90457007973
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOLEPTOGEN FRASCO X 25 DS",
+   "priceSinIva": 28758.26347531736
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOLEPTOGEN FRASCO X 50 DS",
+   "priceSinIva": 57515.70795063932
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOPOLIGEN \"Q\" X 50 DS",
+   "priceSinIva": 60407.93991626099
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOPOLIGEN AIR X 40 DS",
+   "priceSinIva": 60922.559949742754
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOPOLIGEN AIR X 80 DS",
+   "priceSinIva": 122008.35404402595
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOPOLIGEN HS FRASCO X 25 DS",
+   "priceSinIva": 26268.660089259138
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOPOLIGEN HS FRASCO X 50 DS",
+   "priceSinIva": 52538.12428760468
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOQUERATOGEN OLEO MAX FRASCO X 40 DS",
+   "priceSinIva": 55724.79881521385
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOQUERATOGEN OLEO MAX FRASCO X 80 DS",
+   "priceSinIva": 111450.40173951413
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOZECTRA X 1 LT",
+   "priceSinIva": 350511.5230371354
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOZECTRA X 2,5 LTS",
+   "priceSinIva": 796617.5445389418
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "BIOZECTRA X 5 LTS",
+   "priceSinIva": 1593234.270077888
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "CEFTIOMAX X 100 ML",
+   "priceSinIva": 29302.085044999236
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "CIPERSIN X 5 LTS",
+   "priceSinIva": 274695.87446170306
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "CRONI-CIP X 100 ML",
+   "priceSinIva": 25488.173311811683
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "CRONIPRES MONODOSIS 0,5 G X 10 UNIDADES",
+   "priceSinIva": 0
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ECEGON 5.000 U.I.",
+   "priceSinIva": 46624.925193445866
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ECEGON RTU 5.000",
+   "priceSinIva": 43038.15194080453
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ENZAPROST DC X 100 ML",
+   "priceSinIva": 69714.64957323433
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ENZAPROST DC X 20 ML",
+   "priceSinIva": 15311.845223344573
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ESTREPTOCARBOCAFTIAZOL X 1 LT",
+   "priceSinIva": 48659.246727508216
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ESTREPTOPENDIBEN 5M UI X FRASCO",
+   "priceSinIva": 11021.119138281734
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "FLOK 1% X 500 ML",
+   "priceSinIva": 107707.50839683796
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "FLOK 3,15% X 500 ML",
+   "priceSinIva": 145776.26618365292
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "FLOK X 50 ML",
+   "priceSinIva": 15210.467914821378
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "FLOROXIN X 100 ML BB",
+   "priceSinIva": 42934.43675956716
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "FORBOX \"FT\" X 2.5 LTS",
+   "priceSinIva": 168406.0550569261
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "FORBOX \"FT\" X 5 LTS",
+   "priceSinIva": 319971.8322081578
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "FORTIUM GEL X 240 ML",
+   "priceSinIva": 241141.86159506012
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "FOSFAMISOL MV X 500 ML",
+   "priceSinIva": 67923.09452872159
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "GALGOSANTEL ORAL AL 15% (BIDON X 2.5 LTS)",
+   "priceSinIva": 312391.98725060484
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "GALMETRIN PLUS SPRAY X 440 ML",
+   "priceSinIva": 6798.518961928293
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "GALMETRIN POMADA - POTE  1 KG",
+   "priceSinIva": 50185.86271895917
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "GONAXAL X 50 ML",
+   "priceSinIva": 28154.76284233333
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "KETOPROFENO BB X 100 ML",
+   "priceSinIva": 42338.75572653933
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "KETOPROFENO BB X 50 ML",
+   "priceSinIva": 23448.6250686877
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "MAXIBIOTIC LA X 250 ML",
+   "priceSinIva": 37241.50822781119
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "MAXITYL PLATINUM X 100 ML",
+   "priceSinIva": 78440.0372698267
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "MAXITYL X 100 ML",
+   "priceSinIva": 51769.34709190985
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "PACK REPROD. BIOGENESIS 0,5 GR 100 TRAT. CON CIPIO",
+   "priceSinIva": 446212.565955755
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "PARAXANE INY X 1 LT",
+   "priceSinIva": 80647.67409382756
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "POLICALCINA FORTE X 500 ML",
+   "priceSinIva": 23812.42486665042
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "POLICLOSTRIGEN X 25 DS",
+   "priceSinIva": 17459.825811315888
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "POLICLOSTRIGEN X 50 DS",
+   "priceSinIva": 34923.74662260884
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "RABIA PARESIANTE BB X 25 DS",
+   "priceSinIva": 20575.112430233916
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "REVERVAC HEMOGLOBINURIA X 80 DOSIS",
+   "priceSinIva": 88077.4426885845
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ROTATEC J5 FRASCO X 40 DS",
+   "priceSinIva": 51052.43362319727
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "ROTATEC J5 FRASCO X 80 DS",
+   "priceSinIva": 102105.64901911745
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "STAND UP X 100 ML",
+   "priceSinIva": 55743.25419692869
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "SUPLENUT \"SE\" X 500 ML",
+   "priceSinIva": 77921.29756364074
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "SUPLENUT X 500 ML",
+   "priceSinIva": 70204.6796068538
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "UBREDEM X 25 ML",
+   "priceSinIva": 9617.948782503123
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "UBRESAN SEC JERINGA (EN CAJA X 100)",
+   "priceSinIva": 3717.8108693620775
+  },
+  {
+   "lab": "BIOGENESIS BAGÓ",
+   "name": "UBRESAN SELL JERINGA X 4G (EN BALDE X 100)",
+   "priceSinIva": 4316.494505282177
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE PLUS GATO",
+   "priceSinIva": 6459.150000000001
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE PLUS PERRO CHICO (H10 KG)",
+   "priceSinIva": 7466.400000000001
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE PLUS PERRO GRANDE (20-40 KG)",
+   "priceSinIva": 10888.5
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE PLUS PERRO MEDIANO (10-20 KG)",
+   "priceSinIva": 8063.100000000001
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE PLUS PERRO XL",
+   "priceSinIva": 14193.300000000003
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE SPOT-ON GATOS",
+   "priceSinIva": 4247.2375
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE SPOT-ON PERRO CHICO (H 10 KG)",
+   "priceSinIva": 4646.950000000001
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE SPOT-ON PERRO GRANDE (H 40 KG)",
+   "priceSinIva": 6520.456250000001
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE SPOT-ON PERRO MEDIANO (H 20 KG)",
+   "priceSinIva": 5049.000000000001
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE SPOT-ON XL (H 60 KG)",
+   "priceSinIva": 8237.350000000002
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE SPRAY X 100 ML",
+   "priceSinIva": 16769.6925
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "FRONTLINE SPRAY X 250 ML",
+   "priceSinIva": 25595.625
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD COMBO L X 0,9 ML",
+   "priceSinIva": 15351
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD COMBO S X 0,3 ML",
+   "priceSinIva": 13660
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD G (10,1 A 25 KG)",
+   "priceSinIva": 14696.666666666668
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD GG (25 A 50 KG)",
+   "priceSinIva": 17374.166666666668
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD M (4,1 A 10 KG)",
+   "priceSinIva": 11235
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD P (2 A 4 KG)",
+   "priceSinIva": 10268.333333333332
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD SPECTRA  PP (2 A 3,5 KG.)",
+   "priceSinIva": 11864.166666666668
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD SPECTRA G (15,1 A 30 KG.)",
+   "priceSinIva": 18428.333333333332
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD SPECTRA GG (30,1 A 60 KG.)",
+   "priceSinIva": 21956.666666666664
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD SPECTRA M (7,6 A 15 KG.)",
+   "priceSinIva": 14054.166666666668
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "NEXGARD SPECTRA P (3,6 A 7,5 KG.)",
+   "priceSinIva": 12693.333333333332
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "PREVICOX PERRO CHICO 57 MG X 30 COMP",
+   "priceSinIva": 29300.190000000006
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "PREVICOX PERRO GRANDE 227 MG X 30 COMP",
+   "priceSinIva": 63763.91
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "PUREVAX \"FEL\" X DOSIS",
+   "priceSinIva": 12871.44375
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "PUREVAX RCP X DOSIS",
+   "priceSinIva": 8393.121
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "RABISIN X DOSIS",
+   "priceSinIva": 4774.2783
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "RECOMBITEK C4",
+   "priceSinIva": 6593.994
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "RECOMBITEK C6",
+   "priceSinIva": 7375.317400000001
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "RECOMBITEK C8",
+   "priceSinIva": 8112.882799999999
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "SEMINTRA X 30 ML",
+   "priceSinIva": 21271.717500000002
+  },
+  {
+   "lab": "BOEHRINGER PEQUEÑOS",
+   "name": "SERAQUIN TABS X 60 COMP",
+   "priceSinIva": 35690.82
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "ACEDERM SPRAY",
+   "priceSinIva": 21544.383559851376
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "ARTRIN PALATABLE X 30 COMPRIMIDOS",
+   "priceSinIva": 20394.81356842314
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "ARTRIN PLUS X 18 COMPRIMIDOS",
+   "priceSinIva": 26727.460428376864
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "DERMOMAX X 15 GR",
+   "priceSinIva": 6105.432652800001
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "DERMOMAX X 40 GR",
+   "priceSinIva": 9494.729196376858
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "DEXAFLOX X 5 ML",
+   "priceSinIva": 8604.84999637686
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "DYNAMIDE X 30 COMPRIMIDOS",
+   "priceSinIva": 23548.953696000004
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "EUTHANYLE X 15 ML",
+   "priceSinIva": 33654.508041752386
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "FENOBARBITAL P 100 MG X 30 COMP",
+   "priceSinIva": 13130.867162023145
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "FENOBARBITAL PG 40 MG X 30 COMP",
+   "priceSinIva": 6629.702143576859
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "FORT-E-PEN X 100 ML",
+   "priceSinIva": 33875.414728453194
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "HIALURINA BROUWER X 10 ML",
+   "priceSinIva": 9936.863328
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "LAXAVET X 40 GR",
+   "priceSinIva": 8622.24845730909
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "MELTRA GOLD COMP 10 A 20 KG",
+   "priceSinIva": 3063.6234984727275
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "MELTRA GOLD COMP 40 A 60 KG",
+   "priceSinIva": 5007.724087854545
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "MELTRA SPOT ON GATO 4 A 8 KG",
+   "priceSinIva": 4459.8220288
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "MELTRA SPOT ON GATO HASTA 4 KG",
+   "priceSinIva": 4006.3113294769228
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "MELTRA SUSPENSION X 15 ML",
+   "priceSinIva": 5216.900564114287
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "NEO VITAPEL X 30 COMPRIMIDOS",
+   "priceSinIva": 16387.108979623143
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "OCLADERM 16 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 26517.63850705455
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "OCLADERM 3,6 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 12478.277818181818
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "OCLADERM 5,4 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 17158.46723956364
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "OCUFLOX X 5 ML",
+   "priceSinIva": 11691.62560597686
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "OPTER X 25 ML",
+   "priceSinIva": 7886.747692800002
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "PIMOBENDAN 10 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 11104.65136152381
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "PIMOBENDAN 2,5 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 5024.629662476191
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "PIMOBENDAN 5 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 7572.403599847619
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER COMPRIMIDOS 1400MG 10 A 20 KG",
+   "priceSinIva": 5993.423728211571
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER COMPRIMIDOS 2100MG 20 A 30 KG",
+   "priceSinIva": 7505.481558611572
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER COMPRIMIDOS 2800MG 30 A 40 KG",
+   "priceSinIva": 8808.05715541157
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER COMPRIMIDOS 350MG 2,5 A 5 KG",
+   "priceSinIva": 4846.43608618843
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER COMPRIMIDOS 700MG 5 A 10 KG",
+   "priceSinIva": 5408.611433388431
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER F SPRAY X 100 ML",
+   "priceSinIva": 15435.063110413717
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER ULTRA 10 A 20 KG (VERDE)",
+   "priceSinIva": 3057.3067133884297
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER ULTRA 2 A 4 KG (LILA)",
+   "priceSinIva": 2508.2762976000004
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER ULTRA 20 A 40 KG (AZUL)",
+   "priceSinIva": 4127.365206611571
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER ULTRA 40 A 60 KG (GRIS)",
+   "priceSinIva": 5180.363011199999
+  },
+  {
+   "lab": "BROUWER PA",
+   "name": "POWER ULTRA 5 A 10 KG (ROJA)",
+   "priceSinIva": 2726.098633811571
+  },
+  {
+   "lab": "ELMER P.A",
+   "name": "COLIRIO ELMER X 5 ML",
+   "priceSinIva": 4253.267304
+  },
+  {
+   "lab": "ELMER P.A",
+   "name": "FORTIPET ELMER",
+   "priceSinIva": 9235.75224
+  },
+  {
+   "lab": "ELMER P.A",
+   "name": "HECTOPAR PUNTA OREJA X 5 ML",
+   "priceSinIva": 3058.4954400000006
+  },
+  {
+   "lab": "ELMER P.A",
+   "name": "SUPRESOR DE CELO ELMER INY X 1 ML (AMPOLLA+JGA)",
+   "priceSinIva": 6258.6157920000005
+  },
+  {
+   "lab": "ELMER P.A",
+   "name": "SUPRESOR DE CELO ELMER INY X 10 DS",
+   "priceSinIva": 12878.827104000002
+  },
+  {
+   "lab": "ELMER P.A",
+   "name": "SUPRESOR DE CELO ELMER X 8 COMP",
+   "priceSinIva": 3311.612304
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "ACEDAN GOTAS PALATABLES X 10 ML",
+   "priceSinIva": 3176.602227272727
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "ACEDAN INYECTABLE X 50 ML",
+   "priceSinIva": 17482.378670454542
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "APETIL GOTAS X 10 ML",
+   "priceSinIva": 14081.530022727271
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "APETIL M UNGUENTO X 3 ML",
+   "priceSinIva": 16969.35923863636
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "ATRIBEN INY X 20 ML",
+   "priceSinIva": 14195.849999999997
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "BIO CLIN GEL ANTIPLACA 0.2% X 20 ML",
+   "priceSinIva": 8429.198863636362
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "BUTORMIN X 10 ML",
+   "priceSinIva": 64729.51932954545
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "CARDIAL B 10 MG X 20 COMP",
+   "priceSinIva": 21721.732381818183
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "CARDIAL B 2.5 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 6637.392334090908
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "CARDIAL B 5 MG X 20 COMP",
+   "priceSinIva": 12069.32627840909
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "CARDIAL PALATABLE 5 MG X 30 COMP",
+   "priceSinIva": 10598.41988181818
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "CEFALEXINA 1 BLISTER X 10 COMP (HOLLIDAY)",
+   "priceSinIva": 4794.6813715909075
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "CICLOSPORINA 1% X 3,5 ML (HOLLIDAY)",
+   "priceSinIva": 18802.266784090905
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "CICLOSPORINA 2% X 5 ML (HOLLIDAY)",
+   "priceSinIva": 12696.10227272727
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "CLORALEN GOTAS X 5 ML",
+   "priceSinIva": 11464.668443181818
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "COLLAR CHICO HOLLIDAY",
+   "priceSinIva": 8877.70271590909
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "COLLAR GATO HOLLIDAY",
+   "priceSinIva": 8877.70271590909
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "COLLAR GRANDE HOLLIDAY",
+   "priceSinIva": 9791.216454545454
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "DIURENE 40 X 30 COMP",
+   "priceSinIva": 7166.32759090909
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "ECTHOL 5 AP X  70 ML",
+   "priceSinIva": 4646.355
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "ECTHOL 5 AP X 120 ML",
+   "priceSinIva": 6552.642272727273
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "ECTHOL AP AMBIENTAL X 100 ML",
+   "priceSinIva": 8585.780454545453
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "ENZIMAX X 20 COMP",
+   "priceSinIva": 8403.366204545455
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "EPITELIZANTE OCULAR POMO X 3 GRS",
+   "priceSinIva": 5657.638636363635
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "FLOXADAY 100 MG X 10 COMPRIMIDOS",
+   "priceSinIva": 4210.745454545454
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "FLOXADAY 200 MG X 10 COMPRIMIDOS",
+   "priceSinIva": 5034.3954545454535
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "FLOXADAY 400 MG X 10 COMPRIMIDOS",
+   "priceSinIva": 8061.782693181818
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "FLURBIPROFENO X 5 ML",
+   "priceSinIva": 7517.0945795454545
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "NEOVITA HOLLIDAY X 21 COMP",
+   "priceSinIva": 12061.682556818181
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "NOMAT BLISTER X 20 GRAGEAS",
+   "priceSinIva": 8960.706374999998
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "OFLOXACINA HOLLIDAY X 5 ML",
+   "priceSinIva": 7419.456818181817
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "OFTALDAY CICLOSPORINA 2% HOLLIDAY X 5 ML",
+   "priceSinIva": 12696.10227272727
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "OHM GATOS X 7 GRS",
+   "priceSinIva": 8302.56818181818
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "OHM X 21 COMPRIMIDOS",
+   "priceSinIva": 9697.619863636362
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "OL-TRANS FLEX X 21 COMPRIMIDOS",
+   "priceSinIva": 10842.063920454544
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "OL-TRANS FLEX X 70 COMPRIMIDOS",
+   "priceSinIva": 33786.99289772727
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PILERAN GOTAS X 20 ML",
+   "priceSinIva": 8398.003670454545
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PILERAN INY X 50 ML",
+   "priceSinIva": 16428.954545454544
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PIMOCARD 1,25 MG X 100 COMPRIMIDOS",
+   "priceSinIva": 0
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PIMOCARD 1,25 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 4333.753397727272
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PIMOCARD 2,5 MG X 100 COMPRIMIDOS",
+   "priceSinIva": 26467.65139772727
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PIMOCARD 2,5 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 5477.371602272726
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PIMOCARD 5 MG X 100 COMPRIMIDOS",
+   "priceSinIva": 32948.62070454545
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PIMOCARD 5 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 6937.687636363636
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PREDNISOLONA 1 BLIS X 10 COMP (HOLLIDAY)",
+   "priceSinIva": 3144.8289374999995
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PRO AGE IQ 180 X 21 COMPRIMIDOS",
+   "priceSinIva": 10070.310477272724
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PROTELIV GATOS JERINGA X 7 GR",
+   "priceSinIva": 8792.992295454545
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PROTELIV GOTAS X 15 ML",
+   "priceSinIva": 6010.828125
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "PROTELIV PERRO X 21 COMP",
+   "priceSinIva": 13263.60593181818
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "RELAY C X 10 COMP",
+   "priceSinIva": 15561.996852272725
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "SOLUBRON 20 X 30 COMPRIMIDOS",
+   "priceSinIva": 15224.784852272727
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "TORACARD X 10 ML",
+   "priceSinIva": 8358.472875
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "TOTAL FULL CG X  15 ML",
+   "priceSinIva": 6263.116818181817
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "TOTAL FULL CG X 150 ML",
+   "priceSinIva": 44371.90477272727
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "TOTAL FULL GATOS SUSPENSION X 15 ML",
+   "priceSinIva": 4626.872227272727
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "TOTAL FULL LC GATO X 2 COMP",
+   "priceSinIva": 3025.466489772726
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "TOTAL FULL LC PERROS 10 KG X 2 COMP",
+   "priceSinIva": 2584.7917170454543
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "TOTAL FULL LC PERROS 20 KG X 2 COMP",
+   "priceSinIva": 3046.4038636363625
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "TOTAL FULL LC PERROS 60 KG X 3 COMP",
+   "priceSinIva": 5172.787373863635
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "TOTAL FULL PERROS SUSPENSION X 15 ML",
+   "priceSinIva": 4523.4094545454545
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "VITAMINICO AEDK GOTAS X 5 ML",
+   "priceSinIva": 10458.042613636362
+  },
+  {
+   "lab": "HOLLIDAY",
+   "name": "VIVIRAM X 10 ML",
+   "priceSinIva": 53135.83073863636
+  },
+  {
+   "lab": "JANVIER",
+   "name": "AMLODIPINA CAT X 20 COMP",
+   "priceSinIva": 6614.53
+  },
+  {
+   "lab": "JANVIER",
+   "name": "AZATIOPRINA 10 MG X 20 COMP",
+   "priceSinIva": 8389.16
+  },
+  {
+   "lab": "JANVIER",
+   "name": "BRO K 300 X 150 COMPRIMIDOS",
+   "priceSinIva": 36649.21199999999
+  },
+  {
+   "lab": "JANVIER",
+   "name": "BRO K 300 X 20 COMPRIMIDOS",
+   "priceSinIva": 5519.968
+  },
+  {
+   "lab": "JANVIER",
+   "name": "BRO K 600 X 120 COMPRIMIDOS",
+   "priceSinIva": 42308.99933333333
+  },
+  {
+   "lab": "JANVIER",
+   "name": "BRO K 600 X 20 COMPRIMIDOS",
+   "priceSinIva": 7530.388
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CARDIOVIER  E 10 KG X 100 COMPRIMIDOS",
+   "priceSinIva": 40573.25399999999
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CARDIOVIER  E 20 KG X  20 COMPRIMIDOS",
+   "priceSinIva": 9687.246
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CARDIOVIER  E 20 KG X 100 COMPRIMIDOS",
+   "priceSinIva": 45758.151999999995
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CARDIOVIER 2.5 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 7818.299999999998
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CARDIOVIER 2.5 X 100 COMPRIMIDOS",
+   "priceSinIva": 36770.83
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CARTILAGO \"CD\" FORTE X 64 COMP",
+   "priceSinIva": 32134.453999999994
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CARTILAGO FORTE SENIOR X 120 COMP",
+   "priceSinIva": 55477.799999999996
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CARTILAGO FORTE X 120 COMPR",
+   "priceSinIva": 55477.799999999996
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CONTAL 15 X 100 COMPRIMIDOS",
+   "priceSinIva": 11888.099999999999
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CONTAL 15 X 300 COMPRIMIDOS",
+   "priceSinIva": 36525.85999999999
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CONTAL 150 X 100 COMP",
+   "priceSinIva": 35494.9375
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CONTAL 60 X 180 COMP",
+   "priceSinIva": 32388.4
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CORULETS HOSPITALARIO (10 UNIDADES X 5 ML)",
+   "priceSinIva": 42094.719999999994
+  },
+  {
+   "lab": "JANVIER",
+   "name": "CORULETS POMADA OFTALMICA X 5 ML",
+   "priceSinIva": 4579.29
+  },
+  {
+   "lab": "JANVIER",
+   "name": "EMULSION OFTALMICA JANVIER X 5 ML",
+   "priceSinIva": 5646.55
+  },
+  {
+   "lab": "JANVIER",
+   "name": "FUROSEMIDA JANVIER X 20 COMPRIMIDOS",
+   "priceSinIva": 5214.682000000001
+  },
+  {
+   "lab": "JANVIER",
+   "name": "FUROSEMIDA JANVIER X 200 COMPRIMIDOS",
+   "priceSinIva": 46803.074
+  },
+  {
+   "lab": "JANVIER",
+   "name": "KETOCONAZOL 2% SOLUCION SPRAY X 40 ML",
+   "priceSinIva": 4616.5199999999995
+  },
+  {
+   "lab": "JANVIER",
+   "name": "KETOCONAZOL JANVIER 200 MG X 100 COMPRIMIDOS",
+   "priceSinIva": 39970.128
+  },
+  {
+   "lab": "JANVIER",
+   "name": "NEUROGREEN X 60 COMP",
+   "priceSinIva": 23936.408
+  },
+  {
+   "lab": "JANVIER",
+   "name": "ODONTOBIOTIC X 10 COMP",
+   "priceSinIva": 6098.273999999999
+  },
+  {
+   "lab": "JANVIER",
+   "name": "ODONTOBIOTIC X 100 COMP",
+   "priceSinIva": 56356.291999999994
+  },
+  {
+   "lab": "JANVIER",
+   "name": "ODONTOLIMP NOVO X 60 ML",
+   "priceSinIva": 7182.9079999999985
+  },
+  {
+   "lab": "JANVIER",
+   "name": "OFLOXACINA-CONDROITIN X 5 ML",
+   "priceSinIva": 4745.583999999999
+  },
+  {
+   "lab": "JANVIER",
+   "name": "OTOVIER \"NF\" X 25 ML",
+   "priceSinIva": 4832.454
+  },
+  {
+   "lab": "JANVIER",
+   "name": "OTOVIER CLASSIC X 20 ML",
+   "priceSinIva": 4681.052
+  },
+  {
+   "lab": "JANVIER",
+   "name": "OTOVIER ORAL X 60 COMP",
+   "priceSinIva": 23330.8
+  },
+  {
+   "lab": "JANVIER",
+   "name": "OTOVIER PUNTA OREJAS X 10 ML",
+   "priceSinIva": 4092.8179999999993
+  },
+  {
+   "lab": "JANVIER",
+   "name": "OTOVIER SOLUCION LIMPIA OREJAS X 40 ML",
+   "priceSinIva": 4438.643333333333
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PANTOVIER 10 MG X 10 COMP",
+   "priceSinIva": 5249.429999999999
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PANTOVIER 10 MG X 100 COMP",
+   "priceSinIva": 47237.424
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PIMODEN \"COMPLEX\" 10 KG X 100 COMP.",
+   "priceSinIva": 32349.753333333327
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PIMODEN \"COMPLEX\" 20 KG X 100 COMP.",
+   "priceSinIva": 40316.40666666666
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PIMODEN \"COMPLEX\" 5 KG X 100 COMP.",
+   "priceSinIva": 28905.89333333333
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PIMODEN 10 MG X 100 COMP.",
+   "priceSinIva": 44046.659999999996
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PIMODEN 10 MG X 20 COMP.",
+   "priceSinIva": 9160.619999999999
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PIMODEN 2.5 MG X 100 COMP.",
+   "priceSinIva": 27926.92
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PIMODEN 2.50 MG X 20 COMP.",
+   "priceSinIva": 5907.159999999999
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PIMODEN 5 MG X 100 COMP.",
+   "priceSinIva": 33972.119999999995
+  },
+  {
+   "lab": "JANVIER",
+   "name": "PIMODEN 5 MG X 20 COMP.",
+   "priceSinIva": 7130.48
+  },
+  {
+   "lab": "JANVIER",
+   "name": "SUSP. OFTALMICA X 5 ML (OFLOXACINA-PREDNISOLONA)",
+   "priceSinIva": 5373.529999999999
+  },
+  {
+   "lab": "JANVIER",
+   "name": "TEST DE FLUORESCEINA X 5 ML",
+   "priceSinIva": 3241.4919999999997
+  },
+  {
+   "lab": "JANVIER",
+   "name": "TRAMAVIER X 120 COMPRIMIDOS",
+   "priceSinIva": 36763.384
+  },
+  {
+   "lab": "JANVIER",
+   "name": "UROVIER X 60 COMP",
+   "priceSinIva": 22156.814
+  },
+  {
+   "lab": "JANVIER",
+   "name": "ZAZEN X 60 COMP",
+   "priceSinIva": 23936.408
+  },
+  {
+   "lab": "JANVIER NUTRICION ANIMAL",
+   "name": "RP GATOS ADULTOS X 2 KG",
+   "priceSinIva": 15699.54162201831
+  },
+  {
+   "lab": "JANVIER NUTRICION ANIMAL",
+   "name": "RP PERROS ADULTOS X 10 KG",
+   "priceSinIva": 69747.5597100975
+  },
+  {
+   "lab": "JANVIER NUTRICION ANIMAL",
+   "name": "RP PERROS ADULTOS X 2 KG",
+   "priceSinIva": 14742.097847816065
+  },
+  {
+   "lab": "JANVIER NUTRICION ANIMAL",
+   "name": "RP SUPPLY INTESTINAL X 90 GR",
+   "priceSinIva": 9455.2332
+  },
+  {
+   "lab": "JANVIER NUTRICION ANIMAL",
+   "name": "RP SUPPLY RENAL X 90 GR",
+   "priceSinIva": 9455.2332
+  },
+  {
+   "lab": "JANVIER NUTRICION ANIMAL",
+   "name": "RP SUPPLY SKIN & COAT X 90 GR",
+   "priceSinIva": 9455.2332
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "ASCARICIDA GOTAS X 15 ML",
+   "priceSinIva": 4984.1427
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "ATROPINA SULFATO JM X 10 ML",
+   "priceSinIva": 5631.349205040938
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "ATROPINA SULFATO JM X 50 ML",
+   "priceSinIva": 19076.048925
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "BUPRENORFIN INYECTABLE X 10 ML",
+   "priceSinIva": 64453.0884375
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "CALCIO JARABE X 100 ML",
+   "priceSinIva": 4974.306934968749
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "CEPHILEXINE X 50 COMP",
+   "priceSinIva": 17505.46618569225
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "COLOTRIN +HA CAT POMO X 80 GRS (PALATABLE)",
+   "priceSinIva": 10768.682611593751
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "COLOTRIN +HA DOG POMO X 200 GRS (PALATABLE)",
+   "priceSinIva": 20008.794400968756
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "COLOTRIN +HA DOG POMO X 80 GRS (PALATABLE)",
+   "priceSinIva": 9762.913249312502
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "COLOTRIN PALATABLE X 30 COM",
+   "priceSinIva": 19289.433234375
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "COMPLEJO VITAMINICO JM X 100 ML",
+   "priceSinIva": 5899.9272898125
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "COMPRIMIDO BLOCK! SPINO L (20 A 30 KG)",
+   "priceSinIva": 7711.681232221876
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "COMPRIMIDO BLOCK! SPINO M (10 A 20 KG)",
+   "priceSinIva": 6123.982230928124
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "COMPRIMIDO BLOCK! SPINO S (5 A 10 KG)",
+   "priceSinIva": 5670.354682434375
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "COMPRIMIDO BLOCK! SPINO XL (30 A 40 KG)",
+   "priceSinIva": 8618.938910775
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "COMPRIMIDO BLOCK! SPINO XS (2.5 A 5 KG)",
+   "priceSinIva": 4988.361838753125
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "DEXA 4 JM INY X 50 ML",
+   "priceSinIva": 8941.8721179375
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "DEXAMETASONA INY JM X 50 ML",
+   "priceSinIva": 10149.9759886875
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "DEXASHOCK 20 X 25 ML (JM)",
+   "priceSinIva": 11620.590662625
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "ENROFLOXACINA INY. JM X 50 ML",
+   "priceSinIva": 9270.92707771875
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "FELILAX X 40 GRS",
+   "priceSinIva": 7849.766595937501
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "FLEXAPET X 30 COMP",
+   "priceSinIva": 24298.696515634616
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "GRUPO B TOTAL 5000 X 50 ML (JOHN MARTIN)",
+   "priceSinIva": 14442.00954984375
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "HEPATOPROTECTOR JM X 15 ML",
+   "priceSinIva": 5227.876915875001
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "ISIQUICK X 4 GRS",
+   "priceSinIva": 8115.728091843751
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "MELOXIVET ·2 MG· X 10 COMP",
+   "priceSinIva": 5326.10548790625
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "MELOXIVET ·2 MG· X 100 COMP",
+   "priceSinIva": 43018.569346724995
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "MELOXIVET ·4 MG· X 10 COMP",
+   "priceSinIva": 5785.22832909375
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "MELOXIVET ·4 MG· X 100 COMP",
+   "priceSinIva": 48595.9179643875
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "MELOXIVET GOTAS X 10 ML",
+   "priceSinIva": 10807.018861125
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "MELOXIVET INYECTABLE X 10 ML",
+   "priceSinIva": 18352.289791593754
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "NOVOTIOC \"50\" X 20 GRAGEAS",
+   "priceSinIva": 10830.33039871875
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "NOVOTIOC INY X 50 CC",
+   "priceSinIva": 8485.50294675
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "NUTRIPET PALATABLE X 40 GRS",
+   "priceSinIva": 5110.49312690625
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "NUTRIPET PALATABLE X 80 GRS",
+   "priceSinIva": 7842.600169762501
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "OMEGA 3 JM X 200 GR",
+   "priceSinIva": 21203.259000000002
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "OMEGA 3 JM X 80 GR",
+   "priceSinIva": 12721.9554
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "PANTOLIV X 30 COMP",
+   "priceSinIva": 17416.96275
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "PIPETA BLOCK! FIPRO GATOS",
+   "priceSinIva": 4050.6622557399
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "PIPETA BLOCK! FIPRO L (21 A 40 KG)",
+   "priceSinIva": 5860.253100870001
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "PIPETA BLOCK! FIPRO M (11 A 20 KG)",
+   "priceSinIva": 4362.858297765001
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "PIPETA BLOCK! FIPRO S (2 A 10 KG)",
+   "priceSinIva": 3987.0071257950003
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "PIPETA BLOCK! FIPRO XL (+40 KG)",
+   "priceSinIva": 7147.702595835
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "PREDNISOL GOTAS JM X 15 ML",
+   "priceSinIva": 12151.799421281252
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "PREGABALIV 20 MG X 20 COMP",
+   "priceSinIva": 23496.7391116875
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "PREGABALIV 80 MG X 20 COMP",
+   "priceSinIva": 32308.018429875003
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "PUPPYLINE PASTA X 80 GRS",
+   "priceSinIva": 5455.245329567308
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "RANITIDINA GOTAS JM X 30 ML",
+   "priceSinIva": 5218.333728281249
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "RANITIDINA INY JM 20 X 50 ML",
+   "priceSinIva": 14389.285374562502
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "RANITIDINA JM 50 MG X 10 COMP",
+   "priceSinIva": 4024.7468615625003
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "RANITIDINA JM 50 MG X 100 COMP",
+   "priceSinIva": 28506.484058512502
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "SENIORLINE CAT X 60 COMP",
+   "priceSinIva": 20964.620679278538
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "SENIORLINE DOG X 40 COMP",
+   "priceSinIva": 28548.34433369581
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "SILIHEPATIC X 30 COMP",
+   "priceSinIva": 16391.97793425
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "TOLZURIL X 3 COMP",
+   "priceSinIva": 8038.12622915625
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "TONICO TOTAL GATO PALATABLE X 80 GR",
+   "priceSinIva": 10051.6768538625
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "TONICO TOTAL PERRO PALATABLE X 80 GR",
+   "priceSinIva": 9681.4906695
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "TONICO TOTAL X 200 ML",
+   "priceSinIva": 9883.34328571875
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "TONICO TOTAL X 900 ML",
+   "priceSinIva": 24357.13190840625
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "TRAMADOL GOTAS X 10 ML",
+   "priceSinIva": 8302.633443093751
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "TRAMADOL HOSPITALARIO X 120 COMP",
+   "priceSinIva": 38446.172606249995
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "TRAMADOL INYECTABLE X 50 ML",
+   "priceSinIva": 18039.64498396875
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "TRAMADOL X  20 COMP",
+   "priceSinIva": 7265.257112343751
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "URSOLIV JARABE X 75 ML",
+   "priceSinIva": 14667.251150625
+  },
+  {
+   "lab": "JOHN MARTIN",
+   "name": "VITAMINA K1 X 10 ML",
+   "priceSinIva": 7426.037019468751
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "ANA-BOLDE INY X 10 ML",
+   "priceSinIva": 23437.93761178323
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "APLONAL 5% INY X 50 ML",
+   "priceSinIva": 11316.989311919118
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "ASPOPAR X 100 ML",
+   "priceSinIva": 15051.682599243293
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "BACTROFLAY X 1 LT",
+   "priceSinIva": 31086.777520448246
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "BACTROFLAY X 5 LITROS",
+   "priceSinIva": 125531.36827304814
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "BACTROVET INYECTABLE X 50 ML",
+   "priceSinIva": 13099.211748985319
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "BACTROVET INYECTABLE X 500 ML",
+   "priceSinIva": 80990.03404392848
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "BACTROVET ORO AEROSOL X 440",
+   "priceSinIva": 0
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "BACTROVET PLATA AEROSOL X 440 ML",
+   "priceSinIva": 7905.199265811188
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "BACTROVET PLATA PASTA POMO X 150 GRS",
+   "priceSinIva": 12005.835044929856
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "BACTROVET PLATA PASTA X 1,2 KG",
+   "priceSinIva": 61623.47925400889
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "BACTROVET PLATA PASTA X 455 GRS",
+   "priceSinIva": 29627.36475545189
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "BTK 35 AEROSOL X 440 ML",
+   "priceSinIva": 18396.91780398254
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "CONTROL PART INY X 50 ML (CLENBUTEROL)",
+   "priceSinIva": 9014.92404896108
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "DARDOX 7X X 5 LTS",
+   "priceSinIva": 607029.3855459079
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "DIAFIN 2 X 20",
+   "priceSinIva": 10553.622254635753
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "DIAFIN N X 20 CC",
+   "priceSinIva": 12991.279568885864
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "DUALTAP BACTROVET ORO X 440",
+   "priceSinIva": 9016.473674139042
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "DUALTAP BACTROVET PLATA X 440 ML",
+   "priceSinIva": 8857.965898142129
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "ENERGO-MAG X 250 ML",
+   "priceSinIva": 13459.991205061971
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "GLYPONDIN 4 MULTIMINERAL X 250 ML",
+   "priceSinIva": 37463.449942578496
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "GLYPONDIN 4 MULTIMINERAL X 500 ML",
+   "priceSinIva": 68115.36353196089
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "GLYPONDIN X 248 ML",
+   "priceSinIva": 21470.24673836208
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "HEMODINE GR X 100 ML",
+   "priceSinIva": 12798.707533562061
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "KENSOL X 10 ML",
+   "priceSinIva": 7129.568134927061
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "KOBRA CURABICHERA AEROSOL X 440 ML",
+   "priceSinIva": 5058.802401910394
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "KURAMICINA \"MAX\" X 250 ML",
+   "priceSinIva": 28215.074956948345
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "KURAMICINA X 250 ML",
+   "priceSinIva": 23546.71902276567
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "KURAMICINA X 500 ML",
+   "priceSinIva": 42384.09424097822
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "OXIMAX X 500 GR",
+   "priceSinIva": 31482.80712895719
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "RANDON TITANIUM X 500 ML",
+   "priceSinIva": 42726.40852875249
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "REVIVON X 600 ML",
+   "priceSinIva": 17368.756308921602
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "RICOVERM X 625",
+   "priceSinIva": 46909.394366402434
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "SEDOMIN X 50 ML",
+   "priceSinIva": 21390.525628112027
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "TRATTO PASTA X 26 GRS (FENILBUTAZONA)",
+   "priceSinIva": 13080.221871371052
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "VERMIPLEX PLUS JERINGA",
+   "priceSinIva": 9969.399438478322
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "VERMKOM APR X 1 LT",
+   "priceSinIva": 125550.9842479344
+  },
+  {
+   "lab": "KONIG G.A",
+   "name": "VERMKOM APR X 4 LTS",
+   "priceSinIva": 451983.5432925637
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "APLONAL 1% INY X 12 ML",
+   "priceSinIva": 3801.1509042937073
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "APLONAL 20 MG X 12 COMPRIMIDOS",
+   "priceSinIva": 4756.868845944696
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "ARTROSAN CANINO X 10 ML",
+   "priceSinIva": 54357.132015136915
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "ARTROSAN EQUINO HI-JECT X 2 ML",
+   "priceSinIva": 36520.462032198615
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "ARTROSAN EQUINO INTRAMUSCULAR X 6 ML",
+   "priceSinIva": 66091.75220672635
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "AURIX CLEANSER X 120 ML",
+   "priceSinIva": 4253.9949301402385
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "AURIX CLEANSER X 30 ML",
+   "priceSinIva": 2187.7688212149797
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "AURIX MAXIUM X 30 ML",
+   "priceSinIva": 4675.488659916268
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "AURIX THERAPY X 25 ML",
+   "priceSinIva": 3064.2003806492266
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BACTROPROFEN X 130 COMP",
+   "priceSinIva": 32051.03887298528
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BACTROPROFEN X 20 COMP",
+   "priceSinIva": 6163.661321727937
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BACTROVET CHICO ORO PETS X 250 ML",
+   "priceSinIva": 6613.449655174918
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BACTROVET CHICO PETS X 250 ML",
+   "priceSinIva": 5919.9571695152645
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN 4 ACTIVE PERRO CHICO - 10 KG",
+   "priceSinIva": 2056.8029566523023
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN 4 ACTIVE PERRO GIGANTE - 60 KG",
+   "priceSinIva": 4114.65369881487
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN 4 ACTIVE PERRO GRANDE - 40 KG",
+   "priceSinIva": 3569.2228596696436
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN 4 ACTIVE PERRO MEDIANO - 20 KG",
+   "priceSinIva": 2424.226408918938
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN DOBLE 20 X 4 COMP",
+   "priceSinIva": 1769.7459072818485
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN DOBLE 40 X 4 COMP",
+   "priceSinIva": 2848.90652197629
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN DOBLE 40 X 60 COMP - HOSPITALARIO",
+   "priceSinIva": 34721.177650841695
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN DOBLE 60 X 3 COMP",
+   "priceSinIva": 3606.157273739387
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN DOBLE 60 X 60 COMP - HOSPITALARIO",
+   "priceSinIva": 58602.525570924896
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN PLUS GATOS X 4 COMP",
+   "priceSinIva": 1833.2713468917427
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN PLUS PERRO CHICO X 4 COMP",
+   "priceSinIva": 1741.607779547156
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "BASKEN SUSPENSION X 15 ML",
+   "priceSinIva": 3503.47321392139
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "CESTODAN INY INDOLORO X 10 ML",
+   "priceSinIva": 14343.34798186547
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "CIDAR DISPLAY POR 21 UNIDADES (3 DE C/U)",
+   "priceSinIva": 281379.0831271177
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "CIDAR GATOS 1,5 A 3 KG",
+   "priceSinIva": 10078.122130936365
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "CIDAR GATOS 3 A 6 KG",
+   "priceSinIva": 10782.668038513637
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "CIDAR PERROS DE 1,5 A 3 KG",
+   "priceSinIva": 9893.202458809092
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "CIDAR PERROS DE 12,1 A 25 KG",
+   "priceSinIva": 15366.866764534092
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "CIDAR PERROS DE 25,1 A 50 KG",
+   "priceSinIva": 18309.603704604546
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "CIDAR PERROS DE 3,1 A 6 KG",
+   "priceSinIva": 10584.820918540909
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "CIDAR PERROS DE 6,1 A 12 KG",
+   "priceSinIva": 11719.14702582273
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "DOMINAL MAX GATO HASTA 4 KG",
+   "priceSinIva": 2224.948838651454
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "DOMINAL MAX GATO MAS DE 4 KG",
+   "priceSinIva": 2454.7187595912087
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "DOMINAL MAX PERRO  5-10 KG",
+   "priceSinIva": 2765.5157238909287
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "DOMINAL MAX PERRO 10-25 KG",
+   "priceSinIva": 3101.274500182151
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "DOMINAL MAX PERRO 25-40 KG",
+   "priceSinIva": 4186.83655409782
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "DOMINAL MAX PERRO HASTA 5 KG",
+   "priceSinIva": 2544.2860638648444
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "DOMINAL MAX PERRO MAS 40 KG",
+   "priceSinIva": 5255.001780226378
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "DOMINAL SHAMPOO X 250 ML",
+   "priceSinIva": 5863.253460082645
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "ECP ESTRADIOL X 10 ML",
+   "priceSinIva": 9209.083799317283
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "EPISOL X 18 COMP",
+   "priceSinIva": 5149.9983716245715
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "ESPUMA SECA FAUNA QUICK X 162 GR",
+   "priceSinIva": 7675.398833483532
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "FOGGER TEA LARVOX X 419 ML",
+   "priceSinIva": 10245.006357937038
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "JABON FAUNA X 80 GRS",
+   "priceSinIva": 6856.974269866752
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "KURADERM PLATA AEROSOL X 250 GRS",
+   "priceSinIva": 11912.837891214578
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "KURADERM PLATA X 100 ML",
+   "priceSinIva": 6807.335937836901
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "NUTRICAL X 120 ML",
+   "priceSinIva": 3971.039454991837
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "REPEXXIN COLLAR 25 A 50 KG",
+   "priceSinIva": 16317.115027075428
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "REPEXXIN COLLAR 4 A 25 KG",
+   "priceSinIva": 15521.158196486376
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "SERENEX CANINO \"SPRAY\" X 25 ML",
+   "priceSinIva": 11713.367753528039
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "SERENEX CANINO \"SPRAY\" X 70 ML",
+   "priceSinIva": 26571.991663096007
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "SERENEX CANINO CAJA CON REPUESTO DIFUSOR X 42 ML",
+   "priceSinIva": 19138.92838622082
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "SERENEX CANINO DIFUSOR X 42 ML (KIT DIFUSOR + REP)",
+   "priceSinIva": 31511.28297908844
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "SERENEX FELINO \"SPRAY\" X 25 ML",
+   "priceSinIva": 11930.281971185965
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "SERENEX FELINO \"SPRAY\" X 70 ML",
+   "priceSinIva": 27064.065582782976
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "SERENEX FELINO CAJA CON REPUESTO DIFUSOR X 42 ML",
+   "priceSinIva": 19493.352985965652
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "SERENEX FELINO DIFUSOR X 42 ML (KIT DIFUSOR + REP)",
+   "priceSinIva": 32094.82525647896
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "SINGESTAR MP X 3 ML",
+   "priceSinIva": 10412.8250198618
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "SINGESTAR X 8 COMP",
+   "priceSinIva": 5835.111379054635
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TANDON COX2 2% INY X 10 ML",
+   "priceSinIva": 16356.278052000001
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TANDON COX2 CANINO 32 MG X 32 COMP",
+   "priceSinIva": 39004.530830548014
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TANDON COX2 CANINO/FELINO 8 MG X 32 COMP",
+   "priceSinIva": 17844.557814568423
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TANDON COX2 FELINO 4 MG X 32 COMP",
+   "priceSinIva": 9814.507604662498
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA AEROSOL X 170 ML",
+   "priceSinIva": 6916.451800689481
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA COLLAR CACHORRO",
+   "priceSinIva": 7301.768688981988
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA COLLAR GATOS",
+   "priceSinIva": 7292.8549390777325
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA COLLAR PERRO EXTRA GRANDE",
+   "priceSinIva": 8199.124816143758
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA COLLAR PERRO GRANDE",
+   "priceSinIva": 8054.646845815236
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA COLLAR PERRO MEDIANO",
+   "priceSinIva": 7801.8103977403225
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA DERMASOFT X 120 ML",
+   "priceSinIva": 4358.789422630854
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA LARVOX X 440 ML",
+   "priceSinIva": 13660.298598610467
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA LIQUIDO X  70 ML",
+   "priceSinIva": 3007.563485855532
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA LIQUIDO X 120 ML",
+   "priceSinIva": 4401.844648801558
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA PIPETA GATO HASTA 5 KG",
+   "priceSinIva": 1461.0149438748465
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA PIPETA PERROS  5 A 10 KG",
+   "priceSinIva": 1629.8998194872922
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA PIPETA PERROS 10 A 20 KG",
+   "priceSinIva": 1827.799821054913
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA PIPETA PERROS 20 A 40 KG",
+   "priceSinIva": 2467.625454749842
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA PIPETA PERROS 40 A 60 KG",
+   "priceSinIva": 3097.115885268127
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA PIPETA PERROS HASTA 5 KG",
+   "priceSinIva": 1499.5614238707064
+  },
+  {
+   "lab": "KONIG P.A",
+   "name": "TEA POLVO X 80 GRS",
+   "priceSinIva": 3977.6902885136606
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CALCICOMPLEX COMP PALAT 3000 MG X 30 COMP",
+   "priceSinIva": 8321.043283644
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIO 3 10 KG X 20 COMP",
+   "priceSinIva": 8368.983270581817
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIO 3 20 KG X 20 COMP",
+   "priceSinIva": 14141.060113345453
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIO 3 40 KG X 20 COMP",
+   "priceSinIva": 21823.331715309087
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIO 3 5 KG X 20 COMP",
+   "priceSinIva": 4579.479129018181
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIOBENDAN 10 MG X 100 COMP",
+   "priceSinIva": 44455.40634079999
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIOBENDAN 2,5 MG X 100 COMP",
+   "priceSinIva": 20135.05770639999
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIOBENDAN 2,5 MG X 20 COMP",
+   "priceSinIva": 4837.451954872727
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIOBENDAN 5 MG X 100 COMP",
+   "priceSinIva": 32415.37322494544
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIODARONA 200 MG X 20 COMP",
+   "priceSinIva": 14921.21395723636
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIODARONA 50 MG X 20 COMP",
+   "priceSinIva": 4907.471762581817
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIONAFIL 25 MG X 10 COMP",
+   "priceSinIva": 2512.8349659636356
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIONAFIL 50 MG X 10 COMP",
+   "priceSinIva": 2642.364544654545
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIOTENOL 12,5 MG X 20 COMP",
+   "priceSinIva": 2851.6555869454537
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIOTENOL 6,25 MG X 20 COMP",
+   "priceSinIva": 2724.8727489454536
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIOZEPRIL 10 MG X 20 COMP",
+   "priceSinIva": 7696.040633272725
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIOZEPRIL 2,5 MG X 20 COMP",
+   "priceSinIva": 3391.544692072727
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIOZEPRIL 20 MG X 20 COMP",
+   "priceSinIva": 13553.699203672726
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CARDIOZEPRIL 5 MG X 20 COMP",
+   "priceSinIva": 4486.452056036363
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CEFALEXINA KUALKOS 500 MG X 100 COMPRIMIDOS",
+   "priceSinIva": 33000.6012154
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CEFALEXINA SUSPENSION KUALCOS (POLVO X 25 GRS)",
+   "priceSinIva": 7099.600464981818
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CLORMADINONA 2 MG KUALCOS X 400 COMP",
+   "priceSinIva": 37609.433375563625
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "CLORMADINONA 4 MG KUALCOS X 100 COMP",
+   "priceSinIva": 15377.331887272725
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "COMPLEMIN PALAT. 3000 MG X 30 COMPRIMIDOS",
+   "priceSinIva": 9240.41899144
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "DEXAMETASONA INY KUALCOS X 50 CC",
+   "priceSinIva": 9180.11964290909
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "DEXAMETASONA KUALCOS 0.5 MG X 100 COMP",
+   "priceSinIva": 7529.16951232727
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "DOMPERIDONA GOTAS X 20 ML",
+   "priceSinIva": 3857.1569830181816
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "DOMPERIDONA INYECTABLE X 50 ML",
+   "priceSinIva": 5760.577626109089
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "DOXIBROM KUALCOS 200 MG X 100 COMP",
+   "priceSinIva": 45300.333805999995
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "DOXICICLINA KUALCOS 100 MG X 100 COMP",
+   "priceSinIva": 22744.639013296193
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "DOXICICLINA KUALCOS 200 MG X 100 COMP",
+   "priceSinIva": 28952.8279400178
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "DOXICICLINA KUALCOS 50 MG X 100 COMP",
+   "priceSinIva": 14585.5408405434
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "ENROFLOXACINA KUALKOS  50 MG X 100 COMP",
+   "priceSinIva": 10742.099910388753
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "ENROFLOXACINA KUALKOS 100 MG X 100 COMP",
+   "priceSinIva": 14486.368073397582
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "ENROFLOXACINA KUALKOS 200 MG X 100 COMP",
+   "priceSinIva": 20840.348118939073
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "ENTEROSEPT SUSPENSION FRASCO X 100 ML",
+   "priceSinIva": 3924.059107563636
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "EPIFEN 640 MG X 100 COMP",
+   "priceSinIva": 31986.24577578181
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "FENTEL MAX  5 KG. X 30 COMP",
+   "priceSinIva": 14871.286866799994
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "FENTEL MAX 10 KG. X 30 COMP",
+   "priceSinIva": 21363.142250036355
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "FENTEL MAX 20 KG. X 30 COMP",
+   "priceSinIva": 38047.46344407272
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "FENTEL MAX SUSPENSION X 100 ML",
+   "priceSinIva": 10862.520395999996
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "FENTEL MAX SUSPENSION X 20 ML",
+   "priceSinIva": 4621.819562690908
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "KETOCONAZOL 200 MG X 50 COMP (KUALCOS)",
+   "priceSinIva": 17882.553700581815
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "KUALCODERM CREMA X 20 GRS",
+   "priceSinIva": 4635.067508145455
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "KUALCODERM CREMA X 40 GRS",
+   "priceSinIva": 6093.366015927271
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "KUALCOHEPAT  INYECTABLE X 50 ML",
+   "priceSinIva": 6542.69216592727
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "KUALCOHEPAT 10 KG  X 200 COMP",
+   "priceSinIva": 31700.84087087272
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "KUALCOHEPAT 20 KG X 100 COMP",
+   "priceSinIva": 31141.009191854544
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "KUALCOVIT B JARABE X 100 ML",
+   "priceSinIva": 4108.532332036362
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "KUALCOVIT INY X 50 ML",
+   "priceSinIva": 11192.03212730909
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "LEVAMISOL GOTAS KUALCOS X 20 ML",
+   "priceSinIva": 3167.79572530909
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "MOXIOFTAL COLIRIO GOTERO X 10 ML",
+   "priceSinIva": 7326.820393454544
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "OTOMICINE PLUS X 20 ML",
+   "priceSinIva": 5474.4485001818175
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PARMAX CACHORROS SUSPENSION X 20 ML",
+   "priceSinIva": 3729.853059163636
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS GATO HASTA 4 KG",
+   "priceSinIva": 1267.1763375689598
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS GATO MAS 4 KG",
+   "priceSinIva": 1343.4060469502397
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS MAX CANINOS 10-20 KG",
+   "priceSinIva": 1802.36184423568
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS MAX CANINOS 20-40 KG",
+   "priceSinIva": 2021.6825515140795
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS MAX CANINOS 2-5 KG",
+   "priceSinIva": 1488.63428227696
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS MAX CANINOS 40-60 KG",
+   "priceSinIva": 2397.92844106816
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS MAX CANINOS 5-10 KG",
+   "priceSinIva": 1593.1038647887997
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS MULTIDOSIS CANINO X 75 ML",
+   "priceSinIva": 29777.534430799995
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS MULTIDOSIS FELINO GOTERO X 10 ML",
+   "priceSinIva": 6793.061932799999
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS TALCO X 100 GRS",
+   "priceSinIva": 2819.247174545454
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PERFOS X 100 ML",
+   "priceSinIva": 4155.533392919999
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "POLADIN GERIATRICO PALATABLE X 30 COMP",
+   "priceSinIva": 24836.437363919995
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "POLADIN MAX 2400 MG X 30 COMP.",
+   "priceSinIva": 11999.57389043636
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "POLADIN MAX CACHORROS X 50 COMP",
+   "priceSinIva": 10791.54673621818
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "POLADIN MAX FORTE X 30 COMP.",
+   "priceSinIva": 21478.637838509087
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "POLFEN 20 MG X 100 COMPRIMIDOS",
+   "priceSinIva": 15498.371299319997
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PREDNISOLONA KUALCOS 10 MG X 100 COMP.",
+   "priceSinIva": 12358.71349891833
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PREDNISOLONA KUALCOS 10 MG X 200 COMP",
+   "priceSinIva": 23564.94837089447
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PREDNISOLONA KUALCOS 20 MG X 100 COMP",
+   "priceSinIva": 25126.132836763634
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PREDNISOLONA KUALCOS 20 MG X 200 COMP",
+   "priceSinIva": 41437.98969945544
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PROPOLVET CICATRIZANTE X 60 ML",
+   "priceSinIva": 6759.675848545451
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "PROPOLVET CURABICHERA X 60 ML",
+   "priceSinIva": 6997.511797309089
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "RANITIDINA KUALCOS 40 MG X 100 COMPRIMIDOS",
+   "priceSinIva": 23194.167287199994
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "RANITIDINA KUALCOS INYECTABLE X 50 ML",
+   "priceSinIva": 11178.854837563633
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "SOFTAL \"E\" X 10 ML",
+   "priceSinIva": 4705.864528654544
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "SOFTAL COLIRIO GOTERO X 10 ML",
+   "priceSinIva": 4462.729401709091
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "SULFADIM  5 KG X 100 COMPRIMIDOS",
+   "priceSinIva": 16345.048082802066
+  },
+  {
+   "lab": "KUALCOS",
+   "name": "SULFADIM JARABE X 100 ML",
+   "priceSinIva": 7369.8320563636335
+  },
+  {
+   "lab": "LAMAR",
+   "name": "AMOXICILINA 100 MG X 100 COMP",
+   "priceSinIva": 23249.1
+  },
+  {
+   "lab": "LAMAR",
+   "name": "AMOXICILINA 250 MG X 100 COMP",
+   "priceSinIva": 40509
+  },
+  {
+   "lab": "LAMAR",
+   "name": "AMOXICILINA 500 MG X 100 COMP",
+   "priceSinIva": 67656.75
+  },
+  {
+   "lab": "LAMAR",
+   "name": "AMOXICILINA LAMAR SUSP./ EXTEM. JB",
+   "priceSinIva": 14172.899999999998
+  },
+  {
+   "lab": "LAMAR",
+   "name": "BRONCO TOS COMUN X 100 ML",
+   "priceSinIva": 8584.8
+  },
+  {
+   "lab": "LAMAR",
+   "name": "BRONCO TOS FORTE X 100 ML",
+   "priceSinIva": 11098.499999999998
+  },
+  {
+   "lab": "LAMAR",
+   "name": "CLINDAMICIN 110 MG X 100 COMP",
+   "priceSinIva": 29758.049999999996
+  },
+  {
+   "lab": "LAMAR",
+   "name": "CLINDAMICIN 220 MG X 100 COMP",
+   "priceSinIva": 58078.649999999994
+  },
+  {
+   "lab": "LAMAR",
+   "name": "CLINDAMICIN 220 MG X 500 COMP",
+   "priceSinIva": 260497.64999999997
+  },
+  {
+   "lab": "LAMAR",
+   "name": "CLORMADINONA 4 MG LAMAR X 100 COMP",
+   "priceSinIva": 13961.849999999999
+  },
+  {
+   "lab": "LAMAR",
+   "name": "CLORMADINONA LAMAR X  500 COMP",
+   "priceSinIva": 41883.45
+  },
+  {
+   "lab": "LAMAR",
+   "name": "CLORMADINONA LAMAR X 100 COMP",
+   "priceSinIva": 9604.349999999999
+  },
+  {
+   "lab": "LAMAR",
+   "name": "CLORMADINONA LAMAR X 1000 COMP",
+   "priceSinIva": 80788.04999999999
+  },
+  {
+   "lab": "LAMAR",
+   "name": "DEXAMETASONA 0.5 MG X 100 COMP (LAMAR)",
+   "priceSinIva": 7574.699999999999
+  },
+  {
+   "lab": "LAMAR",
+   "name": "DEXAMETASONA 1 MG X 100 COMP. (LAMAR)",
+   "priceSinIva": 12221.999999999998
+  },
+  {
+   "lab": "LAMAR",
+   "name": "DEXAMETASONA INY X 2 FRASCOS (LAMAR)",
+   "priceSinIva": 7922.25
+  },
+  {
+   "lab": "LAMAR",
+   "name": "DIAZEPAN INY X 2 FCOS X 10 ML",
+   "priceSinIva": 10952.55
+  },
+  {
+   "lab": "LAMAR",
+   "name": "ENROFLOXACINA  50 MG X 120 COMP (LAMAR)",
+   "priceSinIva": 14129.849999999999
+  },
+  {
+   "lab": "LAMAR",
+   "name": "ENROFLOXACINA  50 MG X 360 COMP (LAMAR)",
+   "priceSinIva": 35370.299999999996
+  },
+  {
+   "lab": "LAMAR",
+   "name": "ENROFLOXACINA 150 MG X 100 COMP (LAMAR)",
+   "priceSinIva": 18453.75
+  },
+  {
+   "lab": "LAMAR",
+   "name": "ENTEROSULFATRIN SUSP X 100 ML",
+   "priceSinIva": 3811.5
+  },
+  {
+   "lab": "LAMAR",
+   "name": "GLUCOSA INY LAMAR 25% X 50 ML",
+   "priceSinIva": 12239.849999999999
+  },
+  {
+   "lab": "LAMAR",
+   "name": "GRISEOFULVINA 250 X 100 COMP",
+   "priceSinIva": 47560.799999999996
+  },
+  {
+   "lab": "LAMAR",
+   "name": "HIDROXICINA X 150 COMP",
+   "priceSinIva": 45804.149999999994
+  },
+  {
+   "lab": "LAMAR",
+   "name": "KNOCK OUT GATOS MULTIDOSIS X 10",
+   "priceSinIva": 5668.95
+  },
+  {
+   "lab": "LAMAR",
+   "name": "KNOCK OUT PERROS MULTIDOSIS X 50",
+   "priceSinIva": 25200
+  },
+  {
+   "lab": "LAMAR",
+   "name": "LEVAMISOL GOTAS LAMAR X 15 ML",
+   "priceSinIva": 1747.1999999999998
+  },
+  {
+   "lab": "LAMAR",
+   "name": "MEGESTROL PERRAS X 400  COMP",
+   "priceSinIva": 161646.44999999998
+  },
+  {
+   "lab": "LAMAR",
+   "name": "METOCLOPRAMIDA GOTAS X 15 ML",
+   "priceSinIva": 5104.049999999999
+  },
+  {
+   "lab": "LAMAR",
+   "name": "METOCLOPRAMIDA INYECTABLE X 50 ML",
+   "priceSinIva": 12081.3
+  },
+  {
+   "lab": "LAMAR",
+   "name": "PREDNISOLONA 10 MG X 200 COMP (LAMAR)",
+   "priceSinIva": 21844.199999999997
+  },
+  {
+   "lab": "LAMAR",
+   "name": "PREDNISOLONA 20 MG X 200 COMP (LAMAR)",
+   "priceSinIva": 37695
+  },
+  {
+   "lab": "LAMAR",
+   "name": "PREDNISOLONA 20 MG X 500 COMP (LAMAR)",
+   "priceSinIva": 77350.34999999999
+  },
+  {
+   "lab": "LAMAR",
+   "name": "SEDAGOTAS X 10 ML",
+   "priceSinIva": 2986.2
+  },
+  {
+   "lab": "LAMAR",
+   "name": "SIN PAR 10 EXHIBIDOR 10 ESTUCHES X 2 COMP",
+   "priceSinIva": 19009.199999999997
+  },
+  {
+   "lab": "LAMAR",
+   "name": "SIN PAR 20 EXHIBIDOR 10 ESTUCHES X 2 COMP",
+   "priceSinIva": 20524.35
+  },
+  {
+   "lab": "LAMAR",
+   "name": "SIN PAR 40 EXHIBIDOR 10 ESTUCHES X 4 COMP",
+   "priceSinIva": 27420.75
+  },
+  {
+   "lab": "LAMAR",
+   "name": "SIN PAR 60 EXHIBIDOR 10 ESTUCHES X 6 COMP",
+   "priceSinIva": 31978.799999999996
+  },
+  {
+   "lab": "LAMAR",
+   "name": "SIN PAR GATOS EXHIBIDOR 10 ESTUCHES X 2 COM",
+   "priceSinIva": 20524.35
+  },
+  {
+   "lab": "LAMAR",
+   "name": "SULFATRIM \"F\" X 100 COMP",
+   "priceSinIva": 27375.6
+  },
+  {
+   "lab": "LAMAR",
+   "name": "SULFATRIM X 100 COMP",
+   "priceSinIva": 19946.85
+  },
+  {
+   "lab": "LAMAR",
+   "name": "T4 \"F\" X 100 COMP",
+   "priceSinIva": 28933.351999999995
+  },
+  {
+   "lab": "LAMAR",
+   "name": "T4 \"F\" X 500 COMP",
+   "priceSinIva": 116088.26599999997
+  },
+  {
+   "lab": "LAMAR",
+   "name": "T4 X 100 COMP",
+   "priceSinIva": 19972.441999999995
+  },
+  {
+   "lab": "LAMAR",
+   "name": "T4 X 500 COMP",
+   "priceSinIva": 90215.43999999999
+  },
+  {
+   "lab": "LOVE",
+   "name": "ANTIBACTERIANO CON ESTEROIDES X 10 ML",
+   "priceSinIva": 10603.78125
+  },
+  {
+   "lab": "LOVE",
+   "name": "ANTIBACTERIANO SIN ESTEROIDES X 10 ML",
+   "priceSinIva": 9592.921875
+  },
+  {
+   "lab": "LOVE",
+   "name": "ANTIVIRAL IDU",
+   "priceSinIva": 14966.953125
+  },
+  {
+   "lab": "LOVE",
+   "name": "ATROPINA LOVE 1% X 5 ML",
+   "priceSinIva": 10895.015624999998
+  },
+  {
+   "lab": "LOVE",
+   "name": "CC&T UNGÜENTO X 5 GRS",
+   "priceSinIva": 12290.625
+  },
+  {
+   "lab": "LOVE",
+   "name": "CICATRIZANTE OCULAR C/ATB X 5 GRS",
+   "priceSinIva": 14493.140625
+  },
+  {
+   "lab": "LOVE",
+   "name": "CICLOCELL 0,2% X 5 ML",
+   "priceSinIva": 8972.15625
+  },
+  {
+   "lab": "LOVE",
+   "name": "CICLOCELL 0,5% X 5 ML",
+   "priceSinIva": 11505.984375000002
+  },
+  {
+   "lab": "LOVE",
+   "name": "CICLOCELL 1% X 5 ML",
+   "priceSinIva": 14435.25
+  },
+  {
+   "lab": "LOVE",
+   "name": "CICLOCELL 2% X 5 ML",
+   "priceSinIva": 20313.375
+  },
+  {
+   "lab": "LOVE",
+   "name": "GLAUCOVET X 5 ML",
+   "priceSinIva": 13769.0625
+  },
+  {
+   "lab": "LOVE",
+   "name": "ISAMI CREMA POMO X 15 GRS",
+   "priceSinIva": 8129.625
+  },
+  {
+   "lab": "LOVE",
+   "name": "LUBRICELL X 15 ML",
+   "priceSinIva": 10605.562499999998
+  },
+  {
+   "lab": "LOVE",
+   "name": "PARACATARATAS X 10 ML",
+   "priceSinIva": 13305.9375
+  },
+  {
+   "lab": "LOVE",
+   "name": "PREDNISOLONA PLUS SUSPENSIÓN LOVE X 5 ML",
+   "priceSinIva": 12262.124999999998
+  },
+  {
+   "lab": "LOVE",
+   "name": "TEST DE SCHIRMER SOBRE X 10 UN",
+   "priceSinIva": 9449.53125
+  },
+  {
+   "lab": "LOVE",
+   "name": "TEST DE SCHIRMER SOBRE X 20 UN",
+   "priceSinIva": 15622.453125
+  },
+  {
+   "lab": "LOVE",
+   "name": "TOBRA OFTAL \"D\" X 5 ML",
+   "priceSinIva": 12434.90625
+  },
+  {
+   "lab": "LOVE",
+   "name": "TOBRA OFTAL X 5 ML",
+   "priceSinIva": 11723.296874999998
+  },
+  {
+   "lab": "LOVE",
+   "name": "VISTASEDAN BAÑO OCULAR X 100 ML",
+   "priceSinIva": 12836.578125
+  },
+  {
+   "lab": "LOVE",
+   "name": "VISUFENICOL POMO X 5 GRS",
+   "priceSinIva": 11411.578124999998
+  },
+  {
+   "lab": "MAYORS",
+   "name": "DOXILINA MAYORS 150 MGR X 10 COMP",
+   "priceSinIva": 7594.263432
+  },
+  {
+   "lab": "MAYORS",
+   "name": "DOXILINA MAYORS 150 MGR X 50 COMP",
+   "priceSinIva": 28081.06812
+  },
+  {
+   "lab": "MAYORS",
+   "name": "DOXILINA MAYORS 50 MGR X 10 COMP",
+   "priceSinIva": 4639.9061520000005
+  },
+  {
+   "lab": "MAYORS",
+   "name": "DOXILINA MAYORS 50 MGR X 50 COMP",
+   "priceSinIva": 18513.6462
+  },
+  {
+   "lab": "MAYORS",
+   "name": "ENERGIA VITAL 3 BLISTER X 10 COMP",
+   "priceSinIva": 17790.709104
+  },
+  {
+   "lab": "MAYORS",
+   "name": "GIACOCCIDE AMARILLO HOSPITALARIO X 100 COMP",
+   "priceSinIva": 48617.764272
+  },
+  {
+   "lab": "MAYORS",
+   "name": "GIACOCCIDE ROJO HOSPITALARIO X 50 COMP",
+   "priceSinIva": 47860.587935999996
+  },
+  {
+   "lab": "MAYORS",
+   "name": "GIACOCCIDE VERDE HOSPITALARIO X 50 COMP",
+   "priceSinIva": 33533.911656
+  },
+  {
+   "lab": "MAYORS",
+   "name": "MAYOR 10 HOSPITALARIO X 150 COMP",
+   "priceSinIva": 81807.56999999999
+  },
+  {
+   "lab": "MAYORS",
+   "name": "MAYOR 10 X 50 COMP",
+   "priceSinIva": 29224.003299120002
+  },
+  {
+   "lab": "MAYORS",
+   "name": "MOXIDEX PLUS HOSPITALARIO X 15 COMP",
+   "priceSinIva": 15940.151999999998
+  },
+  {
+   "lab": "MAYORS",
+   "name": "NOGASTROL 10 MG X 10 COMP",
+   "priceSinIva": 6394.911767999999
+  },
+  {
+   "lab": "MAYORS",
+   "name": "NOGASTROL 10 MG X 50 COMP",
+   "priceSinIva": 24449.093999999997
+  },
+  {
+   "lab": "MAYORS",
+   "name": "NOGASTROL 30 MG X 10 COMP",
+   "priceSinIva": 9914.70564
+  },
+  {
+   "lab": "MAYORS",
+   "name": "NOGASTROL 30 MG X 25 COMP",
+   "priceSinIva": 23223.98736
+  },
+  {
+   "lab": "MAYORS",
+   "name": "PRURICILONA SPRAY X 15 CC",
+   "priceSinIva": 12291.887159999998
+  },
+  {
+   "lab": "MAYORS",
+   "name": "SOSTEN ART 25 X 30 COMP",
+   "priceSinIva": 17067.772008
+  },
+  {
+   "lab": "MAYORS",
+   "name": "SOSTEN CG INYECTABLE 5 FRASCOS X 5 ML",
+   "priceSinIva": 47563.416
+  },
+  {
+   "lab": "MAYORS",
+   "name": "SOSTEN CG INYECTABLE X 5 ML",
+   "priceSinIva": 11549.384784
+  },
+  {
+   "lab": "MAYORS",
+   "name": "SOSTEN CG ORAL X 80 COMP",
+   "priceSinIva": 44547.786
+  },
+  {
+   "lab": "MAYORS",
+   "name": "TOLTRAZOL \"PLUS\" X 10 ML",
+   "priceSinIva": 9898.793999999998
+  },
+  {
+   "lab": "MAYORS",
+   "name": "TOLTRAZOL HOSPITALARIO X 15 COMP",
+   "priceSinIva": 30956.796
+  },
+  {
+   "lab": "MAYORS",
+   "name": "TOLTRAZOL SUSPENSION X 10 ML",
+   "priceSinIva": 7302.740760000001
+  },
+  {
+   "lab": "MAYORS",
+   "name": "TOLTRAZOL X 3 COMP",
+   "priceSinIva": 8820.028224
+  },
+  {
+   "lab": "MAYORS",
+   "name": "VILISIN H X 30 ML",
+   "priceSinIva": 13402.2168
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "BEBE LOCION X 130 ML",
+   "priceSinIva": 9238.657379631017
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "BEBE LOCION X 950 ML",
+   "priceSinIva": 33942.717714114304
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CAMILO LOCION X 130 ML",
+   "priceSinIva": 9238.657379631017
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CAMILO LOCION X 950 ML",
+   "priceSinIva": 33942.717714114304
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CANDELA LOCION X 130 ML",
+   "priceSinIva": 9238.657379631017
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CANDELA LOCION X 950 ML",
+   "priceSinIva": 33942.717714114304
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CERA AMBIENTAL OSSPRET X 5 LTS",
+   "priceSinIva": 61081.352182390874
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CERA X 950 CM",
+   "priceSinIva": 15706.633418329084
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CREMA DE ORDENE \"OSSPRET\" X 110 ML",
+   "priceSinIva": 0
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CREMA DE ORDENE \"OSSPRET\" X 220 ML",
+   "priceSinIva": 8345.002624868755
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CREMA DE ORDENE \"OSSPRET\" X 450 ML",
+   "priceSinIva": 15343.939178041097
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CREMA DESINFLAMANTE OSSPRET X 100 GRS",
+   "priceSinIva": 7574.087670616469
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CREMA DESINFLAMANTE OSSPRET X 500 GRS",
+   "priceSinIva": 21535.5395980201
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "CREMA ROLL-ON X 90 ML",
+   "priceSinIva": 7895.80808459577
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "DENTAL OSSPRET X 250 CC",
+   "priceSinIva": 3308.2570871456423
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ELIAN LOCION X 130 ML",
+   "priceSinIva": 9238.657379631017
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ELIAN LOCION X 950 ML",
+   "priceSinIva": 33942.717714114304
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ENJUAGUE OMEGA CHOCOLATE X  250 ML",
+   "priceSinIva": 8194.765261736913
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ENJUAGUE REACONDICIONADOR COMUN X  250 ML",
+   "priceSinIva": 7663.623068846558
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ENJUAGUE REACONDICIONADOR COMUN X 5 LITROS",
+   "priceSinIva": 75877.45612719364
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ENJUAGUE REACONDICIONADOR ESPECIAL X  250 ML",
+   "priceSinIva": 7663.623068846558
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ENJUAGUE REACONDICIONADOR ESPECIAL X 5 LTS",
+   "priceSinIva": 75877.45612719364
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ENJUAJE EXTRA BRILLO GROOMERS EXPERT X 250 ML",
+   "priceSinIva": 7739.500524973751
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ENJUAJE EXTRA BRILLO GROOMERS EXPERT X 5 LTS",
+   "priceSinIva": 77395.00524973751
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "EXHIBIDOR LOCION SURTIDAS 20 UNID X 50 ML",
+   "priceSinIva": 151762.5
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "JABÓN LÍQUIDO CON GLICERINA X 250 ML",
+   "priceSinIva": 5007.91210439478
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "JABÓN LIQUIDO CON GLICERINA X 5 LTS",
+   "priceSinIva": 42676.51642417879
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPASTILLA GATOS DE 2 A 3 KG (CELESTE)",
+   "priceSinIva": 4041.6039999999994
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPASTILLA GATOS DE 3,1 A 6 KG (ROSADA)",
+   "priceSinIva": 4496.756599999999
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPASTILLA PERROS DE 10,1 A 20 KG (NARANJA)",
+   "priceSinIva": 4948.131999999999
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPASTILLA PERROS DE 2,5 A 5 KG (LILA)",
+   "priceSinIva": 4041.6039999999994
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPASTILLA PERROS DE 20,1 A 40 KG (AZUL)",
+   "priceSinIva": 8545.914999999999
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPASTILLA PERROS DE 40,1 A 80 KG (VERDE)",
+   "priceSinIva": 15054.974899999996
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPASTILLA PERROS DE 5,1 A 10 KG (ROJA)",
+   "priceSinIva": 4496.756599999999
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA DE 11 A 20 KG (NARANJA)",
+   "priceSinIva": 1991.5286999999998
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA DE 2 A 10 KG (ROJA)",
+   "priceSinIva": 1828.1647999999993
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA DE 21 A 40 KG (AZUL)",
+   "priceSinIva": 2409.8536
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA GATOS 0 A 4 KG (AMARILLA)",
+   "priceSinIva": 1757.3422999999993
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA GATOS 4 A 8 KG (ROSADA)",
+   "priceSinIva": 1881.9898999999996
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA MÁS DE 40 KG (VERDE)",
+   "priceSinIva": 2661.9817
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA PLUS GATOS 1 A 9 KG",
+   "priceSinIva": 2728.0827
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA PLUS PERROS DE 11 A 20 KG",
+   "priceSinIva": 3031.203
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA PLUS PERROS DE 2 A 10 KG",
+   "priceSinIva": 2627.0425999999993
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA PLUS PERROS DE 21 A 40 KG",
+   "priceSinIva": 3536.4034999999994
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LAPIPETA PLUS PERROS DE 41 A 60 KG",
+   "priceSinIva": 4041.6039999999994
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LIMPIA LAGRIMAS PROCOLOR A GATILLO X 250 ML",
+   "priceSinIva": 8141.651042447877
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LIMPIA LAGRIMAS PROCOLOR X 125 ML",
+   "priceSinIva": 4871.33268336583
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LOCION A2 X 125 ML",
+   "priceSinIva": 8159.861631918404
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LOCION CLOREXPRO X 125 ML",
+   "priceSinIva": 6531.531423428829
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LOCION CON FILTRO SOLAR X 130 CC",
+   "priceSinIva": 16844.795260236988
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LOCION DESATANUDOS X 130 ML",
+   "priceSinIva": 9530.208489575522
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LOCION GROOMERS EXPERT X 130 ML",
+   "priceSinIva": 9587.875356232187
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LOCION GROOMERS EXPERT X 950 ML",
+   "priceSinIva": 33234.32578371081
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LOCION NATURAL NEEM X 125 ML",
+   "priceSinIva": 10883.862306884657
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LOCION OMEGA CHOCOLATE X 130 ML",
+   "priceSinIva": 9587.875356232187
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "LOCION OMEGA CHOCOLATE X 950 ML",
+   "priceSinIva": 33234.32578371081
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "MAXIMA LOCION X 130 ML",
+   "priceSinIva": 9238.657379631017
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "MAXIMA LOCION X 950 ML",
+   "priceSinIva": 33942.717714114304
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "MIX FRUTAL LOCION X 130 ML",
+   "priceSinIva": 9241.860797585123
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "MIX FRUTAL LOCION X 950 ML",
+   "priceSinIva": 33942.717714114304
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "PACK REPELENTE OSSPRET (LOC.NEEM+SH TRDX)",
+   "priceSinIva": 10784.918104094795
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "PACK VERANO SOLAR OSSPRET (LOC.FIL.SOL+SH TRDX70)",
+   "priceSinIva": 16694.2923260087
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO A2 X 1 LTS",
+   "priceSinIva": 17049.66439178041
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO A2 X 250 ML",
+   "priceSinIva": 6171.722663866806
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO ALGAS X 250 ML",
+   "priceSinIva": 5918.441577921104
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO AMITRAZ AL 0.25% X 250 ML",
+   "priceSinIva": 6152.144142792861
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO AQUA ECTO PGP X 250 ML",
+   "priceSinIva": 6024.776886155692
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO AQUA ECTO PGP X 5 LTS",
+   "priceSinIva": 55011.15569221539
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO CLOREXPRO X 250 ML",
+   "priceSinIva": 6639.277411129444
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO CLORHEXIDINA AL 2.5% X 250 ML",
+   "priceSinIva": 5995.387730613469
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO CLORHEXIDINA AL 2.5% X 5 LTS",
+   "priceSinIva": 58425.6412179391
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO CON ACEITE DE JOJOBA X 250 ML",
+   "priceSinIva": 6100.547472626368
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO CON ACEITE DE JOJOBA X 5 LTS",
+   "priceSinIva": 67910.32323383831
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO DE BELLEZA GROOMERS EXPERT X 250 ML",
+   "priceSinIva": 5918.441577921104
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO DE BELLEZA GROOMERS EXPERT X 5 LTS",
+   "priceSinIva": 50079.1210439478
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO DE BELLEZA GROOMERS EXPERT X 950 ML",
+   "priceSinIva": 15023.736313184341
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO DE BELLEZA MIX FRUTAL X 5 LTS",
+   "priceSinIva": 46875.70308984551
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO DOUBLE 2 EN 1 X 1 LT",
+   "priceSinIva": 17300.05999700015
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO DOUBLE 2 EN 1 X 250 ML",
+   "priceSinIva": 6412.713739313034
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO DOUBLE 2 EN 1 X 5 LITROS",
+   "priceSinIva": 71021.29893505324
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO KETOCONAZOL AL 1% X 250 ML",
+   "priceSinIva": 9691.068696565171
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO MAXIMO COLOR BLANCO X 250 ML",
+   "priceSinIva": 6297.828858557072
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO MAXIMO COLOR BLANCO X 5 LTS",
+   "priceSinIva": 61460.739463026846
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO MAXIMO COLOR BRONCE X 250 ML",
+   "priceSinIva": 6297.828858557072
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO MAXIMO COLOR NEGRO X 250 ML",
+   "priceSinIva": 6297.828858557072
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO MAXIMO COLOR NEGRO X 5 LT",
+   "priceSinIva": 61460.739463026846
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO MEDICADO HIPOALERGENICO X 250 ML",
+   "priceSinIva": 5628.023286335682
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO NATURAL NEEM X 250 ML",
+   "priceSinIva": 7716.737288135592
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO NATURAL NEEM X 5 LTS",
+   "priceSinIva": 81568.26533673317
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO OMEGA CHOCOLATE X 250 ML",
+   "priceSinIva": 6753.093595320234
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO PARA CACHORROS X 250 ML",
+   "priceSinIva": 5690.809209539523
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO PERFUMADO MIX FRUTAL X 250 ML",
+   "priceSinIva": 5590.650967451627
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO PEROXIDO DE BENZOILO AL 2% X 250 ML",
+   "priceSinIva": 10138.745687715613
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO POTENCIADO PLUS ANTISEBORREICO X 250",
+   "priceSinIva": 6753.093595320234
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO POTENCIADO X 250",
+   "priceSinIva": 6221.951402429878
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO POTENCIADO X 5 LITROS",
+   "priceSinIva": 58160.070121493925
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO PULGUICIDA PARA GATOS X 250 ML",
+   "priceSinIva": 6221.951402429878
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO REFRESCANTE (MENTA)  X 250 ML",
+   "priceSinIva": 7448.131093445328
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO TRADICIONAL X 1 LT",
+   "priceSinIva": 15630.75596220189
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO TRADICIONAL X 250 ML",
+   "priceSinIva": 5957.18182840858
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "SHAMPOO TRADICIONAL X 5 LTS",
+   "priceSinIva": 59806.93152842358
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ZAHARA LOCION X 130 ML",
+   "priceSinIva": 9238.657379631017
+  },
+  {
+   "lab": "OSSPRET",
+   "name": "ZAHARA LOCION X 950 ML",
+   "priceSinIva": 33942.717714114304
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "ANTIPARASITARIO INTERNO ORAL X 20 ML",
+   "priceSinIva": 3252.867258
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "CALCIFICANTE INTEGRAL (DISPLAY CON 6 SOBRES)",
+   "priceSinIva": 17666.402544
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "CEFATIDINA X 200 COMP",
+   "priceSinIva": 52344.915883999995
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "CLEAN EYES X 50 GR",
+   "priceSinIva": 13942.371095
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "COLIRIO MAGNUM X 10 ML",
+   "priceSinIva": 5220.864645000001
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "FUROSEMIDA GOTAS 2% X 20 ML. (PARAQUEÑOS)",
+   "priceSinIva": 6231.882278
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "KOPROFAGIA TALQUERA X 60 GR",
+   "priceSinIva": 13941.334992000002
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "LIMPIAOREJAS X 20 ML",
+   "priceSinIva": 4187.592687
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "MEDROXIL 10 AMPOLLAS X 1 ML",
+   "priceSinIva": 15204.957455000002
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "NUTRAPRO ANTIAGE X 30 COMP",
+   "priceSinIva": 9484.370118
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "NUTRAPRO GERONTIUM X 30 COMP",
+   "priceSinIva": 12204.286423000001
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "PREDNISOLONA PROAGRO 20 MG X 200 COMP",
+   "priceSinIva": 32788.851177
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "PULGAR SPRAY X 150 ML",
+   "priceSinIva": 10174.59
+  },
+  {
+   "lab": "PROAGRO P.A",
+   "name": "SALES REHIDRANTES (18 SOBRES X 27.5 GRS)",
+   "priceSinIva": 17039.764531
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESC. NEOJET 16X5 X100 U. (CONO NARANJA)",
+   "priceSinIva": 1995.3622499999997
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESC. NEOJET 25X12 X100 U. (CONO ROSA CORTA)",
+   "priceSinIva": 2468.76975
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESC. NEOJET 25X8 X100 U. (CONO VERDE CORTA)",
+   "priceSinIva": 2084.22975
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESC. NEOJET 30X12 X100 U",
+   "priceSinIva": 2468.76975
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESC. NEOJET 40X12 X100 U. (CONO ROSA LARGA)",
+   "priceSinIva": 2468.76975
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESC. NEOJET 40X16 X100 U. (CONO BLANCO)",
+   "priceSinIva": 2705.8815
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESC. NEOJET 40X8 X100 U. (CONO VERDE LARGA)",
+   "priceSinIva": 2105.382
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESC. NEOJET 50X12 X100 U",
+   "priceSinIva": 3584.598749999999
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESC. NEOJET 50X8 X100 U",
+   "priceSinIva": 3120.95775
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESCARTABLE \"BD\" 13X4 X 100 U",
+   "priceSinIva": 13318.25475
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA DESCARTABLE \"BD\" 15X5 X 100 U",
+   "priceSinIva": 12238.02375
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA PERICRANEAL 21G ASEPTO",
+   "priceSinIva": 958.04775
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA PERICRANEAL 23G ASEPTO",
+   "priceSinIva": 958.04775
+  },
+  {
+   "lab": "PROPATO",
+   "name": "AGUJA PERICRANEAL 25G ASEPTO",
+   "priceSinIva": 958.04775
+  },
+  {
+   "lab": "PROPATO",
+   "name": "ALCOHOL 70% BIALCOHOL X 1 LT",
+   "priceSinIva": 3309.166875
+  },
+  {
+   "lab": "PROPATO",
+   "name": "ALGODON PLEGADO INSUMOS XXI X 500 GR",
+   "priceSinIva": 3998.5300499999994
+  },
+  {
+   "lab": "PROPATO",
+   "name": "CATETER TEFLON DEXAL 16G X UNIDAD",
+   "priceSinIva": 344.33925
+  },
+  {
+   "lab": "PROPATO",
+   "name": "CATETER TEFLON DEXAL 18G X UNIDAD",
+   "priceSinIva": 305.4645
+  },
+  {
+   "lab": "PROPATO",
+   "name": "CATETER TEFLON DEXAL 20G X UNIDAD (ROSADO)",
+   "priceSinIva": 305.4645
+  },
+  {
+   "lab": "PROPATO",
+   "name": "CATETER TEFLON DEXAL 22G X UNIDAD (AZUL)",
+   "priceSinIva": 305.4645
+  },
+  {
+   "lab": "PROPATO",
+   "name": "CATETER TEFLON DEXAL 24G X UNIDAD (AMARILLO)",
+   "priceSinIva": 344.33925
+  },
+  {
+   "lab": "PROPATO",
+   "name": "ESTETOSCOPIO DOBLE HAND",
+   "priceSinIva": 5430.365249999999
+  },
+  {
+   "lab": "PROPATO",
+   "name": "ESTETOSCOPIO SIMPKLE HAND",
+   "priceSinIva": 4161.855
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GASA ESTERIL PRINTEX 20 X 20 CM X 32 TROZOS",
+   "priceSinIva": 3265.69575
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GASA TROZADA 20 X 20 CM X 1 KG",
+   "priceSinIva": 14412.370499999999
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES LATEX X 100 CHICO",
+   "priceSinIva": 6058.799999999999
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES LATEX X 100 EXTRA CHICO",
+   "priceSinIva": 6058.799999999999
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES LATEX X 100 EXTRA GRANDE",
+   "priceSinIva": 6058.799999999999
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES LATEX X 100 GRANDE",
+   "priceSinIva": 6058.799999999999
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES LATEX X 100 MEDIANO",
+   "priceSinIva": 6058.799999999999
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES NITRILO AZUL CHICO X 100",
+   "priceSinIva": 6525.832500000001
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES NITRILO AZUL EXTRA GRANDE X 100",
+   "priceSinIva": 6525.8325
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES NITRILO AZUL GRANDE X 100",
+   "priceSinIva": 6525.832500000001
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES NITRILO AZUL MEDIANO X 100",
+   "priceSinIva": 6525.832500000001
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES NITRILO NEGRO CHICO X 100",
+   "priceSinIva": 6525.8325
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES NITRILO NEGRO GRANDE X 100",
+   "priceSinIva": 6525.8325
+  },
+  {
+   "lab": "PROPATO",
+   "name": "GUANTES NITRILO NEGRO MEDIANO X 100",
+   "priceSinIva": 6525.8325
+  },
+  {
+   "lab": "PROPATO",
+   "name": "HILO DE LINO N° 20",
+   "priceSinIva": 21312.963749999995
+  },
+  {
+   "lab": "PROPATO",
+   "name": "HILO DE LINO N° 30",
+   "priceSinIva": 23711.786999999997
+  },
+  {
+   "lab": "PROPATO",
+   "name": "HILO DE LINO N° 50",
+   "priceSinIva": 26319.468
+  },
+  {
+   "lab": "PROPATO",
+   "name": "HOJA BISTURI PRINTEX ESTERIL N° 24 X UNIDAD",
+   "priceSinIva": 163.64812
+  },
+  {
+   "lab": "PROPATO",
+   "name": "JERINGA DESCARTABLE NEOJET  1ML S/AGUJA TUBERCULIN",
+   "priceSinIva": 64.277085
+  },
+  {
+   "lab": "PROPATO",
+   "name": "JERINGA DESCARTABLE NEOJET  3ML S/AGUJA",
+   "priceSinIva": 67.53547499999999
+  },
+  {
+   "lab": "PROPATO",
+   "name": "JERINGA DESCARTABLE NEOJET  5ML S/AGUJA",
+   "priceSinIva": 76.07159999999999
+  },
+  {
+   "lab": "PROPATO",
+   "name": "JERINGA DESCARTABLE NEOJET 10ML S/AGUJA (100)",
+   "priceSinIva": 117.37917749999998
+  },
+  {
+   "lab": "PROPATO",
+   "name": "JERINGA DESCARTABLE NEOJET 20ML S/AGUJA (50)",
+   "priceSinIva": 197.22057
+  },
+  {
+   "lab": "PROPATO",
+   "name": "JERINGA DESCARTABLE NEOJET 30ML S/AGUJA (35)",
+   "priceSinIva": 327.29067857142854
+  },
+  {
+   "lab": "PROPATO",
+   "name": "JERINGA DESCARTABLE NEOJET 60ML S/AGUJA (25)",
+   "priceSinIva": 461.22258
+  },
+  {
+   "lab": "PROPATO",
+   "name": "MANGO BISTURI N°3 H.10/15",
+   "priceSinIva": 2107.218
+  },
+  {
+   "lab": "PROPATO",
+   "name": "MANGO BISTURI N°4 H.20/24",
+   "priceSinIva": 2589.984
+  },
+  {
+   "lab": "PROPATO",
+   "name": "PERFUS \"MICROGOTERO\" TRUX S/AGUJA T/V17",
+   "priceSinIva": 388.773
+  },
+  {
+   "lab": "PROPATO",
+   "name": "PERFUS MACROGOTERO TRUX C/AGUJA V13",
+   "priceSinIva": 377.66774999999996
+  },
+  {
+   "lab": "PROPATO",
+   "name": "PERFUS MACROGOTERO TRUX S/AGUJA V14",
+   "priceSinIva": 344.33925
+  },
+  {
+   "lab": "PROPATO",
+   "name": "TELA ADHESIVA 3M DE 5,08 CM X 9 MTS",
+   "priceSinIva": 0
+  },
+  {
+   "lab": "PROPATO",
+   "name": "TELA ADHESIVA AS 30 CM X 4,5 MTS",
+   "priceSinIva": 5553.9
+  },
+  {
+   "lab": "PROPATO",
+   "name": "TELA ADHESIVA PRINTEX 5 CM X 4,5 MTS",
+   "priceSinIva": 6499.298333333333
+  },
+  {
+   "lab": "PROPATO",
+   "name": "VENDA ELAST. ADHERENTE 10 CM X 4,5 MT",
+   "priceSinIva": 2888.028
+  },
+  {
+   "lab": "PROPATO",
+   "name": "VENDA ELAST. ADHERENTE 5 CM X 4,5 MT",
+   "priceSinIva": 1721.7089999999998
+  },
+  {
+   "lab": "PROPATO",
+   "name": "VENDA ELAST. ADHERENTE 7,5 CM X 4,5 MT",
+   "priceSinIva": 2274.3195
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "ACTINAL X 200 COMP (PREDNISOLONA 20 MG)",
+   "priceSinIva": 42153.49214999999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "ALGEN 20 INYECTABLE X 20 ML",
+   "priceSinIva": 14022.854999999996
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "ALGEN 20 X 120 COMPRIMIDOS",
+   "priceSinIva": 34814.20635
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "ALGEN 60 X 120 COMPRIMIDOS",
+   "priceSinIva": 38677.40414999999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "ALGEN LD 60 X 50 ML",
+   "priceSinIva": 16644.404699999996
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "APRAX ECTOPILLS 11 A 20 KG (700 MG)",
+   "priceSinIva": 4654.205325
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "APRAX ECTOPILLS 2,5 A 10 KG (350 MG)",
+   "priceSinIva": 4217.225512499999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "APRAX ECTOPILLS 21 A 30 KG (1400 MG)",
+   "priceSinIva": 6281.152762499998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "APRAX ECTOPILLS 31 A 50 KG (2100 MG)",
+   "priceSinIva": 7681.956974999998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "APRAX ECTOPILLS FELINOS",
+   "priceSinIva": 4438.924874999999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "APRAX RAZAS GRANDES X 60 COMP",
+   "priceSinIva": 70595.38255000001
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "APRAX RAZAS MEDIANAS X 60 COMP",
+   "priceSinIva": 41827.76185
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "APRAX SUSPENSION X 20 ML",
+   "priceSinIva": 4385.732633333333
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "BOVICINE X 50 ML",
+   "priceSinIva": 9013.469849999998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "BUPINEX VET X 50 ML",
+   "priceSinIva": 14772.386474999998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "CEFALEXINA SUSPENSION 250 MG RICHMOND",
+   "priceSinIva": 11020.778999999997
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "CEFAXIM RICHMOND 1000 MG X 60 COMP",
+   "priceSinIva": 47144.443499999994
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "CEFAXIM RICHMOND 500 MG X 160 COMP",
+   "priceSinIva": 56010.44294999999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "CLINDEX 400 MG X 120 COMP",
+   "priceSinIva": 67745.20252499999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "DAZAM X 20 ML",
+   "priceSinIva": 10819.98225
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "DETOR X 10 ML",
+   "priceSinIva": 32224.257449999997
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "DETOR X 10 ML + ATOMIZADOR INTRANASAL",
+   "priceSinIva": 58127.03819999999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "DETOR X 50 ML",
+   "priceSinIva": 45730.966049999995
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "DEXA 20 X 20 ML (RICHMOND)",
+   "priceSinIva": 11189.316599999998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "FELIFAT X 30 ML",
+   "priceSinIva": 12377.638349999997
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "FLEANET CAT X 0,5 ML",
+   "priceSinIva": 8839.007099999999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "FLEANET COMBO (5 DISPLAY X 10 PIPETAS)",
+   "priceSinIva": 88442.73899999999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "FLEANET PERRO X 1 ML (2 A 10 KG)",
+   "priceSinIva": 5794.138349999998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "FLEANET PERRO X 2 ML (11 A 20 KG)",
+   "priceSinIva": 6482.7724499999995
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "FLEANET PERRO X 4 ML (21 A 40 KG)",
+   "priceSinIva": 7438.696649999998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "FLEANET PERRO X 5 ML (+40 KG)",
+   "priceSinIva": 8228.058299999997
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "GASTRINE INJECTION X 50 ML",
+   "priceSinIva": 24113.38544999999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "HEPATONE X 50 ML",
+   "priceSinIva": 13643.645399999998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "INELTANO VET X 100 ML",
+   "priceSinIva": 79847.15681249998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "JUVENIA DOGS POMO X 150 GR",
+   "priceSinIva": 24110.422874999997
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "KETONAL 100 X 50 ML",
+   "priceSinIva": 29184.317679999996
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "KETONAL 50 X 50 ML",
+   "priceSinIva": 15708.77364
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "METROZOL 250 MG X 50 COMP",
+   "priceSinIva": 15123.616199999997
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "METROZOL 500 MG X 40 COMP",
+   "priceSinIva": 18591.14565
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "METROZOL INYECTABLE X 100 ML",
+   "priceSinIva": 8980.552349999998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "MIDAZOLAM X 20 ML",
+   "priceSinIva": 13766.756849999996
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "NALBUFINE 10 X 20 ML",
+   "priceSinIva": 71728.87837499999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "OXICAM B 12 X 120 COMP",
+   "priceSinIva": 40467.78697499999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "OXICAM INYECTABLE X 20 ML",
+   "priceSinIva": 11327.570099999999
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "PENICILINE S X 100 ML",
+   "priceSinIva": 31409.8785
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "PROPOVET AMPOLLA X 20 ML",
+   "priceSinIva": 10195.866449999998
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "PROPOVET X 50 ML",
+   "priceSinIva": 28314.316799999993
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "XILACINA 20 X 20 ML",
+   "priceSinIva": 12785.156999999997
+  },
+  {
+   "lab": "RICHMOND P.A",
+   "name": "YOHIMBINE VET X 10 ML",
+   "priceSinIva": 24332.615999999995
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "ALBENDAZOL GOTAS RUMINAL X 20 ML",
+   "priceSinIva": 3783.9254999999994
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "ANTIPARASITARIO INTERNO RUMINAL POTE X 50 GRS",
+   "priceSinIva": 5469.7795000000015
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "COCCIDIOL CON ELECTROLITOS RUMINAL POTE X 100 GRS",
+   "priceSinIva": 10588.9815
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "COOL RUMINAL X 100 ML",
+   "priceSinIva": 11343.301
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "DOXICILINA RUMINAL 300 MG X 70 COMP",
+   "priceSinIva": 37407.775
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "DOXICILINA RUMINAL 50 MG X 30 COMP",
+   "priceSinIva": 6078.4745
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "ELECTROLITOS RUMINAL X 1 KG",
+   "priceSinIva": 28362.436200000004
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "ENROFLOXACINA GOTAS RUMINAL 10% X 20 ML",
+   "priceSinIva": 5433.566
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "ENROFLOXACINA INY RUMINAL 10% X 50 ML",
+   "priceSinIva": 11806.371499999997
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "ENROFLOXACINA RUMINAL 100 MG X 100 COMP",
+   "priceSinIva": 16925.5735
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "ENROFLOXACINA RUMINAL 50 MG X 100 COMP",
+   "priceSinIva": 12067.571
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "ENTEROLECTROL X 100 ML",
+   "priceSinIva": 7275.8315
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "ESPUMA SECA YOUNG X 265 ML",
+   "priceSinIva": 7187.840399999999
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "GOTAS OTICAS RUMINAL X 20 ML",
+   "priceSinIva": 4606.8195
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "LIMPIAOREJAS RUMINAL X 100 ML",
+   "priceSinIva": 5319.531999999999
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "LIMPIAOREJAS RUMINAL X 35 ML",
+   "priceSinIva": 3377.1014999999998
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "MICOL RUMINAL POTE X 100 GRS",
+   "priceSinIva": 8252.825499999999
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "MILACREM POTE X 120 GRS",
+   "priceSinIva": 14785.894999999999
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "MILACREM POTE X 30 GRS",
+   "priceSinIva": 6282.657
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "PREDNISOLONA RUMINAL 20 MG X 100 COMP",
+   "priceSinIva": 22731.711272727276
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "PULGUICIDA AMBIENTAL YOUNG X 400 CC",
+   "priceSinIva": 9098.9886
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "PUNTAOREJA RUMINAL X 10 ML",
+   "priceSinIva": 4559.8189999999995
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "REPLUME POTE X 100 GRS",
+   "priceSinIva": 6650.1855
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "REPRODUCTOR RUMINAL POTE X 100 GRS",
+   "priceSinIva": 8802.9625
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "RUMICLAMOX 250 MG X 100 COMP",
+   "priceSinIva": 56285.44527272726
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "RUMICLAMOX 50 MG X 20 COMP",
+   "priceSinIva": 12278.687999999998
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "RUMICLAMOX 500 MG X 80 COMP",
+   "priceSinIva": 70101.49090909089
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "RUMICONEX LOCION X 100 ML",
+   "priceSinIva": 5691.683499999999
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "RUMINAL 88 X 100 ML",
+   "priceSinIva": 4203.848
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "RUMIVITAL FORTE 120 MG ESTUCHE X 100 COMP",
+   "priceSinIva": 10882.285166666665
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "RUMIVITAL FORTE 800 MG POTE X 100 COMP",
+   "priceSinIva": 25159.907
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "SPORT X 100 ML",
+   "priceSinIva": 7705
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "TALCO RUMINAL X 100 GRS",
+   "priceSinIva": 3426.7098461538462
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "TILO RUMINAL X 500 GR",
+   "priceSinIva": 142690.27500000002
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "TOL RUMINAL X 100 ML",
+   "priceSinIva": 11302.464500000002
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "TRICHOMONICIDA RUMINAL POTE X 100 GRS",
+   "priceSinIva": 8859.979500000001
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "TRICHONAZOL RUMINAL POTE X 100 GRS",
+   "priceSinIva": 10669.113500000001
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "TRIPLEX HOSPITALARIO X 160 COMP",
+   "priceSinIva": 48066.872
+  },
+  {
+   "lab": "RUMINAL",
+   "name": "VITARRESPIRATORIO X 100 GR",
+   "priceSinIva": 7705
+  },
+  {
+   "lab": "TRITON",
+   "name": "ANEMI-BYE X 20 COMP",
+   "priceSinIva": 14700
+  },
+  {
+   "lab": "TRITON",
+   "name": "CIPROFLOXACINA TRITON 200 X 80 COMP",
+   "priceSinIva": 50820
+  },
+  {
+   "lab": "TRITON",
+   "name": "CONDROACTIVE X 32 COMP",
+   "priceSinIva": 23887.499999999996
+  },
+  {
+   "lab": "TRITON",
+   "name": "DOXICICLINA TRITON 150 MG X 50 COMP",
+   "priceSinIva": 25200
+  },
+  {
+   "lab": "TRITON",
+   "name": "DOXICICLINA TRITON 50 MG X 50 COMP",
+   "priceSinIva": 17430
+  },
+  {
+   "lab": "TRITON",
+   "name": "ENDOFOUR 100 HOSPITALARIO X 50 COMP",
+   "priceSinIva": 77490
+  },
+  {
+   "lab": "TRITON",
+   "name": "ENDOFOUR 100 X 5 COMP",
+   "priceSinIva": 9975
+  },
+  {
+   "lab": "TRITON",
+   "name": "ENDOFOUR 40 HOSPITALARIO X 40 COMP",
+   "priceSinIva": 61530
+  },
+  {
+   "lab": "TRITON",
+   "name": "ENDOFOUR 40 X 4 COMP.",
+   "priceSinIva": 7875
+  },
+  {
+   "lab": "TRITON",
+   "name": "FOSFO OUT X 200 ML",
+   "priceSinIva": 22469.999999999996
+  },
+  {
+   "lab": "TRITON",
+   "name": "FOSFO OUT X 500 ML",
+   "priceSinIva": 31185
+  },
+  {
+   "lab": "TRITON",
+   "name": "HIDRODERMYL X 12 0ML",
+   "priceSinIva": 10919.999999999998
+  },
+  {
+   "lab": "TRITON",
+   "name": "LEVOTIROXINA TRITON T4 0,1 X 30 COMP.",
+   "priceSinIva": 11549.999999999998
+  },
+  {
+   "lab": "TRITON",
+   "name": "LEVOTIROXINA TRITON T4 0,2 X 30 COMP.",
+   "priceSinIva": 12600
+  },
+  {
+   "lab": "TRITON",
+   "name": "LEVOTIROXINA TRITON T4 0,4 X 30 COMP.",
+   "priceSinIva": 13650
+  },
+  {
+   "lab": "TRITON",
+   "name": "LEVOTIROXINA TRITON T4 0,8 X 30 COMP.",
+   "priceSinIva": 14805
+  },
+  {
+   "lab": "TRITON",
+   "name": "MEPROMAZIN 10 MG X 10 COMP.",
+   "priceSinIva": 6405
+  },
+  {
+   "lab": "TRITON",
+   "name": "MEPROMAZIN 10 MG X 100 COMP.",
+   "priceSinIva": 52185
+  },
+  {
+   "lab": "TRITON",
+   "name": "MEPROMAZIN 25 MG X 8 COMP.",
+   "priceSinIva": 8662.5
+  },
+  {
+   "lab": "TRITON",
+   "name": "MEPROMAZIN 25 MG X 80 COMP.",
+   "priceSinIva": 70297.5
+  },
+  {
+   "lab": "TRITON",
+   "name": "METFORMINA GATOS X 100 COMP",
+   "priceSinIva": 30135
+  },
+  {
+   "lab": "TRITON",
+   "name": "METFORMINA PERROS TRITON 200",
+   "priceSinIva": 46724.99999999999
+  },
+  {
+   "lab": "TRITON",
+   "name": "NEUMOFLOGIN X 16 COMP",
+   "priceSinIva": 20873.999999999996
+  },
+  {
+   "lab": "TRITON",
+   "name": "PIRECORT SHAMPOO X 250 ML",
+   "priceSinIva": 15015
+  },
+  {
+   "lab": "TRITON",
+   "name": "PROPANTELINA TRITON X 16 COMPRIMIDOS",
+   "priceSinIva": 13335
+  },
+  {
+   "lab": "TRITON",
+   "name": "PROPANTELINA TRITON X 80 COMP",
+   "priceSinIva": 53969.999999999985
+  },
+  {
+   "lab": "TRITON",
+   "name": "SPECTRYL 10 X 100 COMP",
+   "priceSinIva": 69300
+  },
+  {
+   "lab": "TRITON",
+   "name": "SPECTRYL 10 X 20 COMP",
+   "priceSinIva": 17115
+  },
+  {
+   "lab": "TRITON",
+   "name": "SPECTRYL 20 X 50 COMP",
+   "priceSinIva": 67725
+  },
+  {
+   "lab": "TRITON",
+   "name": "STOMAGYL X 100 COMP",
+   "priceSinIva": 86099.99999999999
+  },
+  {
+   "lab": "TRITON",
+   "name": "STOMAGYL X 20 COMP",
+   "priceSinIva": 22994.999999999996
+  },
+  {
+   "lab": "TRITON",
+   "name": "T4 TRITON 0.4 MG X 100 COMP.",
+   "priceSinIva": 39165
+  },
+  {
+   "lab": "TRITON",
+   "name": "T4 TRITON 0.8 MG X 100 COMP",
+   "priceSinIva": 45464.99999999999
+  },
+  {
+   "lab": "TRITON",
+   "name": "TRITOHEXIDIN PLUS X 50 ML (SPRAY)",
+   "priceSinIva": 14175.514415322581
+  },
+  {
+   "lab": "TRITON",
+   "name": "TRITOHEXIDIN SHAMPOO X 250 ML",
+   "priceSinIva": 12599.73
+  },
+  {
+   "lab": "TRITON",
+   "name": "TRITOHEXIDIN X 1 LITRO",
+   "priceSinIva": 34125
+  },
+  {
+   "lab": "TRITON",
+   "name": "TRITOHEXIDIN X 5 LITROS",
+   "priceSinIva": 78750
+  },
+  {
+   "lab": "TRITON",
+   "name": "TRITOHEXIDIN X 50 ML",
+   "priceSinIva": 10290
+  },
+  {
+   "lab": "TRITON",
+   "name": "TRITONYL 300 X 16 COMPRIMIDOS",
+   "priceSinIva": 11969.999999999998
+  },
+  {
+   "lab": "TRITON",
+   "name": "TRITONYL 300 X 80 COMP.",
+   "priceSinIva": 51450.21011589404
+  },
+  {
+   "lab": "TRITON",
+   "name": "UROFLOGIN X 16 COMP (CIPRO + 8 PROPANT)",
+   "priceSinIva": 19845
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "APOQUEL \"MASTICABLE\" 16 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 27945.71297466136
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "APOQUEL \"MASTICABLE\" 3,6 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 14232.74172175227
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "APOQUEL \"MASTICABLE\" 5,4 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 19480.341023897723
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "APOQUEL 16 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 27945.71297466136
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "APOQUEL 3,6 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 13966.710608597727
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "APOQUEL 5,4 MG X 20 COMPRIMIDOS",
+   "priceSinIva": 19116.22940296364
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "ARTROGLYCAN PLUS X 60 COMPRIMIDOS",
+   "priceSinIva": 78283.92353764501
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "ARTROGLYCAN X 90 COMP",
+   "priceSinIva": 75646.771620525
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "CERENIA INY X 20",
+   "priceSinIva": 67326.58351503001
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "CLAVAMOX TABS 250 MG X 50 TABLETAS",
+   "priceSinIva": 38957.3252404875
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "CONVENIA X 10 ML",
+   "priceSinIva": 144772.136435115
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "CONVENIA X 4 ML",
+   "priceSinIva": 78612.015348405
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "CYTOPOINT X 20 MG",
+   "priceSinIva": 80767.104160428
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "CYTOPOINT X 40 MG",
+   "priceSinIva": 134611.84026738
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "FELOCELL CVR X DOSIS",
+   "priceSinIva": 9205.778914920002
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "LIBRELA 10 MG (10 A 20 KG) X 1 ML",
+   "priceSinIva": 84219.858171162
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "LIBRELA 15 MG (20 A 30 KG) X 1 ML",
+   "priceSinIva": 105299.91223038002
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "LIBRELA 20 MG (30 A 40 KG) X 1 ML",
+   "priceSinIva": 116341.84115139602
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "LIBRELA 30 MG (40 A 60 KG) X 1 ML",
+   "priceSinIva": 133406.660677122
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "LIBRELA 5 MG (5 A 10 KG) X 1 ML",
+   "priceSinIva": 71170.302282282
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "RIMADYL CHEWABLE  25 MG X 60 TAB",
+   "priceSinIva": 31633.284310425002
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "RIMADYL CHEWABLE  75 MG X 60 TAB",
+   "priceSinIva": 55582.54345460249
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "RIMADYL CHEWABLE 100 MG X 60 TAB",
+   "priceSinIva": 70458.97750605001
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA \"TRIO\"  DE 2,5 A 5 KG",
+   "priceSinIva": 11759.6521389186
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA \"TRIO\" DE 1,3 A 2,5 KG",
+   "priceSinIva": 10368.7999409232
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA \"TRIO\" DE 10 A 20 KG",
+   "priceSinIva": 15100.1852103837
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA \"TRIO\" DE 20 A 40 KG",
+   "priceSinIva": 18025.714639982703
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA \"TRIO\" DE 40 A 60 KG",
+   "priceSinIva": 22498.481477247304
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA \"TRIO\" DE 5 A 10 KG",
+   "priceSinIva": 12425.297399411402
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA 10 MG (2,5 A 5 KG)",
+   "priceSinIva": 11215.223595122401
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA 120 MG (40 A 60 KG)",
+   "priceSinIva": 20690.5653278037
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA 20 MG (5 A 10 KG)",
+   "priceSinIva": 11426.829508672201
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA 40 MG (10 A 20 KG)",
+   "priceSinIva": 14812.568196262202
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA 5 MG (1,3 A 2,5 KG)",
+   "priceSinIva": 10368.7999409232
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SIMPARICA 80 MG (20 A 40 KG)",
+   "priceSinIva": 17351.8611942564
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "SOLENSIA SOL 7 MG X 1 ML",
+   "priceSinIva": 136048.57584318004
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "TROCOXIL 30 MG X 2 TABLETAS",
+   "priceSinIva": 0
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "TROCOXIL 75 MG X 2 TABLETAS",
+   "priceSinIva": 0
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "TROCOXIL 95 MG X 2 TABLETAS",
+   "priceSinIva": 0
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "VANGUARD PLUS 5 L4 X DS",
+   "priceSinIva": 9247.636101923032
+  },
+  {
+   "lab": "ZOETIS P.A",
+   "name": "VANGUARD PLUS 5 X DS",
+   "priceSinIva": 8594.6761102125
+  }
+ ]
+}
