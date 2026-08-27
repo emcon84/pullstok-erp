@@ -14,6 +14,7 @@ import {
   BadgeDollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { productWeight, formatWeight } from "@/lib/productWeight";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,7 +65,7 @@ interface ProductsTableProps {
 export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, branchMode }: ProductsTableProps) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
-  const [sortBy, setSortBy] = useState<"name" | "code" | "quantity" | "price">("name");
+  const [sortBy, setSortBy] = useState<"name" | "code" | "quantity" | "price" | "peso">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const { deleteProduct, loading } = useDeleteProduct();
@@ -88,6 +89,17 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
     // Regla principal: productos CON STOCK (>0) SIEMPRE primero que SIN STOCK (<=0)
     if (aHasStock !== bHasStock) {
       return bHasStock - aHasStock;
+    }
+
+    // Orden por peso: ascendente (1, 3, 5, 8, 15...) por defecto. Los que no
+    // tienen peso detectable van al final.
+    if (sortBy === "peso") {
+      const aW = productWeight(a);
+      const bW = productWeight(b);
+      const aN = aW != null ? aW : Number.POSITIVE_INFINITY;
+      const bN = bW != null ? bW : Number.POSITIVE_INFINITY;
+      if (aN !== bN) return sortDir === "asc" ? aN - bN : bN - aN;
+      return (a.name || "").localeCompare(b.name || "", "es", { sensitivity: "base" });
     }
 
     // Regla secundaria: orden por la columna elegida dentro de cada grupo
@@ -234,6 +246,7 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="name">Producto</SelectItem>
+            <SelectItem value="peso">Peso</SelectItem>
             <SelectItem value="quantity">Stock</SelectItem>
             <SelectItem value="price">Precio</SelectItem>
           </SelectContent>
@@ -260,6 +273,9 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
               <div className="flex items-center gap-1">Producto <SortIcon col="name" /></div>
             </TableHead>
             <TableHead>Categoría</TableHead>
+            <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("peso")}>
+              <div className="flex items-center gap-1">Peso <SortIcon col="peso" /></div>
+            </TableHead>
             <TableHead className="text-center cursor-pointer select-none" onClick={() => toggleSort("quantity")}>
               <div className="flex items-center justify-center gap-1">Stock <SortIcon col="quantity" /></div>
             </TableHead>
@@ -273,7 +289,7 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
           {slice.length === 0 && (
             <TableRow className="flex w-full sm:table-row">
               <TableCell
-                colSpan={5}
+                colSpan={6}
                 className="w-full h-32 text-center text-muted-foreground sm:table-cell"
               >
                 No hay productos todavía.
@@ -393,6 +409,11 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
                 <TableCell className="hidden sm:table-cell">
                   <span className="text-sm text-muted-foreground">
                     {(p.category as any)?.name || p.category || "—"}
+                  </span>
+                </TableCell>
+                <TableCell className="hidden tabular-nums sm:table-cell">
+                  <span className="text-sm text-muted-foreground">
+                    {formatWeight(p)}
                   </span>
                 </TableCell>
                 <TableCell className="hidden text-center sm:table-cell">
