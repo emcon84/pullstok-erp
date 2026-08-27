@@ -47,6 +47,7 @@ import { planTitleKeyOf } from "@/lib/printGrouping";
 import {
   parseFilterTerms,
   matchesProductFilter,
+  isPurinaProduct,
 } from "@/lib/productFilter";
 
 type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
@@ -226,10 +227,16 @@ export const Dashboard = () => {
       });
     }
     if (providerFilter) {
-      list = list.filter((p) => {
-        const name = (p as any).provider?.name || "";
-        return String(name).toLowerCase() === providerFilter.toLowerCase();
-      });
+      // "PURINA" es un filtro por marca (no un proveedor): incluye todos los
+      // productos del grupo Purina (Pro Plan, Cat Chow, Dog Chow, Excellent).
+      if (providerFilter === "PURINA") {
+        list = list.filter((p) => isPurinaProduct(p));
+      } else {
+        list = list.filter((p) => {
+          const name = (p as any).provider?.name || "";
+          return String(name).toLowerCase() === providerFilter.toLowerCase();
+        });
+      }
     }
     if (titleFilter) {
       list = list.filter((p) => planTitleKeyOf(p) === titleFilter);
@@ -438,6 +445,7 @@ export const Dashboard = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los proveedores</SelectItem>
+              <SelectItem value="PURINA">PURINA</SelectItem>
               {availableProviders.map((name) => (
                 <SelectItem key={name} value={name}>
                   {name}

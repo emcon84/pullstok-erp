@@ -1,6 +1,32 @@
 import type { DataItem } from "@/types";
 
 /**
+ * Marcas del grupo PURINA (productos Purina en el catálogo). Se usan para el
+ * filtro "PURINA" del dashboard (imprimir toda la línea Purina) matcheando por
+ * prefijo del NOMBRE, porque estos productos no traen proveedor ni Marca
+ * (variantAssignments) cargados de forma confiable.
+ */
+export const PURINA_BRANDS = [
+  "PRO PLAN",
+  "CAT CHOW",
+  "DOG CHOW",
+  "EXCELLENT",
+] as const;
+
+/** ¿El producto pertenece a la línea Purina? (por nombre, y por brand de
+ * sección de planilla / variante Marca como refuerzo). */
+export const isPurinaProduct = (p: DataItem): boolean => {
+  const name = (p.name || "").trim().toUpperCase();
+  if (PURINA_BRANDS.some((b) => name.startsWith(b))) return true;
+  if (name.includes("PURINA")) return true;
+  const brand =
+    (p as { planSection?: { brand?: string | null } }).planSection?.brand ??
+    (p as { provider?: { name?: string } }).provider?.name ??
+    "";
+  return PURINA_BRANDS.some((b) => String(brand).trim().toUpperCase().startsWith(b));
+};
+
+/**
  * Parseo del filtro de búsqueda de productos.
  *
  * Semántica:

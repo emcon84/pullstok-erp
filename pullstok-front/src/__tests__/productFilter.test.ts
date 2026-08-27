@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseFilterTerms,
   matchesProductFilter,
+  isPurinaProduct,
 } from "@/lib/productFilter";
 import type { DataItem } from "@/types";
 
@@ -140,5 +141,32 @@ describe("matchesProductFilter", () => {
     expect(matchesProductFilter(p, parseFilterTerms("cat chow"))).toBe(true);
     const other = product({ name: "PURINA ADULTOS X 15 KG" });
     expect(matchesProductFilter(other, parseFilterTerms("cat chow"))).toBe(false);
+  });
+});
+
+describe("isPurinaProduct", () => {
+  it("matchea las marcas del grupo Purina por prefijo de nombre", () => {
+    expect(isPurinaProduct(product({ name: "PRO PLAN DOG ADULT X3KG" }))).toBe(true);
+    expect(isPurinaProduct(product({ name: "CAT CHOW ADULT PESCADO X3KG" }))).toBe(true);
+    expect(isPurinaProduct(product({ name: "DOG CHOW ADULT RAZAS PEQUEÑAS X3KG" }))).toBe(true);
+    expect(isPurinaProduct(product({ name: "EXCELLENT DOG ADULT X3KG" }))).toBe(true);
+  });
+
+  it("matchea nombre que contiene PURINA", () => {
+    expect(isPurinaProduct(product({ name: "PURINA ONE ADULT X 3 KG" }))).toBe(true);
+  });
+
+  it("NO matchea marcas que no son Purina", () => {
+    expect(isPurinaProduct(product({ name: "SIEGER SENIOR X 3 KG" }))).toBe(false);
+    expect(isPurinaProduct(product({ name: "BALANCED PERRO ADULTO X 3 KG" }))).toBe(false);
+    expect(isPurinaProduct(product({ name: "OLD PRINCE ADULTO X 3 KG" }))).toBe(false);
+  });
+
+  it("matchea por brand de la sección de planilla", () => {
+    expect(
+      isPurinaProduct(
+        product({ name: "SOME ORIGINAL NAME", planSection: { brand: "PRO PLAN", line: null, subline: null, position: 0 } }),
+      ),
+    ).toBe(true);
   });
 });
