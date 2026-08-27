@@ -41,7 +41,9 @@ import {
   stockUnitLabel,
 } from "../../hooks/vendorCatalogHelpers";
 
-const PAGE_SIZE = 8;
+// Selector de filas por página (dashboard del admin): 10/20/50.
+const PAGE_SIZES = [10, 20, 50] as const;
+const DEFAULT_PAGE_SIZE = 10;
 const LOW_STOCK = 5;
 
 const imgSrc = (image?: string) => {
@@ -61,6 +63,7 @@ interface ProductsTableProps {
 
 export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, branchMode }: ProductsTableProps) => {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [sortBy, setSortBy] = useState<"name" | "code" | "quantity" | "price">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -95,9 +98,14 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
     return 0;
   });
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const current = Math.min(page, totalPages);
-  const slice = sorted.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const slice = sorted.slice((current - 1) * pageSize, current * pageSize);
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setPage(1);
+  };
 
   const toggleSort = (col: typeof sortBy) => {
     if (sortBy === col) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -208,10 +216,10 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
 
   useEffect(() => {
     if (selectedIndex < 0) return;
-    const targetPage = Math.floor(selectedIndex / PAGE_SIZE) + 1;
+    const targetPage = Math.floor(selectedIndex / pageSize) + 1;
     if (targetPage !== current) setPage(targetPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIndex]);
+  }, [selectedIndex, pageSize]);
 
   return (
     <Card className="overflow-hidden p-0">
@@ -450,49 +458,74 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
         </TableBody>
       </Table>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t px-4 py-3">
-          <p className="text-sm text-muted-foreground">
-            Página {current} de {totalPages}
-          </p>
-          <div className="flex gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={current === 1}
-              onClick={() => setPage(1)}
+      {sorted.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground">Ver</span>
+            <Select
+              value={pageSize.toString()}
+              onValueChange={(v) => handlePageSizeChange(Number(v))}
             >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={current === 1}
-              onClick={() => setPage(current - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={current === totalPages}
-              onClick={() => setPage(current + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={current === totalPages}
-              onClick={() => setPage(totalPages)}
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
+              <SelectTrigger className="h-8 w-auto gap-1 pr-2" aria-label="Productos por página">
+                <SelectValue placeholder="10" />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZES.map((s) => (
+                  <SelectItem key={s} value={s.toString()}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground">
+              Mostrando {(current - 1) * pageSize + 1}–{Math.min(current * pageSize, sorted.length)} de {sorted.length}
+            </span>
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">
+                Página {current} de {totalPages}
+              </p>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={current === 1}
+                  onClick={() => setPage(1)}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={current === 1}
+                  onClick={() => setPage(current - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={current === totalPages}
+                  onClick={() => setPage(current + 1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={current === totalPages}
+                  onClick={() => setPage(totalPages)}
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Card>
