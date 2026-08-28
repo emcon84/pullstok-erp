@@ -317,7 +317,7 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
     expect(mockUseProductFacets).toHaveBeenLastCalledWith(undefined, undefined);
   });
 
-  it("'Solo lo que trabajo' (default ON) oculta los desmarcados y se apaga", async () => {
+  it("'Solo lo que trabajo' default OFF muestra todo; al encenderlo oculta los desmarcados", async () => {
     const list = [
       { _id: "p1", name: "Trabajado", price: 100, quantity: 1, carried: true },
       { _id: "p2", name: "Solo pedido", price: 100, quantity: 1, carried: false },
@@ -326,13 +326,13 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
 
     renderDashboard();
 
-    // Default ON → el desmarcado no aparece.
-    expect(screen.getByTestId("products-table").textContent).toBe("Trabajado");
-
-    // Apagar el Switch → aparece todo el catálogo.
-    fireEvent.click(screen.getByRole("switch"));
+    // Default OFF → muestra todo el catálogo (nada se oculta).
     expect(screen.getByTestId("products-table").textContent).toBe(
       "Trabajado | Solo pedido",
     );
+
+    // Encender el Switch → solo los marcados.
+    fireEvent.click(screen.getByRole("switch"));
+    expect(screen.getByTestId("products-table").textContent).toBe("Trabajado");
   });
 });

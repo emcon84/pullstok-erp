@@ -463,11 +463,13 @@ model Product {
   // Visibilidad en la tienda online pública (negocio.pullstok.com). Default
   // false: un producto nunca aparece publicado sin que el dueño lo decida.
   publishedToStore   Boolean           @default(false)
-  // ¿El negocio trabaja (vende en mostrador) este producto? Default true: todo
-  // el catálogo existente sigue visible/operativo. El admin marca/desmarca; el
-  // filtro "solo lo que trabajo" del dashboard (admin + vendedor) oculta los
-  // desmarcados (productos que se pueden pedir pero no se trabajan aún).
-  carried            Boolean           @default(true)
+  // ¿El negocio trabaja (vende en mostrador) este producto? Es un marcador
+  // EXTRA que el admin marca/desmarca incrementalmente; NO borra nada del
+  // catálogo. Default false: los productos arrancan "no marcados" y el admin
+  // activa los que trabaja. El filtro "solo lo que trabajo" (admin + vendedor)
+  // acota la búsqueda a los marcados SOLO cuando se enciende; apagado muestra
+  // todo el catálogo.
+  carried            Boolean           @default(false)
   organizationId     String
   organization       Organization      @relation(fields: [organizationId], references: [id])
   orderItems         OrderItem[]

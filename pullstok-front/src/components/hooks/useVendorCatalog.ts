@@ -24,8 +24,9 @@ export function useVendorCatalog(branchId: string) {
   // Título de planilla SECO (sdd/alican-plan-titles): se envía server-side como
   // ?title=<key> (la API lo soporta desde GET /products).
   const [titleFilter, setTitleFilter] = useState<string | null>(null);
-  // "Solo lo que trabajo": default ON → envía server-side ?carriedOnly=1.
-  const [onlyCarried, setOnlyCarried] = useState(true);
+  // "Solo lo que trabajo": default OFF → envía el catálogo completo. Al
+  // encenderlo envía server-side ?carriedOnly=1 (solo los marcados).
+  const [onlyCarried, setOnlyCarried] = useState(false);
   const [debouncedFilter, setDebouncedFilter] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 

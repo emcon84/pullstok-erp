@@ -66,9 +66,9 @@ export const Dashboard = () => {
   // Título de planilla SECO (sdd/alican-plan-titles): filtro client-side por
   // la clave compuesta [brand, line, subline].filter(Boolean).join("|").
   const [titleFilter, setTitleFilter] = useState<string | null>(null);
-  // "Solo lo que trabajo": default ON → oculta los productos desmarcados
-  // (carried=false) en la búsqueda/listado. Se apaga para ver todo el catálogo.
-  const [onlyCarried, setOnlyCarried] = useState(true);
+  // "Solo lo que trabajo": default OFF → muestra todo el catálogo. Al encenderlo
+  // acota a los productos marcados (carried=true). El check nunca borra nada.
+  const [onlyCarried, setOnlyCarried] = useState(false);
   // Tipo de planilla ALICAN (SECO/WET): null = Todos (comportamiento actual).
   // Filtra el listado server-side y define qué títulos muestran las facets.
   const [planType, setPlanType] = useState<"SECO" | "WET" | null>(null);

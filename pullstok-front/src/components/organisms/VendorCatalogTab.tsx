@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { toast } from "react-toastify";
 import { Loader } from "@/components/atoms/loader";
 import { ProductDrawer } from "@/components/molecules/ProductDrawer";
@@ -351,6 +353,26 @@ export const VendorCatalogTab = ({
           onCategoryChange={handleCategoryChange}
           onClear={handleClearFilters}
         />
+        {/* "Solo lo que trabajo": oculta productos desmarcados (carried=false).
+            Default ON. El toggle permite ver todo el catálogo al apagarlo. */}
+        <div className="flex items-center gap-2">
+          <Switch
+            id="only-carried"
+            checked={catalog.onlyCarried}
+            onCheckedChange={(v) => {
+              catalog.setOnlyCarried(v);
+              catalog.resetSelection();
+            }}
+          />
+          <Label htmlFor="only-carried" className="cursor-pointer text-sm font-medium">
+            Solo lo que trabajo
+          </Label>
+          {!catalog.onlyCarried && (
+            <span className="text-xs text-muted-foreground">
+              Mostrando todo el catálogo
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── Zona de la lista: toma el espacio sobrante de la columna flex y
