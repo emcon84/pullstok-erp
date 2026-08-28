@@ -56,7 +56,6 @@ describe("useProducts / useProductFacets — priceListType en la query", () => {
         undefined,
         undefined,
         "WET",
-        undefined,
       );
     });
 

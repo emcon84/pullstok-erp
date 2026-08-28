@@ -64,13 +64,12 @@ export const useProducts = (
   search?: string,
   category?: string,
   priceListType?: "SECO" | "WET",
-  carriedOnly?: boolean,
 ) => {
   const { data, error, isLoading } = useQuery<DataItem[], Error>({
-    queryKey: ["products", branchId, search, category, priceListType, carriedOnly].filter(
+    queryKey: ["products", branchId, search, category, priceListType].filter(
       Boolean,
     ),
-    queryFn: () => fetchProducts(branchId, search, category, priceListType, carriedOnly),
+    queryFn: () => fetchProducts(branchId, search, category, priceListType),
     placeholderData: (prev) => prev, // keep previous while fetching
   });
 

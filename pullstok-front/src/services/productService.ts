@@ -195,13 +195,14 @@ export function products(
   search?: string,
   category?: string,
   priceListType?: "SECO" | "WET",
-  carriedOnly?: boolean,
 ): Promise<DataItem[]>;
 // Paginados: page/pageSize en las posiciones 4/5 (contrato legacy intacto,
 // LooseStockAdmin usa products(undefined, "", undefined, 1, 300)); el título de
 // planilla es OPCIONAL y va al final (solo lo usa la variante paginada del
 // vendor dashboard). priceListType también es OPCIONAL y va al final (posición
 // 7): la variante plana del dashboard admin lo recibe en la posición 4.
+// carriedOnly (solo lo que trabajo) va al final (posición 8): lo usa la variante
+// paginada del vendedor; el admin lo filtra client-side.
 export function products(
   branchId: string | undefined,
   search: string | undefined,
