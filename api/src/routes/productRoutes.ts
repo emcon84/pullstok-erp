@@ -21,6 +21,7 @@ import {
   bulkPriceUpdateSchema,
   updateBranchStockSchema,
   applyPriceListSchema,
+  bulkCarriedSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -108,6 +109,16 @@ router.post(
   requireRole("ADMIN"),
   validate(bulkPriceUpdateSchema),
   productController.bulkPriceUpdate,
+);
+
+// Bulk "Lo trabajo" (carried) — marca/desmarca varios productos a la vez.
+router.post(
+  "/bulk-carried",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN"),
+  validate(bulkCarriedSchema),
+  productController.bulkCarried,
 );
 
 // Import de planillas de precios Alican (sdd/alican-wholesale-price-list) — ADMIN only.

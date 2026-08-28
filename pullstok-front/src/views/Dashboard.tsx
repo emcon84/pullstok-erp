@@ -38,6 +38,8 @@ import { toast } from "react-toastify";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
@@ -64,6 +66,9 @@ export const Dashboard = () => {
   // Título de planilla SECO (sdd/alican-plan-titles): filtro client-side por
   // la clave compuesta [brand, line, subline].filter(Boolean).join("|").
   const [titleFilter, setTitleFilter] = useState<string | null>(null);
+  // "Solo lo que trabajo": default ON → oculta los productos desmarcados
+  // (carried=false) en la búsqueda/listado. Se apaga para ver todo el catálogo.
+  const [onlyCarried, setOnlyCarried] = useState(true);
   // Tipo de planilla ALICAN (SECO/WET): null = Todos (comportamiento actual).
   // Filtra el listado server-side y define qué títulos muestran las facets.
   const [planType, setPlanType] = useState<"SECO" | "WET" | null>(null);
@@ -241,9 +246,12 @@ export const Dashboard = () => {
     if (titleFilter) {
       list = list.filter((p) => planTitleKeyOf(p) === titleFilter);
     }
+    if (onlyCarried) {
+      list = list.filter((p) => p.carried !== false);
+    }
     if (filterTerms.length === 0) return list;
     return list.filter((product) => matchesProductFilter(product, filterTerms));
-  }, [products, filterTerms, categoryFilter, providerFilter, titleFilter]);
+  }, [products, filterTerms, categoryFilter, providerFilter, titleFilter, onlyCarried]);
 
   // Proveedores disponibles en el catálogo cargado (para el select de filtro).
   const availableProviders = useMemo(() => {
@@ -455,6 +463,23 @@ export const Dashboard = () => {
           </Select>
         </div>
       )}
+
+      {/* "Solo lo que trabajo": oculta productos desmarcados (carried=false) */}
+      <div className="flex items-center gap-2">
+        <Switch
+          id="only-carried"
+          checked={onlyCarried}
+          onCheckedChange={setOnlyCarried}
+        />
+        <Label htmlFor="only-carried" className="cursor-pointer text-sm font-medium">
+          Solo lo que trabajo
+        </Label>
+        {!onlyCarried && (
+          <span className="text-xs text-muted-foreground">
+            Mostrando todo el catálogo (incluye productos que no se venden aún)
+          </span>
+        )}
+      </div>
 
       {/* Filtro por tipo de planilla ALICAN (SECO/WET): null = Todos. Solo se
           muestra cuando el proveedor seleccionado es ALICAN. */}

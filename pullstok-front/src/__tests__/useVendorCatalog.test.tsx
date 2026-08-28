@@ -59,12 +59,14 @@ describe("useVendorCatalog — filtro por título de planilla (server-side)", ()
   it("pasa el título como 4to argumento de useInfiniteProducts (?title=)", async () => {
     const { result } = renderCatalog();
 
-    // Sin filtro: el 4to argumento es undefined.
+    // Sin filtro: el 4to argumento es undefined; el 6to (onlyCarried) es true por defecto.
     expect(mockUseInfiniteProducts).toHaveBeenCalledWith(
       "branch-1",
       undefined,
       undefined,
       undefined,
+      undefined,
+      true,
     );
 
     act(() => {

@@ -12,6 +12,8 @@ import {
   ChevronRight,
   ChevronsRight,
   BadgeDollarSign,
+  Check,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { productWeight, formatWeight } from "@/lib/productWeight";
@@ -35,6 +37,10 @@ import {
 } from "@/components/ui/table";
 import { useDeleteProduct } from "../../hooks/useProducts";
 import { useConfirm } from "../../hooks/useConfirm";
+import { bulkCarried } from "@/services/productService";
+import { useQueryClient } from "@tanstack/react-query";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "react-toastify";
 import { API_URL } from "../../../constants";
 import { DataItem } from "../../../types";
 import {
@@ -68,6 +74,10 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
   const [sortBy, setSortBy] = useState<"name" | "code" | "quantity" | "price" | "peso">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  // Selección múltiple para marcar/desmarcar "Lo trabajo" en lote.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const queryClient = useQueryClient();
   const { deleteProduct, loading } = useDeleteProduct();
   const confirm = useConfirm();
 
@@ -140,6 +150,43 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
       danger: true,
     });
     if (ok) deleteProduct(id);
+  };
+
+  const pid = (p: DataItem) => p._id || p.id || "";
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleSelectAll = () =>
+    setSelectedIds((prev) => {
+      const all = slice.map(pid).filter(Boolean);
+      const allSelected = all.length > 0 && all.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allSelected) all.forEach((id) => next.delete(id));
+      else all.forEach((id) => next.add(id));
+      return next;
+    });
+
+  const applyCarried = async (carried: boolean) => {
+    const ids = [...selectedIds].filter(Boolean);
+    if (ids.length === 0 || bulkSaving) return;
+    setBulkSaving(true);
+    try {
+      const res = await bulkCarried(ids, carried);
+      toast.success(`Marcaste ${res.updated} producto(s)`);
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al actualizar";
+      toast.error(msg);
+    } finally {
+      setBulkSaving(false);
+    }
   };
 
   // Acceso rápido por teclado: ↑/↓ navegan los productos visibles y Enter (o
@@ -234,6 +281,42 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
   }, [selectedIndex, pageSize]);
 
   return (
+    <div className="space-y-2">
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+          <span className="text-sm font-medium">
+            {selectedIds.size} seleccionado(s)
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkSaving}
+              onClick={() => applyCarried(true)}
+            >
+              <Check className="h-4 w-4" />
+              Marcar lo trabajo
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkSaving}
+              onClick={() => applyCarried(false)}
+            >
+              <X className="h-4 w-4" />
+              Desmarcar (solo pedido)
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={bulkSaving}
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Quitar selección
+            </Button>
+          </div>
+        </div>
+      )}
     <Card className="overflow-hidden p-0">
       {/* Sort compacto — solo mobile, porque en mobile no hay header con columnas */}
       <div className="flex items-center gap-2 border-b px-3 py-2 sm:hidden">
@@ -269,6 +352,17 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
       <Table>
         <TableHeader className="hidden sm:table-header-group">
           <TableRow className="hover:bg-transparent">
+            <TableHead className="w-[36px]">
+              <div className="flex items-center">
+                <Checkbox
+                  checked={
+                    slice.length > 0 && slice.every((p) => selectedIds.has(pid(p)))
+                  }
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Seleccionar todos"
+                />
+              </div>
+            </TableHead>
             <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
               <div className="flex items-center gap-1">Producto <SortIcon col="name" /></div>
             </TableHead>
@@ -289,7 +383,7 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
           {slice.length === 0 && (
             <TableRow className="flex w-full sm:table-row">
               <TableCell
-                colSpan={6}
+                colSpan={7}
                 className="w-full h-32 text-center text-muted-foreground sm:table-cell"
               >
                 No hay productos todavía.
@@ -311,6 +405,14 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
                 )}
                 onClick={() => onEdit(p)}
               >
+                {/* Checkbox de selección (marcar "Lo trabajo" en lote) */}
+                <TableCell className="hidden sm:table-cell w-[36px] p-2" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={!!id && selectedIds.has(id)}
+                    onCheckedChange={() => id && toggleSelect(id)}
+                    aria-label={`Seleccionar ${p.name}`}
+                  />
+                </TableCell>
                 {/* Celda "producto". En mobile renderiza el card del diseño:
                     imagen fija a la izq, nombre (con scroll si desborda) + stock + acciones al centro,
                     divisor vertical + precio con ancho fijo a la derecha.
@@ -550,5 +652,6 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
         </div>
       )}
     </Card>
+    </div>
   );
 };

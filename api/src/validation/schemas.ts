@@ -590,6 +590,15 @@ export const updateBranchStockSchema = z.object({
     .nonnegative("La cantidad no puede ser negativa"),
 });
 
+// ---------- Bulk "Lo trabajo" (carried) ----------
+// Marca/desmarca el flag carried de varios productos de una (selección múltiple
+// en la tabla del admin). carried=true → aparece en el filtro "solo lo que
+// trabajo"; false → se oculta de la búsqueda (se puede pedir, no se vende aún).
+export const bulkCarriedSchema = z.object({
+  productIds: z.array(z.string().uuid("Producto inválido")).min(1),
+  carried: z.boolean(),
+});
+
 // ---------- Bulk Price Update ----------
 // Selectores de alcance redefinidos (sdd/bulk-price-update-selectors): el
 // cliente manda los NODE ids de categoría seleccionados (categoryIds) y el

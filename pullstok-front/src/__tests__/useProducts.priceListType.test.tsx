@@ -56,6 +56,7 @@ describe("useProducts / useProductFacets — priceListType en la query", () => {
         undefined,
         undefined,
         "WET",
+        undefined,
       );
     });
 
@@ -106,6 +107,7 @@ describe("useProducts / useProductFacets — priceListType en la query", () => {
         30,
         "KEY",
         "WET",
+        undefined,
       );
     });
   });

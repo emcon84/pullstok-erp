@@ -195,6 +195,7 @@ export function products(
   search?: string,
   category?: string,
   priceListType?: "SECO" | "WET",
+  carriedOnly?: boolean,
 ): Promise<DataItem[]>;
 // Paginados: page/pageSize en las posiciones 4/5 (contrato legacy intacto,
 // LooseStockAdmin usa products(undefined, "", undefined, 1, 300)); el título de
@@ -209,6 +210,7 @@ export function products(
   pageSize: number,
   title?: string,
   priceListType?: "SECO" | "WET",
+  carriedOnly?: boolean,
 ): Promise<PaginatedProducts>;
 export async function products(
   branchId?: string,
@@ -218,6 +220,7 @@ export async function products(
   pageSizeOrPriceListType?: number | "SECO" | "WET",
   title?: string,
   priceListType?: "SECO" | "WET",
+  carriedOnly?: boolean,
 ): Promise<DataItem[] | PaginatedProducts> {
   try {
     const token = localStorage.getItem("token");
@@ -227,6 +230,7 @@ export async function products(
     if (search) params.name = search;
     if (category) params.category = category;
     if (title) params.title = title;
+    if (carriedOnly) params.carriedOnly = "1";
 
     // priceListType llega por la posición 4 (variante plana del dashboard
     // admin) o por la 7 (variante paginada del vendor dashboard); nunca ambas.
@@ -317,7 +321,6 @@ export const updateProduct = async (product: DataItem) => {
     }
   }
 };
-
 export const deleteProduct = async (productId: string): Promise<void> => {
   try {
     const token = localStorage.getItem("token");
@@ -336,6 +339,30 @@ export const deleteProduct = async (productId: string): Promise<void> => {
       throw new Error("An unknown error occurred");
     }
   }
+};
+
+/**
+ * POST /products/bulk-carried — marca/desmarca el flag "carried" de varios
+ * productos a la vez (selección múltiple en la tabla del admin).
+ */
+export const bulkCarried = async (
+  productIds: string[],
+  carried: boolean,
+): Promise<{ updated: number }> => {
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${API_URL}/products/bulk-carried`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ productIds, carried }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "bulk carried failed");
+  }
+  return res.json();
 };
 
 // ---------------------------------------------------------------------------

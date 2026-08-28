@@ -24,6 +24,8 @@ export function useVendorCatalog(branchId: string) {
   // Título de planilla SECO (sdd/alican-plan-titles): se envía server-side como
   // ?title=<key> (la API lo soporta desde GET /products).
   const [titleFilter, setTitleFilter] = useState<string | null>(null);
+  // "Solo lo que trabajo": default ON → envía server-side ?carriedOnly=1.
+  const [onlyCarried, setOnlyCarried] = useState(true);
   const [debouncedFilter, setDebouncedFilter] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -42,6 +44,8 @@ export function useVendorCatalog(branchId: string) {
       debouncedFilter?.trim() || undefined,
       categoryFilter.trim() || undefined,
       titleFilter?.trim() || undefined,
+      undefined,
+      onlyCarried,
     );
 
   // Complete facets for the filter chips: all org categories plus variant
@@ -114,6 +118,8 @@ export function useVendorCatalog(branchId: string) {
     setCategoryFilter,
     titleFilter,
     setTitleFilter,
+    onlyCarried,
+    setOnlyCarried,
     items,
     isLoadingInitial,
     isFetchingNextPage,

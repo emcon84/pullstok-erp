@@ -2,6 +2,8 @@ import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Loader } from "@/components/atoms/loader";
 import { ProductDrawer } from "@/components/molecules/ProductDrawer";
 import { FilterChips } from "@/components/molecules/FilterChips";
@@ -195,6 +197,25 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           onCategoryChange={handleCategoryChange}
           onClear={handleClearFilters}
         />
+        {/* "Solo lo que trabajo": oculta productos desmarcados (carried=false) */}
+        <div className="flex items-center gap-2">
+          <Switch
+            id="only-carried"
+            checked={catalog.onlyCarried}
+            onCheckedChange={(v) => {
+              catalog.setOnlyCarried(v);
+              catalog.resetSelection();
+            }}
+          />
+          <Label htmlFor="only-carried" className="cursor-pointer text-sm font-medium">
+            Solo lo que trabajo
+          </Label>
+          {!catalog.onlyCarried && (
+            <span className="text-xs text-muted-foreground">
+              Mostrando todo el catálogo
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── Product grid ── */}

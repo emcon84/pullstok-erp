@@ -29,6 +29,9 @@ export interface DataItem {
     subline: string | null;
     position: number;
   } | null;
+  // ¿El negocio trabaja este producto? Default true. El filtro "solo lo que
+  // trabajo" del dashboard (admin + vendedor) oculta los desmarcados.
+  carried?: boolean;
   price: number | string;
   quantity: number | string;
 }

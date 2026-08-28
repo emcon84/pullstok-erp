@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Card,
   CardContent,
@@ -51,6 +52,7 @@ interface ProductPayload {
   categoryId?: string | null;
   weightKg?: number | null;
   bulkFactor?: number | null;
+  carried?: boolean;
 }
 
 export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: ProductDrawerProps) => {
@@ -77,6 +79,8 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
   const [weightKg, setWeightKg] = useState("");
   const [bulkFactor, setBulkFactor] = useState("");
   // priceKgSuelto is read-only (derived server-side from price/weightKg/factor).
+  // ¿El negocio trabaja este producto? (filtro "solo lo que trabajo").
+  const [carried, setCarried] = useState(true);
 
   // Stock por sucursal (edit mode): self-contained response, no GET /branches.
   const productId = isEdit ? (product?._id || product?.id) : undefined;
@@ -179,6 +183,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         setImageFile(null);
         setWeightKg(product.weightKg != null ? String(product.weightKg) : "");
         setBulkFactor(product.bulkFactor != null ? String(product.bulkFactor) : "");
+        setCarried(product.carried !== false); // default true si no viene
         // Pre-select variants if available
         if (product.variantAssignments) {
           const pre: Record<string, string> = {};
@@ -200,6 +205,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         setImageFile(null);
         setWeightKg("");
         setBulkFactor("");
+        setCarried(true);
         setVariants([]);
         setVariantSelections({});
       }
@@ -246,6 +252,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
       payload.weightKg = !Number.isNaN(parsedWeightKg) && parsedWeightKg > 0 ? parsedWeightKg : null;
       const parsedFactor = parseFloat(bulkFactor);
       payload.bulkFactor = !isNaN(parsedFactor) && parsedFactor > 0 ? parsedFactor : null;
+      payload.carried = carried;
 
       if (isEdit && product) {
         payload.categoryId = categoryId || null;
@@ -439,6 +446,25 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
               )}
               <Input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} className="flex-1" />
             </div>
+          </div>
+
+          {/* ¿Lo trabaja el negocio? (filtro "solo lo que trabajo") */}
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="min-w-0">
+              <Label htmlFor="p-carried" className="text-sm font-medium">
+                Lo trabajo
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Aparece en la búsqueda del dashboard. Desmarcalo si solo se puede
+                pedir, no se vende en mostrador.
+              </p>
+            </div>
+            <Switch
+              id="p-carried"
+              checked={carried}
+              onCheckedChange={setCarried}
+              disabled={readOnly}
+            />
           </div>
 
           {/* Variants */}

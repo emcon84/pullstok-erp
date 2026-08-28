@@ -316,4 +316,23 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
     );
     expect(mockUseProductFacets).toHaveBeenLastCalledWith(undefined, undefined);
   });
+
+  it("'Solo lo que trabajo' (default ON) oculta los desmarcados y se apaga", async () => {
+    const list = [
+      { _id: "p1", name: "Trabajado", price: 100, quantity: 1, carried: true },
+      { _id: "p2", name: "Solo pedido", price: 100, quantity: 1, carried: false },
+    ];
+    mockUseProducts.mockReturnValue({ products: list, loading: false, error: null } as never);
+
+    renderDashboard();
+
+    // Default ON → el desmarcado no aparece.
+    expect(screen.getByTestId("products-table").textContent).toBe("Trabajado");
+
+    // Apagar el Switch → aparece todo el catálogo.
+    fireEvent.click(screen.getByRole("switch"));
+    expect(screen.getByTestId("products-table").textContent).toBe(
+      "Trabajado | Solo pedido",
+    );
+  });
 });

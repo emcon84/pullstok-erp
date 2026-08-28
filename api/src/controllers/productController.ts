@@ -481,6 +481,11 @@ const getProducts = async (req: Request, res: Response) => {
       const searchTerm = name as string;
       Object.assign(where, buildProductSearchWhere(searchTerm));
     }
+    // "Solo lo que trabajo": ?carriedOnly=1 (o true) → solo productos con
+    // carried=true (oculta los que se pueden pedir pero no se venden aún).
+    if (req.query.carriedOnly === "1" || req.query.carriedOnly === "true") {
+      where.carried = true;
+    }
     if (category) {
       where.category = { name: { equals: category as string, mode: "insensitive" } };
     }
@@ -1376,6 +1381,25 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
 };
 
 /**
+ * POST /products/bulk-carried — marca/desmarca el flag "carried" de varios
+ * productos a la vez (selección múltiple en la tabla del admin). Solo ADMIN.
+ */
+export const bulkCarried = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const { productIds, carried } = req.body;
+    const result = await prisma.product.updateMany({
+      where: { id: { in: productIds }, organizationId },
+      data: { carried },
+    });
+    return res.status(200).json({ updated: result.count });
+  } catch (error: any) {
+    console.error("Error actualizando carried (bulk):", error);
+    return res.status(500).json({ message: "Error al actualizar" });
+  }
+};
+
+/**
  * GET /products/:id/stock — stock del producto en todas las sucursales ACTIVAS
  * de la org (spec A1). Respuesta autocontenida (design D5): no depende de
  * GET /branches (que es ADMIN/MANAGEMENT-only), cualquier rol autenticado la
@@ -1509,6 +1533,7 @@ export default {
   publishProduct,
   deleteProduct,
   bulkPriceUpdate,
+  bulkCarried,
   getProductStock,
   updateBranchStock,
   getStockSummary,

@@ -64,12 +64,13 @@ export const useProducts = (
   search?: string,
   category?: string,
   priceListType?: "SECO" | "WET",
+  carriedOnly?: boolean,
 ) => {
   const { data, error, isLoading } = useQuery<DataItem[], Error>({
-    queryKey: ["products", branchId, search, category, priceListType].filter(
+    queryKey: ["products", branchId, search, category, priceListType, carriedOnly].filter(
       Boolean,
     ),
-    queryFn: () => fetchProducts(branchId, search, category, priceListType),
+    queryFn: () => fetchProducts(branchId, search, category, priceListType, carriedOnly),
     placeholderData: (prev) => prev, // keep previous while fetching
   });
 
@@ -98,6 +99,7 @@ export const useInfiniteProducts = (
   category?: string,
   title?: string,
   priceListType?: "SECO" | "WET",
+  carriedOnly?: boolean,
 ) => {
   const queryKey = [
     "products",
@@ -106,6 +108,7 @@ export const useInfiniteProducts = (
     category,
     title,
     priceListType,
+    carriedOnly,
   ].filter(Boolean);
 
   const {
@@ -132,6 +135,7 @@ export const useInfiniteProducts = (
         PAGE_SIZE,
         title,
         priceListType,
+        carriedOnly,
       ),
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
     initialPageParam: 1,
