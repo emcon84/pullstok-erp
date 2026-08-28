@@ -2,23 +2,49 @@ import type { DataItem } from "@/types";
 
 /**
  * Marcas del grupo PURINA (productos Purina en el catálogo). Se usan para el
- * filtro "PURINA" del dashboard (imprimir toda la línea Purina) matcheando por
- * prefijo del NOMBRE, porque estos productos no traen proveedor ni Marca
- * (variantAssignments) cargados de forma confiable.
+ * filtro "PURINA" del dashboard (imprimir toda la línea Purina). Se matchea por
+ * prefijo del NOMBRE y, como refuerzo, contra la variante "Marca" asignada
+ * (porque hay productos cuyo nombre no arranca con la marca, ej. "FELIX
+ * MEGAMIX GATITOS" que es de la línea Gati).
  */
 export const PURINA_BRANDS = [
   "PRO PLAN",
+  "PROPLAN",
   "CAT CHOW",
   "DOG CHOW",
   "EXCELLENT",
+  "DOGUI",
+  "BONELO",
+  "BONZO",
+  "GATI",
+  "FELIX",
 ] as const;
 
-/** ¿El producto pertenece a la línea Purina? (por nombre, y por brand de
- * sección de planilla / variante Marca como refuerzo). */
+/** Clave normalizada de una marca (sin espacios/acentos, mayúsculas) para
+ * comparar contra los valores de la variante "Marca" y los brands de sección. */
+export const purinaBrandKey = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s-]+/g, "")
+    .toUpperCase();
+
+const PURINA_BRAND_KEYS = new Set(PURINA_BRANDS.map(purinaBrandKey));
+
+/** ¿El producto pertenece a la línea Purina? (por nombre, y por la variante
+ * "Marca" / brand de sección / proveedor como refuerzo). */
 export const isPurinaProduct = (p: DataItem): boolean => {
   const name = (p.name || "").trim().toUpperCase();
   if (PURINA_BRANDS.some((b) => name.startsWith(b))) return true;
   if (name.includes("PURINA")) return true;
+  // Refuerzo: la Marca asignada (variantAssignments) identifica la línea aunque
+  // el nombre no arranque con el prefijo (ej. un FELIX con Marca Gati).
+  const assignments = (p as unknown as {
+    variantAssignments?: { option?: { value?: string } }[];
+  })?.variantAssignments;
+  if (assignments?.some((a) => PURINA_BRAND_KEYS.has(purinaBrandKey(a.option?.value ?? "")))) {
+    return true;
+  }
   const brand =
     (p as { planSection?: { brand?: string | null } }).planSection?.brand ??
     (p as { provider?: { name?: string } }).provider?.name ??

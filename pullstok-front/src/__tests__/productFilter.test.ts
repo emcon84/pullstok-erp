@@ -150,6 +150,26 @@ describe("isPurinaProduct", () => {
     expect(isPurinaProduct(product({ name: "CAT CHOW ADULT PESCADO X3KG" }))).toBe(true);
     expect(isPurinaProduct(product({ name: "DOG CHOW ADULT RAZAS PEQUEÑAS X3KG" }))).toBe(true);
     expect(isPurinaProduct(product({ name: "EXCELLENT DOG ADULT X3KG" }))).toBe(true);
+    // Marca del portafolio Purina completa (Dogui, Bonelo, Bonzo, Gati).
+    expect(isPurinaProduct(product({ name: "DOGUI ADULTO X 15 KG" }))).toBe(true);
+    expect(isPurinaProduct(product({ name: "BONELO ADULTO CARNE X 20 KG" }))).toBe(true);
+    expect(isPurinaProduct(product({ name: "BONZO ADULTO X 21 KG" }))).toBe(true);
+    expect(isPurinaProduct(product({ name: "GATI ADULTO CARNE X 1 KG" }))).toBe(true);
+  });
+
+  it("matchea por la variante Marca cuando el nombre no arranca con el prefijo", () => {
+    // "FELIX MEGAMIX GATITOS" es de la línea Gati → lo detecta por la Marca.
+    const p = product({
+      name: "FELIX MEGAMIX GATITOS X 15 KG",
+      variantAssignments: [{ option: { value: "Gati" } }],
+    } as unknown as DataItem);
+    expect(isPurinaProduct(p)).toBe(true);
+    // Producto con Marca Purina pero nombre neutro → true.
+    const q = product({
+      name: "BOLSA 15 KG",
+      variantAssignments: [{ option: { value: "Dogui" } }],
+    } as unknown as DataItem);
+    expect(isPurinaProduct(q)).toBe(true);
   });
 
   it("matchea nombre que contiene PURINA", () => {
