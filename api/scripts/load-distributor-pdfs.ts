@@ -600,7 +600,7 @@ async function upsertProduct(
     if (dryRun) return "skipped";
     await basePrisma.product.update({
       where: { id: existing.id },
-      data: { name: p.description, price: p.price, categoryId: catId },
+      data: { name: normalizeProductName(p.description), price: p.price, categoryId: catId },
     });
     // Re-sync variant assignments
     await basePrisma.productVariant.deleteMany({ where: { productId: existing.id } });
@@ -617,7 +617,7 @@ async function upsertProduct(
 
   const product = await basePrisma.product.create({
     data: {
-      name: p.description,
+      name: normalizeProductName(p.description),
       price: p.price,
       quantity: 0,
       categoryId: catId,

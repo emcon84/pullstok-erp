@@ -25,6 +25,7 @@ import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import { basePrisma } from "../src/config/db";
+import { normalizeProductName } from "../src/utils/productName";
 
 const ORG_SLUG = process.env.LRC_ORG_SLUG || "el-almacen-de-las-mascotas";
 // Helper genérico: cualquier planilla del proveedor en el MISMO formato (JSON con
@@ -105,8 +106,10 @@ async function upsertProduct(
 ): Promise<"created" | "updated" | "skipped"> {
   if (row.priceSinIva <= 0) return "skipped";
 
+  const name = normalizeProductName(row.name);
+
   const existing = await basePrisma.product.findFirst({
-    where: { organizationId: orgId, name: row.name, categoryId },
+    where: { organizationId: orgId, name, categoryId },
     include: { variantAssignments: true },
   });
 
@@ -132,7 +135,7 @@ async function upsertProduct(
 
   const product = await basePrisma.product.create({
     data: {
-      name: row.name,
+      name,
       price,
       quantity: 0,
       categoryId,

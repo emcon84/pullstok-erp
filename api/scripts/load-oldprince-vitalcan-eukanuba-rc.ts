@@ -8,6 +8,7 @@
 
 import "dotenv/config";
 import { basePrisma } from "../src/config/db";
+import { normalizeProductName } from "../src/utils/productName";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -434,7 +435,7 @@ async function main() {
 
     const product = await basePrisma.product.create({
       data: {
-        name: p.name,
+        name: normalizeProductName(p.name),
         price: p.price ?? 0,
         quantity: 0,
         categoryId: catId,
@@ -468,7 +469,7 @@ async function main() {
 
     const product = await basePrisma.product.create({
       data: {
-        name: p.name,
+        name: normalizeProductName(p.name),
         price: p.price ?? 0,
         quantity: 0,
         categoryId: catId,

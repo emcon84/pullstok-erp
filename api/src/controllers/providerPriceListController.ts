@@ -28,6 +28,7 @@ import { runWithTenant, requireOrganizationId } from "../config/tenantContext";
 import type { AuthedRequest } from "../middlewares/authMiddleware";
 import { prisma } from "../config/db";
 import { round2, roundBolsaPriceIfHigh } from "../utils/money";
+import { normalizeProductName } from "../utils/productName";
 import {
   buildCatalogIndex,
   computeSuggestedPrice,
@@ -502,7 +503,7 @@ async function applyPriceListCore(
         }
         const product = await tx.product.create({
           data: {
-            name: r.nombre,
+            name: normalizeProductName(r.nombre),
             price: roundBolsaPriceIfHigh(round2(r.precioConIva)),
             quantity: 0,
             categoryId: null,
