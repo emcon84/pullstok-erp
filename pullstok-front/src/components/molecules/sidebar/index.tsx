@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { LogOut, ChevronDown, Moon, Sun } from "lucide-react";
+import {
+  LogOut,
+  ChevronDown,
+  Moon,
+  Sun,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,12 +21,21 @@ import { useBrandingContext } from "@/contexts/BrandingContext";
 import { BrandLogo } from "@/components/atoms/BrandLogo";
 import { InstallButton } from "@/components/atoms/InstallButton";
 import { RefreshDataButton } from "@/components/atoms/RefreshDataButton";
+import type { NavItem } from "./navItems";
 
 interface SidebarContentProps {
   onNavigate?: () => void;
+  /** Modo colapsado (riel de iconos). Solo aplica en el aside de desktop. */
+  collapsed?: boolean;
+  /** Alterna el estado colapsado. Si no se pasa, no se muestra el toggle. */
+  onToggle?: () => void;
 }
 
-export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
+export const SidebarContent = ({
+  onNavigate,
+  collapsed = false,
+  onToggle,
+}: SidebarContentProps) => {
   const location = useLocation();
   const { count: pendingOrders } = usePendingOrdersCount();
   const { count: unreadMessages } = useUnreadMessagesCount();
@@ -35,6 +51,19 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
     }
   })();
 
+  // En modo colapsado el menú se aplana a iconos (sin grupos): se listan los
+  // ítems visibles según rol/plan. VENDEDOR usa el menú plano simple; el resto
+  // aplana los acordeones PRODUCTOS/VENTAS/etc. a una sola lista (todos los
+  // ítems son links directos, sin sub-ítems).
+  const plan = user?.plan;
+  const role = user?.role;
+  const flatItems: NavItem[] =
+    role === "VENDEDOR"
+      ? vendorSimpleNav
+      : navGroups.flatMap((g) =>
+          filterNavItemsByRole(filterNavItemsByPlan(g.items, plan), role),
+        );
+
   // Auto-open group containing the current route
   useEffect(() => {
     const currentPath = location.pathname;
@@ -48,7 +77,9 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
         break;
       }
     }
-  }, [location.pathname]);
+    // user?.plan / user?.role vienen de localStorage como primitivos estables:
+    // el effect solo se re-ejecuta si cambian (o al navegar).
+  }, [location.pathname, user?.plan, user?.role]);
 
   const toggleGroup = (label: string) => {
     setOpenGroups((prev) => {
@@ -69,41 +100,104 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      {/* Marca */}
-      <div className="flex h-16 items-center gap-2 border-b px-4">
-        <BrandLogo
-          logoUrl={branding.logoUrl}
-          displayName={branding.displayName}
-          size="sidebar"
-        />
-        {branding.showDisplayName !== false && (
-          <span
-            className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight"
-            title={branding.displayName || undefined}
-          >
-            {branding.displayName || "Pullstok"}
-          </span>
+      {/* Marca + toggle colapsado */}
+      <div
+        className={cn(
+          "flex h-16 items-center border-b",
+          collapsed ? "justify-center px-0" : "gap-2 px-4",
         )}
-        <div className="ml-auto flex items-center gap-1">
+      >
+        {collapsed ? (
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={toggleTheme}
-            title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+            onClick={onToggle}
+            title="Expandir barra lateral"
+            aria-label="Expandir barra lateral"
           >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4" />
-            ) : (
-              <Moon className="h-4 w-4" />
-            )}
+            <PanelLeftOpen className="h-4 w-4" />
           </Button>
-          <RefreshDataButton className="h-8 w-8" />
-        </div>
+        ) : (
+          <>
+            <BrandLogo
+              logoUrl={branding.logoUrl}
+              displayName={branding.displayName}
+              size="sidebar"
+            />
+            {branding.showDisplayName !== false && (
+              <span
+                className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight"
+                title={branding.displayName || undefined}
+              >
+                {branding.displayName || "Pullstok"}
+              </span>
+            )}
+            <div className="ml-auto flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={toggleTheme}
+                title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+              </Button>
+              <RefreshDataButton className="h-8 w-8" />
+              {onToggle && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onToggle}
+                  title="Colapsar barra lateral"
+                  aria-label="Colapsar barra lateral"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Navegación: VENDEDOR ve el menú simple plano; el resto agrupado */}
-      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+      {/* Navegación: colapsada = riel de iconos aplanado; expandida =
+          VENDEDOR ve el menú simple plano; el resto agrupado */}
+      {collapsed ? (
+        <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
+          <div className="space-y-1">
+            {flatItems.map(({ to, label, icon: Icon }) => {
+              const count = badgeCount(to);
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  title={label}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    cn(
+                      "relative flex items-center justify-center rounded-lg px-2 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )
+                  }
+                >
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {count > 0 && (
+                    <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />
+                  )}
+                </NavLink>
+              );
+            })}
+          </div>
+        </nav>
+      ) : (
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
         {user?.role === "VENDEDOR" ? (
           <div className="space-y-1">
             {vendorSimpleNav.map(({ to, label, icon: Icon }) => {
@@ -203,32 +297,51 @@ export const SidebarContent = ({ onNavigate }: SidebarContentProps) => {
             );
           })
         )}
-      </nav>
+        </nav>
+      )}
 
       {/* Usuario + salir */}
       <div className="border-t p-3">
         {user && (
-          <div className="mb-2 flex items-center gap-3 rounded-lg px-3 py-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold uppercase text-accent-foreground">
+          <div
+            className={cn(
+              "mb-2 flex items-center rounded-lg",
+              collapsed
+                ? "justify-center px-0"
+                : "gap-3 px-3 py-2",
+            )}
+          >
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold uppercase text-accent-foreground"
+              title={user.name || user.username || user.email}
+            >
               {(user.name?.[0] || user.email?.[0] || user.username?.[0] || "U").toUpperCase()}
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{user.name || user.username || user.email}</p>
-              <p className="text-xs capitalize text-muted-foreground">
-                {String(user.role ?? "").toLowerCase()}
-              </p>
-            </div>
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{user.name || user.username || user.email}</p>
+                <p className="text-xs capitalize text-muted-foreground">
+                  {String(user.role ?? "").toLowerCase()}
+                </p>
+              </div>
+            )}
           </div>
         )}
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+          className={cn(
+            "text-muted-foreground hover:text-foreground",
+            collapsed
+              ? "flex w-full justify-center px-0 py-2"
+              : "w-full justify-start gap-3",
+          )}
           onClick={() => logout()}
+          title="Salir"
         >
           <LogOut className="h-4 w-4" />
-          Salir
+          {!collapsed && "Salir"}
         </Button>
-        <InstallButton />
+        {!collapsed && <InstallButton />}
       </div>
     </div>
   );

@@ -12,16 +12,38 @@ import { BottomBar } from "../components/molecules/BottomBar";
 import { useBrandingContext } from "@/contexts/BrandingContext";
 import { BrandLogo } from "@/components/atoms/BrandLogo";
 import { RefreshDataButton } from "@/components/atoms/RefreshDataButton";
+import { cn } from "@/lib/utils";
+
+const SIDEBAR_COLLAPSED_KEY = "pullstok-sidebar-collapsed";
 
 const MainLayout = ({ children }: { children: ReactNode }) => {
   const [open, setOpen] = useState(false);
   const { branding } = useBrandingContext();
+  // Estado COLAPSADO (desktop): al encoger la sidebar a un riel de iconos el
+  // contenido (lista de productos del vendedor/admin) gana ~192px de ancho.
+  // Se persiste en localStorage para que sobreviva a recargas y navegación.
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1",
+  );
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      return next;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* Sidebar fijo (desktop) */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r lg:block">
-        <SidebarContent />
+      {/* Sidebar fijo (desktop), colapsable a riel de iconos */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 hidden border-r transition-all lg:block",
+          collapsed ? "w-16" : "w-64",
+        )}
+      >
+        <SidebarContent collapsed={collapsed} onToggle={toggleCollapsed} />
       </aside>
 
       {/* Header mobile con menú */}
@@ -58,7 +80,12 @@ const MainLayout = ({ children }: { children: ReactNode }) => {
       </header>
 
       {/* Contenido */}
-      <main className="lg:pl-64 pb-20 lg:pb-0">
+      <main
+        className={cn(
+          "pb-20 transition-[padding] lg:pb-0",
+          collapsed ? "lg:pl-16" : "lg:pl-64",
+        )}
+      >
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
 
