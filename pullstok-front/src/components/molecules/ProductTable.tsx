@@ -66,6 +66,17 @@ export const ProductTable = memo(
   }: ProductTableProps) => {
     const hasInline = !!inlineQty;
 
+    // Precio POR UNIDAD mostrado cuando el switch "Pouch por unidad" está ON.
+    // multi-pack → unitPrice (caja÷N, redondeado hacia arriba); producto de a uno
+    // (no multi-pack) → su propio precio (ya es por unidad).
+    const displayedPrice = (p: DataItem): number => {
+      if (isUnitSellable(p.unitsPerBox)) {
+        const u = unitPrice(p);
+        if (u != null) return u;
+      }
+      return Number(p.price ?? 0);
+    };
+
     const qtyCell = (index: number, p: DataItem, compact: boolean) => {
       const id = p._id || p.id;
       const inCart = cartItems.find((ci) => ci.productId === id);
@@ -231,10 +242,10 @@ export const ProductTable = memo(
 
                         {/* Derecha (mobile): divisor vertical + precio con ancho fijo garantizado */}
                         <div className="flex shrink-0 w-[96px] min-w-[96px] flex-col justify-center items-end border-l pl-2 text-right sm:hidden">
-                          {unitMode && isUnitSellable(p.unitsPerBox) && unitPrice(p) != null ? (
+                          {unitMode ? (
                             <>
                               <p className="text-sm font-semibold tabular-nums leading-tight">
-                                ${unitPrice(p)!.toLocaleString("es-AR")}
+                                ${displayedPrice(p).toLocaleString("es-AR")}
                               </p>
                               <span className="text-[10px] text-muted-foreground leading-tight">
                                 por unidad
@@ -290,10 +301,10 @@ export const ProductTable = memo(
                       </div>
                     </TableCell>
                     <TableCell className="hidden text-right font-medium tabular-nums sm:table-cell">
-                      {unitMode && isUnitSellable(p.unitsPerBox) && unitPrice(p) != null ? (
+                      {unitMode ? (
                         <>
                           <span className="tabular-nums">
-                            ${unitPrice(p)!.toLocaleString("es-AR")}
+                            ${displayedPrice(p).toLocaleString("es-AR")}
                           </span>{" "}
                           <span className="text-[10px] font-normal text-muted-foreground">
                             por unidad

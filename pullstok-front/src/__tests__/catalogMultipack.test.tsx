@@ -96,11 +96,11 @@ describe("ProductTable — switch global 'Pouch por unidad'", () => {
     expect(screen.getAllByText("150 u.").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("no elegible → siempre precio de caja + '<qty> u.' (sin 'por unidad')", () => {
+  it("no elegible (unitMode ON) → mismo precio + sufijo 'por unidad' (consistente)", () => {
     renderTable([plain], { unitMode: true });
     expect(screen.getAllByText(/\$4\.500/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("20 u.").length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText(/por unidad/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/por unidad/).length).toBeGreaterThanOrEqual(1);
   });
 
   it("los botones 'Caja' y 'Por unidad' por fila ya NO se renderizan", () => {
