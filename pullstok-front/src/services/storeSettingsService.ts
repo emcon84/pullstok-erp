@@ -18,6 +18,11 @@ export interface StoreSettings {
   contactPhone: string | null;
   address: string | null;
   /**
+   * Whether the online store is published (switch del admin). When false the
+   * storefront won't serve the catalog or accept orders (STORE_NOT_PUBLISHED).
+   */
+  isPublished: boolean;
+  /**
    * Branch whose ProductStock feeds the online store (spec S1). When null or
    * unset, the storefront falls back to the casa central (server-side).
    */

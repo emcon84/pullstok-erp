@@ -45,6 +45,7 @@ const baseSettings = {
   contactEmail: null,
   contactPhone: null,
   address: null,
+  isPublished: false,
   storeBranchId: null,
 };
 

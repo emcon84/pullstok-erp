@@ -4,10 +4,12 @@ import { Copy, Lock, Store } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getMe } from "../services/onboardingService";
 import { StoreSettingsForm } from "../components/molecules/StoreSettingsForm";
 import { StoreProductsList } from "../components/molecules/StoreProductsList";
+import { useStoreSettings } from "../components/hooks/useStoreSettings";
 import { Loader } from "../components/atoms/loader";
 
 // Mismos planes que habilitan la tienda en el backend (checkStoreEnabled.ts):
@@ -19,6 +21,7 @@ type Tab = "settings" | "products";
 export const Tienda = () => {
   const [tab, setTab] = useState<Tab>("settings");
   const { data: me, isLoading } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const { settings: storeSettings } = useStoreSettings();
 
   if (isLoading || !me) {
     return (
@@ -86,6 +89,19 @@ export const Tienda = () => {
               <Copy className="h-3.5 w-3.5" />
             </Button>
           </Card>
+        )}
+        {storeUrl && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "shrink-0",
+              storeSettings?.isPublished
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                : "border-destructive/40 bg-destructive/5 text-destructive",
+            )}
+          >
+            {storeSettings?.isPublished ? "Tienda publicada" : "Tienda apagada"}
+          </Badge>
         )}
       </div>
 

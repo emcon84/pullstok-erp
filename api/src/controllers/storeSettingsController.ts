@@ -30,6 +30,8 @@ export const getStoreSettings = async (req: AuthedRequest, res: Response) => {
       contactEmail: settings?.contactEmail ?? null,
       contactPhone: settings?.contactPhone ?? null,
       address: settings?.address ?? null,
+      // Tienda publicada; false si la org nunca configuró nada (default).
+      isPublished: settings?.isPublished ?? false,
       // Sucursal que alimenta la tienda online (spec S1). null = sin
       // configurar → la tienda usa la casa central (fallback).
       storeBranchId: settings?.storeBranchId ?? null,
@@ -80,6 +82,7 @@ export const updateStoreSettings = async (req: AuthedRequest, res: Response) => 
       contactEmail: settings.contactEmail,
       contactPhone: settings.contactPhone,
       address: settings.address,
+      isPublished: settings.isPublished,
       storeBranchId: settings.storeBranchId,
     });
   } catch (error: any) {

@@ -14,6 +14,19 @@ import { emitOrdersChanged } from "../realtime/socket";
 const DEFAULT_PRIMARY_COLOR = "#6d28d9";
 
 /**
+ * ¿La tienda online está publicada? (isPublished en StoreSettings). StoreSettings
+ * es 1:1 con Organization y no es tenant-model → basePrisma por organizationId.
+ * default false: una org recién creada tiene la tienda en borrador, la tienda
+ * pública no sirve catálogo/checkout hasta que el admin la encienda.
+ */
+const readStorePublished = async (orgId: string): Promise<boolean> => {
+  const settings = await basePrisma.storeSettings.findUnique({
+    where: { organizationId: orgId },
+  });
+  return settings?.isPublished === true;
+};
+
+/**
  * Sucursal efectiva de la tienda online (spec S1): el storeBranchId configurado
  * gana; si no, la casa central; null si no hay ninguna de las dos (en ese caso
  * el catálogo muestra quantity 0 — no hay sucursal de la cual leer stock).
@@ -72,6 +85,14 @@ const getProducts = async (req: PublicStoreRequest, res: Response) => {
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
     const organizationId = requireOrganizationId();
 
+    // Gate de publicación: tienda en borrador → no se sirve el catálogo.
+    if (!(await readStorePublished(organizationId))) {
+      return res.status(403).json({
+        error: "STORE_NOT_PUBLISHED",
+        message: "La tienda aún no está habilitada",
+      });
+    }
+
     const products = await prisma.product.findMany({
       where: {
         publishedToStore: true,
@@ -121,6 +142,15 @@ const getProducts = async (req: PublicStoreRequest, res: Response) => {
 const getProductById = async (req: PublicStoreRequest, res: Response) => {
   try {
     const organizationId = requireOrganizationId();
+
+    // Gate de publicación (mismo criterio que el catálogo).
+    if (!(await readStorePublished(organizationId))) {
+      return res.status(403).json({
+        error: "STORE_NOT_PUBLISHED",
+        message: "La tienda aún no está habilitada",
+      });
+    }
+
     const product = await prisma.product.findFirst({
       where: { id: req.params.id, publishedToStore: true },
       select: {
@@ -201,6 +231,15 @@ const checkout = async (req: PublicStoreRequest, res: Response) => {
       customer: { name: string; email: string; phone: string };
       items: { productId: string; quantity: number }[];
     };
+
+    // Gate de publicación ANTES de la tx: si la tienda está en borrador no se
+    // crea la Order (no entra en la transacción ni consume número de serie).
+    if (!(await readStorePublished(organizationId))) {
+      return res.status(403).json({
+        error: "STORE_NOT_PUBLISHED",
+        message: "La tienda aún no está habilitada",
+      });
+    }
 
     const result = await prisma.$transaction(
       async (tx) => {

@@ -536,6 +536,9 @@ export const updateStoreSettingsSchema = z.object({
   contactEmail: z.email("Email inválido").nullable().optional(),
   contactPhone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
+  // Tienda online publicada: false = borrador. La tienda pública no sirve
+  // catálogo/checkout hasta que el admin la encienda (gate STORE_NOT_PUBLISHED).
+  isPublished: z.boolean().optional(),
   // Sucursal que la tienda online usa para disponibilidad/checkout (spec S1).
   // null = sin configurar → fallback casa central. La columna y el controller
   // llegan en PR 4; el campo queda aceptado en el schema desde acá para no

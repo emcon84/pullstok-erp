@@ -45,11 +45,13 @@ describe("storeSettingsController.getStoreSettings", () => {
     expect(res.status).toHaveBeenCalledWith(200);
     const payload = res.json.mock.calls[0][0];
     expect(payload.storeBranchId).toBeNull();
+    expect(payload.isPublished).toBe(false);
   });
 
   it("devuelve el storeBranchId guardado cuando está configurado", async () => {
     mockedBasePrisma.storeSettings.findUnique.mockResolvedValue({
       storeBranchId: "b-2",
+      isPublished: true,
     });
 
     const res = mockResponse();
@@ -57,6 +59,7 @@ describe("storeSettingsController.getStoreSettings", () => {
 
     const payload = res.json.mock.calls[0][0];
     expect(payload.storeBranchId).toBe("b-2");
+    expect(payload.isPublished).toBe(true);
   });
 });
 

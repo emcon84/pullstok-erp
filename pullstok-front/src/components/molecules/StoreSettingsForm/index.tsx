@@ -112,6 +112,22 @@ export const StoreSettingsForm = () => {
   return (
     <div className="space-y-6">
       <Card className="space-y-4 p-5">
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <div>
+            <p className="text-sm font-medium">Habilitar tienda online</p>
+            <p className="text-xs text-muted-foreground">
+              Apagada, nadie puede ver el catálogo ni hacer pedidos. Encendela
+              cuando esté lista.
+            </p>
+          </div>
+          <Switch
+            checked={form.isPublished ?? false}
+            onCheckedChange={(v) => handleField("isPublished", v)}
+          />
+        </div>
+      </Card>
+
+      <Card className="space-y-4 p-5">
         <h3 className="text-sm font-semibold tracking-tight">Marca</h3>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

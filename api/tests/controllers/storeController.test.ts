@@ -13,7 +13,7 @@ jest.mock("../../src/config/db", () => ({
     productStock: { findMany: jest.fn() },
   },
   basePrisma: {
-    storeSettings: { findFirst: jest.fn() },
+    storeSettings: { findFirst: jest.fn(), findUnique: jest.fn() },
   },
 }));
 
@@ -27,7 +27,7 @@ const mockedPrisma = prisma as unknown as {
   productStock: { findMany: jest.Mock };
 };
 const mockedBasePrisma = basePrisma as unknown as {
-  storeSettings: { findFirst: jest.Mock };
+  storeSettings: { findFirst: jest.Mock; findUnique: jest.Mock };
 };
 
 const mockRequest = (params?: any) =>
@@ -53,6 +53,12 @@ const catalogProduct = {
 describe("storeController.getProducts (S1)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default: la tienda está publicada (el gate STORE_NOT_PUBLISHED se
+    // testea aparte). findUnique = lectura de isPublished, findFirst = la
+    // sucursal efectiva (resolveStoreBranchId).
+    mockedBasePrisma.storeSettings.findUnique.mockResolvedValue({
+      isPublished: true,
+    });
   });
 
   it("quantity = ProductStock de la sucursal configurada (storeBranchId=b-2, stock=3)", async () => {
@@ -109,11 +115,30 @@ describe("storeController.getProducts (S1)", () => {
     const payload = res.json.mock.calls[0][0];
     expect(payload[0].quantity).toBe(0);
   });
+
+  it("403 STORE_NOT_PUBLISHED cuando la tienda está apagada (no sirve el catálogo)", async () => {
+    mockedBasePrisma.storeSettings.findUnique.mockResolvedValue({
+      isPublished: false,
+    });
+
+    const res = mockResponse();
+    await storeController.getProducts(mockRequest(), res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "STORE_NOT_PUBLISHED",
+      message: "La tienda aún no está habilitada",
+    });
+    expect(mockedPrisma.product.findMany).not.toHaveBeenCalled();
+  });
 });
 
 describe("storeController.getProductById (S1)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedBasePrisma.storeSettings.findUnique.mockResolvedValue({
+      isPublished: true,
+    });
   });
 
   it("quantity del ProductStock de la sucursal efectiva en el detalle", async () => {
@@ -144,5 +169,21 @@ describe("storeController.getProductById (S1)", () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(mockedPrisma.productStock.findMany).not.toHaveBeenCalled();
+  });
+
+  it("403 STORE_NOT_PUBLISHED cuando la tienda está apagada (no sirve el detalle)", async () => {
+    mockedBasePrisma.storeSettings.findUnique.mockResolvedValue({
+      isPublished: false,
+    });
+
+    const res = mockResponse();
+    await storeController.getProductById(mockRequest({ id: "prod-1" }), res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "STORE_NOT_PUBLISHED",
+      message: "La tienda aún no está habilitada",
+    });
+    expect(mockedPrisma.product.findFirst).not.toHaveBeenCalled();
   });
 });

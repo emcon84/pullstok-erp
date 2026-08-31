@@ -948,6 +948,9 @@ model StoreSettings {
   contactEmail   String?
   contactPhone   String?
   address        String?
+  // Tienda online publicada (switch del admin): false = borrador, la tienda
+  // pública no sirve catálogo, detalle ni checkout (403 STORE_NOT_PUBLISHED).
+  isPublished    Boolean      @default(false)
   // Sucursal que alimenta la tienda online (spec S1): catálogo/detalle/checkout
   // leen ProductStock de esta sucursal en vez del stock global. null = sin
   // configurar → fallback a la casa central (resolveEffectiveBranch). FK con
