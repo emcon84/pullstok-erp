@@ -4,6 +4,8 @@ import {
   isUnitSellable,
   unitPrice,
   boxCountFromUnits,
+  stockLabel,
+  saleModeForProduct,
 } from "../components/hooks/vendorCatalogHelpers";
 
 // sdd/venta-por-unidad-multpack — helpers del catálogo del vendor para venta
@@ -65,5 +67,67 @@ describe("boxCountFromUnits — conversión stock unidades → cajas", () => {
 
   it("menos de una caja → 0 cajas", () => {
     expect(boxCountFromUnits(10, 15)).toBe(0);
+  });
+});
+
+describe("stockLabel — etiqueta de stock según el modo (switch global)", () => {
+  const eligible: DataItem = {
+    name: "X 15x85grs",
+    price: 18400,
+    quantity: 0,
+    unitsPerBox: 15,
+    stocks: [{ quantity: 150 }],
+  };
+
+  it("unitMode OFF + elegible → cantidad en cajas", () => {
+    expect(stockLabel(eligible, false)).toBe("10 cajas");
+  });
+
+  it("unitMode ON + elegible → cantidad en unidades", () => {
+    expect(stockLabel(eligible, true)).toBe("150 u.");
+  });
+
+  it("no elegible (unitsPerBox <= 1) → siempre en unidades", () => {
+    const plain: DataItem = {
+      name: "Bolsa simple",
+      price: 4500,
+      quantity: 0,
+      unitsPerBox: 1,
+      stocks: [{ quantity: 20 }],
+    };
+    expect(stockLabel(plain, false)).toBe("20 u.");
+    expect(stockLabel(plain, true)).toBe("20 u.");
+  });
+
+  it("sin unitsPerBox → sin conversión a cajas", () => {
+    const p: DataItem = { name: "Sin datos", price: 5, quantity: 0, stocks: [{ quantity: 7 }] };
+    expect(stockLabel(p, false)).toBe("7 u.");
+    expect(stockLabel(p, true)).toBe("7 u.");
+  });
+});
+
+describe("saleModeForProduct — modo según el switch global 'Vender por unidad'", () => {
+  const eligible: DataItem = {
+    name: "X 15x85grs",
+    price: 18400,
+    quantity: 0,
+    unitsPerBox: 15,
+  };
+  const plain: DataItem = { name: "Bolsa", price: 4500, quantity: 0, unitsPerBox: 1 };
+
+  it("unitMode ON + elegible → POR_UNIDAD", () => {
+    expect(saleModeForProduct(eligible, true)).toBe("POR_UNIDAD");
+  });
+
+  it("unitMode OFF + elegible → BOLSA_CERRADA", () => {
+    expect(saleModeForProduct(eligible, false)).toBe("BOLSA_CERRADA");
+  });
+
+  it("unitMode ON + no elegible → BOLSA_CERRADA", () => {
+    expect(saleModeForProduct(plain, true)).toBe("BOLSA_CERRADA");
+  });
+
+  it("unitMode OFF + no elegible → BOLSA_CERRADA", () => {
+    expect(saleModeForProduct(plain, false)).toBe("BOLSA_CERRADA");
   });
 });

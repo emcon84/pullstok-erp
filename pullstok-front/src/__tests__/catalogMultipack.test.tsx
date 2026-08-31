@@ -1,12 +1,34 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { ProductTable } from "@/components/molecules/ProductTable";
+import { VendorCatalogTab } from "@/components/organisms/VendorCatalogTab";
+import { useVendorCatalog } from "@/components/hooks/useVendorCatalog";
 import type { DataItem } from "@/types";
 import type { VendorCartItem } from "@/components/hooks/useVendorCart";
 
-// sdd/venta-por-unidad-multpack — el catálogo muestra "Caja" y "Por unidad"
-// SOLO para productos elegibles (unitsPerBox > 1), con su precio por unidad.
-// Los no elegibles quedan solo como "Caja".
+// sdd/venta-por-unidad-multpack — UX: el modo de venta Caja/Por unidad pasa a
+// un SWITCH GLOBAL "Vender por unidad" (como "Solo lo que trabajo"). Se ELIMINA
+// el par de mini-botones por fila. El catálogo, según el switch, vende
+// BOLSA_CERRADA (con precio de caja + stock "cajas") o POR_UNIDAD (precio
+// unitario + stock "u."). Los productos NO elegibles (unitsPerBox<=1) quedan
+// intactos: siempre caja + unidades.
+
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => vi.fn(),
+}));
+vi.mock("@/components/hooks/useVendorCatalog", () => ({
+  useVendorCatalog: vi.fn(),
+}));
+vi.mock("@/components/hooks/useVendorRowsKeyboard", () => ({
+  useVendorRowsKeyboard: vi.fn(),
+}));
+vi.mock("react-toastify", () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warn: vi.fn() },
+}));
+vi.mock("@/components/molecules/ProductDrawer", () => ({
+  ProductDrawer: () => <div data-testid="product-drawer" />,
+}));
+
 const eligible: DataItem = {
   _id: "p-multipack",
   name: "FELIX POUCH PESC X 15x85grs",
@@ -15,6 +37,13 @@ const eligible: DataItem = {
   quantity: 0,
   unitsPerBox: 15,
   perUnitPrice: 1226.67,
+  stocks: [{ quantity: 150 }],
+};
+
+const noStock: DataItem = {
+  ...eligible,
+  _id: "p-nostock",
+  stocks: [{ quantity: 0 }],
 };
 
 const plain: DataItem = {
@@ -23,6 +52,7 @@ const plain: DataItem = {
   code: "S-1",
   price: 4500,
   quantity: 0,
+  stocks: [{ quantity: 20 }],
 };
 
 function inlineQty(commit = vi.fn()) {
@@ -51,39 +81,115 @@ function renderTable(items: DataItem[], extra?: Record<string, unknown>) {
   );
 }
 
-describe("ProductTable — Caja / Por unidad según elegibilidad", () => {
-  it("eligible product shows BOTH 'Caja' and 'Por unidad' actions", () => {
-    renderTable([eligible]);
-    expect(screen.getByText("Caja")).toBeInTheDocument();
-    expect(screen.getByText("Por unidad")).toBeInTheDocument();
+describe("ProductTable — switch global 'Vender por unidad'", () => {
+  it("unitMode OFF + elegible → precio de caja + stock en cajas", () => {
+    renderTable([eligible], { unitMode: false });
+    expect(screen.getAllByText(/\$18\.400/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("10 cajas").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText(/por unidad/)).not.toBeInTheDocument();
   });
 
-  it("eligible product shows its per-unit price", () => {
-    renderTable([eligible]);
-    // 1226.67 en formato es-AR: "1.226,67"
-    expect(screen.getByText(/Por unidad/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/1\.226,67/).length).toBeGreaterThanOrEqual(1);
+  it("unitMode ON + elegible → precio unitario + sufijo 'por unidad' + stock en unidades", () => {
+    renderTable([eligible], { unitMode: true });
+    expect(screen.getAllByText(/\$1\.226,67/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/por unidad/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("150 u.").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("non-eligible product shows ONLY 'Caja' (no 'Por unidad')", () => {
-    renderTable([plain]);
-    expect(screen.getByText("Caja")).toBeInTheDocument();
+  it("no elegible → siempre precio de caja + '<qty> u.' (sin 'por unidad')", () => {
+    renderTable([plain], { unitMode: true });
+    expect(screen.getAllByText(/\$4\.500/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("20 u.").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText(/por unidad/)).not.toBeInTheDocument();
+  });
+
+  it("los botones 'Caja' y 'Por unidad' por fila ya NO se renderizan", () => {
+    renderTable([eligible], { unitMode: true });
+    expect(screen.queryByText("Caja")).not.toBeInTheDocument();
     expect(screen.queryByText("Por unidad")).not.toBeInTheDocument();
   });
 
-  it("clicking 'Por unidad' raises onRowModeChange('POR_UNIDAD')", () => {
-    const onRowModeChange = vi.fn();
-    renderTable([eligible], { onRowModeChange });
-    const unitBtn = screen.getByText("Por unidad");
-    unitBtn.click();
-    expect(onRowModeChange).toHaveBeenCalledWith(eligible, "POR_UNIDAD");
+  it("sin stock → 'Sin stock' independiente del modo", () => {
+    renderTable([noStock], { unitMode: false });
+    expect(screen.getAllByText("Sin stock").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("clicking 'Caja' raises onRowModeChange('BOLSA_CERRADA')", () => {
-    const onRowModeChange = vi.fn();
-    renderTable([eligible], { onRowModeChange });
-    const cajaBtn = screen.getByText("Caja");
-    cajaBtn.click();
-    expect(onRowModeChange).toHaveBeenCalledWith(eligible, "BOLSA_CERRADA");
+  it("sin stock (unitMode ON) → 'Sin stock'", () => {
+    renderTable([noStock], { unitMode: true });
+    expect(screen.getAllByText("Sin stock").length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── VendorCatalogTab: el switch global vive acá ──
+const mockUseVendorCatalog = vi.mocked(useVendorCatalog);
+
+function makeCatalog(overrides: Record<string, unknown> = {}) {
+  return {
+    filter: "",
+    setFilter: vi.fn(),
+    categoryFilter: "",
+    setCategoryFilter: vi.fn(),
+    titleFilter: null as string | null,
+    setTitleFilter: vi.fn(),
+    onlyCarried: false,
+    setOnlyCarried: vi.fn(),
+    items: [eligible],
+    isLoadingInitial: false,
+    isFetchingNextPage: false,
+    hasNextPage: false,
+    loadMore: vi.fn(),
+    selectedIndex: -1,
+    setSelectedIndex: vi.fn(),
+    searchInputRef: { current: null },
+    sentinelRef: { current: null },
+    resetSelection: vi.fn(),
+    registerRow: vi.fn(),
+    facetsCategories: [],
+    facetsVariants: [],
+    facetsTitles: [],
+    ...overrides,
+  };
+}
+
+function renderCatalogTab(overrides: Record<string, unknown> = {}) {
+  const catalog = makeCatalog(overrides);
+  mockUseVendorCatalog.mockReturnValue(catalog as never);
+  const cart = {
+    items: [],
+    totalAmount: 0,
+    itemCount: 0,
+    addToCart: vi.fn(),
+    updateQuantity: vi.fn(),
+    removeFromCart: vi.fn(),
+    clearCart: vi.fn(),
+  };
+  render(
+    <VendorCatalogTab
+      branchId="b1"
+      cart={cart as never}
+      onSaveOrder={vi.fn()}
+      onConfirmSale={vi.fn()}
+      onToggleTab={vi.fn()}
+      registerGridApi={vi.fn()}
+    />,
+  );
+  return { catalog, cart };
+}
+
+describe("VendorCatalogTab — switch global 'Vender por unidad'", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renderiza el switch 'Vender por unidad' junto a 'Solo lo que trabajo'", () => {
+    renderCatalogTab();
+    expect(screen.getByText("Vender por unidad")).toBeInTheDocument();
+    expect(screen.getByText("Solo lo que trabajo")).toBeInTheDocument();
+  });
+
+  it("activar 'Vender por unidad' resetea la selección del catálogo", () => {
+    const { catalog } = renderCatalogTab();
+    fireEvent.click(screen.getByText("Vender por unidad"));
+    expect(catalog.resetSelection).toHaveBeenCalled();
   });
 });

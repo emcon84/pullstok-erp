@@ -13,9 +13,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { imgSrc, branchQty, stockUnitLabel, isUnitSellable, unitPrice } from "@/components/hooks/vendorCatalogHelpers";
+import { imgSrc, branchQty, stockLabel, isUnitSellable, unitPrice } from "@/components/hooks/vendorCatalogHelpers";
 import type { DataItem } from "@/types";
-import type { VendorCartItem, SaleMode } from "@/components/hooks/useVendorCart";
+import type { VendorCartItem } from "@/components/hooks/useVendorCart";
 
 export interface InlineQtyProps {
   /** Valor (string) del input de cantidad de una fila. */
@@ -40,11 +40,11 @@ interface ProductTableProps {
   /** Input de cantidad INLINE del POS unificado. Si está presente, reemplaza
    *  el botón +/modal de la fila por un input editable + botón de agregar. */
   inlineQty?: InlineQtyProps;
-  /** Modo de venta de cada fila (productId → Caja | Por unidad). Solo usado por
-   *  el POS unificado (inlineQty presente). Default BOLSA_CERRADA. */
-  rowMode?: Record<string, SaleMode>;
-  /** Cambia el modo de venta de una fila (Caja ↔ Por unidad). */
-  onRowModeChange?: (product: DataItem, mode: SaleMode) => void;
+  /** Switch global "Vender por unidad": si está ON (y el multi-pack es
+   *  elegible), la fila muestra el precio POR UNIDAD y el stock en unidades;
+   *  si está OFF, muestra precio de CAJA y stock convertido a cajas. Default
+   *  OFF (BOLSA_CERRADA). Solo usado por el POS unificado (inlineQty presente). */
+  unitMode?: boolean;
 }
 
 // Presentacional: sólo renderiza la tabla. Memoizada para no re-renderizar en
@@ -62,12 +62,9 @@ export const ProductTable = memo(
     onAssignBarcode,
     onOpenQty,
     inlineQty,
-    rowMode,
-    onRowModeChange,
+    unitMode = false,
   }: ProductTableProps) => {
     const hasInline = !!inlineQty;
-
-    const modeForRow = (id?: string): SaleMode => (id ? rowMode?.[id] ?? "BOLSA_CERRADA" : "BOLSA_CERRADA");
 
     const qtyCell = (index: number, p: DataItem, compact: boolean) => {
       const id = p._id || p.id;
@@ -189,54 +186,6 @@ export const ProductTable = memo(
                           </div>
                           <p className="text-[11px] text-muted-foreground font-mono leading-none mt-0.5">{p.code || "—"}</p>
 
-                          {/* Modo Caja / Por unidad (solo POS unificado inlineQty).
-                              Multi-pack elegible (unitsPerBox>1) expone ambos con
-                              su precio por unidad; el resto queda solo "Caja". */}
-                          {inlineQty && isUnitSellable(p.unitsPerBox) && (
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onRowModeChange?.(p, "BOLSA_CERRADA");
-                                }}
-                                className={cn(
-                                  "rounded-sm border px-1.5 py-0.5 text-[10px] font-medium leading-tight transition-colors",
-                                  modeForRow(id) === "BOLSA_CERRADA"
-                                    ? "border-primary bg-primary/10 text-primary"
-                                    : "border-border text-muted-foreground hover:bg-muted",
-                                )}
-                              >
-                                Caja
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onRowModeChange?.(p, "POR_UNIDAD");
-                                }}
-                                className={cn(
-                                  "rounded-sm border px-1.5 py-0.5 text-[10px] font-medium leading-tight transition-colors",
-                                  modeForRow(id) === "POR_UNIDAD"
-                                    ? "border-primary bg-primary/10 text-primary"
-                                    : "border-border text-muted-foreground hover:bg-muted",
-                                )}
-                              >
-                                Por unidad
-                              </button>
-                              {unitPrice(p) != null && (
-                                <span className="text-[10px] text-muted-foreground tabular-nums">
-                                  ${unitPrice(p)!.toLocaleString("es-AR")}/u
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {inlineQty && !isUnitSellable(p.unitsPerBox) && (
-                            <span className="mt-1 inline-flex items-center text-[10px] font-medium text-muted-foreground">
-                              Caja
-                            </span>
-                          )}
-
                           {/* Mobile: stock + acciones en la misma fila */}
                           <div className="mt-1 flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none sm:hidden">
                             <Badge
@@ -248,7 +197,7 @@ export const ProductTable = memo(
                                   : "border-emerald-300 bg-emerald-50 text-emerald-700",
                               )}
                             >
-                              {stock <= 0 ? "Sin stock" : `${stock} ${stockUnitLabel(p)}`}
+                              {stock <= 0 ? "Sin stock" : stockLabel(p, unitMode)}
                             </Badge>
                             <div className="flex gap-0.5 shrink-0 items-center">
                               <Button
@@ -281,10 +230,21 @@ export const ProductTable = memo(
                         </div>
 
                         {/* Derecha (mobile): divisor vertical + precio con ancho fijo garantizado */}
-                        <div className="flex shrink-0 w-[82px] min-w-[82px] flex-col justify-center items-end border-l pl-2 text-right sm:hidden">
-                          <p className="text-sm font-semibold tabular-nums leading-tight">
-                            ${Number(p.price ?? 0).toLocaleString("es-AR")}
-                          </p>
+                        <div className="flex shrink-0 w-[96px] min-w-[96px] flex-col justify-center items-end border-l pl-2 text-right sm:hidden">
+                          {unitMode && isUnitSellable(p.unitsPerBox) && unitPrice(p) != null ? (
+                            <>
+                              <p className="text-sm font-semibold tabular-nums leading-tight">
+                                ${unitPrice(p)!.toLocaleString("es-AR")}
+                              </p>
+                              <span className="text-[10px] text-muted-foreground leading-tight">
+                                por unidad
+                              </span>
+                            </>
+                          ) : (
+                            <p className="text-sm font-semibold tabular-nums leading-tight">
+                              ${Number(p.price ?? 0).toLocaleString("es-AR")}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </TableCell>
@@ -301,7 +261,7 @@ export const ProductTable = memo(
                               : "border-emerald-300 bg-emerald-50 text-emerald-700",
                           )}
                         >
-                          {stock <= 0 ? "Sin stock" : `${stock} ${stockUnitLabel(p)}`}
+                          {stock <= 0 ? "Sin stock" : stockLabel(p, unitMode)}
                         </Badge>
                         <Button
                           variant="ghost"
@@ -330,7 +290,18 @@ export const ProductTable = memo(
                       </div>
                     </TableCell>
                     <TableCell className="hidden text-right font-medium tabular-nums sm:table-cell">
-                      ${Number(p.price ?? 0).toLocaleString("es-AR")}
+                      {unitMode && isUnitSellable(p.unitsPerBox) && unitPrice(p) != null ? (
+                        <>
+                          <span className="tabular-nums">
+                            ${unitPrice(p)!.toLocaleString("es-AR")}
+                          </span>{" "}
+                          <span className="text-[10px] font-normal text-muted-foreground">
+                            por unidad
+                          </span>
+                        </>
+                      ) : (
+                        <>${Number(p.price ?? 0).toLocaleString("es-AR")}</>
+                      )}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {qtyCell(index, p, false)}

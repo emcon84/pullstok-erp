@@ -42,6 +42,48 @@ describe("parseUnitsPerBoxFromName", () => {
   it("NO matchea cuando la unidad no es de peso/unidad", () => {
     expect(parseUnitsPerBoxFromName("PRODUCTO 12x85 ML")).toBeNull();
   });
+
+  it("multi-pack entre parentesis con peso mayúscula: '(12X85G) X 1.02 KG' → 12", () => {
+    expect(
+      parseUnitsPerBoxFromName("ROYAL CANIN FCN URINARY CARE POUCH (12X85G) X 1.02 KG"),
+    ).toBe(12);
+  });
+
+  it("'X N U' después de la X (COMPLETE/NATURAL): '85G (X12U)' → 12", () => {
+    expect(
+      parseUnitsPerBoxFromName("COMPLETE POUCH GATO AD. CARNE 85G (X12U)"),
+    ).toBe(12);
+  });
+
+  it("'X15 UNI' (CAT CHOW): 'POLLO X15 UNI' → 15", () => {
+    expect(
+      parseUnitsPerBoxFromName("CAT CHOW POUCH POLLO X15 UNI"),
+    ).toBe(15);
+  });
+
+  it("'N X M KG' con coma decimal y espacios: '12 X 1,5 KG' → 12", () => {
+    expect(parseUnitsPerBoxFromName("UPPER CROCK GATOS ADULTOS 30% 12 X 1,5 KG")).toBe(12);
+  });
+
+  it("'N X M KG' compacto: '6X3 KG' → 6", () => {
+    expect(parseUnitsPerBoxFromName("UPPER CROCK PERROS ADULTOS 6X3 KG")).toBe(6);
+  });
+
+  it("'N x M gr' (Katze/Sieger Wet): 'Senior +12 x 340 gr.' → 12", () => {
+    expect(parseUnitsPerBoxFromName("Sieger Wet Senior +12 x 340 gr.")).toBe(12);
+  });
+
+  it("NO matchea volumen ml: 'RUMINAL 88 X 100 ML' → null", () => {
+    expect(parseUnitsPerBoxFromName("RUMINAL 88 X 100 ML")).toBeNull();
+  });
+
+  it("NO matchea comprimidos/COMP: 'SPECTRYL 10 X 100 COMP' → null", () => {
+    expect(parseUnitsPerBoxFromName("SPECTRYL 10 X 100 COMP")).toBeNull();
+  });
+
+  it("NO matchea 'X 1.02 KG' (peso total del carton, sin dígito antes de la X)", () => {
+    expect(parseUnitsPerBoxFromName("ROYAL CANIN X 1.02 KG")).toBeNull();
+  });
 });
 
 describe("computePerUnitPrice", () => {

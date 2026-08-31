@@ -5,24 +5,50 @@
  */
 import { round2 } from "./money";
 
-// Patrón "NxG" de un multi-pack (ej. "15x85grs" → 15): 1-4 dígitos, una 'x'/'X',
-// la cantidad de gramos/peso, y una unidad de peso/unidad. NO matchea pesos
-// sueltos como "X 15 KG" (sin dígitos justo antes de la X) ni "21.5 KG" (unidad
-// en mayúscula, sin patrón NxG). Case-sensitive a propósito para no matchear
-// "KG" mayúscula de pesos sueltos; ver Open Questions del design (verificar
-// contra el catálogo live en VPS antes del backfill).
-const UNITS_PER_BOX_REGEX =
-  /(\d{1,4})\s*[xX]\s*\d+(?:[.,]\d+)?\s*(?:grs|gr|g|kg|un|u|und)\b/;
+// Unidades de PESO que indican un multi-pack (una caja con N sobres/latas/bolsas).
+// NO incluye volumen (ml/lts) ni comprimidos: evita falsos positivos como
+// "RUMINAL 88 X 100 ML" o "SPECTRYL 10 X 100 COMP".
+const WEIGHT_UNITS = "(?:grs?|gr|g|kg)";
+
+// Patrón A — el conteo va ANTES de la 'x', con unidad de peso:
+//   "15x85grs", "12X85G", "(6X195G)", "12 X 0,5 KG", "7 x 340 gr".
+// Dentro de "(12X85G) X 1.02 KG" el "X 1.02 KG" del final NO matchea (no hay
+// dígito justo antes de esa X), así que se toma el conteo del parentesis.
+const COUNT_BEFORE_X_REGEX = new RegExp(
+  `(\\d{1,3})\\s*[xX]\\s*\\d+(?:[.,]\\d+)?\\s*${WEIGHT_UNITS}\\b`,
+  "i",
+);
+
+// Patrón B — el conteo va DESPUÉS de la 'x' con palabra de unidad:
+//   "X12U", "X15 UNI", "X 12 U". No matchea "X 15 KG" (KG no es palabra de
+//   unidad) ni "X 1.02 KG" (el peso total del carton).
+const COUNT_AFTER_X_REGEX =
+  /[xX]\s*(\d{1,3})\s*(?:unid|unit|uni|und|un|u)\b/i;
+
+// Límite superior defensivo: los multi-pack de alimento son tipicamente 3-24
+// (pouches/latas). Evita cazar "300 x 16" (medicación) si se colara un peso.
+const MAX_UNITS_PER_BOX = 48;
+
+function isPlausibleCount(n: number): boolean {
+  return n >= 2 && n <= MAX_UNITS_PER_BOX;
+}
 
 /**
- * Deriva `unitsPerBox` del nombre del producto (patrón "NxG"). Devuelve el
- * número capturado (ej. "15x85grs" → 15) o `null` si el nombre no matchea.
+ * Deriva `unitsPerBox` del nombre del producto (patrones multi-pack de peso:
+ * "NxM<unidad>" y "X N U/UNI"). Devuelve el número capturado o `null`.
  */
 export function parseUnitsPerBoxFromName(name: string): number | null {
-  const match = UNITS_PER_BOX_REGEX.exec(name);
-  if (!match) return null;
-  const parsed = Number(match[1]);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  const before = COUNT_BEFORE_X_REGEX.exec(name);
+  if (before) {
+    const n = Number(before[1]);
+    if (isPlausibleCount(n)) return n;
+  }
+  const after = COUNT_AFTER_X_REGEX.exec(name);
+  if (after) {
+    const n = Number(after[1]);
+    if (isPlausibleCount(n)) return n;
+  }
+  return null;
 }
 
 /**

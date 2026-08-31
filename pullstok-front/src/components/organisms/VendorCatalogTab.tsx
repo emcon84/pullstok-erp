@@ -14,6 +14,9 @@ import { useVendorRowsKeyboard } from "@/components/hooks/useVendorRowsKeyboard"
 import { useVendorCart, type SaleMode } from "@/components/hooks/useVendorCart";
 import {
   branchQty,
+  isUnitSellable,
+  unitStock,
+  saleModeForProduct,
   VENDOR_FILTER_KEY,
   type StoredFilter,
 } from "@/components/hooks/vendorCatalogHelpers";
@@ -57,9 +60,11 @@ export const VendorCatalogTab = ({
 
   // ── Cantidades inline (string por fila, sync desde el carrito) ──
   const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
-  // Modo de venta por fila (productId → Caja | Por unidad). Solo los productos
-  // elegibles (unitsPerBox > 1) muestran el toggle; default Caja (bolsa).
-  const [rowMode, setRowMode] = useState<Record<string, SaleMode>>({});
+  // Switch global "Vender por unidad": cuando está ON y el producto es un
+  // multi-pack elegible (unitsPerBox > 1), el catálogo vende POR_UNIDAD
+  // (precio unitario + stock en unidades); si está OFF, vende por CAJA
+  // (BOLSA_CERRADA, precio de caja + stock convertido a cajas).
+  const [unitMode, setUnitMode] = useState(false);
   // Refs de los inputs de cantidad para el foco (roving) y del carrito para el
   // sync de valores (los ítems en el carrito muestran su cantidad al input).
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -72,31 +77,53 @@ export const VendorCatalogTab = ({
     }
   }, [catalog.selectedIndex]);
 
-  // Sync: los items BOLSA_CERRADA del carrito muestran SU cantidad en el input
-  // (la fuente de verdad del pedido). Los que no están, arrancan en "1".
+  // Sync: cada producto muestra en su input la cantidad de la línea del carrito
+  // que coincide con el MODO ACTUAL del switch (POR_UNIDAD si "Vender por
+  // unidad" está ON y el producto es un multi-pack elegible; si no, BOLSA_CERRADA).
+  // Los que no están en el carrito arrancan en "1".
   useEffect(() => {
     setQtyByKey((prev) => {
       let changed = false;
       const next = { ...prev };
       for (const it of cart.items) {
-        if ((it.saleMode ?? "BOLSA_CERRADA") !== "BOLSA_CERRADA") continue;
-        const key = it.productId;
+        const product = catalog.items.find(
+          (p) => (p._id || p.id) === it.productId,
+        );
+        if (!product) continue;
+        const currentMode = saleModeForProduct(product, unitMode);
+        if ((it.saleMode ?? "BOLSA_CERRADA") !== currentMode) continue;
         const s = String(formatBolsaQty(it.quantity));
-        if (next[key] !== s) {
-          next[key] = s;
+        if (next[it.productId] !== s) {
+          next[it.productId] = s;
           changed = true;
         }
       }
       return changed ? next : prev;
     });
-  }, [cart.items]);
+  }, [cart.items, catalog.items, unitMode]);
 
   const keyOf = useCallback((p: DataItem) => (p._id || p.id) || "", []);
 
-  // Modo de venta de la fila (Caja | Por unidad). Default caja (bolsa cerrada).
+  // Modo de venta de la fila según el switch global "Vender por unidad"
+  // (default caja / bolsa cerrada). La vista del catálogo y el commit usan este
+  // modo para saber si agregan la línea POR_UNIDAD o BOLSA_CERRADA.
   const modeFor = useCallback(
-    (p: DataItem): SaleMode => rowMode[keyOf(p)] ?? "BOLSA_CERRADA",
-    [rowMode, keyOf],
+    (p: DataItem): SaleMode => saleModeForProduct(p, unitMode),
+    [unitMode],
+  );
+
+  // Máximo vendible según el modo de la fila: una línea de UNIDADES admite el
+  // stock total en unidades; una línea de CAJAS admite solo las cajas completas.
+  const maxSellable = useCallback(
+    (p: DataItem): number => {
+      const units = unitStock(p);
+      if (modeFor(p) === "POR_UNIDAD") return units;
+      const ub = Number(p.unitsPerBox);
+      return isUnitSellable(p.unitsPerBox) && ub > 0
+        ? Math.floor(units / ub)
+        : units;
+    },
+    [modeFor],
   );
 
   const itemFor = useCallback(
@@ -136,11 +163,10 @@ export const VendorCatalogTab = ({
       const key = keyOf(p);
       const cur = parseDecimal(qtyByKey[key] ?? "1");
       const base = Number.isNaN(cur) ? 1 : Math.max(1, Math.round(cur));
-      const stock = branchQty(p);
-      const max = stock > 0 ? stock : Infinity;
+      const max = maxSellable(p);
       setQtyByKey((prev) => ({ ...prev, [key]: String(Math.min(max, base + 1)) }));
     },
-    [catalog.items, qtyByKey, keyOf],
+    [catalog.items, qtyByKey, keyOf, maxSellable],
   );
 
   const decrement = useCallback(
@@ -184,14 +210,6 @@ export const VendorCatalogTab = ({
   const registerInput = useCallback((index: number, el: HTMLInputElement | null) => {
     inputRefs.current[index] = el;
   }, []);
-
-  // Cambia el modo (Caja ↔ Por unidad) de una fila del panel.
-  const handleRowModeChange = useCallback(
-    (p: DataItem, mode: SaleMode) => {
-      setRowMode((prev) => ({ ...prev, [keyOf(p)]: mode }));
-    },
-    [keyOf],
-  );
 
   // ── Vuelta desde el panel (←): enfocar el listado ──
   // Si hay fila activa la enfoca; si no, selecciona la primera (el efecto la
@@ -376,7 +394,7 @@ export const VendorCatalogTab = ({
         />
         {/* "Solo lo que trabajo": oculta productos desmarcados (carried=false).
             Default ON. El toggle permite ver todo el catálogo al apagarlo. */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Switch
             id="only-carried"
             checked={catalog.onlyCarried}
@@ -393,6 +411,17 @@ export const VendorCatalogTab = ({
               Mostrando todo el catálogo
             </span>
           )}
+          <Switch
+            id="sell-by-unit"
+            checked={unitMode}
+            onCheckedChange={(v) => {
+              setUnitMode(v);
+              catalog.resetSelection();
+            }}
+          />
+          <Label htmlFor="sell-by-unit" className="cursor-pointer text-sm font-medium">
+            Vender por unidad
+          </Label>
         </div>
       </div>
 
@@ -435,8 +464,7 @@ export const VendorCatalogTab = ({
             onOpenDrawer={openDrawer}
             onAssignBarcode={handleAssignBarcode}
             inlineQty={inlineQty}
-            rowMode={rowMode}
-            onRowModeChange={handleRowModeChange}
+            unitMode={unitMode}
           />
         )}
 

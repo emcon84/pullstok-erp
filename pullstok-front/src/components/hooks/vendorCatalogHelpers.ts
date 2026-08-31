@@ -1,4 +1,5 @@
 import type { DataItem } from "../../types";
+import type { SaleMode } from "./useVendorCart";
 
 // ── Helpers compartidos del catálogo de vendor ──
 
@@ -27,6 +28,25 @@ export const unitPrice = (p: DataItem): number | null => {
  *  (división entera; para mostrar stock de unidades convertido en cajas). */
 export const boxCountFromUnits = (units: number, unitsPerBox: number): number =>
   Math.floor(units / unitsPerBox);
+
+/** Etiqueta de stock de una fila según el modo: unidades ("1500 u.") o cajas
+ *  ("100 cajas"). Con el switch "Vender por unidad" OFF y un multi-pack elegible,
+ *  el stock se muestra convertido a cajas; si no, siempre en unidades. */
+export const stockLabel = (p: DataItem, unitMode: boolean): string => {
+  const qty = unitStock(p);
+  const ub = Number(p.unitsPerBox);
+  if (!unitMode && isUnitSellable(p.unitsPerBox) && ub > 0) {
+    return `${boxCountFromUnits(qty, ub)} cajas`;
+  }
+  return `${qty} u.`;
+};
+
+/** Modo de venta de un producto según el switch global "Vender por unidad":
+ *  POR_UNIDAD cuando el switch está ON y el multi-pack es vendible por unidad
+ *  (unitsPerBox > 1); si no, BOLSA_CERRADA (caja/bolsa cerrada). */
+export const saleModeForProduct = (p: DataItem, unitMode: boolean): SaleMode => {
+  return unitMode && isUnitSellable(p.unitsPerBox) ? "POR_UNIDAD" : "BOLSA_CERRADA";
+};
 
 export const imgSrc = (image?: string) => {
   if (!image) return null;
