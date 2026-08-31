@@ -13,9 +13,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { imgSrc, branchQty, stockUnitLabel } from "@/components/hooks/vendorCatalogHelpers";
+import { imgSrc, branchQty, stockUnitLabel, isUnitSellable, unitPrice } from "@/components/hooks/vendorCatalogHelpers";
 import type { DataItem } from "@/types";
-import type { VendorCartItem } from "@/components/hooks/useVendorCart";
+import type { VendorCartItem, SaleMode } from "@/components/hooks/useVendorCart";
 
 export interface InlineQtyProps {
   /** Valor (string) del input de cantidad de una fila. */
@@ -40,6 +40,11 @@ interface ProductTableProps {
   /** Input de cantidad INLINE del POS unificado. Si está presente, reemplaza
    *  el botón +/modal de la fila por un input editable + botón de agregar. */
   inlineQty?: InlineQtyProps;
+  /** Modo de venta de cada fila (productId → Caja | Por unidad). Solo usado por
+   *  el POS unificado (inlineQty presente). Default BOLSA_CERRADA. */
+  rowMode?: Record<string, SaleMode>;
+  /** Cambia el modo de venta de una fila (Caja ↔ Por unidad). */
+  onRowModeChange?: (product: DataItem, mode: SaleMode) => void;
 }
 
 // Presentacional: sólo renderiza la tabla. Memoizada para no re-renderizar en
@@ -57,8 +62,12 @@ export const ProductTable = memo(
     onAssignBarcode,
     onOpenQty,
     inlineQty,
+    rowMode,
+    onRowModeChange,
   }: ProductTableProps) => {
     const hasInline = !!inlineQty;
+
+    const modeForRow = (id?: string): SaleMode => (id ? rowMode?.[id] ?? "BOLSA_CERRADA" : "BOLSA_CERRADA");
 
     const qtyCell = (index: number, p: DataItem, compact: boolean) => {
       const id = p._id || p.id;
@@ -179,6 +188,54 @@ export const ProductTable = memo(
                             {p.name}
                           </div>
                           <p className="text-[11px] text-muted-foreground font-mono leading-none mt-0.5">{p.code || "—"}</p>
+
+                          {/* Modo Caja / Por unidad (solo POS unificado inlineQty).
+                              Multi-pack elegible (unitsPerBox>1) expone ambos con
+                              su precio por unidad; el resto queda solo "Caja". */}
+                          {inlineQty && isUnitSellable(p.unitsPerBox) && (
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRowModeChange?.(p, "BOLSA_CERRADA");
+                                }}
+                                className={cn(
+                                  "rounded-sm border px-1.5 py-0.5 text-[10px] font-medium leading-tight transition-colors",
+                                  modeForRow(id) === "BOLSA_CERRADA"
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-border text-muted-foreground hover:bg-muted",
+                                )}
+                              >
+                                Caja
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRowModeChange?.(p, "POR_UNIDAD");
+                                }}
+                                className={cn(
+                                  "rounded-sm border px-1.5 py-0.5 text-[10px] font-medium leading-tight transition-colors",
+                                  modeForRow(id) === "POR_UNIDAD"
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-border text-muted-foreground hover:bg-muted",
+                                )}
+                              >
+                                Por unidad
+                              </button>
+                              {unitPrice(p) != null && (
+                                <span className="text-[10px] text-muted-foreground tabular-nums">
+                                  ${unitPrice(p)!.toLocaleString("es-AR")}/u
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {inlineQty && !isUnitSellable(p.unitsPerBox) && (
+                            <span className="mt-1 inline-flex items-center text-[10px] font-medium text-muted-foreground">
+                              Caja
+                            </span>
+                          )}
 
                           {/* Mobile: stock + acciones en la misma fila */}
                           <div className="mt-1 flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none sm:hidden">

@@ -160,6 +160,12 @@ export const createProductSchema = z.object({
   // No hay recompute en create (regla de staleness B-05) — pesan en el PUT.
   weightKg: z.coerce.number().positive("El peso debe ser mayor a 0").multipleOf(0.01).optional(),
   bulkFactor: z.coerce.number().positive("El factor debe ser mayor a 0").multipleOf(0.01).optional(),
+  // Multi-pack por unidad (sdd/venta-por-unidad-multpack): cuántas unidades
+  // vienen por caja. Entero ≥ 0, opcional en el alta (ausente = box-only).
+  // Por convención un pack tiene >= 1 unidad; la elegibilidad para venta
+  // unitaria se define SIEMPRE en el server (unitsPerBox > 1), acá solo se
+  // valida la forma (entero no negativo).
+  unitsPerBox: z.coerce.number().int("unitsPerBox debe ser un entero").nonnegative("unitsPerBox no puede ser negativo").optional(),
 });
 // En edición, categoryId puede venir null: un producto sin categoría es válido
 // (la FK es nullable en la DB). createProductSchema lo exige string min(1), así
@@ -183,6 +189,9 @@ export const updateProductSchema = createProductSchema.partial().extend({
   // null = volver al cálculo automático price/weightKg×factor (flag=false).
   // ausente = no tocar el valor almacenado ni el flag.
   priceKgSuelto: z.coerce.number().nonnegative("El precio por kg no puede ser negativo").multipleOf(0.01).nullable().optional(),
+  // Multi-pack por unidad (sdd/venta-por-unidad-multpack): en edición se permite
+  // null (limpiar → box-only legacy). Entero ≥ 0.
+  unitsPerBox: z.coerce.number().int("unitsPerBox debe ser un entero").nonnegative("unitsPerBox no puede ser negativo").nullable().optional(),
 });
 
 // Toggle dedicado "Publicar en tienda" (WS4 — UI de Tienda/listado de
@@ -237,25 +246,25 @@ const saleProductSchema = z.object({
   price: z.coerce.number().nonnegative(),
   category: z.string().optional(),
   saleMode: z
-    .enum(["BOLSA_CERRADA", "POR_PESO", "POR_MONTO"], {
+    .enum(["BOLSA_CERRADA", "POR_PESO", "POR_MONTO", "POR_UNIDAD"], {
       message: "saleMode inválido",
     })
     .default("BOLSA_CERRADA"),
 }).superRefine((item, ctx) => {
   const mode = item.saleMode ?? "BOLSA_CERRADA";
-  if (mode === "BOLSA_CERRADA") {
+  if (mode === "BOLSA_CERRADA" || mode === "POR_UNIDAD") {
     if (!item.productId) {
       ctx.addIssue({
         code: "custom",
         path: ["productId"],
-        message: "Una venta de bolsa cerrada requiere un producto",
+        message: "Una venta de bolsa cerrada / por unidad requiere un producto",
       });
     }
     if (!Number.isInteger(item.quantity)) {
       ctx.addIssue({
         code: "custom",
         path: ["quantity"],
-        message: "La cantidad debe ser un número entero (bolsa cerrada)",
+        message: "La cantidad debe ser un número entero (bolsa cerrada / por unidad)",
       });
     }
     return;

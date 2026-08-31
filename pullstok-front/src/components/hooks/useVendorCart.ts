@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import type { DataItem } from "../../types";
+import { unitPrice } from "./vendorCatalogHelpers";
 
-export type SaleMode = "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO";
+export type SaleMode = "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD";
 
 export interface VendorCartItem {
   productId: string;
@@ -19,6 +20,11 @@ export interface VendorCartItem {
   loosePriceId?: string;
   /** Nombre de la línea suelta ("MARCA · TIPO") para el payload de la venta. */
   looseName?: string;
+  // sdd/venta-por-unidad-multpack: multi-pack vendible por unidad. Se guardan
+  // para mostrar/precio del drawer del carrito y para armar el payload del
+  // checkout (POR_UNIDAD usa perUnitPrice, la caja usa product.price).
+  unitsPerBox?: number | null;
+  perUnitPrice?: number | null;
 }
 
 const STORAGE_KEY = "vendor-cart";
@@ -88,6 +94,8 @@ export function useVendorCart() {
             image: product.image,
             price: mode === "POR_MONTO"
               ? 1 // amount IS the total; backend computes kg from priceKgSuelto
+              : mode === "POR_UNIDAD"
+              ? unitPrice(product) ?? Number(product.price) // price per unit
               : mode !== "BOLSA_CERRADA"
               ? kgPrice
               : Number(product.price),
@@ -98,6 +106,8 @@ export function useVendorCart() {
             priceKgSuelto: priceKgSueltoOverride ?? product.priceKgSuelto ?? null,
             loosePriceId: loosePriceId ?? undefined,
             looseName: looseName ?? undefined,
+            unitsPerBox: product.unitsPerBox ?? null,
+            perUnitPrice: unitPrice(product),
           },
         ];
       });

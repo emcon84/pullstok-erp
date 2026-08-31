@@ -11,7 +11,7 @@ import { VendorSearchBar } from "@/components/molecules/VendorSearchBar";
 import { ProductTable } from "@/components/molecules/ProductTable";
 import { useVendorCatalog } from "@/components/hooks/useVendorCatalog";
 import { useVendorRowsKeyboard } from "@/components/hooks/useVendorRowsKeyboard";
-import { useVendorCart } from "@/components/hooks/useVendorCart";
+import { useVendorCart, type SaleMode } from "@/components/hooks/useVendorCart";
 import {
   branchQty,
   VENDOR_FILTER_KEY,
@@ -57,6 +57,9 @@ export const VendorCatalogTab = ({
 
   // ── Cantidades inline (string por fila, sync desde el carrito) ──
   const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
+  // Modo de venta por fila (productId → Caja | Por unidad). Solo los productos
+  // elegibles (unitsPerBox > 1) muestran el toggle; default Caja (bolsa).
+  const [rowMode, setRowMode] = useState<Record<string, SaleMode>>({});
   // Refs de los inputs de cantidad para el foco (roving) y del carrito para el
   // sync de valores (los ítems en el carrito muestran su cantidad al input).
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -90,12 +93,19 @@ export const VendorCatalogTab = ({
 
   const keyOf = useCallback((p: DataItem) => (p._id || p.id) || "", []);
 
-  const bolsaItemFor = useCallback(
-    (p: DataItem) =>
+  // Modo de venta de la fila (Caja | Por unidad). Default caja (bolsa cerrada).
+  const modeFor = useCallback(
+    (p: DataItem): SaleMode => rowMode[keyOf(p)] ?? "BOLSA_CERRADA",
+    [rowMode, keyOf],
+  );
+
+  const itemFor = useCallback(
+    (p: DataItem, mode: SaleMode) =>
       cart.items.find(
         (i) =>
           i.productId === keyOf(p) &&
-          (i.saleMode ?? "BOLSA_CERRADA") === "BOLSA_CERRADA",
+          (i.saleMode ?? "BOLSA_CERRADA") === mode &&
+          (i.loosePriceId ?? null) === null,
       ),
     [cart.items, keyOf],
   );
@@ -157,20 +167,31 @@ export const VendorCatalogTab = ({
       const key = keyOf(p);
       const cur = parseDecimal(qtyByKey[key] ?? "1");
       const qty = Number.isNaN(cur) ? 1 : Math.max(1, Math.round(cur));
-      const existing = bolsaItemFor(p);
+      // Multi-pack: la fila puede estar en modo "Caja" o "Por unidad". El commit
+      // agrega/actualiza la línea del MODO actual (líneas distintas por modo).
+      const mode = modeFor(p);
+      const existing = itemFor(p, mode);
       if (existing) {
-        cart.updateQuantity(key, qty);
+        cart.updateQuantity(key, qty, mode);
       } else {
-        cart.addToCart(p, qty, branchId, stock, "BOLSA_CERRADA");
+        cart.addToCart(p, qty, branchId, stock, mode);
       }
       toast.success(`"${p.name}" agregado al pedido`);
     },
-    [catalog.items, qtyByKey, keyOf, bolsaItemFor, cart, branchId],
+    [catalog.items, qtyByKey, keyOf, modeFor, itemFor, cart, branchId],
   );
 
   const registerInput = useCallback((index: number, el: HTMLInputElement | null) => {
     inputRefs.current[index] = el;
   }, []);
+
+  // Cambia el modo (Caja ↔ Por unidad) de una fila del panel.
+  const handleRowModeChange = useCallback(
+    (p: DataItem, mode: SaleMode) => {
+      setRowMode((prev) => ({ ...prev, [keyOf(p)]: mode }));
+    },
+    [keyOf],
+  );
 
   // ── Vuelta desde el panel (←): enfocar el listado ──
   // Si hay fila activa la enfoca; si no, selecciona la primera (el efecto la
@@ -414,6 +435,8 @@ export const VendorCatalogTab = ({
             onOpenDrawer={openDrawer}
             onAssignBarcode={handleAssignBarcode}
             inlineQty={inlineQty}
+            rowMode={rowMode}
+            onRowModeChange={handleRowModeChange}
           />
         )}
 

@@ -34,6 +34,12 @@ export interface DataItem {
   carried?: boolean;
   price: number | string;
   quantity: number | string;
+  // sdd/venta-por-unidad-multpack: un multi-pack puede venderse por unidad.
+  // `unitsPerBox` = cantidad de unidades por caja (eligibilidad: > 1);
+  // `perUnitPrice` = round2(price / unitsPerBox) calculado on-the-fly por el
+  // backend (nunca almacenado). Ambos opcionales: null = no elegible.
+  unitsPerBox?: number | null;
+  perUnitPrice?: number | null;
 }
 
 type ValidationRule =

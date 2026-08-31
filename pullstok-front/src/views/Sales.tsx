@@ -34,6 +34,7 @@ import { toast } from "react-toastify";
 import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
 import { CartItem, Sale } from "../models/salesModel";
+import { isLooseSale, isUnitSale } from "../models/saleModeHelpers";
 import type { PaymentInput } from "../models/cashSessionModel";
 
 const TAX_CONDITIONS = [
@@ -48,7 +49,7 @@ type CustomerMode = "select" | "create";
 
 /** Filtro de tipo de venta: todas, sueltas (algún renglón POR_PESO/POR_MONTO) o
  * bolsas cerradas (sin renglones sueltos). */
-type SaleTypeFilter = "all" | "loose" | "bag";
+type SaleTypeFilter = "all" | "loose" | "bag" | "unit";
 
 interface InvoiceModalState {
   sale: Sale | null;
@@ -152,12 +153,8 @@ export const SalesPage = () => {
   };
 
   // Una venta es "suelta" si al menos un renglón se vendió por peso o monto
-  // (modos que el backend asocia a stock suelto en kg / LooseStock).
-  const isLooseSale = (sale: Sale) =>
-    (sale.items || []).some(
-      (item) => item.saleMode === "POR_PESO" || item.saleMode === "POR_MONTO",
-    );
-
+  // (modos que el backend asocia a stock suelto en kg / LooseStock). POR_UNIDAD
+  // es un producto físico por unidad: NO es suelta (ver models/saleModeHelpers).
   const filteredSales = sales.filter((sale) => {
     const matchesDate = filterDate
       ? new DateObject(sale.saleDate).format("YYYY-MM-DD") === filterDate
@@ -173,7 +170,9 @@ export const SalesPage = () => {
         ? true
         : filterType === "loose"
           ? isLooseSale(sale)
-          : !isLooseSale(sale);
+          : filterType === "unit"
+            ? isUnitSale(sale)
+            : !isLooseSale(sale);
     return matchesDate && matchesProduct && matchesType;
   });
 
@@ -329,6 +328,7 @@ export const SalesPage = () => {
               <SelectItem value="all">Todas</SelectItem>
               <SelectItem value="loose">Solo sueltas</SelectItem>
               <SelectItem value="bag">Solo bolsas</SelectItem>
+              <SelectItem value="unit">Solo por unidad</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -382,6 +382,11 @@ export const SalesPage = () => {
                     {isLooseSale(sale) && (
                       <Badge className="bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400">
                         Suelta
+                      </Badge>
+                    )}
+                    {isUnitSale(sale) && (
+                      <Badge className="bg-sky-500/15 text-sky-700 hover:bg-sky-500/25 dark:text-sky-400">
+                        Por unidad
                       </Badge>
                     )}
                     {isInvoiced && (

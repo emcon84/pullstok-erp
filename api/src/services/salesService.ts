@@ -4,6 +4,7 @@ import { sendMail } from "./mailService";
 import { saleConfirmedEmail } from "./mailTemplates";
 import { emitOrdersChanged } from "../realtime/socket";
 import { round2 } from "../utils/money";
+import { computePerUnitPrice } from "../utils/unitsPerBox";
 import { resolveCellForProduct, looseLineName, CellWithNames } from "./looseSaleService";
 
 interface IProductSale {
@@ -19,7 +20,9 @@ interface IProductSale {
   price: number;
   // Modo de venta del renglón (sdd/venta-alimento-suelto B-08): ausente =
   // legacy BOLSA_CERRADA (el schema lo normaliza con .default()).
-  saleMode?: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO";
+  // POR_UNIDAD (sdd/venta-por-unidad-multpack): línea de un multi-pack vendida
+  // por unidad; el precio lo recomputa el server (round2(price/unitsPerBox)).
+  saleMode?: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD";
 }
 
 interface ISaleRequest {
@@ -118,7 +121,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       quantity: number;
       category: string;
       price: number;
-      saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO";
+      saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD";
     }[] = [];
 
     for (const item of saleRequest.products) {
@@ -130,7 +133,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       // parseInt (que truncaba los kg sueltos): el schema ya validó la forma.
       const quantity = Number(String(item.quantity));
       const price = parseFloat(String(item.price));
-      const saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" =
+      const saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD" =
         item.saleMode ?? "BOLSA_CERRADA";
       const isLoose = saleMode === "POR_PESO" || saleMode === "POR_MONTO";
 
@@ -213,12 +216,41 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         linePrice = unitPrice; // snapshot congelado (B-04)
       }
 
+      // POR_UNIDAD (sdd/venta-por-unidad-multpack): multi-pack vendido por
+      // unidad. El precio por unidad lo RECOMPUTA el server (box anchor gana):
+      // round2(product.price / unitsPerBox). Jamás confiamos en el price del
+      // cliente (evita drift de rounding contra la caja). Se exige que el
+      // producto exista y que unitsPerBox > 1 y no null.
+      if (saleMode === "POR_UNIDAD") {
+        if (!product) {
+          throw new Error(
+            "La venta por unidad requiere un producto",
+          );
+        }
+        const unitsPerBox = product.unitsPerBox as number | null | undefined;
+        const perUnitPrice = computePerUnitPrice(Number(product.price), unitsPerBox);
+        if (unitsPerBox === null || unitsPerBox === undefined || unitsPerBox <= 1 || perUnitPrice === null) {
+          throw new Error(
+            `El producto "${product.name}" no se puede vender por unidad (unitsPerBox debe ser mayor a 1)`,
+          );
+        }
+        linePrice = perUnitPrice; // server-authoritative
+      }
+
       const lineName = isLoose
         ? item.looseName ??
           looseLineName(cell?.brand?.name ?? "", cell?.type?.name ?? "")
         : product!.name;
 
       // ── Deducción de stock según el pool correcto ──
+      // Stock en UNIDADES (sdd/venta-por-unidad-multpack). Para un multi-pack
+      // (unitsPerBox > 1): la caja (BOLSA_CERRADA) descuenta qty × unitsPerBox;
+      // la unidad (POR_UNIDAD) descuenta qty × 1. Para un producto legacy sin
+      // unitsPerBox la caja sigue descontando 1 por bolsa (cajaMultiplier = 1).
+      const cajaMultiplier =
+        product?.unitsPerBox && product.unitsPerBox > 1 ? product.unitsPerBox : 1;
+      const stockUnits =
+        saleMode === "BOLSA_CERRADA" ? lineQuantity * cajaMultiplier : lineQuantity;
       if (isLoose && cell) {
         // Ventas sueltas: descuentan kg del LooseStock de la celda (la bolsa
         // física ya se abrió con openBag y su peso quedó acreditado acá).
@@ -253,7 +285,6 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         // BOLSA_CERRADA scoped a sucursal: el stock de bolsas volvió a UNIDADES
         // (backfill reverse en 20260817120000_loose_lines_stock) — la bolsa
         // cerrada descuenta 1 por bolsa, el suelto va por LooseStock.
-        const stockUnits = lineQuantity;
         const stock = await tx.productStock.findFirst({
           where: {
             productId: product!.id,
@@ -283,7 +314,6 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         }
       } else {
         // ── Legacy / admin sale: deduct from product.quantity (HQ global) ──
-        const stockUnits = lineQuantity;
         if (product!.quantity < stockUnits) {
           throw new Error(
             `Stock insuficiente para el producto ${product!.name}`,

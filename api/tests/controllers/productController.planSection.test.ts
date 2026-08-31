@@ -109,6 +109,8 @@ describe("productController.getProducts — planSection y filtro por título", (
         id: "p-1",
         name: "SIEGER Puppy Mini x 1 Kg.",
         price: 10642,
+        unitsPerBox: null,
+        perUnitPrice: null,
         planSection: {
           brand: "SIEGER",
           line: "SUPER PREMIUM PARA PERROS",
@@ -116,7 +118,7 @@ describe("productController.getProducts — planSection y filtro por título", (
           position: 2,
         },
       },
-      { id: "p-2", name: "Collar Suelto", price: 500, planSection: null },
+      { id: "p-2", name: "Collar Suelto", price: 500, unitsPerBox: null, perUnitPrice: null, planSection: null },
     ]);
   });
 

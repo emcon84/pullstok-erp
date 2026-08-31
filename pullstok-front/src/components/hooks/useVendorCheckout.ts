@@ -52,8 +52,12 @@ export function useVendorCheckout({
             // la planilla (guardado en priceKgSuelto del item), no el price=1 de
             // la cuenta del carrito. Sin celda (showroom), priceKgSuelto ==
             // priceKgSuelto almacenado → mismo comportamiento que antes.
+            // Multipack por unidad: product.price = perUnitPrice (nunca el del
+            // price de caja del item).
             price:
-              i.saleMode === "POR_MONTO"
+              i.saleMode === "POR_UNIDAD"
+                ? (i.perUnitPrice ?? i.price)
+                : i.saleMode === "POR_MONTO"
                 ? (i.priceKgSuelto ?? i.price)
                 : i.price,
             quantity: i.stock,
@@ -61,7 +65,9 @@ export function useVendorCheckout({
             category: "",
           },
           quantity: i.quantity,
-          totalPrice: i.price * i.quantity,
+          totalPrice:
+            (i.saleMode === "POR_UNIDAD" ? (i.perUnitPrice ?? i.price) : i.price) *
+            i.quantity,
           saleMode: i.saleMode ?? "BOLSA_CERRADA",
           // Ventas sueltas: la celda de la planilla que identifica la línea.
           loosePriceId: i.loosePriceId,

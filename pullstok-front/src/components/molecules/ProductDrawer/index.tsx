@@ -52,6 +52,7 @@ interface ProductPayload {
   categoryId?: string | null;
   weightKg?: number | null;
   bulkFactor?: number | null;
+  unitsPerBox?: number | null;
   carried?: boolean;
 }
 
@@ -78,6 +79,9 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
   // Loose-sale fields (sdd/venta-alimento-suelto A-02):
   const [weightKg, setWeightKg] = useState("");
   const [bulkFactor, setBulkFactor] = useState("");
+  // Multi-pack: unidades por caja (sdd/venta-por-unidad-multpack). Int, > 1
+  // habilita la venta por unidad. Puede derivarse del nombre ("15x85grs").
+  const [unitsPerBox, setUnitsPerBox] = useState("");
   // priceKgSuelto is read-only (derived server-side from price/weightKg/factor).
   // ¿El negocio trabaja este producto? (filtro "solo lo que trabajo").
   const [carried, setCarried] = useState(true);
@@ -183,6 +187,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         setImageFile(null);
         setWeightKg(product.weightKg != null ? String(product.weightKg) : "");
         setBulkFactor(product.bulkFactor != null ? String(product.bulkFactor) : "");
+        setUnitsPerBox(product.unitsPerBox != null ? String(product.unitsPerBox) : "");
         setCarried(product.carried !== false); // default true si no viene
         // Pre-select variants if available
         if (product.variantAssignments) {
@@ -205,6 +210,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         setImageFile(null);
         setWeightKg("");
         setBulkFactor("");
+        setUnitsPerBox("");
         setCarried(true);
         setVariants([]);
         setVariantSelections({});
@@ -252,6 +258,9 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
       payload.weightKg = !Number.isNaN(parsedWeightKg) && parsedWeightKg > 0 ? parsedWeightKg : null;
       const parsedFactor = parseFloat(bulkFactor);
       payload.bulkFactor = !isNaN(parsedFactor) && parsedFactor > 0 ? parsedFactor : null;
+      const parsedUnitsPerBox = parseInt(unitsPerBox, 10);
+      payload.unitsPerBox =
+        !isNaN(parsedUnitsPerBox) && parsedUnitsPerBox > 1 ? parsedUnitsPerBox : null;
       payload.carried = carried;
 
       if (isEdit && product) {
@@ -363,6 +372,29 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
               />
               <p className="text-[11px] text-muted-foreground">
                 Vacío = usa el factor de la organización.
+              </p>
+            </div>
+          </div>
+          )}
+
+          {/* ── Multi-pack por unidad (sdd/venta-por-unidad-multpack) ── */}
+          {!readOnly && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="p-unitsPerBox">Unidades por caja</Label>
+              <Input
+                id="p-unitsPerBox"
+                type="number"
+                inputMode="numeric"
+                step="1"
+                min="0"
+                value={unitsPerBox}
+                onChange={(e) => setUnitsPerBox(e.target.value)}
+                placeholder="Ej: 15"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Puede derivarse del nombre (ej: "15x85grs"). Mayor a 1 habilita
+                la venta "por unidad" en el POS.
               </p>
             </div>
           </div>

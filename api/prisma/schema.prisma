@@ -460,6 +460,11 @@ model Product {
   bulkFactor         Float?
   // Peso del envase/bolsa en kg (entrada del backfill o del admin).
   weightKg           Float?
+  // Cuántas unidades vienen por caja/pack (sdd/venta-por-unidad-multpack).
+  // null = producto NO multi-pack (box-only, comportamiento legacy). Un
+  // producto es vendible "por unidad" SOLO cuando unitsPerBox > 1 y no null.
+  // Se deriva del nombre (regex "NxG") en el backfill o se edita a mano.
+  unitsPerBox        Int?
   // Visibilidad en la tienda online pública (negocio.pullstok.com). Default
   // false: un producto nunca aparece publicado sin que el dueño lo decida.
   publishedToStore   Boolean           @default(false)
@@ -735,6 +740,10 @@ enum SaleMode {
   BOLSA_CERRADA
   POR_PESO
   POR_MONTO
+  // Venta de un multi-pack POR UNIDAD (sdd/venta-por-unidad-multpack): la
+  // línea usa el precio por unidad derivado (round2(price/unitsPerBox)) y
+  // descuenta 1 unidad de stock por unidad vendida.
+  POR_UNIDAD
 }
 
 model Receipt {

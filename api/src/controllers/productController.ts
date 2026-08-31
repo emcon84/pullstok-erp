@@ -12,6 +12,7 @@ import {
   recomputeForCsvImport,
 } from "../services/priceLooseService";
 import { roundBolsaPriceIfHigh } from "../utils/money";
+import { isUnitSellable, computePerUnitPrice } from "../utils/unitsPerBox";
 import { requireOrganizationId } from "../config/tenantContext";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
@@ -538,10 +539,17 @@ const getProducts = async (req: Request, res: Response) => {
 
     // Exponer solo la sección de la planilla (planSection) y descartar el array
     // completo de entries (que incluiría precios de proveedor si se ampliara).
+    // sdd/venta-por-unidad-multpack: además expone `unitsPerBox` (columna nueva)
+    // y el `perUnitPrice` DERIVADO (round2(price/unitsPerBox)) on-the-fly — nunca
+    // persistido. `null` cuando el producto no es vendible por unidad.
     const mapProduct = (p: any) => {
-      const { priceListEntries, ...rest } = p;
+      const { priceListEntries, unitsPerBox, ...rest } = p;
       return {
         ...rest,
+        unitsPerBox: unitsPerBox ?? null,
+        perUnitPrice: isUnitSellable(unitsPerBox)
+          ? computePerUnitPrice(Number(p.price), unitsPerBox)
+          : null,
         planSection:
           Array.isArray(priceListEntries) && priceListEntries.length > 0
             ? priceListEntries[0].section ?? null

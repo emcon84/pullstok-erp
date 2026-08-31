@@ -2,6 +2,32 @@ import type { DataItem } from "../../types";
 
 // ── Helpers compartidos del catálogo de vendor ──
 
+// sdd/venta-por-unidad-multpack — un multi-pack se puede vender por unidad
+// (POR_UNIDAD) SOLO cuando unitsPerBox > 1. `unitPrice` es el precio unitario
+// (el backend lo calcula como round2(price/unitsPerBox) y lo expone como
+// perUnitPrice); acá lo resolvemos con el dato del backend o derivándolo.
+
+/** ¿El producto es vendible por unidad? Requiere unitsPerBox > 1. */
+export const isUnitSellable = (unitsPerBox?: number | null): boolean =>
+  !!unitsPerBox && unitsPerBox > 1;
+
+/** Precio unitario de un multi-pack, o null si no es elegible. Usa el
+ *  perUnitPrice que ya calculó el backend; si no viene, lo deriva como
+ *  round2(price / unitsPerBox). */
+export const unitPrice = (p: DataItem): number | null => {
+  if (p.perUnitPrice != null) return Number(p.perUnitPrice);
+  if (!isUnitSellable(p.unitsPerBox)) return null;
+  const price = Number(p.price);
+  const ub = Number(p.unitsPerBox);
+  if (!price || !ub) return null;
+  return Math.round((price / ub) * 100) / 100;
+};
+
+/** Cantidad de cajas completas que hay en `units` unidades de stock
+ *  (división entera; para mostrar stock de unidades convertido en cajas). */
+export const boxCountFromUnits = (units: number, unitsPerBox: number): number =>
+  Math.floor(units / unitsPerBox);
+
 export const imgSrc = (image?: string) => {
   if (!image) return null;
   return image.startsWith("http") ? image : undefined;

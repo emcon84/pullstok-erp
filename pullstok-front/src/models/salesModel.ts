@@ -1,7 +1,7 @@
 import { ProductsProps } from "./productsModel";
 import { PaymentMethod } from "./cashSessionModel";
 
-export type SaleMode = "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO";
+export type SaleMode = "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD";
 
 export interface CartItem {
   product: ProductsProps;
