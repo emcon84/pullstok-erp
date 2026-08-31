@@ -84,6 +84,22 @@ describe("parseUnitsPerBoxFromName", () => {
   it("NO matchea 'X 1.02 KG' (peso total del carton, sin dígito antes de la X)", () => {
     expect(parseUnitsPerBoxFromName("ROYAL CANIN X 1.02 KG")).toBeNull();
   });
+
+  it("NO matchea edad+peso: 'PRO PLAN CAT ADULT +7 X7,5KG' → null (7 es edad)", () => {
+    expect(parseUnitsPerBoxFromName("PRO PLAN CAT ADULT +7 X7,5KG")).toBeNull();
+  });
+
+  it("NO matchea edad+peso: 'ROYAL CANIN AGEING +11 X 2 KG' → null (11 es edad)", () => {
+    expect(parseUnitsPerBoxFromName("ROYAL CANIN AGEING +11 X 2 KG")).toBeNull();
+  });
+
+  it("NO matchea edad+peso: 'PEDIGREE SENIOR +7 X 8KG' → null (7 es edad)", () => {
+    expect(parseUnitsPerBoxFromName("PEDIGREE SENIOR +7 X 8KG")).toBeNull();
+  });
+
+  it("sigue matcheando multi-pack real 'UPPER CROCK 12 X 0,5 KG' → 12", () => {
+    expect(parseUnitsPerBoxFromName("UPPER CROCK GATOS ADULTOS 30% 12 X 0,5 KG")).toBe(12);
+  });
 });
 
 describe("computePerUnitPrice", () => {

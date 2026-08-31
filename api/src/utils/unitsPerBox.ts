@@ -8,14 +8,13 @@ import { round2 } from "./money";
 // Unidades de PESO que indican un multi-pack (una caja con N sobres/latas/bolsas).
 // NO incluye volumen (ml/lts) ni comprimidos: evita falsos positivos como
 // "RUMINAL 88 X 100 ML" o "SPECTRYL 10 X 100 COMP".
-const WEIGHT_UNITS = "(?:grs?|gr|g|kg)";
 
-// Patrón A — el conteo va ANTES de la 'x', con unidad de peso:
+// Patrón A — el conteo va ANTES de la 'x', con unidad de peso. Captura la
+// unidad (grupo 2) para desambiguar edad vs conteo en el código.
 //   "15x85grs", "12X85G", "(6X195G)", "12 X 0,5 KG", "7 x 340 gr".
-// Dentro de "(12X85G) X 1.02 KG" el "X 1.02 KG" del final NO matchea (no hay
-// dígito justo antes de esa X), así que se toma el conteo del parentesis.
+// (?<![\d]) evita agarrar un dígito que es parte de un número mayor.
 const COUNT_BEFORE_X_REGEX = new RegExp(
-  `(\\d{1,3})\\s*[xX]\\s*\\d+(?:[.,]\\d+)?\\s*${WEIGHT_UNITS}\\b`,
+  `(?<![\\d])(\\d{1,3})\\s*[xX]\\s*\\d+(?:[.,]\\d+)?\\s*(grs?|gr|g|kg)\\b`,
   "i",
 );
 
@@ -41,7 +40,12 @@ export function parseUnitsPerBoxFromName(name: string): number | null {
   const before = COUNT_BEFORE_X_REGEX.exec(name);
   if (before) {
     const n = Number(before[1]);
-    if (isPlausibleCount(n)) return n;
+    const unit = before[2]?.toLowerCase();
+    // "ADULT +7 X7,5KG" / "AGEING +11 X 2 KG": el "+N" es EDAD y el peso es KG
+    // (bolsa seca de 7,5/2kg), NO un conteo. En gramos (latas/pouches húmedos)
+    // "+12 x 340 gr" sí es un conteo real, se acepta.
+    const isAgeKg = unit === "kg" && name[before.index - 1] === "+";
+    if (isPlausibleCount(n) && !isAgeKg) return n;
   }
   const after = COUNT_AFTER_X_REGEX.exec(name);
   if (after) {
