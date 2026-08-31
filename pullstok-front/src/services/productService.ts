@@ -366,6 +366,50 @@ export const bulkCarried = async (
   return res.json();
 };
 
+/**
+ * POST /products/bulk-publish — publica/despublica en la tienda online todos
+ * los productos de la org que tengan la variante "Marca" en brandValues.
+ * Mismo estilo que bulkCarried (plain fetch + token de localStorage).
+ */
+export const bulkPublishProducts = async (
+  brandValues: string[],
+  publishedToStore: boolean,
+): Promise<{ count: number }> => {
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${API_URL}/products/bulk-publish`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ brandValues, publishedToStore }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "bulk publish failed");
+  }
+  return res.json();
+};
+
+/** Respuesta de GET /products/brands: marcas disponibles de la org (variante
+ * "Marca", valores únicos ordenados) para el selector del bulk-publish. */
+export interface StoreBrands {
+  brands: string[];
+}
+
+/** GET /products/brands — marcas disponibles para el selector del masivo. */
+export const listStoreBrands = async (): Promise<StoreBrands> => {
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${API_URL}/products/brands`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "list store brands failed");
+  }
+  return res.json();
+};
+
 // ---------------------------------------------------------------------------
 // Bulk price update (sdd/bulk-price-update-selectors)
 // ---------------------------------------------------------------------------

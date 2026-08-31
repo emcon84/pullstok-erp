@@ -22,6 +22,7 @@ import {
   updateBranchStockSchema,
   applyPriceListSchema,
   bulkCarriedSchema,
+  bulkPublishSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -72,6 +73,15 @@ router.get(
   productController.getProductFilterFacets,
 );
 
+// Marcas disponibles para el bulk-publish por marca (variante "Marca" de la
+// org). Debe registrarse ANTES de "/:id" para que "brands" no la matchee.
+router.get(
+  "/brands",
+  authenticateJWT,
+  checkBusinessHours,
+  productController.listStoreBrands,
+);
+
 router.get("/:id", authenticateJWT, checkBusinessHours, productController.getProductById);
 router.put(
   "/:id",
@@ -119,6 +129,17 @@ router.post(
   requireRole("ADMIN"),
   validate(bulkCarriedSchema),
   productController.bulkCarried,
+);
+
+// Bulk "Publicar en tienda" por marca — publica/despublica todos los productos
+// de la org con la variante "Marca" en brandValues. ADMIN/MANAGEMENT.
+router.post(
+  "/bulk-publish",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN", "MANAGEMENT"),
+  validate(bulkPublishSchema),
+  productController.bulkPublish,
 );
 
 // Import de planillas de precios Alican (sdd/alican-wholesale-price-list) — ADMIN only.

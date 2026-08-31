@@ -608,6 +608,20 @@ export const bulkCarriedSchema = z.object({
   carried: z.boolean(),
 });
 
+// ---------- Bulk "Publicar en tienda" por marca ----------
+// Publica/despublica en la tienda online todos los productos de la org que
+// tengan la variante "Marca" con un valor en brandValues (mismo matching por
+// marca que bulkPriceUpdate). brandValues >= 1 (no se permite barrer toda la
+// org por error); .strip() descarta campos desconocidos.
+export const bulkPublishSchema = z
+  .object({
+    brandValues: z
+      .array(z.string().min(1, "La marca no puede estar vacía"))
+      .min(1, "Seleccioná al menos una marca"),
+    publishedToStore: z.boolean(),
+  })
+  .strip();
+
 // ---------- Bulk Price Update ----------
 // Selectores de alcance redefinidos (sdd/bulk-price-update-selectors): el
 // cliente manda los NODE ids de categoría seleccionados (categoryIds) y el

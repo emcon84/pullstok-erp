@@ -14,6 +14,7 @@ import {
 import { roundBolsaPriceIfHigh } from "../utils/money";
 import { isUnitSellable, computePerUnitPrice } from "../utils/unitsPerBox";
 import { requireOrganizationId } from "../config/tenantContext";
+import { PLAN_LIMITS } from "../config/planLimits";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
 /**
@@ -1408,6 +1409,83 @@ export const bulkCarried = async (req: Request, res: Response) => {
 };
 
 /**
+ * POST /products/bulk-publish — publica/despublica en la tienda online todos
+ * los productos de la org que tengan asignada la variante "Marca" con un valor
+ * IN brandValues (mismo where por marca que bulkPriceUpdate, reutilizado vía
+ * buildBulkPriceWhere). Solo ADMIN/MANAGEMENT.
+ *
+ * Si publicado (publishedToStore === true) respeta el tope de productos
+ * publicables del plan (maxStoreProducts): si el total resultante supera el
+ * límite responde 403 { error: "PLAN_LIMIT" } (PREMIUM es ilimitado → null).
+ * Devuelve { count } = productos actualizados.
+ */
+export const bulkPublish = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const { brandValues, publishedToStore } = req.body as {
+      brandValues: string[];
+      publishedToStore: boolean;
+    };
+    // Reutiliza el where por marca de bulkPriceUpdate (variante "Marca").
+    const where = buildBulkPriceWhere(brandValues, [], [], [], [], [], organizationId);
+
+    if (publishedToStore) {
+      const org = await basePrisma.organization.findUniqueOrThrow({
+        where: { id: organizationId },
+      });
+      const limit = PLAN_LIMITS[org.plan].maxStoreProducts;
+      if (limit !== null) {
+        // current = ya publicados; toPublish = matcheados por marca aún no
+        // publicados. El total resultante debe caber en el tope del plan.
+        const [current, toPublish] = await Promise.all([
+          prisma.product.count({ where: { publishedToStore: true } }),
+          prisma.product.count({ where: { ...where, publishedToStore: false } }),
+        ]);
+        if (current + toPublish > limit) {
+          return res.status(403).json({
+            error: "PLAN_LIMIT",
+            resource: "storeProducts",
+            limit,
+            current,
+          });
+        }
+      }
+    }
+
+    const result = await prisma.product.updateMany({
+      where,
+      data: { publishedToStore },
+    });
+    return res.status(200).json({ count: result.count });
+  } catch (error: any) {
+    console.error("Error en publicación masiva por marca:", error);
+    return res.status(500).json({ message: "Error al publicar en tienda" });
+  }
+};
+
+/**
+ * GET /products/brands — marcas disponibles de la org (valores únicos de la
+ * variante "Marca", ordenados alfabéticamente). Alimenta el selector del
+ * bulk-publish por marca. ProductVariant es tenant-scoped (scope org
+ * automático), así que cualquier rol autenticado solo ve las marcas de su org.
+ */
+export const listStoreBrands = async (req: Request, res: Response) => {
+  try {
+    const rows = await prisma.productVariant.findMany({
+      where: { option: { variant: { name: "Marca" } } },
+      select: { option: { select: { value: true } } },
+    });
+    const brands = [...new Set(rows.map((r) => r.option.value))].sort((a, b) =>
+      a.localeCompare(b),
+    );
+    return res.status(200).json({ brands });
+  } catch (error: any) {
+    console.error("Error listando marcas:", error);
+    return res.status(500).json({ message: "Error al listar marcas" });
+  }
+};
+
+/**
  * GET /products/:id/stock — stock del producto en todas las sucursales ACTIVAS
  * de la org (spec A1). Respuesta autocontenida (design D5): no depende de
  * GET /branches (que es ADMIN/MANAGEMENT-only), cualquier rol autenticado la
@@ -1542,6 +1620,8 @@ export default {
   deleteProduct,
   bulkPriceUpdate,
   bulkCarried,
+  bulkPublish,
+  listStoreBrands,
   getProductStock,
   updateBranchStock,
   getStockSummary,

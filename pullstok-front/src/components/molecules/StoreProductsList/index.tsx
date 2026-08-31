@@ -3,6 +3,14 @@ import { ImageIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -12,7 +20,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useProducts } from "../../hooks/useProducts";
-import { usePublishProduct } from "../../hooks/useStoreSettings";
+import {
+  usePublishProduct,
+  useBulkPublish,
+  useStoreBrands,
+} from "../../hooks/useStoreSettings";
 import { API_URL } from "../../../constants";
 import { Loader } from "../../atoms/loader";
 
@@ -25,11 +37,16 @@ const imgSrc = (image?: string) => {
 
 /** Lista de productos con el switch "Publicar en tienda" (WS4). Reutiliza
  * useProducts (mismo cache que el listado de Dashboard); el switch togglea
- * vía PATCH /products/:id/publish y solo invalida ese cache. */
+ * vía PATCH /products/:id/publish con UPDATE OPTIMISTA (el cache se actualiza
+ * al instante y se revierte si el PATCH falla), y además permite publicar/
+ * despublicar por MARCA de forma masiva. */
 export const StoreProductsList = () => {
   const { products, loading } = useProducts();
   const { setPublished, loading: publishing } = usePublishProduct();
+  const { bulkPublish, loading: bulking } = useBulkPublish();
+  const { brands, loading: brandsLoading } = useStoreBrands();
   const [filter, setFilter] = useState("");
+  const [brand, setBrand] = useState<string>("");
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(filter.toLowerCase()),
@@ -45,12 +62,43 @@ export const StoreProductsList = () => {
 
   return (
     <div className="space-y-4">
-      <Input
-        placeholder="Buscar producto..."
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="max-w-sm"
-      />
+      <div className="flex flex-wrap items-end gap-3">
+        <Input
+          placeholder="Buscar producto..."
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="max-w-sm"
+        />
+
+        <div className="flex flex-1 items-end justify-end gap-2">
+          <Select value={brand} onValueChange={setBrand} disabled={brandsLoading}>
+            <SelectTrigger className="w-full sm:w-56" aria-label="Publicación masiva por marca">
+              <SelectValue placeholder="Marca..." />
+            </SelectTrigger>
+            <SelectContent>
+              {brands.map((b) => (
+                <SelectItem key={b} value={b}>
+                  {b}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="default"
+            disabled={!brand || bulking}
+            onClick={() => bulkPublish({ brandValues: [brand], publishedToStore: true })}
+          >
+            Publicar marca
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!brand || bulking}
+            onClick={() => bulkPublish({ brandValues: [brand], publishedToStore: false })}
+          >
+            Despublicar marca
+          </Button>
+        </div>
+      </div>
 
       <Card className="overflow-hidden p-0">
         <Table>
