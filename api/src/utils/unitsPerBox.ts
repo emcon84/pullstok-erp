@@ -3,8 +3,6 @@
  * Sin DB, sin side-effects: son la fuente de verdad de la derivación de
  * `unitsPerBox` y `perUnitPrice`.
  */
-import { round2 } from "./money";
-
 // Unidades de PESO que indican un multi-pack (una caja con N sobres/latas/bolsas).
 // NO incluye volumen (ml/lts) ni comprimidos: evita falsos positivos como
 // "RUMINAL 88 X 100 ML" o "SPECTRYL 10 X 100 COMP".
@@ -55,10 +53,15 @@ export function parseUnitsPerBoxFromName(name: string): number | null {
   return null;
 }
 
+// Paso de redondeo del precio por unidad (hacia ARRIBA): se vende el pouch al
+// próximo "número redondo" ($100). Ej. 18.400 ÷ 15 = 1.226,67 → 1.300.
+const UNIT_PRICE_ROUND_STEP = 100;
+
 /**
- * Precio por unidad derivado del precio de caja (box anchor): round2(price ÷
- * unitsPerBox). `null` cuando no se puede derivar (unitsPerBox ausente o <= 0).
- * NUNCA se persiste — se deriva on-the-fly (single source of truth).
+ * Precio por unidad derivado del precio de caja: round2(price ÷ unitsPerBox)
+ * redondeado HACIA ARRIBA al próximo `UNIT_PRICE_ROUND_STEP` (ej. 18.400 ÷ 15
+ * = 1.226,67 → 1.300). `null` cuando no se puede derivar (unitsPerBox ausente
+ * o <= 0). NUNCA se persiste — se deriva on-the-fly (single source of truth).
  */
 export function computePerUnitPrice(
   price: number,
@@ -67,7 +70,8 @@ export function computePerUnitPrice(
   if (unitsPerBox === null || unitsPerBox === undefined || unitsPerBox <= 0) {
     return null;
   }
-  return round2(price / unitsPerBox);
+  const perUnit = price / unitsPerBox;
+  return Math.ceil(perUnit / UNIT_PRICE_ROUND_STEP) * UNIT_PRICE_ROUND_STEP;
 }
 
 /**

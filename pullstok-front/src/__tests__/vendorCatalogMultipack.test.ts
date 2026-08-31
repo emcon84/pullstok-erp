@@ -40,9 +40,9 @@ describe("unitPrice — precio unitario de un multipack", () => {
     expect(unitPrice(p)).toBeCloseTo(1226.67, 2);
   });
 
-  it("deriva round2(price / unitsPerBox) cuando el perUnitPrice no viene", () => {
+  it("redondea hacia arriba al próximo $100 cuando el perUnitPrice no viene: 18400 ÷ 15 → 1300", () => {
     const p: DataItem = { name: "X 15x85grs", price: 18400, quantity: 0, unitsPerBox: 15 };
-    expect(unitPrice(p)).toBeCloseTo(1226.67, 2);
+    expect(unitPrice(p)).toBe(1300);
   });
 
   it("producto no elegible → null (no hay precio por unidad)", () => {

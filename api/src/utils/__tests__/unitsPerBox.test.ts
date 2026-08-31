@@ -103,16 +103,24 @@ describe("parseUnitsPerBoxFromName", () => {
 });
 
 describe("computePerUnitPrice", () => {
-  it("round2(18400 ÷ 15) = 1226.67", () => {
-    expect(computePerUnitPrice(18400, 15)).toBe(1226.67);
+  it("redondea hacia arriba al próximo $100: 18400 ÷ 15 = 1226.67 → 1300", () => {
+    expect(computePerUnitPrice(18400, 15)).toBe(1300);
   });
 
-  it("round2(18400.5 ÷ 15) = 1226.7", () => {
-    expect(computePerUnitPrice(18400.5, 15)).toBe(1226.7);
+  it("redondea hacia arriba: 18400.5 ÷ 15 = 1226.7 → 1300", () => {
+    expect(computePerUnitPrice(18400.5, 15)).toBe(1300);
   });
 
-  it("round2(100 ÷ 3) = 33.33", () => {
-    expect(computePerUnitPrice(100, 3)).toBe(33.33);
+  it("redondea hacia arriba: 100 ÷ 3 = 33.33 → 100", () => {
+    expect(computePerUnitPrice(100, 3)).toBe(100);
+  });
+
+  it("no redondea cuando el resultado ya es múltiplo de 100: 7000 ÷ 7 = 1000 → 1000", () => {
+    expect(computePerUnitPrice(7000, 7)).toBe(1000);
+  });
+
+  it("redondea hacia arriba: 7000 ÷ 12 = 583.33 → 600", () => {
+    expect(computePerUnitPrice(7000, 12)).toBe(600);
   });
 
   it("unitsPerBox null/undefined/0 → null (no se puede derivar)", () => {

@@ -420,7 +420,7 @@ export const VendorCatalogTab = ({
             }}
           />
           <Label htmlFor="sell-by-unit" className="cursor-pointer text-sm font-medium">
-            Vender por unidad
+            Pouch por unidad
           </Label>
         </div>
       </div>

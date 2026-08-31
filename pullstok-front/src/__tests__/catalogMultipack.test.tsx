@@ -7,7 +7,7 @@ import type { DataItem } from "@/types";
 import type { VendorCartItem } from "@/components/hooks/useVendorCart";
 
 // sdd/venta-por-unidad-multpack — UX: el modo de venta Caja/Por unidad pasa a
-// un SWITCH GLOBAL "Vender por unidad" (como "Solo lo que trabajo"). Se ELIMINA
+// un SWITCH GLOBAL "Pouch por unidad" (como "Solo lo que trabajo"). Se ELIMINA
 // el par de mini-botones por fila. El catálogo, según el switch, vende
 // BOLSA_CERRADA (con precio de caja + stock "cajas") o POR_UNIDAD (precio
 // unitario + stock "u."). Los productos NO elegibles (unitsPerBox<=1) quedan
@@ -81,7 +81,7 @@ function renderTable(items: DataItem[], extra?: Record<string, unknown>) {
   );
 }
 
-describe("ProductTable — switch global 'Vender por unidad'", () => {
+describe("ProductTable — switch global 'Pouch por unidad'", () => {
   it("unitMode OFF + elegible → precio de caja + stock en cajas", () => {
     renderTable([eligible], { unitMode: false });
     expect(screen.getAllByText(/\$18\.400/).length).toBeGreaterThanOrEqual(1);
@@ -176,20 +176,20 @@ function renderCatalogTab(overrides: Record<string, unknown> = {}) {
   return { catalog, cart };
 }
 
-describe("VendorCatalogTab — switch global 'Vender por unidad'", () => {
+describe("VendorCatalogTab — switch global 'Pouch por unidad'", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("renderiza el switch 'Vender por unidad' junto a 'Solo lo que trabajo'", () => {
+  it("renderiza el switch 'Pouch por unidad' junto a 'Solo lo que trabajo'", () => {
     renderCatalogTab();
-    expect(screen.getByText("Vender por unidad")).toBeInTheDocument();
+    expect(screen.getByText("Pouch por unidad")).toBeInTheDocument();
     expect(screen.getByText("Solo lo que trabajo")).toBeInTheDocument();
   });
 
-  it("activar 'Vender por unidad' resetea la selección del catálogo", () => {
+  it("activar 'Pouch por unidad' resetea la selección del catálogo", () => {
     const { catalog } = renderCatalogTab();
-    fireEvent.click(screen.getByText("Vender por unidad"));
+    fireEvent.click(screen.getByText("Pouch por unidad"));
     expect(catalog.resetSelection).toHaveBeenCalled();
   });
 });

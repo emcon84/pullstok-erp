@@ -13,15 +13,15 @@ export const isUnitSellable = (unitsPerBox?: number | null): boolean =>
   !!unitsPerBox && unitsPerBox > 1;
 
 /** Precio unitario de un multi-pack, o null si no es elegible. Usa el
- *  perUnitPrice que ya calculó el backend; si no viene, lo deriva como
- *  round2(price / unitsPerBox). */
+ *  perUnitPrice que ya calculó el backend (redondeado hacia arriba al próximo
+ *  $100, ej. 18.400/15=1.226,67 → 1.300); si no viene, lo deriva igual. */
 export const unitPrice = (p: DataItem): number | null => {
   if (p.perUnitPrice != null) return Number(p.perUnitPrice);
   if (!isUnitSellable(p.unitsPerBox)) return null;
   const price = Number(p.price);
   const ub = Number(p.unitsPerBox);
   if (!price || !ub) return null;
-  return Math.round((price / ub) * 100) / 100;
+  return Math.ceil(price / ub / 100) * 100;
 };
 
 /** Cantidad de cajas completas que hay en `units` unidades de stock
