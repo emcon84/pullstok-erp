@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Landmark } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "react-toastify";
 import { API_URL } from "@/constants";
 import { VendorCatalogTab } from "@/components/organisms/VendorCatalogTab";
 import { LooseSellTab } from "@/components/organisms/LooseSellTab";
