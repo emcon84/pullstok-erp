@@ -22,7 +22,7 @@
  */
 import "dotenv/config";
 import { basePrisma } from "../src/config/db";
-import { findCellForProduct, findAlimentoSecoCategoryIds } from "../src/services/priceMatchingService";
+import { findCellForProduct } from "../src/services/priceMatchingService";
 
 const DEFAULT_ORG_SLUG = "el-almacen-de-las-mascotas";
 
@@ -103,17 +103,19 @@ async function main() {
     where: { organizationId: org.id },
     select: { id: true, name: true, parentId: true },
   });
-  const secoIds = findAlimentoSecoCategoryIds(categories as any);
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
   const [brands, types, cells, products] = await Promise.all([
     basePrisma.priceKgBrand.findMany({ where: { organizationId: org.id } }),
     basePrisma.priceKgType.findMany({ where: { organizationId: org.id } }),
     basePrisma.priceKgPrice.findMany({ where: { organizationId: org.id } }),
+    // "Suelto" = priceKgSuelto > 0 (criterio isLooseEligible del sistema),
+    // acotado a los que el negocio trabaja (carried). El set real vive en
+    // "Alimento Seco (Balanceado)" y afines — no en una categoría "Alimento
+    // Seco" literal, así que NO filtramos por categoría acá.
     basePrisma.product.findMany({
       where: {
         organizationId: org.id,
-        categoryId: { in: secoIds },
         carried: true,
         priceKgSuelto: { gt: 0 },
       },
