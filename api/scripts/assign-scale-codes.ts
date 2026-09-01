@@ -82,11 +82,11 @@ export const planScaleCodes = (products: AssignableProduct[]): PlannedCode[] => 
   parents.forEach((parent, fi) => {
     const family = String(fi + 1).padStart(2, "0");
     const items = byParent.get(parent)!.sort((a, b) =>
-      a.productName.localeCompare(b.productName, "es", { sensitivity: "base" }),
+      a.name.localeCompare(b.name, "es", { sensitivity: "base" }),
     );
     items.forEach((p, ii) => {
       const index = String(ii + 1).padStart(2, "0");
-      out.push({ productId: p.id, scaleCode: `${family}${index}`, parentBrand: parent, productName: p.productName });
+      out.push({ productId: p.id, scaleCode: `${family}${index}`, parentBrand: parent, productName: p.name });
     });
   });
   return out;
