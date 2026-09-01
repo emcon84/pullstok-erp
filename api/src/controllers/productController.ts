@@ -928,7 +928,7 @@ export const getProductByCode = async (req: Request, res: Response) => {
     const product = await prisma.product.findFirst({
       where: {
         organizationId,
-        OR: [{ code }, { barcode: code }, { scaleCode: code }],
+        OR: [{ code }, { barcode: code }],
       },
       include: {
         category: { select: { id: true, name: true } },
@@ -944,11 +944,12 @@ export const getProductByCode = async (req: Request, res: Response) => {
 
 /**
  * GET /products/by-scan/:barcode
- * Resuelve un código escaneado (pistola). Si es una etiqueta de balanza (EAN-13
- * que empieza por «20»), extrae scaleCode + peso en gramos, busca el producto
- * por scaleCode y devuelve el peso en kg (y el precio suelto si está cargado).
- * Si NO es etiqueta de balanza, cae al lookup normal por code/barcode/scaleCode.
- * Devuelve 400 si el código es inválido/ilegible.
+ * Resuelve un código escaneado (pistola). Si es etiqueta de balanza (EAN-13 que
+ * empieza por «20») extrae scaleCode + peso en gramos, busca la CELDA de la
+ * planilla "Precios por kilo" (PriceKgPrice) por scaleCode y devuelve su
+ * precio/kg + nombre (marca · tipo) + peso en kg. El POS lo agrega como línea
+ * POR_PESO. Si NO es etiqueta de balanza, cae al lookup normal por code/barcode.
+ * Devuelve 400 si el código es ilegible, 404 si no hay celda/producto.
  */
 export const getProductByScan = async (req: Request, res: Response) => {
   try {
@@ -959,31 +960,37 @@ export const getProductByScan = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Código de barras inválido" });
     }
 
-    const findProduct = (code: string) =>
-      prisma.product.findFirst({
-        where: { organizationId, OR: [{ scaleCode: code }, { code }, { barcode: code }] },
+    if (parsed.isScale) {
+      const cell = await prisma.priceKgPrice.findFirst({
+        where: { organizationId, scaleCode: parsed.code },
         include: {
-          category: { select: { id: true, name: true } },
-          variantAssignments: { include: { option: { include: { variant: true } } } },
+          brand: { select: { name: true } },
+          type: { select: { name: true } },
         },
       });
-
-    if (parsed.isScale) {
-      const product = await findProduct(parsed.code);
-      if (!product) return res.status(404).json({ message: "Producto no encontrado para el código de balanza" });
+      if (!cell) {
+        return res.status(404).json({ message: "Celda suelta no encontrada para el código de balanza" });
+      }
+      const looseName = `${cell.brand.name} · ${cell.type.name}`;
       return res.status(200).json({
-        product,
         isScale: true,
         scaleCode: parsed.code,
         weightGram: parsed.weightGrams,
         weightKg: parsed.weightKg,
-        // Precio por kg suelto (nullable si el producto aún no lo tiene).
-        priceKgSuelto: product.priceKgSuelto,
-        total: product.priceKgSuelto != null ? Math.round(parsed.weightKg * product.priceKgSuelto * 100) / 100 : null,
+        cell: { id: cell.id, priceKg: cell.priceKg, brandName: cell.brand.name, typeName: cell.type.name, species: cell.species },
+        looseName,
+        priceKg: cell.priceKg,
+        total: Math.round(parsed.weightKg * cell.priceKg * 100) / 100,
       });
     }
 
-    const product = await findProduct(barcode);
+    const product = await prisma.product.findFirst({
+      where: { organizationId, OR: [{ code: barcode }, { barcode }] },
+      include: {
+        category: { select: { id: true, name: true } },
+        variantAssignments: { include: { option: { include: { variant: true } } } },
+      },
+    });
     if (!product) return res.status(404).json({ message: "Producto no encontrado" });
     return res.status(200).json({ product, isScale: false });
   } catch (error: any) {

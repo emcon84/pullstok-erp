@@ -100,28 +100,26 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         const data = await res.json();
 
         if (data.isScale) {
-          const p = data.product;
           cart.addToCart(
             {
-              _id: p._id || p.id,
-              id: p.id,
-              name: p.name,
-              price: data.priceKgSuelto ?? p.priceKgSuelto ?? 0,
-              priceKgSuelto: data.priceKgSuelto ?? p.priceKgSuelto ?? null,
+              _id: data.cell.id,
+              id: data.cell.id,
+              name: data.looseName,
+              price: data.priceKg,
+              priceKgSuelto: data.priceKg,
               quantity: 0,
-              category: p.category?.name ?? "",
-              image: p.image,
-              code: p.code ?? "",
-              unitsPerBox: p.unitsPerBox ?? null,
+              category: "",
             },
             data.weightKg,
             branchId,
-            0, // stock lo resuelve el backend (LooseStock de la línea)
+            0, // stock lo resuelve el backend (LooseStock de la celda)
             "POR_PESO",
-            data.priceKgSuelto ?? p.priceKgSuelto ?? null,
+            data.priceKg,
+            data.cell.id, // loosePriceId = celda de la planilla
+            data.looseName,
           );
           toast.success(
-            `${p.name}: ${data.weightKg.toFixed(3)} kg → $${(data.total ?? 0).toLocaleString("es-AR")}`,
+            `${data.looseName}: ${data.weightKg.toFixed(3)} kg → $${(data.total ?? 0).toLocaleString("es-AR")}`,
           );
         } else {
           const p = data.product;
