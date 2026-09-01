@@ -440,6 +440,12 @@ model Product {
   price              Float
   code               String?           // Código de barras / SKU del proveedor
   barcode             String?           // EAN-13 / UPC escaneado
+  // Código interno de balanza (PLU de la Systel Cuora). Es la llave que une la
+  // etiqueta de la balanza con el producto: la balanza imprime el EAN-13 con la
+  // composición 20 + scaleCode(4) + peso(gramos 6) + verificador, y el POS al
+  // escanear extrae scaleCode y busca el producto por acá. null = sin código de
+  // balanza (normal para el resto del catálogo).
+  scaleCode           String?
   description        String?
   categoryId         String?
   category           Category?         @relation(fields: [categoryId], references: [id])
@@ -501,6 +507,7 @@ model Product {
   @@index([categoryId])
   @@index([organizationId, code])
   @@index([organizationId, barcode])
+  @@index([organizationId, scaleCode])
   @@index([organizationId, providerId])
   @@map("products")
 }

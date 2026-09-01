@@ -13,6 +13,7 @@ import {
 } from "../services/priceLooseService";
 import { roundBolsaPriceIfHigh } from "../utils/money";
 import { isUnitSellable, computePerUnitPrice } from "../utils/unitsPerBox";
+import { parseScaleBarcode } from "../utils/scaleBarcode";
 import { requireOrganizationId } from "../config/tenantContext";
 import { PLAN_LIMITS } from "../config/planLimits";
 import { AuthedRequest } from "../middlewares/authMiddleware";
@@ -927,7 +928,7 @@ export const getProductByCode = async (req: Request, res: Response) => {
     const product = await prisma.product.findFirst({
       where: {
         organizationId,
-        OR: [{ code }, { barcode: code }],
+        OR: [{ code }, { barcode: code }, { scaleCode: code }],
       },
       include: {
         category: { select: { id: true, name: true } },
@@ -936,6 +937,55 @@ export const getProductByCode = async (req: Request, res: Response) => {
     });
     if (!product) return res.status(404).json({ message: "Producto no encontrado" });
     res.status(200).json(product);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * GET /products/by-scan/:barcode
+ * Resuelve un código escaneado (pistola). Si es una etiqueta de balanza (EAN-13
+ * que empieza por «20»), extrae scaleCode + peso en gramos, busca el producto
+ * por scaleCode y devuelve el peso en kg (y el precio suelto si está cargado).
+ * Si NO es etiqueta de balanza, cae al lookup normal por code/barcode/scaleCode.
+ * Devuelve 400 si el código es inválido/ilegible.
+ */
+export const getProductByScan = async (req: Request, res: Response) => {
+  try {
+    const { barcode } = req.params;
+    const organizationId = requireOrganizationId();
+    const parsed = parseScaleBarcode(barcode);
+    if (parsed === null) {
+      return res.status(400).json({ message: "Código de barras inválido" });
+    }
+
+    const findProduct = (code: string) =>
+      prisma.product.findFirst({
+        where: { organizationId, OR: [{ scaleCode: code }, { code }, { barcode: code }] },
+        include: {
+          category: { select: { id: true, name: true } },
+          variantAssignments: { include: { option: { include: { variant: true } } } },
+        },
+      });
+
+    if (parsed.isScale) {
+      const product = await findProduct(parsed.code);
+      if (!product) return res.status(404).json({ message: "Producto no encontrado para el código de balanza" });
+      return res.status(200).json({
+        product,
+        isScale: true,
+        scaleCode: parsed.code,
+        weightGram: parsed.weightGrams,
+        weightKg: parsed.weightKg,
+        // Precio por kg suelto (nullable si el producto aún no lo tiene).
+        priceKgSuelto: product.priceKgSuelto,
+        total: product.priceKgSuelto != null ? Math.round(parsed.weightKg * product.priceKgSuelto * 100) / 100 : null,
+      });
+    }
+
+    const product = await findProduct(barcode);
+    if (!product) return res.status(404).json({ message: "Producto no encontrado" });
+    return res.status(200).json({ product, isScale: false });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

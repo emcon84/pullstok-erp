@@ -1,6 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Landmark } from "lucide-react";
+import { toast } from "sonner";
+import { API_URL } from "@/constants";
 import { VendorCatalogTab } from "@/components/organisms/VendorCatalogTab";
 import { LooseSellTab } from "@/components/organisms/LooseSellTab";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
@@ -70,6 +72,115 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   const toggleTab = useCallback(() => {
     setTab((t) => (t === "unidad" ? "suelto" : "unidad"));
   }, []);
+
+  // ── Escaneo de la pistola (balanza / barcode) ──
+  // La pistola USB HID emula teclado: tipea los dígitos y manda Enter. Acá
+  // capturamos un run de dígitos terminado en Enter, llamamos a /by-scan y:
+  //  - etiqueta de balanza (isScale) → agrega el producto con POR_PESO y el
+  //    peso en kg (el backend calculó total = peso × precio/kg).
+  //  - código normal → agrega el producto como BOLSA_CERRADA (qty 1).
+  const handleScan = useCallback(
+    async (barcode: string) => {
+      if (!barcode || !/^\d+$/.test(barcode)) return;
+      try {
+        const token = localStorage.getItem("token") || "";
+        const res = await fetch(
+          `${API_URL}/products/by-scan/${encodeURIComponent(barcode)}`,
+          { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } },
+        );
+        if (res.status === 404) {
+          toast.error("Producto no encontrado para ese código");
+          return;
+        }
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ message: "Error al procesar el código" }));
+          toast.error(err.message || "Error al procesar el código");
+          return;
+        }
+        const data = await res.json();
+
+        if (data.isScale) {
+          const p = data.product;
+          cart.addToCart(
+            {
+              _id: p._id || p.id,
+              id: p.id,
+              name: p.name,
+              price: data.priceKgSuelto ?? p.priceKgSuelto ?? 0,
+              priceKgSuelto: data.priceKgSuelto ?? p.priceKgSuelto ?? null,
+              quantity: 0,
+              category: p.category?.name ?? "",
+              image: p.image,
+              code: p.code ?? "",
+              unitsPerBox: p.unitsPerBox ?? null,
+            },
+            data.weightKg,
+            branchId,
+            0, // stock lo resuelve el backend (LooseStock de la línea)
+            "POR_PESO",
+            data.priceKgSuelto ?? p.priceKgSuelto ?? null,
+          );
+          toast.success(
+            `${p.name}: ${data.weightKg.toFixed(3)} kg → $${(data.total ?? 0).toLocaleString("es-AR")}`,
+          );
+        } else {
+          const p = data.product;
+          cart.addToCart(
+            {
+              _id: p._id || p.id,
+              id: p.id,
+              name: p.name,
+              price: p.price,
+              priceKgSuelto: p.priceKgSuelto ?? null,
+              quantity: 0,
+              category: p.category?.name ?? "",
+              image: p.image,
+              code: p.code ?? "",
+              unitsPerBox: p.unitsPerBox ?? null,
+            },
+            1,
+            branchId,
+            Number(p.quantity ?? 0),
+          );
+          toast.success(`${p.name} agregado`);
+        }
+      } catch (e: any) {
+        toast.error(e?.message || "Error al escanear");
+      }
+    },
+    [cart, branchId],
+  );
+
+  // Capturador global (fase CAPTURE) del patrón de la pistola. Reset si hay
+  // letras o pausas largas; solo un run de dígitos (≥6) + Enter se trata como
+  // escaneo. Números cortos y texto no se interceptan.
+  useEffect(() => {
+    let buffer = "";
+    let lastKeyAt = 0;
+    const onKey = (e: KeyboardEvent) => {
+      const now = Date.now();
+      if (now - lastKeyAt > 400) buffer = "";
+      lastKeyAt = now;
+
+      if (e.key === "Enter") {
+        const code = buffer;
+        buffer = "";
+        if (code.length >= 6 && /^\d+$/.test(code)) {
+          e.preventDefault();
+          e.stopPropagation();
+          void handleScan(code);
+        }
+        return;
+      }
+      if (/^\d$/.test(e.key)) {
+        buffer += e.key;
+      } else {
+        buffer = "";
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [handleScan]);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "unidad", label: "Por unidad" },

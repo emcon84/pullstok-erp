@@ -3,6 +3,7 @@ import productController, {
   uploadProductsCsv,
   downloadTemplateCsv,
   getProductByCode,
+  getProductByScan,
 } from "../controllers/productController";
 import providerPriceListController from "../controllers/providerPriceListController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
@@ -51,6 +52,7 @@ router.post(
 );
 router.get("/template-csv", downloadTemplateCsv);
 router.get("/by-code/:code", authenticateJWT, checkBusinessHours, getProductByCode);
+router.get("/by-scan/:barcode", authenticateJWT, checkBusinessHours, getProductByScan);
 router.get("/", authenticateJWT, checkBusinessHours, productController.getProducts);
 
 // Resumen de stock de toda la org (dashboard). Debe registrarse ANTES de
