@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -473,18 +474,25 @@ export const PriceKgUpdate = () => {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Precios por kilo</h1>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={
-            !matrixReady ||
-            visibleBrands.length === 0 ||
-            visibleTypes.length === 0
-          }
-          onClick={handlePrint}
-        >
-          Imprimir planilla
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link to="/suelto-codigos">
+            <Button variant="outline" size="sm">
+              Códigos de balanza
+            </Button>
+          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={
+              !matrixReady ||
+              visibleBrands.length === 0 ||
+              visibleTypes.length === 0
+            }
+            onClick={handlePrint}
+          >
+            Imprimir planilla
+          </Button>
+        </div>
       </div>
 
       {/* Sección A — Gestión de tipos (colapsable) */}

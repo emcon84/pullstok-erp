@@ -100,6 +100,9 @@ const BulkPriceUpdate = lazy(() =>
 const PriceKgUpdate = lazy(() =>
   import("./views/PriceKgUpdate").then((m) => ({ default: m.PriceKgUpdate })),
 );
+const BalanzaCodes = lazy(() =>
+  import("./views/BalanzaCodes").then((m) => ({ default: m.BalanzaCodes })),
+);
 const PriceKgLookup = lazy(() =>
   import("./views/PriceKgLookup").then((m) => ({ default: m.PriceKgLookup })),
 );
@@ -287,6 +290,7 @@ const AppRoutes = () => (
         <Route path="/scanner" element={<StockScannerPage />} />
         <Route path="/actualizar-precios" element={<BulkPriceUpdate />} />
         <Route path="/precios-por-kilo" element={<PriceKgUpdate />} />
+        <Route path="/suelto-codigos" element={<BalanzaCodes />} />
         <Route path="/consultar-precios" element={<PriceKgLookup />} />
         <Route path="/revision-precios-kg" element={<AdminReviewQueue />} />
         <Route path="/stock-suelto" element={<LooseStockAdmin />} />

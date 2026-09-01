@@ -56,3 +56,27 @@ export const savePriceKgPlan = async (
   }
   return data;
 };
+
+/** Una celda con código de balanza (para el listado imprimible). */
+export interface BalanzaCode {
+  code: string;
+  brand: string;
+  type: string;
+  species: PriceKgSpecies;
+  priceKg: number;
+}
+
+/**
+ * GET /price-kg-plan/codes — celdas que tienen código de balanza (scaleCode),
+ * con marca/tipo/especie y precio/kg. Para el listado que imprimen los
+ * vendedores.
+ */
+export const getBalanzaCodes = async (): Promise<BalanzaCode[]> => {
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${API_URL}/price-kg-plan/codes`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.items ?? [];
+};

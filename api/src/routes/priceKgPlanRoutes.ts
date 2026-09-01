@@ -15,6 +15,14 @@ router.get(
   priceKgPlanController.getPriceKgPlan,
 );
 
+// Listado de códigos de balanza (celdas con scaleCode) para el listado imprimible.
+router.get(
+  "/codes",
+  authenticateJWT,
+  checkBusinessHours,
+  priceKgPlanController.getBalanzaCodes,
+);
+
 router.put(
   "/",
   authenticateJWT,

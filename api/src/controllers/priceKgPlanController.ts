@@ -38,6 +38,41 @@ export const getPriceKgPlan = async (_req: Request, res: Response) => {
   }
 };
 
+/**
+ * GET celdas con código de balanza (para el listado imprimible de códigos de la
+ * balanza Systel Cuora). Devuelve las celdas con scaleCode no nulo + nombres.
+ */
+export const getBalanzaCodes = async (_req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const items = await prisma.priceKgPrice.findMany({
+      where: { organizationId, scaleCode: { not: null } },
+      select: {
+        id: true,
+        scaleCode: true,
+        species: true,
+        priceKg: true,
+        brand: { select: { name: true } },
+        type: { select: { name: true } },
+      },
+    });
+    return res.status(200).json({
+      items: items
+        .filter((it) => it.scaleCode)
+        .map((it) => ({
+          code: it.scaleCode as string,
+          brand: it.brand.name,
+          type: it.type.name,
+          species: it.species,
+          priceKg: it.priceKg,
+        })),
+    });
+  } catch (error: any) {
+    console.error("Error listando códigos de balanza:", error);
+    return res.status(500).json({ message: "Error al listar los códigos de balanza" });
+  }
+};
+
 export const savePriceKgPlan = async (req: Request, res: Response) => {
   try {
     const organizationId = requireOrganizationId();
@@ -107,6 +142,7 @@ export const savePriceKgPlan = async (req: Request, res: Response) => {
 
 const priceKgPlanController = {
   getPriceKgPlan,
+  getBalanzaCodes,
   savePriceKgPlan,
 };
 export default priceKgPlanController;
