@@ -78,26 +78,13 @@ export default defineConfig({
         assetFileNames: "assets/[name].[hash].[ext]",
         // Split de vendors estables por familia → mejor caching en el navegador
         // (los vendors no cambian de hash salvo upgrade) y descarga en paralelo
-        // (HTTP/2). Solo se agrupan los estables; las libs por-feature pesadas
+        // (HTTP/2). SOLO se agrupan los estables; las libs por-feature pesadas
         // (xlsx/jspdf/recharts/zxing/qrcode) quedan SIN agrupar para que cada
         // vista lazy traiga únicamente lo suyo (móvil no arrastra todo).
-        // IMPORTANTE: TODO el ecosistema React va en UN solo chunk "framework".
-        // Dividir react/react-dom/react-router en chunks separados rompe el
-        // binding de `createContext`/React en prod (Uncaught TypeError).
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
-          if (
-            id.includes("/react/") ||
-            id.includes("react-dom") ||
-            id.includes("react-router") ||
-            id.includes("react-is") ||
-            id.includes("react-refresh") ||
-            id.includes("scheduler") ||
-            id.includes("use-sync-external-store") ||
-            id.includes("@remix-run/router")
-          ) {
-            return "framework";
-          }
+          if (id.includes("react-dom") || id.includes("/react/") || id.includes("scheduler")) return "react";
+          if (id.includes("react-router")) return "router";
           if (id.includes("@tanstack")) return "query";
           if (id.includes("socket.io-client")) return "socket";
           if (id.includes("radix-ui") || id.includes("@radix-ui")) return "radix";
