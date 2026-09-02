@@ -993,6 +993,97 @@ export const getProductByCode = async (req: Request, res: Response) => {
 };
 
 /**
+ * GET /products/offline-snapshot
+ * Snapshot liviano del catálogo (org-scoped) para operar OFFLINE (Fase 1, solo
+ * lectura): el scanner/búsqueda resuelven contra datos locales en el celular.
+ * NO trae includes pesados; solo lo que la tarjeta del scanner necesita.
+ * `priceKgLista` = precio por kg de la LISTA de suelto (PriceKgPrice, resuelto
+ * con findCellForProduct), NO el priceKgSuelto derivado de la bolsa.
+ */
+export const getOfflineSnapshot = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+
+    const [categories, brands, types, cells, products] = await Promise.all([
+      prisma.category.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, parentId: true },
+      }),
+      prisma.priceKgBrand.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, keywords: true },
+      }),
+      prisma.priceKgType.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, synonyms: true },
+      }),
+      prisma.priceKgPrice.findMany({
+        where: { organizationId },
+        select: { id: true, brandId: true, typeId: true, species: true, priceKg: true },
+      }),
+      prisma.product.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          barcode: true,
+          price: true,
+          description: true,
+          categoryId: true,
+          category: { select: { name: true } },
+          variantAssignments: {
+            select: {
+              option: {
+                select: {
+                  id: true,
+                  value: true,
+                  variantId: true,
+                  variant: { select: { id: true, name: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const categoryById = new Map(categories.map((c) => [c.id, c]));
+
+    const snapshot = products.map((p) => {
+      const { cell } = findCellForProduct(
+        { id: p.id, name: p.name, categoryId: p.categoryId },
+        brands as any,
+        types as any,
+        categoryById as any,
+        cells as any,
+      );
+      return {
+        id: p.id,
+        name: p.name,
+        code: p.code,
+        barcode: p.barcode,
+        price: p.price,
+        priceKgLista: cell?.priceKg ?? null,
+        description: p.description,
+        categoryId: p.categoryId,
+        categoryName: p.category?.name ?? null,
+        variants: (p.variantAssignments || []).map((va) => ({
+          value: va.option.value,
+          variantName: va.option.variant.name,
+          variantId: va.option.variantId,
+          optionId: va.option.id,
+        })),
+      };
+    });
+
+    res.status(200).json(snapshot);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
  * GET /products/by-scan/:barcode
  * Resuelve un código escaneado (pistola). Si es etiqueta de balanza (EAN-13 que
  * empieza por «20») extrae scaleCode + peso en gramos, busca la CELDA de la

@@ -19,6 +19,14 @@ import { resolveScannerBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
 import type { DataItem } from "@/types";
 import { formatCurrency } from "@/utils/statsHelpers";
+import {
+  ensureOfflineCatalog,
+  lookupProductByCode,
+  searchProducts as searchOfflineProducts,
+  syncOfflineCatalog,
+  isCatalogStale,
+} from "@/lib/offlineCatalog";
+import type { OfflineProduct } from "@/lib/offlineCatalog";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -38,6 +46,30 @@ interface Product {
   priceKgLista?: number; // Precio por kg de la LISTA de suelto (PriceKgPrice)
   category: { name: string } | null; categoryId?: string;
   variantAssignments?: { option: { id: string; value: string; variantId?: string; variant: { name: string } } }[];
+}
+
+/** Mapea un producto del catálogo offline al shape que usa el scanner. */
+function mapOfflineProduct(p: OfflineProduct): Product {
+  return {
+    id: p.id,
+    name: p.name,
+    code: p.code ?? "",
+    barcode: p.barcode ?? "",
+    price: p.price,
+    quantity: 0,
+    description: p.description,
+    priceKgLista: p.priceKgLista ?? undefined,
+    category: p.categoryName ? { name: p.categoryName } : null,
+    categoryId: p.categoryId ?? undefined,
+    variantAssignments: (p.variants || []).map((v) => ({
+      option: {
+        id: v.optionId,
+        value: v.value,
+        variantId: v.variantId ?? undefined,
+        variant: { name: v.variantName },
+      },
+    })),
+  };
 }
 
 export const StockScannerPage = () => {
@@ -225,6 +257,32 @@ export const StockScannerPage = () => {
 
     setLoading(true);
     try {
+      // 1) LOCAL primero: catálogo en IndexedDB/memoria (instantáneo + offline).
+      const local = lookupProductByCode(c);
+      if (local) {
+        setProduct(mapOfflineProduct(local));
+        setAssignOpen(false);
+        lastScannedRef.current = "";
+        stopScanner();
+        playBeep();
+        toast.success(local.name);
+        setLoading(false);
+        return;
+      }
+      // 2) OFFLINE y no está en el catálogo local → no se puede resolver.
+      if (!navigator.onLine) {
+        setProduct(null);
+        setNotFoundCode(c);
+        setSearchQuery("");
+        setSearchResults([]);
+        setAssignOpen(true);
+        stopScanner();
+        toast.error("Sin conexión: el código no está en el catálogo offline");
+        setTimeout(() => searchInputRef.current?.focus(), 300);
+        setLoading(false);
+        return;
+      }
+      // 3) ONLINE: fallback a la API (by-code).
       const res = await fetch(`${API_URL}/products/by-code/${encodeURIComponent(c)}`, { headers });
       const data = await res.json();
       playBeep();
@@ -250,11 +308,22 @@ export const StockScannerPage = () => {
   const searchProducts = useCallback(async (q: string) => {
     if (q.length < 2) { setSearchResults([]); return; }
     setSearching(true);
+    // 1) LOCAL primero (instantáneo + offline).
+    const local = searchOfflineProducts(q, 12);
+    if (!navigator.onLine || local.length >= 12) {
+      setSearchResults(local.map(mapOfflineProduct));
+      setSearching(false);
+      return;
+    }
+    // 2) ONLINE: si lo local no alcanzó, consultar la API (más completo).
     try {
       const res = await fetch(`${API_URL}/products?name=${encodeURIComponent(q)}`, { headers });
       const data = await res.json();
-      setSearchResults(Array.isArray(data) ? data.slice(0, 12) : []);
-    } catch { setSearchResults([]); }
+      const apiHits = (Array.isArray(data) ? data : []).slice(0, 12) as Product[];
+      setSearchResults(apiHits.length ? apiHits : local.map(mapOfflineProduct));
+    } catch {
+      setSearchResults(local.map(mapOfflineProduct));
+    }
     setSearching(false);
   }, [headers]);
 
@@ -384,6 +453,22 @@ export const StockScannerPage = () => {
   };
 
   useEffect(() => { return () => stopScanner(); }, []);
+
+  // ── Catálogo offline (Fase 1, solo lectura) ──
+  // Al montar, carga el snapshot desde IndexedDB a memoria y, si está
+  // desactualizado y hay internet, lo re-sincroniza en background.
+  useEffect(() => {
+    void ensureOfflineCatalog();
+  }, []);
+
+  // Al volver de estar offline, re-sincroniza el catálogo si quedó viejo.
+  useEffect(() => {
+    const onOnline = () => {
+      if (isCatalogStale()) void syncOfflineCatalog().catch(() => {});
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => searchProducts(searchQuery), 250);

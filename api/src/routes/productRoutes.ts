@@ -4,6 +4,7 @@ import productController, {
   downloadTemplateCsv,
   getProductByCode,
   getProductByScan,
+  getOfflineSnapshot,
 } from "../controllers/productController";
 import providerPriceListController from "../controllers/providerPriceListController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
@@ -54,6 +55,15 @@ router.get("/template-csv", downloadTemplateCsv);
 router.get("/by-code/:code", authenticateJWT, checkBusinessHours, getProductByCode);
 router.get("/by-scan/:barcode", authenticateJWT, checkBusinessHours, getProductByScan);
 router.get("/", authenticateJWT, checkBusinessHours, productController.getProducts);
+
+// Snapshot liviano del catálogo para el modo OFFLINE del scanner (Fase 1,
+// solo lectura). Debe registrarse antes de "/:id" (literal no colisiona).
+router.get(
+  "/offline-snapshot",
+  authenticateJWT,
+  checkBusinessHours,
+  getOfflineSnapshot,
+);
 
 // Resumen de stock de toda la org (dashboard). Debe registrarse ANTES de
 // "/:id" (un id literal "stock-summary" la matchearía) y antes de la sección
