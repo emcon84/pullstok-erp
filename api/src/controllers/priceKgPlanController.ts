@@ -34,6 +34,7 @@ export const getPriceKgPlan = async (_req: Request, res: Response) => {
         typeId: true,
         species: true,
         priceKg: true,
+        scaleCode: true,
       },
     });
     return res.status(200).json({ items });

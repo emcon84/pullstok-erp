@@ -36,6 +36,7 @@ const cellKeyOf = (
 interface CellPriceEntry {
   priceKg: string;
   priceKgPriceId: string;
+  scaleCode?: string | null;
 }
 
 const cellPriceEntry = (
@@ -168,6 +169,7 @@ export const LooseSellTab = ({
           map[cellKeyOf(c.species, c.brandId, c.typeId)] = {
             priceKg: String(c.priceKg),
             priceKgPriceId: c.id,
+            scaleCode: c.scaleCode ?? null,
           };
         }
         setCells(map);
@@ -245,6 +247,7 @@ export const LooseSellTab = ({
             species: sp,
             priceKg,
             stockKg: stockByCell[entry.priceKgPriceId] ?? null,
+            scaleCode: entry.scaleCode ?? null,
           });
         }
       }

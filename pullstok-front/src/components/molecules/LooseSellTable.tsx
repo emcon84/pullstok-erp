@@ -26,6 +26,8 @@ export interface LooseCellRow {
   priceKg: number;
   /** Stock suelto en kg de la sucursal (null = sin lectura). */
   stockKg: number | null;
+  /** Código de balanza (scaleCode) de la celda, si lo tiene. */
+  scaleCode?: string | null;
 }
 
 interface LooseSellTableProps {
@@ -78,6 +80,7 @@ export const LooseSellTable = memo(
             <TableHead>Marca</TableHead>
             <TableHead>Tipo</TableHead>
             <TableHead>Especie</TableHead>
+            <TableHead className="text-right">Código balanza</TableHead>
             <TableHead className="text-right">Precio/kg</TableHead>
             <TableHead className="text-right">Stock</TableHead>
             <TableHead className="w-[150px] text-right">
@@ -105,6 +108,15 @@ export const LooseSellTable = memo(
                   <Badge variant="outline" className="font-medium">
                     {SPECIES_LABEL[row.species]}
                   </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  {row.scaleCode ? (
+                    <span className="font-mono font-bold tabular-nums">
+                      {row.scaleCode}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
                   ${money(row.priceKg)}

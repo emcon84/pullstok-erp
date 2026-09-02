@@ -13,6 +13,8 @@ export interface PriceKgPrice {
   typeId: string;
   species: PriceKgSpecies;
   priceKg: number;
+  /** Código de balanza (scaleCode) asignado a la celda, si lo tiene. */
+  scaleCode?: string | null;
 }
 
 /** Una celda de la planilla: priceKg null borra la celda; number la upserta. */
