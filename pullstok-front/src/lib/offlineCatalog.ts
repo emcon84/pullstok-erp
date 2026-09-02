@@ -27,6 +27,8 @@ export interface OfflineProduct {
   barcode: string | null;
   price: number;
   priceKgLista: number | null;
+  priceKgSuelto: number | null;
+  priceKgSueltoManual: boolean;
   description: string | null;
   categoryId: string | null;
   categoryName: string | null;

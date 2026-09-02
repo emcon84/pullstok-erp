@@ -43,6 +43,7 @@ interface Product {
   id: string; name: string; code: string; barcode: string; price: number;
   quantity: number; description: string | null;
   weightKg?: number; priceKgSuelto?: number;
+  priceKgSueltoManual?: boolean;
   priceKgLista?: number; // Precio por kg de la LISTA de suelto (PriceKgPrice)
   category: { name: string } | null; categoryId?: string;
   variantAssignments?: { option: { id: string; value: string; variantId?: string; variant: { name: string } } }[];
@@ -58,6 +59,8 @@ function mapOfflineProduct(p: OfflineProduct): Product {
     price: p.price,
     quantity: 0,
     description: p.description,
+    priceKgSuelto: p.priceKgSuelto ?? undefined,
+    priceKgSueltoManual: p.priceKgSueltoManual,
     priceKgLista: p.priceKgLista ?? undefined,
     category: p.categoryName ? { name: p.categoryName } : null,
     categoryId: p.categoryId ?? undefined,
@@ -85,6 +88,9 @@ export const StockScannerPage = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [adjustQty, setAdjustQty] = useState("");
+  // Asignar/editar precio por kg directo desde el scanner (PUT priceKgSuelto).
+  const [kgEditOpen, setKgEditOpen] = useState(false);
+  const [kgInput, setKgInput] = useState("");
   const lastScannedRef = useRef("");
 
   // Assignment panel
@@ -165,6 +171,15 @@ export const StockScannerPage = () => {
   }, [effectiveQty, effectiveBranchId]);
   const shownQty =
     displayQty ?? (product ? unitStock(product as unknown as DataItem) : 0);
+
+  // Precio por kg efectivo para mostrar: gana el MANUAL (asignado desde el
+  // scanner, priceKgSueltoManual=true); si no, el de la LISTA de suelto (celda
+  // PriceKgPrice). Si no hay ninguno → null (se muestra el botón Asignar).
+  const effectiveKg = product
+    ? ((product.priceKgSueltoManual ? product.priceKgSuelto : null) ??
+        product.priceKgLista ??
+        null)
+    : null;
 
   // Editing requires a known branch AND its current quantity: writing a
   // +/- step without the real value could store a wrong number.
@@ -486,6 +501,37 @@ export const StockScannerPage = () => {
     }
   };
 
+  // Asigna/edita el precio por kg del producto escaneado (PUT /products/:id con
+  // priceKgSuelto → el server marca priceKgSueltoManual=true, no lo sobreescribe).
+  const saveKgPrice = async () => {
+    if (!product) return;
+    const n = parseFloat(kgInput.trim().replace(",", "."));
+    if (Number.isNaN(n) || n < 0) {
+      toast.error("Ingresá un precio por kg válido");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/products/${product.id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ priceKgSuelto: n }),
+      });
+      const data = await res.json();
+      if (res.ok && data.id) {
+        setProduct(data);
+        setKgEditOpen(false);
+        playBeep();
+        toast.success(`Precio por kg asignado: ${formatCurrency(n)}`);
+      } else {
+        toast.error(data.message || "Error al asignar precio por kg");
+      }
+    } catch {
+      toast.error("Error de conexión — se necesita internet para asignar el precio por kg");
+    }
+    setLoading(false);
+  };
+
   const resetAndScan = () => {
     setProduct(null);
     setAssignOpen(false);
@@ -594,16 +640,43 @@ export const StockScannerPage = () => {
           {product.description && <p className="text-sm text-muted-foreground">{product.description}</p>}
 
           {/* Precio (mobile: dato clave al escanear) */}
-          <div className="flex items-baseline gap-3">
+          <div className="flex flex-wrap items-baseline gap-3">
             <span className="text-2xl font-bold text-primary tabular-nums">
               {formatCurrency(product.price)}
             </span>
-            {typeof product.priceKgLista === "number" && (
+            {effectiveKg !== null ? (
               <span className="text-sm text-muted-foreground">
-                por kg: {formatCurrency(product.priceKgLista)}
+                por kg: {formatCurrency(effectiveKg)}
               </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">sin precio por kg</span>
             )}
+            <button
+              type="button"
+              className="ml-auto inline-flex items-center gap-1 rounded-lg border border-primary/20 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+              onClick={() => {
+                setKgInput(effectiveKg != null ? String(effectiveKg) : "");
+                setKgEditOpen(true);
+              }}
+            >
+              {effectiveKg !== null ? "Editar por kg" : "Asignar por kg"}
+            </button>
           </div>
+
+          {kgEditOpen && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                inputMode="decimal"
+                placeholder="Precio por kg ($)"
+                value={kgInput}
+                onChange={(e) => setKgInput(e.target.value)}
+                className="h-9"
+              />
+              <Button size="sm" onClick={() => void saveKgPrice()}>Guardar</Button>
+              <Button size="sm" variant="ghost" onClick={() => setKgEditOpen(false)}>Cancelar</Button>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2">
             {product.code && (

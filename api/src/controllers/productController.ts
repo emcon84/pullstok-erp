@@ -1031,6 +1031,8 @@ export const getOfflineSnapshot = async (req: Request, res: Response) => {
           price: true,
           description: true,
           categoryId: true,
+          priceKgSuelto: true,
+          priceKgSueltoManual: true,
           category: { select: { name: true } },
           variantAssignments: {
             select: {
@@ -1065,6 +1067,8 @@ export const getOfflineSnapshot = async (req: Request, res: Response) => {
         barcode: p.barcode,
         price: p.price,
         priceKgLista: cell?.priceKg ?? null,
+        priceKgSuelto: p.priceKgSuelto,
+        priceKgSueltoManual: p.priceKgSueltoManual,
         description: p.description,
         categoryId: p.categoryId,
         categoryName: p.category?.name ?? null,
