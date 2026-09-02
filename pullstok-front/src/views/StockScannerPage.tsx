@@ -35,6 +35,7 @@ interface Product {
   id: string; name: string; code: string; barcode: string; price: number;
   quantity: number; description: string | null;
   weightKg?: number; priceKgSuelto?: number;
+  priceKgLista?: number; // Precio por kg de la LISTA de suelto (PriceKgPrice)
   category: { name: string } | null; categoryId?: string;
   variantAssignments?: { option: { id: string; value: string; variantId?: string; variant: { name: string } } }[];
 }
@@ -512,9 +513,9 @@ export const StockScannerPage = () => {
             <span className="text-2xl font-bold text-primary tabular-nums">
               {formatCurrency(product.price)}
             </span>
-            {typeof product.priceKgSuelto === "number" && (
+            {typeof product.priceKgLista === "number" && (
               <span className="text-sm text-muted-foreground">
-                por kg: {formatCurrency(product.priceKgSuelto)}
+                por kg: {formatCurrency(product.priceKgLista)}
               </span>
             )}
           </div>

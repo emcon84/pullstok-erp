@@ -11,6 +11,7 @@ import {
   recomputeForBulkPriceUpdate,
   recomputeForCsvImport,
 } from "../services/priceLooseService";
+import { findCellForProduct, findAlimentoSecoCategoryIds } from "../services/priceMatchingService";
 import { roundBolsaPriceIfHigh } from "../utils/money";
 import { isUnitSellable, computePerUnitPrice } from "../utils/unitsPerBox";
 import { parseScaleBarcode } from "../utils/scaleBarcode";
@@ -949,7 +950,46 @@ export const getProductByCode = async (req: Request, res: Response) => {
       },
     });
     if (!product) return res.status(404).json({ message: "Producto no encontrado" });
-    res.status(200).json(product);
+
+    // Precio por kg de la LISTA de precios suelto (PriceKgPrice) — fuente
+    // autoritativa para el scanner. NO usar product.priceKgSuelto (B-01/B-04):
+    // para bolsas suele ser el valor DERIVADO del precio por unidad
+    // (price/weightKg × factor) y puede no coincidir con la lista de suelto.
+    let priceKgLista: number | null = null;
+    if (product.categoryId) {
+      const categories = await prisma.category.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, parentId: true },
+      });
+      const secoIds = findAlimentoSecoCategoryIds(categories as any);
+      if (secoIds.includes(product.categoryId)) {
+        const [brands, types, cells] = await Promise.all([
+          prisma.priceKgBrand.findMany({
+            where: { organizationId },
+            select: { id: true, name: true, keywords: true },
+          }),
+          prisma.priceKgType.findMany({
+            where: { organizationId },
+            select: { id: true, name: true, synonyms: true },
+          }),
+          prisma.priceKgPrice.findMany({
+            where: { organizationId },
+            select: { id: true, brandId: true, typeId: true, species: true, priceKg: true },
+          }),
+        ]);
+        const categoryById = new Map(categories.map((c) => [c.id, c]));
+        const { cell } = findCellForProduct(
+          { id: product.id, name: product.name, categoryId: product.categoryId },
+          brands as any,
+          types as any,
+          categoryById as any,
+          cells as any,
+        );
+        priceKgLista = cell?.priceKg ?? null;
+      }
+    }
+
+    res.status(200).json({ ...product, priceKgLista });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
