@@ -930,9 +930,22 @@ export const getProductByCode = async (req: Request, res: Response) => {
         organizationId,
         OR: [{ code }, { barcode: code }],
       },
+      // Include mínimo (mobile): el scanner solo pinta category.name y
+      // option.value + variant.name. No se trae el árbol de variantes completo.
       include: {
         category: { select: { id: true, name: true } },
-        variantAssignments: { include: { option: { include: { variant: true } } } },
+        variantAssignments: {
+          include: {
+            option: {
+              select: {
+                id: true,
+                value: true,
+                variantId: true,
+                variant: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
       },
     });
     if (!product) return res.status(404).json({ message: "Producto no encontrado" });

@@ -330,8 +330,14 @@ export const StockScannerPage = () => {
     setNotFoundCode("");
     setSearchResults([]);
     try {
+      // Resolución reducida para teléfonos viejos: 480x360 (min 320x240) baja
+      // el CPU del BarcodeDetector sin perder legibilidad de códigos decente.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+        video: {
+          facingMode: "environment",
+          width: { min: 320, ideal: 480 },
+          height: { min: 240, ideal: 360 },
+        },
       });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
@@ -354,7 +360,7 @@ export const StockScannerPage = () => {
             if (barcodes.length > 0) { lookupProduct(barcodes[0].rawValue); return; }
           }
         } catch { /* frame read errors are transient; keep scanning */ }
-        scanTimerRef.current = setTimeout(scanLoop, 200);
+        scanTimerRef.current = setTimeout(scanLoop, 350);
       };
       scanLoop();
     } catch (e) {
