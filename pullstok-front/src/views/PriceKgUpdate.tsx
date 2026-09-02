@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
+import { Download } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +52,7 @@ import {
 import {
   getPriceKgPlan,
   savePriceKgPlan,
+  downloadScaleCsv,
   type PriceKgPlanEntry,
 } from "@/services/priceKgPlan";
 import { PrintHeader } from "@/components/molecules/PrintHeader";
@@ -179,6 +181,7 @@ export const PriceKgUpdate = () => {
   const [cells, setCells] = useState<Record<string, string>>({});
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [savingPlan, setSavingPlan] = useState(false);
+  const [downloadingCsv, setDownloadingCsv] = useState(false);
   // Snapshot del estado cargado de la DB: permite detectar borrados (celda con
   // valor previo que el usuario deja vacía) y si hubo cambios antes de guardar.
   const baselineRef = useRef<Record<string, string>>({});
@@ -470,6 +473,25 @@ export const PriceKgUpdate = () => {
     window.print();
   };
 
+  // Descarga del CSV de códigos de balanza (para actualizar los precios en la
+  // balanza Systel Cuora vía Qendra). El navegador elige la carpeta: por defecto
+  // "Descargas"; si se quiere "Documentos", hay que activar "preguntar dónde
+  // guardar" en el navegador.
+  const handleDownloadCsv = async () => {
+    setDownloadingCsv(true);
+    try {
+      const filename = await downloadScaleCsv();
+      toast.success(
+        `CSV descargado: ${filename}. Revisá la carpeta de descargas del navegador.`,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Error al descargar el CSV";
+      toast.error(message);
+    }
+    setDownloadingCsv(false);
+  };
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-center justify-between">
@@ -480,6 +502,21 @@ export const PriceKgUpdate = () => {
               Códigos de balanza
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!matrixReady || downloadingCsv}
+            onClick={handleDownloadCsv}
+          >
+            {downloadingCsv ? (
+              "Generando..."
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Descargar CSV
+              </>
+            )}
+          </Button>
           <Button
             variant="outline"
             size="sm"

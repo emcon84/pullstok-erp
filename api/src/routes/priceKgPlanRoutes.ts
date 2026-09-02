@@ -23,6 +23,16 @@ router.get(
   priceKgPlanController.getBalanzaCodes,
 );
 
+// Descarga del CSV de códigos de balanza para actualizar precios en la Cuora.
+// La planilla la edita ADMIN (PUT /), así que la exportación es SOLO ADMIN.
+router.get(
+  "/codes/csv",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN"),
+  priceKgPlanController.getScaleCsv,
+);
+
 router.put(
   "/",
   authenticateJWT,

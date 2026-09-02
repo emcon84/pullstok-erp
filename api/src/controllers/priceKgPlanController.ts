@@ -1,6 +1,11 @@
 import { Request, Response } from "express";
 import { prisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
+import {
+  buildDescription,
+  buildRow,
+  formatPrice,
+} from "../utils/scaleCsv";
 
 /**
  * Planilla "Precios por kilo": matriz marca (filas) × tipo (columnas) →
@@ -140,9 +145,58 @@ export const savePriceKgPlan = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * GET /price-kg-plan/codes/csv — descarga el CSV de códigos de balanza en el
+ * formato de importación de Qendra (Systel Cuora) para actualizar los precios
+ * de la balanza. Reutiliza la MISMA lógica del CLI (utils/scaleCsv) y de
+ * `getBalanzaCodes` (celdas con scaleCode). Sin encabezado, delimitado por ';'.
+ */
+export const getScaleCsv = async (_req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+
+    const [brands, types, cells] = await Promise.all([
+      prisma.priceKgBrand.findMany({ where: { organizationId }, select: { id: true, name: true } }),
+      prisma.priceKgType.findMany({ where: { organizationId }, select: { id: true, name: true } }),
+      prisma.priceKgPrice.findMany({
+        where: { organizationId, scaleCode: { not: null } },
+        select: { id: true, brandId: true, typeId: true, species: true, priceKg: true, scaleCode: true },
+      }),
+    ]);
+
+    const brandById = new Map(brands.map((b) => [b.id, b.name]));
+    const typeById = new Map(types.map((t) => [t.id, t.name]));
+
+    const rows = cells
+      .filter((c) => c.scaleCode)
+      .map((c) =>
+        buildRow({
+          section: "SUELTO",
+          code: c.scaleCode as string,
+          description: buildDescription(
+            brandById.get(c.brandId) ?? "",
+            typeById.get(c.typeId) ?? "",
+            c.species,
+          ),
+          price: formatPrice(c.priceKg),
+        }),
+      )
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+    const csv = rows.length ? rows.join("\n") + "\n" : "";
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="scale-codes-qendra.csv"`);
+    return res.send(csv);
+  } catch (error: any) {
+    console.error("Error generando el CSV de códigos de balanza:", error);
+    return res.status(500).json({ message: "Error al generar el CSV de códigos de balanza" });
+  }
+};
+
 const priceKgPlanController = {
   getPriceKgPlan,
   getBalanzaCodes,
+  getScaleCsv,
   savePriceKgPlan,
 };
 export default priceKgPlanController;

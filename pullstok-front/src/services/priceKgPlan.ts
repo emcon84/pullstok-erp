@@ -80,3 +80,35 @@ export const getBalanzaCodes = async (): Promise<BalanzaCode[]> => {
   const data = await res.json();
   return data.items ?? [];
 };
+
+/**
+ * Descarga el CSV de códigos de balanza (formato Qendra / Systel Cuora) para
+ * actualizar los precios de la balanza. Lo baja como archivo (blob) y devuelve
+ * el nombre sugerido desde el header Content-Disposition. El navegador elige la
+ * carpeta de descarga (habitualmente "Descargas"; si el usuario quiere
+ * "Documentos", debe configurar "preguntar dónde guardar" en el navegador).
+ */
+export const downloadScaleCsv = async (): Promise<string> => {
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${API_URL}/price-kg-plan/codes/csv`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "No se pudo generar el CSV");
+  }
+  const blob = await res.blob();
+  const filename =
+    res.headers
+      .get("content-disposition")
+      ?.match(/filename="?([^"]+)"?/)?.[1] || "scale-codes-qendra.csv";
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+  return filename;
+};
