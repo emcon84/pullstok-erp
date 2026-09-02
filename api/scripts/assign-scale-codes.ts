@@ -3,13 +3,16 @@
  * scaleCode + peso en gramos + verificador) a las CELDAS de la planilla
  * "Precios por kilo" (los "productos sueltos": marca × tipo × especie).
  *
- * Esquema: familia por MARCA MADRE (colapsando variantes) + índice de celda.
- *   '<familia 2 dígitos>' + '<índice 2 dígitos>'
- *   PRO PLAN (01) → 0101, 0102...   SIEGER (02) → 0201, 0202...
+ * Esquema: códigos CORRIDOS a partir de SCALE_CODE_BASE (1001), ordenados por
+ * marca madre → tipo → especie. El límite de la balanza Systel Cuora rechaza
+ * códigos ≥ 4000, así que TODOS los códigos quedan en [1001, 3999].
+ *
+ * ANTES se usaba '<familia 2> + <índice 2>' (familia = índice alfabético de la
+ * media madre), pero con 46 marcas madre generaba códigos 40xx-46xx que la
+ * balanza rechaza por superar el límite. Se reemplaza por códigos corridos.
  *
  * "Marca madre" = marca de la planilla con las variantes colapsadas
  * (se quitan tokens tipo RP/EN/CORDERO/PREMIUM...): "PRO PLAN RP" → "PRO PLAN".
- * Es un heurístico inicial, ajustable después.
  *
  * Set objetivo: celdas de la org con priceKg > 0 (las "146 celdas con precio
  * cargado" de la planilla). Idempotente.
@@ -24,7 +27,11 @@ import "dotenv/config";
 import { basePrisma } from "../src/config/db";
 
 const DEFAULT_ORG_SLUG = "el-almacen-de-las-mascotas";
-const MAX_CELLS_PER_FAMILY = 99;
+
+/** Primer código a usar (1001 → evita doble cero inicial). */
+const SCALE_CODE_BASE = 1000;
+/** La balanza rechaza códigos ≥ 4000 (confirmado): tope inclusive a 3999. */
+const SCALE_CODE_LIMIT = 2999; // cantidad de códigos disponibles (1001..3999)
 
 export const hasApplyFlag = (argv: string[] = process.argv): boolean =>
   argv.includes("--apply");
@@ -67,45 +74,37 @@ export interface PlannedCode {
   species: string;
 }
 
-/** Asigna los códigos (pura, testeable): marca madre alfabética + índice de celda. */
+/**
+ * Asigna códigos corridos (1001+) dentro del rango que acepta la balanza,
+ * ordenando de forma determinista por marca madre → tipo → especie. Si las
+ * celdas superan el rango disponible, las que no entran van con "0000".
+ */
 export const planScaleCodes = (cells: CellLike[]): PlannedCode[] => {
-  const groups = new Map<string, CellLike[]>();
-  for (const c of cells) {
-    const arr = groups.get(c.parentBrand) ?? [];
-    arr.push(c);
-    groups.set(c.parentBrand, arr);
-  }
-
-  const parents = [...groups.keys()].sort((a, b) =>
-    a.localeCompare(b, "es", { sensitivity: "base" }),
-  );
+  const sorted = cells
+    .slice()
+    .sort((a, b) => {
+      const byParent = a.parentBrand.localeCompare(b.parentBrand, "es", { sensitivity: "base" });
+      if (byParent !== 0) return byParent;
+      const byType = a.typeName.localeCompare(b.typeName, "es", { sensitivity: "base" });
+      if (byType !== 0) return byType;
+      return a.species.localeCompare(b.species, "es", { sensitivity: "base" });
+    });
 
   const out: PlannedCode[] = [];
-  for (const [fi, parent] of parents.entries()) {
-    const family = String(fi + 1).padStart(2, "0");
-    const items = groups
-      .get(parent)!
-      .slice()
-      .sort((a, b) => {
-        const byType = a.typeName.localeCompare(b.typeName, "es", { sensitivity: "base" });
-        if (byType !== 0) return byType;
-        return a.species.localeCompare(b.species, "es", { sensitivity: "base" });
-      });
-
-    // Guarda de seguridad: más celdas de las que entran en 2 dígitos. En la
-    // práctica ninguna marca madre supera ~15 celdas.
-    if (items.length > MAX_CELLS_PER_FAMILY) {
-      for (const c of items) {
-        out.push({ priceKgPriceId: c.id, scaleCode: "0000", parentBrand: parent, typeName: c.typeName, species: c.species });
-      }
-      continue;
-    }
-
-    items.forEach((c, ii) => {
-      const index = String(ii + 1).padStart(2, "0");
-      out.push({ priceKgPriceId: c.id, scaleCode: `${family}${index}`, parentBrand: parent, typeName: c.typeName, species: c.species });
+  sorted.forEach((c, i) => {
+    const num = SCALE_CODE_BASE + 1 + i; // 1001, 1002, ...
+    const scaleCode =
+      i + 1 > SCALE_CODE_LIMIT
+        ? "0000"
+        : String(num).padStart(4, "0");
+    out.push({
+      priceKgPriceId: c.id,
+      scaleCode,
+      parentBrand: c.parentBrand,
+      typeName: c.typeName,
+      species: c.species,
     });
-  }
+  });
   return out;
 };
 
