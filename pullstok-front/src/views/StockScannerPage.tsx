@@ -18,6 +18,7 @@ import { unitStock } from "@/components/hooks/vendorCatalogHelpers";
 import { resolveScannerBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
 import type { DataItem } from "@/types";
+import { formatCurrency } from "@/utils/statsHelpers";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -212,6 +213,7 @@ export const StockScannerPage = () => {
           lastScannedRef.current = "";
           toast.success("Código corregido");
           playBeep();
+          stopScanner();
         } else {
           toast.error(data.message || "Error al actualizar código");
         }
@@ -231,11 +233,13 @@ export const StockScannerPage = () => {
         setSearchQuery("");
         setSearchResults([]);
         setAssignOpen(true);
+        stopScanner();
         setTimeout(() => searchInputRef.current?.focus(), 300);
       } else {
         setProduct(data);
         setAssignOpen(false);
         lastScannedRef.current = "";
+        stopScanner();
         toast.success(data.name);
       }
     } catch { toast.error("Error al buscar"); }
@@ -275,6 +279,7 @@ export const StockScannerPage = () => {
         lastScannedRef.current = "";
         toast.success("¡Código asignado!");
         playBeep();
+        stopScanner();
       } else {
         toast.error(data.message || "Error al asignar código");
       }
@@ -315,6 +320,7 @@ export const StockScannerPage = () => {
         lastScannedRef.current = "";
         toast.success("¡Producto duplicado y código asignado!");
         playBeep();
+        stopScanner();
       } else {
         toast.success("Producto duplicado. Asigná el código manualmente.");
         setAssignOpen(false);
@@ -500,6 +506,18 @@ export const StockScannerPage = () => {
         <Card className="p-4 space-y-3">
           <h2 className="text-lg font-semibold">{product.name}</h2>
           {product.description && <p className="text-sm text-muted-foreground">{product.description}</p>}
+
+          {/* Precio (mobile: dato clave al escanear) */}
+          <div className="flex items-baseline gap-3">
+            <span className="text-2xl font-bold text-primary tabular-nums">
+              {formatCurrency(product.price)}
+            </span>
+            {typeof product.priceKgSuelto === "number" && (
+              <span className="text-sm text-muted-foreground">
+                por kg: {formatCurrency(product.priceKgSuelto)}
+              </span>
+            )}
+          </div>
 
           <div className="flex flex-wrap gap-2">
             {product.code && (
