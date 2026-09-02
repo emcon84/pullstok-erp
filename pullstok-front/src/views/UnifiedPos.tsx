@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Landmark } from "lucide-react";
+import { Landmark, ShoppingCart } from "lucide-react";
 import { toast } from "react-toastify";
 import { API_URL } from "@/constants";
 import { VendorCatalogTab } from "@/components/organisms/VendorCatalogTab";
@@ -11,9 +11,34 @@ import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecules/VendorOrderPanel";
 import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
+import { imgSrc } from "@/components/hooks/vendorCatalogHelpers";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 type Tab = "unidad" | "suelto";
+
+// Producto devuelto por GET /products/by-scan (rama no-balanza) que se muestra
+// en el modal de confirmación antes de sumarlo como BOLSA_CERRADA al pedido.
+interface ScannedProduct {
+  id?: string;
+  _id?: string;
+  name: string;
+  price?: number | string;
+  code?: string | null;
+  barcode?: string | null;
+  image?: string | null;
+  category?: { name?: string } | null;
+  quantity?: number | string;
+  priceKgSuelto?: number | null;
+  unitsPerBox?: number | null;
+}
 
 interface UnifiedPosProps {
   branchId: string;
@@ -30,6 +55,11 @@ interface UnifiedPosProps {
 export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("unidad");
+
+  // Producto de BOLSA CERRADA escaneado, pendiente de confirmación en el modal.
+  // null = sin modal abierto. La rama balanza (isScale) NO pasa por acá: se
+  // agrega directo al pedido (flujo suelto intacto).
+  const [scanProduct, setScanProduct] = useState<ScannedProduct | null>(null);
 
   // Modal de pago: lo abre la tecla V (listado y panel) y el botón Vender.
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -77,8 +107,10 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // La pistola USB HID emula teclado: tipea los dígitos y manda Enter. Acá
   // capturamos un run de dígitos terminado en Enter, llamamos a /by-scan y:
   //  - etiqueta de balanza (isScale) → agrega el producto con POR_PESO y el
-  //    peso en kg (el backend calculó total = peso × precio/kg).
-  //  - código normal → agrega el producto como BOLSA_CERRADA (qty 1).
+  //    peso en kg (el backend calculó total = peso × precio/kg). FLUJO INTACTO.
+  //  - código normal (bolsa cerrada) → NO agrega en el acto: abre un modal de
+  //    confirmación con el producto y su precio; recién al confirmar se suma
+  //    como BOLSA_CERRADA (qty 1).
   const handleScan = useCallback(
     async (barcode: string) => {
       if (!barcode || !/^\d+$/.test(barcode)) return;
@@ -122,25 +154,9 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             `${data.looseName}: ${data.weightKg.toFixed(3)} kg → $${(data.total ?? 0).toLocaleString("es-AR")}`,
           );
         } else {
-          const p = data.product;
-          cart.addToCart(
-            {
-              _id: p._id || p.id,
-              id: p.id,
-              name: p.name,
-              price: p.price,
-              priceKgSuelto: p.priceKgSuelto ?? null,
-              quantity: 0,
-              category: p.category?.name ?? "",
-              image: p.image,
-              code: p.code ?? "",
-              unitsPerBox: p.unitsPerBox ?? null,
-            },
-            1,
-            branchId,
-            Number(p.quantity ?? 0),
-          );
-          toast.success(`${p.name} agregado`);
+          // Bolsa cerrada: abrimos el modal de confirmación con producto+precio
+          // en lugar de sumar directo. La balanza (isScale) NUNCA llega acá.
+          setScanProduct(data.product);
         }
       } catch (e: any) {
         toast.error(e?.message || "Error al escanear");
@@ -148,6 +164,33 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     },
     [cart, branchId],
   );
+
+  // ── Modal de confirmación de bolsa cerrada escaneada ──
+  const handleCancelScan = useCallback(() => setScanProduct(null), []);
+
+  const handleConfirmScan = useCallback(() => {
+    if (!scanProduct) return;
+    const p = scanProduct;
+    cart.addToCart(
+      {
+        _id: p._id || p.id,
+        id: p.id,
+        name: p.name,
+        price: p.price ?? 0,
+        priceKgSuelto: p.priceKgSuelto ?? null,
+        quantity: 0,
+        category: p.category?.name ?? "",
+        image: p.image ?? undefined,
+        code: p.code ?? "",
+        unitsPerBox: p.unitsPerBox ?? null,
+      },
+      1,
+      branchId,
+      Number(p.quantity ?? 0),
+    );
+    toast.success(`${p.name} agregado`);
+    setScanProduct(null);
+  }, [cart, branchId, scanProduct]);
 
   // Capturador global (fase CAPTURE) del patrón de la pistola. Reset si hay
   // letras o pausas largas; solo un run de dígitos (≥6) + Enter se trata como
@@ -212,7 +255,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+    <>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
       {/* ── Columna izquierda: header + tabs + contenido ── */}
       <div className="min-w-0 space-y-4 lg:flex lg:h-[calc(100vh_-_2rem)] lg:flex-col lg:space-y-0 lg:overflow-hidden">
         <div className="space-y-4 lg:shrink-0">
@@ -288,5 +332,62 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         className="lg:sticky lg:top-4 lg:max-h-[calc(100vh_-_2rem)]"
       />
     </div>
+
+    {/* ── Modal de confirmación de bolsa cerrada escaneada ── */}
+    <Dialog open={!!scanProduct} onOpenChange={(open) => !open && handleCancelScan()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{scanProduct?.name}</DialogTitle>
+          <DialogDescription>
+            Producto escaneado — confirmá para sumarlo al pedido
+          </DialogDescription>
+        </DialogHeader>
+
+        {scanProduct?.image && imgSrc(scanProduct.image) && (
+          <div className="flex justify-center">
+            <img
+              src={imgSrc(scanProduct.image)!}
+              alt={scanProduct.name}
+              className="h-32 w-32 object-cover rounded-lg"
+            />
+          </div>
+        )}
+
+        {(scanProduct?.code || scanProduct?.barcode) && (
+          <div className="space-y-1 text-sm text-muted-foreground">
+            {scanProduct.code && (
+              <p>
+                Código:{" "}
+                <span className="font-medium text-foreground">{scanProduct.code}</span>
+              </p>
+            )}
+            {scanProduct.barcode && (
+              <p>
+                Código de barras:{" "}
+                <span className="font-medium text-foreground">{scanProduct.barcode}</span>
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-baseline justify-between rounded-lg bg-muted p-3">
+          <span className="text-sm text-muted-foreground">Precio por unidad</span>
+          <span className="text-2xl font-bold tabular-nums">
+            ${Number(scanProduct?.price ?? 0).toLocaleString("es-AR")}
+          </span>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleCancelScan}>
+            Cancelar
+          </Button>
+          <Button autoFocus onClick={handleConfirmScan}>
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            Agregar al pedido
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
