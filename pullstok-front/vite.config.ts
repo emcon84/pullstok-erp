@@ -76,6 +76,22 @@ export default defineConfig({
         entryFileNames: "assets/[name].[hash].js",
         chunkFileNames: "assets/[name].[hash].js",
         assetFileNames: "assets/[name].[hash].[ext]",
+        // Split de vendors estables por familia → mejor caching en el navegador
+        // (los vendors no cambian de hash salvo upgrade) y descarga en paralelo
+        // (HTTP/2). SOLO se agrupan los estables; las libs por-feature pesadas
+        // (xlsx/jspdf/recharts/zxing/qrcode) quedan SIN agrupar para que cada
+        // vista lazy traiga únicamente lo suyo (móvil no arrastra todo).
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("react-dom") || id.includes("/react/") || id.includes("scheduler")) return "react";
+          if (id.includes("react-router")) return "router";
+          if (id.includes("@tanstack")) return "query";
+          if (id.includes("socket.io-client")) return "socket";
+          if (id.includes("radix-ui") || id.includes("@radix-ui")) return "radix";
+          if (id.includes("lucide-react") || id.includes("react-icons")) return "icons";
+          if (id.includes("axios")) return "http";
+          return undefined;
+        },
       },
     },
   },

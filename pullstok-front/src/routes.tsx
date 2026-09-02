@@ -1,10 +1,25 @@
 import { Suspense, lazy } from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import AuthLayout from "./layouts/AuthLayout";
-import ProtectedLayout from "./layouts/ProtectedLayout";
-import OnboardingLayout from "./layouts/OnboardingLayout";
-import SuperadminLayout from "./layouts/SuperadminLayout";
+// Los layouts autenticados/onboarding/superadmin se cargan bajo demanda (lazy):
+// así el login NO baja el app-shell (socket.io, sidebar, UI pesada) — recorta
+// la carga inicial en mobile. AuthLayout queda eager porque el login lo usa ya.
+const ProtectedLayout = lazy(() =>
+  import("./layouts/ProtectedLayout").then((m) => ({ default: m.default })),
+);
+const OnboardingLayout = lazy(() =>
+  import("./layouts/OnboardingLayout").then((m) => ({ default: m.default })),
+);
+const SuperadminLayout = lazy(() =>
+  import("./layouts/SuperadminLayout").then((m) => ({ default: m.default })),
+);
 import { Loader } from "./components/atoms/loader";
+
+const layoutFallback = (
+  <div className="flex min-h-[60vh] items-center justify-center">
+    <Loader />
+  </div>
+);
 
 const LoginPage = lazy(() =>
   import("./views/LoginPage").then((m) => ({ default: m.LoginPage })),
@@ -206,7 +221,8 @@ const AppRoutes = () => (
       <Route
         path="/cambiar-contrasena"
         element={
-          <OnboardingLayout>
+          <Suspense fallback={layoutFallback}>
+            <OnboardingLayout>
             <Suspense
               fallback={
                 <div className="flex min-h-[60vh] items-center justify-center">
@@ -217,12 +233,14 @@ const AppRoutes = () => (
               <ChangePassword />
             </Suspense>
           </OnboardingLayout>
+          </Suspense>
         }
       />
       <Route
         path="/bienvenida"
         element={
-          <OnboardingLayout>
+          <Suspense fallback={layoutFallback}>
+            <OnboardingLayout>
             <Suspense
               fallback={
                 <div className="flex min-h-[60vh] items-center justify-center">
@@ -233,12 +251,14 @@ const AppRoutes = () => (
               <Wizard />
             </Suspense>
           </OnboardingLayout>
+          </Suspense>
         }
       />
       <Route
         path="/organizacion-suspendida"
         element={
-          <OnboardingLayout>
+          <Suspense fallback={layoutFallback}>
+            <OnboardingLayout>
             <Suspense
               fallback={
                 <div className="flex min-h-[60vh] items-center justify-center">
@@ -249,12 +269,14 @@ const AppRoutes = () => (
               <OrganizationSuspended />
             </Suspense>
           </OnboardingLayout>
+          </Suspense>
         }
       />
       <Route
         path="/fuera-de-horario"
         element={
-          <OnboardingLayout>
+          <Suspense fallback={layoutFallback}>
+            <OnboardingLayout>
             <Suspense
               fallback={
                 <div className="flex min-h-[60vh] items-center justify-center">
@@ -265,11 +287,12 @@ const AppRoutes = () => (
               <OutsideBusinessHours />
             </Suspense>
           </OnboardingLayout>
+          </Suspense>
         }
       />
 
       {/* Rutas autenticadas: MainLayout persistente, solo el contenido suspende */}
-      <Route element={<ProtectedLayout />}>
+      <Route element={<Suspense fallback={layoutFallback}><ProtectedLayout /></Suspense>}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/presupuestos" element={<Quotations />} />
         <Route path="/pedidos" element={<Orders />} />
@@ -305,7 +328,7 @@ const AppRoutes = () => (
       {/* Panel superadmin (sdd/planes-y-billing): rutas de plataforma, fuera
           de ProtectedLayout. Guard propio en SuperadminLayout (rol !==
           SUPERADMIN -> /dashboard). */}
-      <Route element={<SuperadminLayout />}>
+      <Route element={<Suspense fallback={layoutFallback}><SuperadminLayout /></Suspense>}>
         <Route path="/superadmin/organizaciones" element={<OrganizationsList />} />
         <Route path="/superadmin/organizaciones/:orgId/usuarios" element={<SuperadminUsersPage />} />
       </Route>
