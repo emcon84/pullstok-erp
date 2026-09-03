@@ -13,6 +13,7 @@ import {
   escalateConversation,
 } from "../services/chatService";
 import { maybeReplyToGuestMessage } from "../services/botService";
+import { sendText } from "../services/whatsappService";
 
 // ===========================================================================
 // TIENDA (guest — público, tenant por slug/token)
@@ -135,6 +136,17 @@ const postOperatorMessage = async (req: AuthedRequest, res: Response) => {
       senderUserId: req.user!.id,
       body,
     });
+
+    // WhatsApp (FASE 5): si el cliente llegó por WhatsApp, la respuesta del
+    // operador debe viajar de vuelta por Kapso (hoy solo se persiste y se emite
+    // por socket, pero el cliente en WhatsApp no la ve). Enviamos con sendText;
+    // un fallo de Kapso NUNCA debe romper la respuesta HTTP ni la persistencia —
+    // el mensaje ya quedó guardado en la bandeja del operador.
+    if (conversation.channel === "WHATSAPP" && conversation.guestPhone) {
+      sendText(conversation.guestPhone, body).catch((err) => {
+        console.error("[chat] no se pudo enviar la respuesta a WhatsApp", err);
+      });
+    }
 
     res.status(201).json(toMessageDTO(message));
   } catch (error: any) {
