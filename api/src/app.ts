@@ -22,7 +22,17 @@ app.use(
   }),
 );
 
-app.use(express.json());
+// JSON parser con captura del body crudo. Kapso firma el body EXACTO con un
+// HMAC (x-webhook-signature), y `JSON.stringify` del body ya parseado NO
+// reproduce los bytes originales → hay que verificar la firma contra este
+// buffer (req.rawBody), no contra req.body.
+app.use(
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
 
 // Servir archivos estáticos desde la carpeta uploads
 app.use("/uploads", express.static("uploads"));

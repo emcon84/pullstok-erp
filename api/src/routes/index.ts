@@ -35,6 +35,7 @@ import looseStockRoutes from "./looseStockRoutes";
 import arcaRoutes from "./arcaRoutes";
 import cashSessionRoutes from "./cashSessionRoutes";
 import landingChatRoutes from "./landingChatRoutes";
+import whatsappRoutes from "./whatsappRoutes";
 
 const router = Router();
 
@@ -76,6 +77,9 @@ router.use("/price-kg-products", priceKgProductsRouter);
 router.use("/loose-stock", looseStockRoutes);
 router.use("/cash-sessions", cashSessionRoutes);
 router.use("/landing-chat", landingChatRoutes);
+// Público SIN auth (webhook Kapso): resuelve org por slug y verifica la firma
+// en el controller. Mismo espíritu que /store y /landing-chat.
+router.use("/whatsapp", whatsappRoutes);
 router.use("/", arcaRoutes);
 
 export default router;

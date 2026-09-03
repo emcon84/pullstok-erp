@@ -993,6 +993,13 @@ enum ConversationMode {
   HUMAN
 }
 
+// Canal de origen de la conversación: WEB (widget tienda) | WHATSAPP (Kapso).
+// Default WEB para que las conversaciones existentes no cambien de comportamiento.
+enum ConversationChannel {
+  WEB
+  WHATSAPP
+}
+
 // Una conversación de chat entre un visitante (guest) de la tienda pública y
 // los operadores del comercio. Es tenant-scoped (organizationId): pertenece a
 // la org y está en TENANT_MODELS (db.ts) → scope automático anti-fuga en los
@@ -1008,6 +1015,11 @@ model Conversation {
   // obligatoria: un visitante puede escribir sin haber comprado nunca.
   customerId     String?
   customer       Customer?          @relation(fields: [customerId], references: [id])
+  // Canal de origen de la conversación: WEB (widget tienda) | WHATSAPP (Kapso).
+  // Default WEB para que las conversaciones existentes no cambien de comportamiento.
+  channel        ConversationChannel @default(WEB)
+  // Identidad del cliente por WhatsApp (E.164 sin espacios/+). Null en canal WEB.
+  guestPhone     String?
   status         ConversationStatus @default(OPEN)
   // Modo de atención (FASE 1 bot IA): BOT = el asistente Groq responde
   // automáticamente; HUMAN = lo atiende un operador (handoff de FASE 2). Default
@@ -1025,6 +1037,7 @@ model Conversation {
   messages       Message[]
 
   @@index([organizationId, lastMessageAt])
+  @@index([organizationId, channel, guestPhone])
   @@map("conversations")
 }
 
