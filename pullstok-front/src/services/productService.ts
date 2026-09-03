@@ -513,3 +513,43 @@ export const bulkPriceUpdate = async (
   return res.json();
 };
 
+// ---------------------------------------------------------------------------
+// Reporte de productos de "Alimento Seco" con/sin código de barras (admin)
+// ---------------------------------------------------------------------------
+
+/** Item del reporte de alimento seco: producto con/sin código de barras. */
+export interface SecoBarcodeItem {
+  id: string;
+  name: string;
+  species: string;
+  code: string;
+  barcode: string;
+  hasBarcode: boolean;
+}
+
+/** Reporte de productos de Alimento Seco con/sin código de barras. */
+export interface SecoBarcodesReport {
+  total: number;
+  conBarcode: number;
+  sinBarcode: number;
+  items: SecoBarcodeItem[];
+}
+
+/** GET /products/seco-barcodes-report — listado de alimento seco con/sin barras. */
+export const getSecoBarcodesReport = async (): Promise<SecoBarcodesReport> => {
+  try {
+    const token = localStorage.getItem("token");
+    const response = await axios.get<SecoBarcodesReport>(
+      `${API_URL}/products/seco-barcodes-report`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "get seco barcodes report failed");
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+

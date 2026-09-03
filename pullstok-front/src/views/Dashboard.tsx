@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Upload, ShoppingCart, Search, X, Printer } from "lucide-react";
+import { Plus, Upload, ShoppingCart, Search, X, Printer, Barcode } from "lucide-react";
 import {
   FaShoppingCart,
   FaFileInvoice,
@@ -23,6 +23,7 @@ import { ProductsTable } from "../components/molecules/ProductsTable";
 import { PrintProductList } from "../components/molecules/PrintProductList";
 import { ProductDrawer } from "../components/molecules/ProductDrawer";
 import { QuickPriceModal } from "../components/molecules/QuickPriceModal";
+import { SecoBarcodesReportDialog } from "../components/molecules/SecoBarcodesReportDialog";
 import { Statistics } from "./Statistics";
 import { useProducts, useProductFacets } from "../components/hooks/useProducts";
 import { useStockSummary } from "../components/hooks/useStockSummary";
@@ -73,6 +74,7 @@ export const Dashboard = () => {
   // Filtra el listado server-side y define qué títulos muestran las facets.
   const [planType, setPlanType] = useState<"SECO" | "WET" | null>(null);
   const [selectedStat, setSelectedStat] = useState<StatType>(null);
+  const [secoReportOpen, setSecoReportOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // --- Branch scope resolution ---
@@ -308,6 +310,12 @@ export const Dashboard = () => {
             <Upload className="h-4 w-4" />
             Importar CSV
           </Button>
+          {(userRole === "ADMIN" || userRole === "MANAGEMENT") && (
+            <Button variant="outline" onClick={() => setSecoReportOpen(true)}>
+              <Barcode className="h-4 w-4" />
+              Alimento seco · barras
+            </Button>
+          )}
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="h-4 w-4" />
             Imprimir listado
@@ -527,6 +535,9 @@ export const Dashboard = () => {
 
       {/* Quick price modal (solo precio, atajo Ctrl+Shift+P / Enter) */}
       <QuickPriceModal open={!!quickPriceProduct} onClose={closeQuickPrice} product={quickPriceProduct} />
+
+      {/* Reporte de alimento seco con/sin código de barras (admin) */}
+      <SecoBarcodesReportDialog open={secoReportOpen} onClose={() => setSecoReportOpen(false)} />
 
       <SalesDrawer
         isOpen={isModalSalesOpen}

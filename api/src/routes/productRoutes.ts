@@ -94,6 +94,16 @@ router.get(
   productController.listStoreBrands,
 );
 
+// Reporte de productos de "Alimento Seco" con/sin código de barras (admin).
+// Debe registrarse ANTES de "/:id" (un id literal "seco-barcodes-report" la
+// matchearía). Solo lectura, sin gate de horario comercial.
+router.get(
+  "/seco-barcodes-report",
+  authenticateJWT,
+  requireRole("ADMIN", "MANAGEMENT"),
+  productController.getSecoBarcodesReport,
+);
+
 router.get("/:id", authenticateJWT, checkBusinessHours, productController.getProductById);
 router.put(
   "/:id",

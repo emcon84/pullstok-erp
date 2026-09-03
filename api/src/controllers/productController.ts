@@ -11,7 +11,7 @@ import {
   recomputeForBulkPriceUpdate,
   recomputeForCsvImport,
 } from "../services/priceLooseService";
-import { findCellForProduct } from "../services/priceMatchingService";
+import { findCellForProduct, normalizeName } from "../services/priceMatchingService";
 import { roundBolsaPriceIfHigh } from "../utils/money";
 import { isUnitSellable, computePerUnitPrice } from "../utils/unitsPerBox";
 import { parseScaleBarcode } from "../utils/scaleBarcode";
@@ -1811,11 +1811,71 @@ export const getStockSummary = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * GET /products/seco-barcodes-report — reporte de productos de "Alimento Seco"
+ * con/sin código de barras (EAN/UPC). La categoría puede llamarse "Alimento
+ * Seco" o "Alimento Seco (Balanceado)", por eso el filtro es por contener
+ * "alimento seco" (normalizado) y NO por igualdad exacta. Solo lectura.
+ */
+export const getSecoBarcodesReport = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+
+    const categories = await prisma.category.findMany({
+      where: { organizationId },
+      select: { id: true, name: true, parentId: true },
+    });
+    const secoIds = categories
+      .filter((c) => normalizeName(c.name).includes("alimento seco"))
+      .map((c) => c.id);
+
+    const products = await prisma.product.findMany({
+      where: { organizationId, categoryId: { in: secoIds } },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        barcode: true,
+        categoryId: true,
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const byId = new Map(categories.map((c) => [c.id, c]));
+    const items = products.map((p) => {
+      const cat = p.categoryId ? byId.get(p.categoryId) : undefined;
+      const parentName = cat?.parentId ? byId.get(cat.parentId)?.name ?? "" : "";
+      const haystack = normalizeName(`${parentName} ${cat?.name ?? ""}`);
+      let species = "Sin especie";
+      if (haystack.includes("perro")) species = "Perro";
+      else if (haystack.includes("gato")) species = "Gato";
+      const barcode = (p.barcode ?? "").trim();
+      return {
+        id: p.id,
+        name: p.name,
+        species,
+        code: p.code ?? "",
+        barcode,
+        hasBarcode: barcode.length > 0,
+      };
+    });
+
+    const conBarcode = items.filter((i) => i.hasBarcode).length;
+    const sinBarcode = items.length - conBarcode;
+
+    res.json({ total: items.length, conBarcode, sinBarcode, items });
+  } catch (error) {
+    console.error("Error en getSecoBarcodesReport:", error);
+    res.status(500).json({ message: "Error al generar el reporte de códigos de barra" });
+  }
+};
+
 export default {
   createProduct,
   bulkUploadProducts,
   getProducts,
   getProductFilterFacets,
+  getSecoBarcodesReport,
   getProductById,
   updateProduct,
   publishProduct,
