@@ -2,6 +2,7 @@ import { createHmac } from "crypto";
 import {
   normalizePhone,
   verifyWebhookSignature,
+  isCatalogQuery,
 } from "../../src/services/whatsappService";
 
 // Las funciones puras que testeamos no tocan DB; mockeamos los módulos pesados
@@ -72,6 +73,25 @@ describe("whatsappService", () => {
       const shortSig = "a1b2c3";
       expect(() => verifyWebhookSignature(body, shortSig, secret)).not.toThrow();
       expect(verifyWebhookSignature(body, shortSig, secret)).toBe(false);
+    });
+  });
+
+  describe("isCatalogQuery (FASE 4)", () => {
+    it("detecta consultas de producto", () => {
+      expect(isCatalogQuery("¿para qué sirve el Pro Plan?")).toBe(true);
+      expect(isCatalogQuery("qué me recomendas para cachorros")).toBe(true);
+      expect(isCatalogQuery("ayudame a elegir un alimento")).toBe(true);
+      expect(isCatalogQuery("cuánto sale el royal canin")).toBe(true);
+    });
+
+    it("NO trata como consulta los ids del flujo guiado (botones)", () => {
+      expect(isCatalogQuery("perro")).toBe(false);
+      expect(isCatalogQuery("gato")).toBe(false);
+      expect(isCatalogQuery("t-adulto")).toBe(false);
+      expect(isCatalogQuery("b-proplan")).toBe(false);
+      expect(isCatalogQuery("NEED_MORE")).toBe(false);
+      expect(isCatalogQuery("45")).toBe(false);
+      expect(isCatalogQuery("ok")).toBe(false);
     });
   });
 });

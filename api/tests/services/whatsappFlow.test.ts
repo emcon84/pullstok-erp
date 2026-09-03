@@ -23,6 +23,13 @@ import {
   STAGE_PRODUCT,
   STAGE_AMOUNT,
   STAGE_PROD_AMOUNT,
+  STAGE_SPECIES,
+  STAGE_TYPED,
+  STAGE_BRAND,
+  STAGE_PRODUCT_SELECT,
+  STAGE_PRODUCT_QUANTITY,
+  STAGE_PRODUCT_AMOUNT,
+  STAGE_NEED_MORE,
   STAGE_ADDRESS,
   STAGE_PAYMENT,
   STAGE_QR,
@@ -38,6 +45,9 @@ import {
   BUTTON_QR,
   BUTTON_TRANSFERENCIA,
   BUTTON_EFECTIVO,
+  BUTTON_MORE,
+  BUTTON_DONE_MORE,
+  type FlowCatalog,
 } from "../../src/services/whatsappFlow";
 
 describe("whatsappFlow — nextStageForAnswer", () => {
@@ -62,27 +72,27 @@ describe("whatsappFlow — nextStageForAnswer", () => {
   });
 
   it("TYPE + TYPE_BAG → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_BOLSA.id)).toBe(STAGE_PRODUCT);
+    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_BOLSA.id)).toBe(STAGE_SPECIES);
   });
 
   it("TYPE + '1' (bolsa) → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, "1")).toBe(STAGE_PRODUCT);
+    expect(nextStageForAnswer(STAGE_TYPE, "1")).toBe(STAGE_SPECIES);
   });
 
   it("TYPE + 'bolsa' (texto libre) → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, "bolsa")).toBe(STAGE_PRODUCT);
+    expect(nextStageForAnswer(STAGE_TYPE, "bolsa")).toBe(STAGE_SPECIES);
   });
 
   it("TYPE + TYPE_KILO → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_KILO.id)).toBe(STAGE_PRODUCT);
+    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_KILO.id)).toBe(STAGE_SPECIES);
   });
 
   it("TYPE + '2' (kilo) → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, "2")).toBe(STAGE_PRODUCT);
+    expect(nextStageForAnswer(STAGE_TYPE, "2")).toBe(STAGE_SPECIES);
   });
 
   it("TYPE + TYPE_MONTO → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_MONTO.id)).toBe(STAGE_PRODUCT);
+    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_MONTO.id)).toBe(STAGE_SPECIES);
   });
 
   it("TYPE + TYPE_OTHER → OTHER", () => {
@@ -170,7 +180,7 @@ describe("whatsappFlow — planResponse", () => {
 
   it("TYPE + '1' → PRODUCT", () => {
     const r = planResponse({ currentStage: STAGE_TYPE, answer: "1" });
-    expect(r.nextStage).toBe(STAGE_PRODUCT);
+    expect(r.nextStage).toBe(STAGE_SPECIES);
   });
 
   it("PRODUCT → ADDRESS", () => {
@@ -352,5 +362,232 @@ describe("whatsappFlow — normalize helpers (FASE 3)", () => {
     expect(normalizePaymentMethod("transferencia")).toBe("transferencia");
     expect(normalizePaymentMethod("efectivo")).toBe("efectivo");
     expect(normalizePaymentMethod("débito")).toBeNull();
+  });
+});
+
+describe("whatsappFlow — flujo guiado FASE 4 (especie→etapa→marca→producto)", () => {
+  it("SPECIES → STAGE", () => {
+    expect(nextStageForAnswer(STAGE_SPECIES, "perro")).toBe(STAGE_TYPED);
+  });
+
+  it("STAGE → BRAND", () => {
+    expect(nextStageForAnswer(STAGE_TYPED, "tipo-uuid")).toBe(STAGE_BRAND);
+  });
+
+  it("BRAND → PRODUCT_SELECT", () => {
+    expect(nextStageForAnswer(STAGE_BRAND, "marca-uuid")).toBe(STAGE_PRODUCT_SELECT);
+  });
+
+  it("PRODUCT_SELECT → QUANTITY cuando orderType es bolsa/kilo", () => {
+    expect(
+      nextStageForAnswer(STAGE_PRODUCT_SELECT, "prod-uuid", { orderType: "bolsa" }),
+    ).toBe(STAGE_PRODUCT_QUANTITY);
+  });
+
+  it("PRODUCT_SELECT → AMOUNT cuando orderType es monto", () => {
+    expect(
+      nextStageForAnswer(STAGE_PRODUCT_SELECT, "prod-uuid", { orderType: "monto" }),
+    ).toBe(STAGE_PRODUCT_AMOUNT);
+  });
+
+  it("PRODUCT_SELECT → QUANTITY por default (sin orderType)", () => {
+    expect(nextStageForAnswer(STAGE_PRODUCT_SELECT, "prod-uuid")).toBe(
+      STAGE_PRODUCT_QUANTITY,
+    );
+  });
+
+  it("QUANTITY → NEED_MORE (tras confirmar cantidad)", () => {
+    expect(nextStageForAnswer(STAGE_PRODUCT_QUANTITY, "2")).toBe(STAGE_NEED_MORE);
+  });
+
+  it("AMOUNT → NEED_MORE (tras confirmar importe)", () => {
+    expect(nextStageForAnswer(STAGE_PRODUCT_AMOUNT, "15000")).toBe(STAGE_NEED_MORE);
+  });
+
+  it("NEED_MORE + 'sí' → SPECIES (agregar otra línea)", () => {
+    expect(nextStageForAnswer(STAGE_NEED_MORE, "sí, otro")).toBe(STAGE_SPECIES);
+  });
+
+  it("NEED_MORE + 'no' → ADDRESS (terminar)", () => {
+    expect(nextStageForAnswer(STAGE_NEED_MORE, "no, está todo")).toBe(STAGE_ADDRESS);
+  });
+
+  it("NEED_MORE sin palabra 'sí/no' → ADDRESS por default", () => {
+    expect(nextStageForAnswer(STAGE_NEED_MORE, "messi")).toBe(STAGE_ADDRESS);
+  });
+
+  it("ADDRESS → PAYMENT se mantiene", () => {
+    expect(nextStageForAnswer(STAGE_ADDRESS, "San Martín 123")).toBe(STAGE_PAYMENT);
+  });
+});
+
+describe("whatsappFlow — menús con catálogo (FASE 4)", () => {
+  const catalog: FlowCatalog = {
+    species: ["perro", "gato"],
+    stages: [
+      { stage: "Adulto", id: "t-adulto" },
+      { stage: "Cachorro", id: "t-cachorro" },
+    ],
+    brands: [{ brand: "Pro Plan", id: "b-proplan" }],
+    products: [
+      {
+        type: "bolsa",
+        id: "p-1",
+        label: "Pro Plan Cachorro 15kg",
+        price: 45000,
+        priceKg: null,
+      },
+      {
+        type: "kilo",
+        id: "c-1",
+        label: "Pro Plan Cachorro suelto",
+        price: 30000,
+        priceKg: 30000,
+      },
+    ],
+  };
+
+  it("buttonsForStage(SPECIES, catalog) genera botones de especie", () => {
+    expect(buttonsForStage(STAGE_SPECIES, catalog)).toEqual([
+      { id: "perro", title: "🐶 Perro" },
+      { id: "gato", title: "🐱 Gato" },
+    ]);
+  });
+
+  it("buttonsForStage(STAGE, catalog) filtra por las especies listadas", () => {
+    const gatoOnly = { ...catalog, species: ["gato"] };
+    expect(buttonsForStage(STAGE_SPECIES, gatoOnly)).toEqual([
+      { id: "gato", title: "🐱 Gato" },
+    ]);
+  });
+
+  it("buttonsForStage(TYPED, catalog) mapea las etapas", () => {
+    expect(buttonsForStage(STAGE_TYPED, catalog)).toEqual([
+      { id: "t-adulto", title: "Adulto" },
+      { id: "t-cachorro", title: "Cachorro" },
+    ]);
+  });
+
+  it("buttonsForStage(BRAND, catalog) mapea las marcas", () => {
+    expect(buttonsForStage(STAGE_BRAND, catalog)).toEqual([
+      { id: "b-proplan", title: "Pro Plan" },
+    ]);
+  });
+
+  it("buttonsForStage(PRODUCT_SELECT, catalog) mapea los productos (títulos recortados)", () => {
+    expect(buttonsForStage(STAGE_PRODUCT_SELECT, catalog)).toEqual([
+      { id: "p-1", title: "Pro Plan Cachorro 15kg" },
+      { id: "c-1", title: "Pro Plan Cachorro suelto" },
+    ]);
+  });
+
+  it("buttonsForStage(NEED_MORE, catalog) ofrece 'más' y 'terminar' (≤3)", () => {
+    expect(buttonsForStage(STAGE_NEED_MORE, catalog)).toEqual([
+      BUTTON_MORE,
+      BUTTON_DONE_MORE,
+    ]);
+  });
+
+  it("buttonsForStage devuelve null si hay más de 3 opciones (límite WhatsApp)", () => {
+    const manyStages = {
+      ...catalog,
+      stages: [
+        { stage: "A", id: "1" },
+        { stage: "B", id: "2" },
+        { stage: "C", id: "3" },
+        { stage: "D", id: "4" },
+      ],
+    };
+    expect(buttonsForStage(STAGE_TYPED, manyStages)).toBeNull();
+  });
+
+  it("buttonsForStage sin catálogo devuelve null en menús (el service debe cargarlo)", () => {
+    expect(buttonsForStage(STAGE_TYPED)).toBeNull();
+  });
+
+  it("messageForStage(TYPED, catalog) muestra las etapas numeradas", () => {
+    const msg = messageForStage(STAGE_TYPED, catalog);
+    expect(msg).toContain("Adulto");
+    expect(msg).toContain("1️⃣ Adulto");
+  });
+
+  it("messageForStage(SPECIES, catalog) muestra las especies numeradas", () => {
+    const msg = messageForStage(STAGE_SPECIES, catalog);
+    expect(msg).toContain("1️⃣ 🐶 Perro");
+    expect(msg).toContain("2️⃣ 🐱 Gato");
+  });
+
+  it("planResponse antepone el costo al salir de QUANTITY hacia NEED_MORE", () => {
+    const r = planResponse({
+      currentStage: STAGE_PRODUCT_QUANTITY,
+      answer: "2",
+      catalog,
+      orderType: "bolsa",
+      cost: { total: 90000, detail: "2 × Pro Plan Cachorro 15kg @ $45000 = $90000" },
+    });
+    expect(r.nextStage).toBe(STAGE_NEED_MORE);
+    expect(r.message).toContain("$90000");
+    expect(r.message).toContain("¿Necesitás algo más?");
+    expect(r.buttons).toEqual([BUTTON_MORE, BUTTON_DONE_MORE]);
+  });
+
+  it("planResponse(SPECIES + 'perro') avanza a TYPED con sus botones", () => {
+    const r = planResponse({
+      currentStage: STAGE_SPECIES,
+      answer: "perro",
+      catalog,
+      orderType: "bolsa",
+    });
+    expect(r.nextStage).toBe(STAGE_TYPED);
+    expect(r.buttons).toEqual([
+      { id: "t-adulto", title: "Adulto" },
+      { id: "t-cachorro", title: "Cachorro" },
+    ]);
+  });
+});
+
+describe("whatsappFlow — buildDraftData (FASE 4)", () => {
+  it("SPECIES + 'perro' → selectedSpecies", () => {
+    expect(buildDraftData(STAGE_SPECIES, "perro")).toEqual({ selectedSpecies: "perro" });
+  });
+
+  it("SPECIES + botón de gato → selectedSpecies gato", () => {
+    expect(buildDraftData(STAGE_SPECIES, "gato")).toEqual({ selectedSpecies: "gato" });
+  });
+
+  it("STAGE + id (uuid) → selectedStageId", () => {
+    expect(buildDraftData(STAGE_TYPED, "t-adulto")).toEqual({ selectedStageId: "t-adulto" });
+  });
+
+  it("STAGE + número → {} (lo resuelve el service con el catálogo)", () => {
+    expect(buildDraftData(STAGE_TYPED, "2")).toEqual({});
+  });
+
+  it("BRAND + id → selectedBrandId", () => {
+    expect(buildDraftData(STAGE_BRAND, "b-proplan")).toEqual({ selectedBrandId: "b-proplan" });
+  });
+
+  it("PRODUCT_SELECT no captura nada (el service arma selectedProduct)", () => {
+    expect(buildDraftData(STAGE_PRODUCT_SELECT, "p-1")).toEqual({});
+  });
+
+  it("PRODUCT_QUANTITY + '2' → quantityKg", () => {
+    expect(buildDraftData(STAGE_PRODUCT_QUANTITY, "2")).toEqual({ quantityKg: 2 });
+  });
+
+  it("PRODUCT_QUANTITY + '1.5' → quantityKg 1.5", () => {
+    expect(buildDraftData(STAGE_PRODUCT_QUANTITY, "1.5")).toEqual({ quantityKg: 1.5 });
+  });
+
+  it("PRODUCT_QUANTITY + texto inválido → {}", () => {
+    expect(buildDraftData(STAGE_PRODUCT_QUANTITY, "dos")).toEqual({});
+  });
+
+  it("PRODUCT_AMOUNT + '15000' → amount", () => {
+    expect(buildDraftData(STAGE_PRODUCT_AMOUNT, "15000")).toEqual({ amount: 15000 });
+  });
+
+  it("NEED_MORE no aporta dato (es un nodo informativo)", () => {
+    expect(buildDraftData(STAGE_NEED_MORE, "no")).toEqual({});
   });
 });

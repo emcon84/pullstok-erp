@@ -29,6 +29,14 @@ export const STAGE_TYPE = "TYPE";
 export const STAGE_PRODUCT = "PRODUCT";
 export const STAGE_AMOUNT = "AMOUNT";
 export const STAGE_PROD_AMOUNT = "PROD_AMOUNT";
+// ── FASE 4: flujo guiado por taxonomía (especie → etapa → marca → producto) ──
+export const STAGE_SPECIES = "SPECIES";
+export const STAGE_TYPED = "STAGE";
+export const STAGE_BRAND = "BRAND";
+export const STAGE_PRODUCT_SELECT = "PRODUCT_SELECT";
+export const STAGE_PRODUCT_QUANTITY = "PRODUCT_QUANTITY";
+export const STAGE_PRODUCT_AMOUNT = "PRODUCT_AMOUNT";
+export const STAGE_NEED_MORE = "NEED_MORE";
 export const STAGE_ADDRESS = "ADDRESS";
 export const STAGE_PAYMENT = "PAYMENT";
 export const STAGE_QR = "QR";
@@ -59,13 +67,91 @@ export const BUTTON_TRANSFERENCIA = {
   title: "🏦 Transferencia",
 };
 export const BUTTON_EFECTIVO = { id: "PAY_CASH", title: "💵 Efectivo" };
+// Botones del loop "¿necesitás algo más?" (FASE 4). Si el cliente elige "más",
+// vuelve a SPECIES para sumar otra línea al pedido; si no, pasa a dirección.
+export const BUTTON_MORE = { id: "NEED_MORE", title: "➕ Sí, agregar otro" };
+export const BUTTON_DONE_MORE = { id: "NEED_DONE", title: "🛍️ No, terminar" };
+
+// ---------------------------------------------------------------------------
+// Catálogo resuelto por el service (FASE 4). whatsappFlow es PURO (sin I/O): el
+// service inyecta acá las opciones ya consultadas (especies/etapas/marcas/
+// productos) para que el flujo arme los botones/mensajes SIN tocar la DB.
+// `cost` es el costo del ítem recién confirmado (bolsa/kilo/monto) y se pisa en
+// el mensaje para que el cliente vea cuánto va a pagar ANTES de ir a dirección.
+// ---------------------------------------------------------------------------
+export interface FlowCatalog {
+  species?: string[];
+  stages?: { stage: string; id: string }[];
+  brands?: { brand: string; id: string }[];
+  products?: {
+    type: "bolsa" | "kilo";
+    id: string;
+    label: string;
+    price: number;
+    priceKg: number | null;
+  }[];
+}
+
+// Especies ofrecidas por el bot, con su clave (id) = clave de especie que usa
+// whatsappCatalog ("perro"/"gato"). Se filtran por catalog.species.
+const SPECIES_OPTIONS = [
+  { id: "perro", title: "🐶 Perro" },
+  { id: "gato", title: "🐱 Gato" },
+];
+
+/** Trunca un título a un máximo de caracteres (botones/listas de WhatsApp). */
+const clip = (s: string, max = 22): string =>
+  s.length > max ? `${s.slice(0, max - 1)}…` : s;
+
+/**
+ * Opciones de un nodo de menú (las que se convierten en botones o lista
+ * numerada en el texto). Devuelve null para nodos que no son menú.
+ */
+const menuOptions = (
+  stage: string,
+  catalog?: FlowCatalog,
+): { id: string; title: string }[] | null => {
+  switch (stage) {
+    case STAGE_SPECIES:
+      return SPECIES_OPTIONS.filter((o) => catalog?.species?.includes(o.id));
+    case STAGE_TYPED:
+      return (catalog?.stages ?? []).map((s) => ({ id: s.id, title: s.stage }));
+    case STAGE_BRAND:
+      return (catalog?.brands ?? []).map((b) => ({ id: b.id, title: b.brand }));
+    case STAGE_PRODUCT_SELECT:
+      return (catalog?.products ?? []).map((p) => ({
+        id: p.id,
+        title: clip(p.label, 24),
+      }));
+    case STAGE_NEED_MORE:
+      return [BUTTON_MORE, BUTTON_DONE_MORE];
+    default:
+      return null;
+  }
+};
+
+/**
+ * Devuelve la lista numerada de opciones para un nodo de menú (texto de respaldo
+ * cuando no van por botones interactivos, o cuando hay más de 3 opciones).
+ */
+const numberedList = (options: { id: string; title: string }[]): string[] =>
+  options.map((o, i) => `${i + 1}️⃣ ${o.title}`);
 
 /**
  * Botones interactivos para un nodo. Devuelve null cuando el nodo espera texto
  * libre (esos se mandan con sendText). TYPE no va por botones interactivos sino
  * por texto numerado (ver nota del encabezado), por eso también devuelve null.
+ * Los nodos de menú de FASE 4 (especie/etapa/marca/producto) generan botones con
+ * las opciones del `catalog`; si hay más de 3 (límite de WhatsApp) devolvemos null
+ * y la selección va por texto numerado/lista.
  */
-export function buttonsForStage(stage: string): { id: string; title: string }[] | null {
+export function buttonsForStage(
+  stage: string,
+  catalog?: FlowCatalog,
+): { id: string; title: string }[] | null {
+  const menu = menuOptions(stage, catalog);
+  if (menu) return menu.length > 0 && menu.length <= 3 ? menu : null;
+
   switch (stage) {
     case STAGE_START:
       return [BUTTON_PEDIDO, BUTTON_CONSULTA];
@@ -79,9 +165,18 @@ export function buttonsForStage(stage: string): { id: string; title: string }[] 
 /**
  * Mensaje que el cliente ve al ENTRAR a un nodo (el texto del body). Cálido,
  * breve y voseo suave. TYPE lleva las opciones numeradas embebidas porque no va
- * con botones interactivos.
+ * con botones interactivos. Los menús de FASE 4 llevan las opciones numeradas
+ * según el `catalog` resuelto por el service (así el texto funciona también
+ * cuando el cliente responde con números).
  */
-export function messageForStage(stage: string): string {
+export function messageForStage(stage: string, catalog?: FlowCatalog): string {
+  const menu = menuOptions(stage, catalog);
+  const withOptions = (base: string): string => {
+    if (!menu) return base;
+    if (menu.length === 0) return `${base}\n\nNo tenemos datos cargados para esa opción todavía. Probá con otra o escribí "otro".`;
+    return `${base}\n${numberedList(menu).join("\n")}`;
+  };
+
   switch (stage) {
     case STAGE_START:
       return "¡Hola! 👋 Soy el asistente de El Almacén de las Mascotas. ¿Qué necesitás hoy?";
@@ -94,6 +189,20 @@ export function messageForStage(stage: string): string {
         "4️⃣ Otro",
         "Respondé con el número o el nombre.",
       ].join("\n");
+    case STAGE_SPECIES:
+      return withOptions("¿Para qué especie es el alimento? Elegí una opción:");
+    case STAGE_TYPED:
+      return withOptions("¿Qué etapa es? (Adulto, Cachorro, Kitten, Senior...) Elegí una:");
+    case STAGE_BRAND:
+      return withOptions("¿Qué marca es? Elegí una:");
+    case STAGE_PRODUCT_SELECT:
+      return withOptions("Elegí el producto:");
+    case STAGE_PRODUCT_QUANTITY:
+      return "¿Cuánto querés? Decime la cantidad (kg para el suelto, cantidad de bolsas para la cerrada).";
+    case STAGE_PRODUCT_AMOUNT:
+      return "¿Cuánto querés gastar? Decime el importe (ej: 15000).";
+    case STAGE_NEED_MORE:
+      return withOptions("¿Necesitás algo más? Elegí una opción:");
     case STAGE_PRODUCT:
       return "¿Qué producto estás buscando? Contame el nombre o la marca.";
     case STAGE_AMOUNT:
@@ -130,10 +239,19 @@ const norm = (answer: string): string => (answer ?? "").trim().toLowerCase();
  * esperan texto las responden con palabras). Para los nodos de texto aceptamos
  * varias formas (número o palabra) para no cortar el flujo si el cliente escribe
  * distinto a lo esperado — un fallo de match NUNCA debe matar la conversación.
+ *
+ * `ctx.orderType` (bolsa/kilo/monto) desambigua el paso PRODUCT_SELECT → cantidad
+ * vs → importe (rama "por monto"). Como el flujo es PURO y no guarda estado, el
+ * service pasa el orderType acumulado en el borrador; si falta, default bolsa.
  */
-export function nextStageForAnswer(currentStage: string, answer: string): string {
+export function nextStageForAnswer(
+  currentStage: string,
+  answer: string,
+  ctx?: { orderType?: string | null },
+): string {
   const a = norm(answer);
   const has = (kw: string) => a.includes(kw);
+  const orderType = ctx?.orderType ?? null;
 
   switch (currentStage) {
     case STAGE_START:
@@ -147,22 +265,46 @@ export function nextStageForAnswer(currentStage: string, answer: string): string
       return STAGE_CONSULTA;
 
     case STAGE_TYPE:
-      // Botones (por si Kapso mandara alguno) + números + palabras libres.
-      if (a === BUTTON_BOLSA.id.toLowerCase() || has("bolsa") || a === "1") {
-        return STAGE_PRODUCT;
-      }
-      if (a === BUTTON_KILO.id.toLowerCase() || has("kilo") || a === "2") {
-        return STAGE_PRODUCT;
-      }
-      if (a === BUTTON_MONTO.id.toLowerCase() || has("monto") || a === "3") {
-        return STAGE_PRODUCT;
-      }
+      // Botones (por si Kapso mandara alguno) + números + palabras libres. En
+      // FASE 4 TODOS los pedidos entran al flujo guiado por taxonomía → SPECIES.
       if (a === BUTTON_OTRO.id.toLowerCase() || has("otro") || a === "4") {
         return STAGE_OTHER;
       }
-      // Respuesta no reconocida en TYPE → default bolsa: sigue el pedido en vez
-      // de cortar el flujo con un error confuso.
-      return STAGE_PRODUCT;
+      return STAGE_SPECIES;
+
+    case STAGE_SPECIES:
+      // Ya eligió especie (por botón o número) → pasa a etapa.
+      return STAGE_TYPED;
+
+    case STAGE_TYPED:
+      return STAGE_BRAND;
+
+    case STAGE_BRAND:
+      return STAGE_PRODUCT_SELECT;
+
+    case STAGE_PRODUCT_SELECT:
+      // Según el tipo de pedido (orderType): bolsa/kilo → cantidad; monto → importe.
+      return orderType === "monto" ? STAGE_PRODUCT_AMOUNT : STAGE_PRODUCT_QUANTITY;
+
+    case STAGE_PRODUCT_QUANTITY:
+    case STAGE_PRODUCT_AMOUNT:
+      // Tras confirmar cantidad/importe se muestra el costo y se pregunta si
+      // necesita algo más.
+      return STAGE_NEED_MORE;
+
+    case STAGE_NEED_MORE: {
+      // Loop: "sí" → otra línea (vuelve a especie); "no" → a dirección. Usamos
+      // TOKENS (no substring) para no caer en falsos positivos ("messi" no es "sí").
+      // Los ids de botones NEED_MORE/NEED_DONE arriban como "need_more"/"need_done",
+      // que tokenizan a ["need","more"] / ["need","done"].
+      const toks = a.replace(/[^\p{L}\p{N}]+/gu, " ").split(" ").filter(Boolean);
+      const finish = ["no", "nada", "listo", "gracias", "fin", "done", "terminar", "termine"];
+      const more = ["si", "sí", "otro", "mas", "más", "more", "dale", "adicional"];
+      if (toks.some((t) => finish.includes(t))) return STAGE_ADDRESS;
+      if (toks.some((t) => more.includes(t))) return STAGE_SPECIES;
+      // Respuesta ambigua → asumimos terminar.
+      return STAGE_ADDRESS;
+    }
 
     case STAGE_PRODUCT:
       // FASE 2 (simplicidad): tras elegir el producto se pasa directo a dirección.
@@ -284,6 +426,12 @@ export function normalizePaymentMethod(answer: string): string | null {
  * Nodos informativos (START, QR, terminales) devuelven {} (no aportan datos).
  * STAGE_AMOUNT / STAGE_PROD_AMOUNT (rama "por monto" con cálculo, FASE 4) se
  * capturan por completitud aunque hoy el flujo no los alcanza (quedan null).
+ *
+ * En los menús de FASE 4 (especie/etapa/marca/producto) el `answer` suele ser un
+ * id de botón: cuando es un id (no numérico) se captura directo. Los números
+ * (respuesta por lista numerada) los resuelve el service en whatsappService con
+ * el catálogo cargado (el flujo es PURO y no conoce la lista). Las especies se
+ * resuelven por palabra ("perro"/"gato").
  */
 export function buildDraftData(
   currentStage: string | null,
@@ -295,8 +443,12 @@ export function buildDraftData(
   amount?: number;
   address?: string;
   paymentMethod?: string;
+  selectedSpecies?: string;
+  selectedStageId?: string;
+  selectedBrandId?: string;
 } {
   const a = norm(answer);
+  const isNumeric = /^\d+(\.\d+)?$/.test(a);
   switch (currentStage) {
     case STAGE_TYPE: {
       const orderType = normalizeOrderType(answer);
@@ -305,8 +457,25 @@ export function buildDraftData(
     case STAGE_PRODUCT:
       // El producto se guarda tal cual lo escribió el cliente (texto libre).
       return { productText: a };
+    case STAGE_SPECIES: {
+      const species = speciesKey(a);
+      return species ? { selectedSpecies: species } : {};
+    }
+    case STAGE_TYPED:
+      // Id de la etapa (botón). Un número → lo resuelve el service (lista).
+      return !isNumeric && a.length > 0 ? { selectedStageId: a } : {};
+    case STAGE_BRAND:
+      return !isNumeric && a.length > 0 ? { selectedBrandId: a } : {};
+    case STAGE_PRODUCT_SELECT:
+      // El objeto selectedProduct (id + tipo + nombre + precio) lo arma el service
+      // en whatsappService con el catálogo cargado (el flujo es puro y no lo sabe).
+      return {};
+    case STAGE_PRODUCT_QUANTITY: {
+      const qty = parseFloat(a);
+      return Number.isFinite(qty) && qty > 0 ? { quantityKg: qty } : {};
+    }
     case STAGE_AMOUNT:
-    case STAGE_PROD_AMOUNT: {
+    case STAGE_PRODUCT_AMOUNT: {
       const amount = parseFloat(a);
       return Number.isFinite(amount) ? { amount } : {};
     }
@@ -320,6 +489,15 @@ export function buildDraftData(
       return {};
   }
 }
+
+/** Clave de especie ("perro"/"gato") desde la respuesta (id, palabra o número). */
+const speciesKey = (a: string): string | null => {
+  if (a === "perro" || a === "1") return "perro";
+  if (a === "gato" || a === "2") return "gato";
+  if (a.includes("perro")) return "perro";
+  if (a.includes("gato")) return "gato";
+  return null;
+};
 
 /**
  * Mergea los datos previos del borrador con el patch recién capturado. Pura y
@@ -346,18 +524,26 @@ const QR_NO_IMAGE_TEXT =
  * Primer contacto: cuando `currentStage` es null (conversación recién creada o
  * que nunca entró al flujo) se saluda con el nodo START y sus botones de inicio;
  * eso dispara la bienvenida y arranca el flujo. La excepción: msj. de inicio.
+ *
+ * FASE 4: acepta `catalog` (opciones resueltas por el service), `cost` (costo del
+ * ítem recién confirmado) y `orderType` (para desambiguar cantidad vs importe).
+ * Al confirmar la cantidad/importe, el costo se antepone al mensaje del nodo
+ * siguiente (NEED_MORE) para que el cliente vea cuánto va a pagar.
  */
 export function planResponse(input: {
   currentStage: string | null;
   answer: string;
   qrImageUrl?: string;
+  catalog?: FlowCatalog;
+  cost?: { total: number; detail: string } | null;
+  orderType?: string | null;
 }): {
   nextStage: string;
   message: string;
   buttons: { id: string; title: string }[] | null;
   sendImage: boolean;
 } {
-  const { currentStage, answer, qrImageUrl } = input;
+  const { currentStage, answer, qrImageUrl, catalog, cost, orderType } = input;
 
   // Nunca estuvo en flujo → saludar y plantar los botones de START.
   if (!currentStage) {
@@ -369,7 +555,7 @@ export function planResponse(input: {
     };
   }
 
-  const next = nextStageForAnswer(currentStage, answer);
+  const next = nextStageForAnswer(currentStage, answer, { orderType });
 
   // Nodo QR: si hay URL mandamos la imagen; si no, texto de respaldo.
   if (next === STAGE_QR) {
@@ -389,10 +575,24 @@ export function planResponse(input: {
     };
   }
 
+  let message = messageForStage(next, catalog);
+
+  // Costo recién confirmado (salimos de cantidad/importe hacia NEED_MORE): se
+  // antepone al mensaje para que el cliente vea el desglose ANTES de decidir si
+  // sigue o termina.
+  if (
+    cost &&
+    (currentStage === STAGE_PRODUCT_QUANTITY ||
+      currentStage === STAGE_PRODUCT_AMOUNT) &&
+    next === STAGE_NEED_MORE
+  ) {
+    message = `${cost.detail}\n\n${message}`;
+  }
+
   return {
     nextStage: next,
-    message: messageForStage(next),
-    buttons: buttonsForStage(next),
+    message,
+    buttons: buttonsForStage(next, catalog),
     sendImage: false,
   };
 }
@@ -415,6 +615,13 @@ export default {
   STAGE_PRODUCT,
   STAGE_AMOUNT,
   STAGE_PROD_AMOUNT,
+  STAGE_SPECIES,
+  STAGE_TYPED,
+  STAGE_BRAND,
+  STAGE_PRODUCT_SELECT,
+  STAGE_PRODUCT_QUANTITY,
+  STAGE_PRODUCT_AMOUNT,
+  STAGE_NEED_MORE,
   STAGE_ADDRESS,
   STAGE_PAYMENT,
   STAGE_QR,
@@ -430,4 +637,6 @@ export default {
   BUTTON_QR,
   BUTTON_TRANSFERENCIA,
   BUTTON_EFECTIVO,
+  BUTTON_MORE,
+  BUTTON_DONE_MORE,
 };

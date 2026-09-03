@@ -5,11 +5,31 @@ import { runWithTenant, requireOrganizationId } from "../config/tenantContext";
 import { persistMessage, escalateConversation } from "./chatService";
 import {
   planResponse,
+  nextStageForAnswer,
   buildDraftData,
   mergeDraftData,
   isHandoffStage,
   isTerminalStage,
+  STAGE_SPECIES,
+  STAGE_TYPED,
+  STAGE_BRAND,
+  STAGE_PRODUCT_SELECT,
+  STAGE_PRODUCT_QUANTITY,
+  STAGE_PRODUCT_AMOUNT,
+  type FlowCatalog,
 } from "./whatsappFlow";
+import {
+  listSpecies,
+  listStages,
+  listBrands,
+  listProductsForSelection,
+  calculateOrderCost,
+  buildCatalogSlug,
+  searchCatalog,
+  findPrice,
+  normalizeSpeciesAnswer,
+  parseDecimal,
+} from "./whatsappCatalog";
 
 /**
  * Servicio de dominio de WhatsApp Business vía Kapso (FASE 1).
@@ -23,6 +43,266 @@ import {
  * verifica contra el buffer crudo (req.rawBody) y NO contra el JSON.parseado:
  * `JSON.stringify` de los bytes parseados no es idéntico al cuerpo original.
  */
+
+// ---------------------------------------------------------------------------
+// Asesoramiento Groq (FASE 4): consulta de productos con tools y datos REALES.
+// Reutiliza el endpoint/config de botService (Groq, fetch nativo, caps) pero con
+// tools propias (get_product_info / get_price) que consultan el catálogo de la DB
+// → Groq SIEMPRE responde con datos reales, nunca inventa precios ni composición.
+// ---------------------------------------------------------------------------
+
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.1-8b-instant";
+const GROQ_MAX_TOKENS = 500;
+const GROQ_TIMEOUT_MS = 15000;
+const GROQ_HISTORY_LIMIT = 8;
+const CATALOG_SLUG_CAP = 4500;
+
+// Tools (function calling, formato OpenAI que Groq acepta) para el asesoramiento
+// con datos reales del catálogo. El modelo las llama y nosotros ejecutamos la
+// consulta REAL a la DB, devolviéndole el resultado para que arme la respuesta.
+const GET_PRODUCT_INFO_TOOL = {
+  type: "function",
+  function: {
+    name: "get_product_info",
+    description:
+      "Buscar información real de un producto del catálogo: nombre, categoría, marca, etapa, especie y precio (bolsa y por kg). Llamar cuando el cliente pregunta por un producto específico o quiere conocer su detalle.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Nombre, marca o texto del producto que busca el cliente.",
+        },
+      },
+      required: ["query"],
+    },
+  },
+} as const;
+
+const GET_PRICE_TOOL = {
+  type: "function",
+  function: {
+    name: "get_price",
+    description:
+      "Consultar el precio REAL de un producto (bolsa y/o por kg) del catálogo. Llamar para dar un precio exacto de lo que pregunta el cliente.",
+    parameters: {
+      type: "object",
+      properties: {
+        product: {
+          type: "string",
+          description: "Nombre o marca del producto cuyo precio quiere el cliente.",
+        },
+      },
+      required: ["product"],
+    },
+  },
+} as const;
+
+const CATALOG_TOOLS = [GET_PRODUCT_INFO_TOOL, GET_PRICE_TOOL] as const;
+
+/** Quita etiquetas `<function ...>` que algunos modelos filtran como texto. */
+const stripFunctionTags = (text: string): string =>
+  text
+    .replace(/<function[^>]*>[\s\S]*?<\/function>/gi, "")
+    .replace(/<function[^>]*>\s*\{[\s\S]*?\}/gi, "")
+    .replace(/<\/?function[^>]*>/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+/**
+ * ¿El mensaje del cliente parece una CONSULTA sobre un producto? Si es así, el
+ * flujo rígido de nodos se corta y Groq asesora con tools (datos reales). Los
+ * ids de botones (especies/etapas/productos) NO matchean estos patrones, así que
+ * el flujo guiado sigue intacto cuando el cliente elige opciones.
+ */
+export const isCatalogQuery = (message: string): boolean => {
+  const m = (message ?? "").toLowerCase();
+  return (
+    m.includes("para qué sirve") ||
+    m.includes("qué es") ||
+    m.includes("que es") ||
+    m.includes("qué me recomendas") ||
+    m.includes("recomend") ||
+    m.includes("ayudame a elegir") ||
+    m.includes("ayudame") ||
+    m.includes("sirve para") ||
+    m.includes("cuánto sale") ||
+    m.includes("cuanto sale") ||
+    m.includes("es bueno") ||
+    m.includes("porque es")
+  );
+};
+
+interface GroqMsg {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  tool_call_id?: string;
+  name?: string;
+}
+
+// Ejecuta una tool real contra el catálogo (get_product_info / get_price).
+const runCatalogTool = async (
+  name: string,
+  args: Record<string, unknown>,
+): Promise<string> => {
+  const query =
+    String(args?.query ?? args?.product ?? "").trim() || "alimento";
+  if (name === "get_price") return findPrice(query);
+  return searchCatalog(query);
+};
+
+// Llamada única a Groq con tools (o sin tools para el segundo round del loop).
+const callGroq = async (
+  apiKey: string,
+  messages: GroqMsg[],
+  withTools: boolean,
+): Promise<Response> =>
+  fetch(GROQ_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      max_tokens: GROQ_MAX_TOKENS,
+      temperature: 0.4,
+      messages,
+      ...(withTools ? { tools: CATALOG_TOOLS, tool_choice: "auto" } : {}),
+    }),
+    signal: AbortSignal.timeout(GROQ_TIMEOUT_MS),
+  });
+
+/**
+ * Asesora al cliente con Groq + tools sobre el catálogo REAL: carga un slug del
+ * catálogo (nombre/categoría/marca/etapa/especie/precio) en el system prompt y le
+ * exige NO inventar datos. Si el modelo llama a get_product_info/get_price,
+ * ejecutamos la consulta real y alimentamos la respuesta. Luego se envía por
+ * WhatsApp y se persiste como mensaje del bot.
+ *
+ * Corre DENTRO del runWithTenant del webhook → prisma scoped (org real).
+ */
+const answerCatalogAdvice = async (input: {
+  conversationId: string;
+  phone: string;
+  answer: string;
+}): Promise<void> => {
+  const { conversationId, phone, answer } = input;
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    console.warn("[whatsapp] GROQ_API_KEY no configurada — sin asesoramiento");
+    return;
+  }
+
+  const slug = await buildCatalogSlug(CATALOG_SLUG_CAP).catch((err) => {
+    console.error("[whatsapp] fallo al armar slug de catálogo", err);
+    return "(No se pudieron cargar los productos)";
+  });
+
+  const system = [
+    "Sos el asistente de venta de una pet shop. Asesorás al cliente sobre productos del catálogo.",
+    "Respondé SIEMPRE en español rioplatense, cordial, breve y claro.",
+    "Usá EXCLUSIVAMENTE los productos y precios que te paso abajo. NO inventes precios, marcas, etapas ni descripciones.",
+    "Para precios exactos o detalles de un producto específico, usá las tools get_product_info y get_price en vez de adivinar.",
+    "Si no tenés el dato (precio, stock, composición), decilo con honestidad y ofrecé que el cliente hable con una persona.",
+    "NO prometas descuentos ni ofertas que no estén en los datos.",
+    "",
+    "--- CATÁLOGO REAL ---",
+    slug,
+    "--- FIN CATÁLOGO ---",
+  ].join("\n");
+
+  const history = await prisma.message
+    .findMany({
+      where: { conversationId },
+      orderBy: { createdAt: "asc" },
+      take: GROQ_HISTORY_LIMIT + 2,
+    })
+    .catch(() => []);
+
+  const messages: GroqMsg[] = [
+    { role: "system", content: system },
+    // Excluimos la última (el mensaje actual ya se persiste y se manda aparte
+    // como user) para no duplicar el pedido en el historial de Groq.
+    ...history
+      .slice(0, -1)
+      .filter((m: any) => m.sender === "GUEST")
+      .slice(-GROQ_HISTORY_LIMIT)
+      .map((m: any) => ({ role: "user" as const, content: m.body })),
+    { role: "user", content: answer },
+  ];
+
+  try {
+    let res = await callGroq(apiKey, messages, true);
+    // Degradación con gracia: si el modelo no soporta tools, reintentamos sin.
+    if (!res.ok) {
+      console.warn(
+        `[whatsapp] Groq respondió ${res.status} con tools — reintento sin tools`,
+      );
+      res = await callGroq(apiKey, messages, false);
+    }
+    if (!res.ok) return;
+
+    const data = (await res.json()) as {
+      choices?: {
+        message?: {
+          content?: string | null;
+          tool_calls?: { id?: string; function?: { name?: string; arguments?: string } }[];
+        };
+      }[];
+    };
+    let msg = data.choices?.[0]?.message;
+
+    // Tool loop: si el modelo llamó tools, ejecutamos las consultas reales y le
+    // pedimos la respuesta final (segundo round, sin tools).
+    const toolCalls = msg?.tool_calls ?? [];
+    if (toolCalls.length > 0) {
+      const enriched: GroqMsg[] = [...messages];
+      for (const tc of toolCalls) {
+        const name = tc.function?.name ?? "";
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(tc.function?.arguments ?? "{}");
+        } catch {
+          /* args mal formados → vacíos */
+        }
+        const result = await runCatalogTool(name, args);
+        enriched.push({
+          role: "tool",
+          content: result,
+          tool_call_id: tc.id ?? name,
+          name,
+        });
+      }
+      try {
+        const finalRes = await callGroq(apiKey, enriched, false);
+        if (finalRes.ok) {
+          const finalData = (await finalRes.json()) as {
+            choices?: { message?: { content?: string | null } }[];
+          };
+          msg = finalData.choices?.[0]?.message;
+        }
+      } catch {
+        /* si el segundo round falla, usamos el texto del primero */
+      }
+    }
+
+    const content = stripFunctionTags(msg?.content ?? "");
+    if (content.length === 0) return;
+
+    await sendText(phone, content);
+    await persistMessage({
+      conversationId,
+      sender: "OPERATOR",
+      senderUserId: null,
+      isBot: true,
+      body: content,
+    });
+  } catch (err) {
+    console.error("[whatsapp] asesoramiento Groq falló", err);
+  }
+};
 
 /** Verifica la firma HMAC-SHA256 (hex) de Kapso sobre el body crudo. */
 export const verifyWebhookSignature = (
@@ -188,11 +468,159 @@ export const handleIncomingMessage = async (payload: any): Promise<void> => {
   );
 };
 
+// Acumulador JSON del borrador (FASE 3, extendido en FASE 4). El `any` es
+// intencional: whatsappDraftData es un Json flexible y no hay un shape único.
+type DraftData = Record<string, any>;
+
+/**
+ * Opciones (ids) de un nodo de menú para mapear una respuesta NUMÉRICA a un id.
+ * Reutiliza las mismas consultas de catálogo → el número N apunta a la N-ésima
+ * opción que el cliente vio en el texto/botones.
+ */
+const optionsForStage = async (
+  stage: string,
+  draft: DraftData,
+): Promise<{ id: string }[]> => {
+  if (stage === STAGE_TYPED) {
+    return listStages(draft.selectedSpecies);
+  }
+  if (stage === STAGE_BRAND) {
+    return listBrands(draft.selectedSpecies, draft.selectedStageId);
+  }
+  if (stage === STAGE_PRODUCT_SELECT) {
+    return listProductsForSelection(
+      draft.selectedSpecies,
+      draft.selectedStageId,
+      draft.selectedBrandId,
+    );
+  }
+  return [];
+};
+
+/**
+ * Captura la selección de la respuesta del cliente en los nodos de menú de FASE 4
+ * y la devuelve como patch del borrador. Resuelve tanto el id de botón como el
+ * número (1..N) contra el catálogo ya cargado (el flujo es puro y no sabe mapear
+ * números → acá se resuelve contra la DB).
+ */
+const captureSelectionFor = async (
+  currentStage: string,
+  answer: string,
+  draftBefore: DraftData,
+): Promise<DraftData> => {
+  const trimmed = (answer ?? "").trim();
+
+  if (currentStage === STAGE_SPECIES) {
+    const species = normalizeSpeciesAnswer(trimmed);
+    return species ? { selectedSpecies: species } : {};
+  }
+
+  if (/^\d+$/.test(trimmed)) {
+    const list = await optionsForStage(currentStage, draftBefore);
+    const opt = list[parseInt(trimmed, 10) - 1];
+    if (!opt) return {};
+    if (currentStage === STAGE_TYPED) return { selectedStageId: opt.id };
+    if (currentStage === STAGE_BRAND) return { selectedBrandId: opt.id };
+  }
+
+  // Id directo (botón interactivo). PRODUCT_SELECT además arma el objeto completo
+  // (id + tipo + nombre + precio) para el cálculo de costo y la lectura del pedido.
+  if (currentStage === STAGE_PRODUCT_SELECT) {
+    const products = await listProductsForSelection(
+      draftBefore.selectedSpecies,
+      draftBefore.selectedStageId,
+      draftBefore.selectedBrandId,
+    );
+    const prod =
+      (/^\d+$/.test(trimmed)
+        ? products[parseInt(trimmed, 10) - 1]
+        : products.find((p) => p.id === trimmed)) ?? null;
+    if (!prod) return {};
+    return {
+      selectedProduct: {
+        id: prod.id,
+        type: prod.type,
+        name: prod.label,
+        price: prod.price,
+      },
+    };
+  }
+
+  if (currentStage === STAGE_TYPED && trimmed.length > 0) {
+    return { selectedStageId: trimmed };
+  }
+  if (currentStage === STAGE_BRAND && trimmed.length > 0) {
+    return { selectedBrandId: trimmed };
+  }
+  return {};
+};
+
+/**
+ * Resuelve el catálogo (especies/etapas/marcas/productos) para un nodo destino,
+ * según la selección acumulada en el borrador. Lo que arma los botones/mensajes
+ * del flujo puro.
+ */
+const catalogForStage = async (
+  stage: string,
+  draft: DraftData,
+): Promise<FlowCatalog> => {
+  switch (stage) {
+    case STAGE_SPECIES:
+      return { species: await listSpecies() };
+    case STAGE_TYPED:
+      return { stages: await listStages(draft.selectedSpecies) };
+    case STAGE_BRAND:
+      return {
+        brands: await listBrands(draft.selectedSpecies, draft.selectedStageId),
+      };
+    case STAGE_PRODUCT_SELECT:
+      return {
+        products: await listProductsForSelection(
+          draft.selectedSpecies,
+          draft.selectedStageId,
+          draft.selectedBrandId,
+        ),
+      };
+    default:
+      return {};
+  }
+};
+
+/** Calcula el costo del ítem al confirmar cantidad (bolsa/kilo) o importe (monto). */
+const computeItemCost = async (
+  currentStage: string,
+  answer: string,
+  draft: DraftData,
+): Promise<{ total: number; detail: string } | null> => {
+  if (currentStage !== STAGE_PRODUCT_QUANTITY && currentStage !== STAGE_PRODUCT_AMOUNT) {
+    return null;
+  }
+  const sel = draft.selectedProduct;
+  if (!sel) return null;
+
+  if (currentStage === STAGE_PRODUCT_AMOUNT) {
+    const amount = parseDecimal(answer);
+    return amount
+      ? calculateOrderCost({ type: "monto", id: sel.id, amount })
+      : null;
+  }
+
+  const quantity = parseDecimal(answer);
+  if (!quantity) return null;
+  const type = sel.type === "kilo" ? "kilo" : "bolsa";
+  return calculateOrderCost({ type, id: sel.id, quantity });
+};
+
 /**
  * FASE 2 — lógica de auto-respuesta del flujo guiado. Corre SIEMPRE dentro del
  * runWithTenant abierto por handleIncomingMessage (ya hay org activa). Envuelve
  * el I/O (enviar por Kapso + persistir la respuesta del bot + avanzar el stage)
  * alrededor de la decisión pura `planResponse`.
+ *
+ * FASE 4: resuelve el catálogo para el nodo (especies/etapas/marcas/productos),
+ * captura la selección guiada, calcula el costo real al confirmar cantidad y
+ * corta el flujo rígido hacia el asesoramiento Groq (tools con datos reales)
+ * cuando el mensaje parece una consulta de producto.
  *
  * Guards para no disparar el flujo fuera de lugar:
  * - Org sin feature → salir (mantiene el comportamiento previo de FASE 1).
@@ -224,10 +652,72 @@ const applyFlowReply = async (input: {
   });
   if (!conversation || conversation.mode !== "BOT") return;
 
+  // Consulta de producto ("para qué sirve X", "qué me recomendas"...) → Groq con
+  // tools responde con datos reales en vez del flujo rígido de nodos. El flujo de
+  // pedido (ids de botones) NO matchea estos patrones → se sigue guiando normal.
+  if (isCatalogQuery(answer)) {
+    await answerCatalogAdvice({ conversationId, phone, answer });
+    return;
+  }
+
+  // Borrador acumulado hasta el mensaje anterior (sin el patch de este turno).
+  const draftBefore =
+    (conversation.whatsappDraftData as DraftData | null) ?? {};
+
+  // Captura la selección guiada de ESTA respuesta (especie/etapa/marca/producto).
+  // En el primer contacto (currentStage null) no hay selección que capturar.
+  const selectionPatch = currentStage
+    ? await captureSelectionFor(currentStage, answer, draftBefore)
+    : {};
+  const mergedDraft = mergeDraftData(draftBefore, selectionPatch);
+
+  const orderType = (mergedDraft.orderType as string) ?? "bolsa";
+  let catalog: FlowCatalog = {};
+  let cost: { total: number; detail: string } | null = null;
+
+  // Armamos el catálogo para el NODO destino usando la selección ya actualizada,
+  // para que el flujo puro arme los botones/mensajes del paso siguiente. El costo
+  // REAL del ítem se calcula al confirmar la cantidad/importe (fuente: la DB).
+  if (currentStage) {
+    const next = nextStageForAnswer(currentStage, answer, { orderType });
+    catalog = await catalogForStage(next, mergedDraft);
+    cost = await computeItemCost(currentStage, answer, mergedDraft);
+    if (cost) {
+      // Acumulamos la línea en `items` para no perder un pedido de varios productos;
+      // los campos simples del WhatsAppOrderDraft guardan la última línea (la UI
+      // multi-item se ajusta en una fase posterior sobre el acumulador JSON).
+      const sel = (mergedDraft.selectedProduct as
+        | { id?: string; type?: string; name?: string; price?: number }
+        | undefined);
+      const itemQty =
+        currentStage === STAGE_PRODUCT_QUANTITY
+          ? parseDecimal(answer)
+          : (mergedDraft.quantityKg as number) ?? null;
+      const itemAmount =
+        currentStage === STAGE_PRODUCT_AMOUNT
+          ? parseDecimal(answer)
+          : (mergedDraft.amount as number) ?? null;
+      const items = Array.isArray(mergedDraft.items) ? [...mergedDraft.items] : [];
+      items.push({
+        product: sel?.name ?? null,
+        productId: sel?.id ?? null,
+        type: sel?.type ?? null,
+        quantity: itemQty,
+        amount: itemAmount,
+        detail: cost.detail,
+        total: cost.total,
+      });
+      mergedDraft.items = items;
+    }
+  }
+
   const plan = planResponse({
     currentStage,
     answer,
     qrImageUrl: process.env.KAPSO_QR_IMAGE_URL,
+    catalog,
+    cost,
+    orderType,
   });
 
   // Handoff directo (consulta / "otro"): el cliente ve UN único mensaje puente,
@@ -242,19 +732,19 @@ const applyFlowReply = async (input: {
     return;
   }
 
-  // FASE 3 — captura del borrador. Del nodo actual + respuesta extraemos el dato
-  // que el cliente acaba de aportar (producto, dirección, pago...) y lo mergeamos
-  // en el acumulador JSON de la conversación. Ese acumulador alimenta el
-  // WhatsAppOrderDraft al llegar a un estado terminal, sin re-parsear el flujo.
+  // FASE 3 — captura del borrador (campos simples: cantidad, importe, dirección,
+  // pago, tipo). Ya mergeamos la selección guiada arriba; acá sumamos el resto.
   const draftPatch = buildDraftData(currentStage, answer);
-  const mergedDraft = mergeDraftData(
-    (conversation.whatsappDraftData as Record<string, unknown> | null) ?? {},
-    draftPatch,
-  );
-  if (Object.keys(draftPatch).length > 0) {
+  const finalDraft = Object.keys(draftPatch).length > 0
+    ? mergeDraftData(mergedDraft, draftPatch)
+    : mergedDraft;
+  if (
+    Object.keys(draftPatch).length > 0 ||
+    Object.keys(selectionPatch).length > 0
+  ) {
     await prisma.conversation.updateMany({
       where: { id: conversationId },
-      data: { whatsappDraftData: mergedDraft },
+      data: { whatsappDraftData: finalDraft },
     });
   }
 
@@ -298,8 +788,9 @@ const applyFlowReply = async (input: {
   // Terminal → crear el borrador de pedido (FASE 3) y handoff a humano. El
   // pedido real recién se crea cuando el vendedor lo aprueba en el ERP.
   if (terminal) {
-    // guestPhone es el phone normalizado de la conversación (E.164 sin espacios).
-    // contactName usa guestName (la Conversation no tiene "contactName").
+    const selectedProduct = finalDraft.selectedProduct as
+      | { id: string; type: string; name: string; price: number }
+      | undefined;
     await prisma.whatsAppOrderDraft.create({
       data: {
         organizationId,
@@ -307,12 +798,12 @@ const applyFlowReply = async (input: {
         phone: conversation.guestPhone ?? phone,
         contactName: conversation.guestName,
         customerId: conversation.customerId ?? null,
-        orderType: (mergedDraft.orderType as string) ?? "otro",
-        productText: (mergedDraft.productText as string) ?? null,
-        quantityKg: (mergedDraft.quantityKg as number) ?? null,
-        amount: (mergedDraft.amount as number) ?? null,
-        address: (mergedDraft.address as string) ?? null,
-        paymentMethod: (mergedDraft.paymentMethod as string) ?? "efectivo",
+        orderType: (finalDraft.orderType as string) ?? "otro",
+        productText: selectedProduct?.name ?? (finalDraft.productText as string) ?? null,
+        quantityKg: (finalDraft.quantityKg as number) ?? null,
+        amount: (finalDraft.amount as number) ?? null,
+        address: (finalDraft.address as string) ?? null,
+        paymentMethod: (finalDraft.paymentMethod as string) ?? "efectivo",
         status: "PENDING_REVIEW",
       },
     });
@@ -430,6 +921,7 @@ export default {
   resolveOrgIdBySlug,
   getOrCreateWhatsAppConversation,
   handleIncomingMessage,
+  isCatalogQuery,
   sendText,
   sendInteractiveButtons,
   sendImage,
