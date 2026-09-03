@@ -374,6 +374,43 @@ export function isTerminalStage(stage: string): boolean {
   return stage === STAGE_DONE || stage === STAGE_PAYMENT_DONE;
 }
 
+/**
+ * Detecta la intención del cliente de REINICIAR el flujo desde cero. Aplica en
+ * CUALQUIER nodo: si el cliente se perdió o quiere arrancar de nuevo, escribe
+ * algo como "hola", "empezar", "cancelar", "nuevo pedido", "otro pedido". En ese
+ * caso el service resetea stage=null + borrador vacío y arranca desde START.
+ *
+ * Es el ESCAPE del flujo (FASE 5): sin esto el cliente quedaría "atrapado" en un
+ * nodo (p.ej. el de marca) si escribe algo que el nodo no espera.
+ */
+export function isRestartIntent(answer: string): boolean {
+  const a = norm(answer);
+  if (!a) return false;
+  const toks = a.replace(/[^\p{L}\p{N}]+/gu, " ").split(" ").filter(Boolean);
+  const restart = [
+    "hola",
+    "hi",
+    "buenas",
+    "empezar",
+    "empecemos",
+    "cancelar",
+    "reiniciar",
+    "empiezo",
+  ];
+  // Reinicio explícito: "quiero/cambiar" solo cuenta si va con "pedido"/"otro"/
+  // "nuevo" ("quiero hacer otro pedido"). NO si el cliente está pidiendo un
+  // producto ("quiero proplan") — eso sería un falso positivo que corta el flujo.
+  const explicitNew = ["pedido", "otro", "nuevo", "empiezo", "empezar"];
+  if (toks.some((t) => restart.includes(t))) return true;
+  if (
+    toks.some((t) => ["quiero", "cambiar"].includes(t)) &&
+    toks.some((t) => explicitNew.includes(t))
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** Nodo de handoff directo a humano (consulta / "otro"). */
 export function isHandoffStage(stage: string): boolean {
   return stage === STAGE_CONSULTA || stage === STAGE_OTHER;
@@ -644,6 +681,7 @@ export default {
   buttonsForStage,
   isTerminalStage,
   isHandoffStage,
+  isRestartIntent,
   shouldEscalate,
   buildDraftData,
   mergeDraftData,

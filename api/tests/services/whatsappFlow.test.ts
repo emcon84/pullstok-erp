@@ -12,6 +12,7 @@ import {
   buttonsForStage,
   isTerminalStage,
   isHandoffStage,
+  isRestartIntent,
   shouldEscalate,
   buildDraftData,
   mergeDraftData,
@@ -249,6 +250,18 @@ describe("whatsappFlow — helpers", () => {
     expect(shouldEscalate(STAGE_CONSULTA)).toBe(true);
     expect(shouldEscalate(STAGE_OTHER)).toBe(true);
     expect(shouldEscalate(STAGE_PRODUCT)).toBe(false);
+  });
+
+  it("isRestartIntent detecta palabras de reinicio", () => {
+    expect(isRestartIntent("hola")).toBe(true);
+    expect(isRestartIntent("Hola!")).toBe(true);
+    expect(isRestartIntent("empezar")).toBe(true);
+    expect(isRestartIntent("cancelar")).toBe(true);
+    expect(isRestartIntent("quiero hacer otro pedido")).toBe(true);
+    expect(isRestartIntent("quiero cambiar el pedido")).toBe(true);
+    expect(isRestartIntent("quiero proplan de 15kg")).toBe(false);
+    expect(isRestartIntent("old prince")).toBe(false);
+    expect(isRestartIntent("")).toBe(false);
   });
 
   it("buttonsForStage devuelve null en nodos que esperan texto (incluye TYPE)", () => {

@@ -10,6 +10,7 @@ import {
   mergeDraftData,
   isHandoffStage,
   isTerminalStage,
+  isRestartIntent,
   STAGE_SPECIES,
   STAGE_TYPED,
   STAGE_BRAND,
@@ -721,6 +722,26 @@ const applyFlowReply = async (input: {
     where: { id: conversationId },
   });
   if (!conversation || conversation.mode !== "BOT") return;
+
+  // ESCAPE / REINICIO (FASE 5): si el cliente escribe "hola", "empezar",
+  // "cancelar", "nuevo pedido" en CUALQUIER nodo, reseteamos el flujo a cero
+  // (stage null + borrador vacío) y arrancamos desde START. Sin esto el cliente
+  // quedaría "atrapado" en un nodo (p.ej. el de marca) si escribe algo inesperado.
+  if (isRestartIntent(answer)) {
+    await prisma.conversation.updateMany({
+      where: { id: conversationId },
+      data: { whatsappStage: null, whatsappDraftData: Prisma.DbNull },
+    });
+    // Dejamos que el flujo arranque desde START: el siguiente bloque pasa por
+    // currentStage null → planResponse saluda con la bienvenida + botones.
+    return applyFlowReply({
+      conversationId,
+      phone,
+      organizationId,
+      currentStage: null,
+      answer: "@start",
+    });
+  }
 
   // Consulta de producto ("para qué sirve X", "qué me recomendas"...) → Groq con
   // tools responde con datos reales en vez del flujo rígido de nodos. El flujo de
