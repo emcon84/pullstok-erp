@@ -172,10 +172,14 @@ export function buttonsForStage(
  * REGLA ANTI-PAYLOAD-GIGANTE: si un menú tiene MÁS DE 3 opciones NO se listan
  * (excede el límite de botones de WhatsApp y un texto numerado grande revienta
  * el límite de ~4096 chars). En ese caso se le pide al cliente que ESCRIBA el
- * texto y el service lo matchea (ver matchBrands en whatsappCatalog). Esto aplica
- * de forma genérica a `withOptions`: si el menú es muy grande, no lo mostramos.
+ * texto y el service lo matchea (ver matchBrands/matchers en whatsappCatalog).
+ *
+ * NOTA: el límite de BOTONES interactivos de WhatsApp es 3 (ver buttonsForStage).
+ * Acá el límite es distinto: cuántas opciones podemos listar en TEXTO numerado sin
+ * exceder ~4096 chars. 12 es un tope seguro para las listas del catálogo (etapas,
+ * productos); las marcas (90+) se manejan aparte como texto libre.
  */
-const MENU_LIMIT = 3;
+const MENU_LIMIT = 12;
 export function messageForStage(stage: string, catalog?: FlowCatalog): string {
   const menu = menuOptions(stage, catalog);
   const withOptions = (base: string): string => {
@@ -468,6 +472,10 @@ export function buildDraftData(
   brandTyped?: string;
   brandCandidates?: { id: string; brand: string }[];
   brandNotFound?: boolean;
+  // FASE 4 — matching de etapa por texto libre. stageCandidates son las etapas
+  // que coincidieron (≤3) para confirmar; stageNotFound indica que no se encontró.
+  stageCandidates?: { id: string; stage: string }[];
+  stageNotFound?: boolean;
 } {
   const a = norm(answer);
   const isNumeric = /^\d+(\.\d+)?$/.test(a);

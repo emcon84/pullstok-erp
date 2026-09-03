@@ -129,6 +129,50 @@ export const listStages = async (
 };
 
 /**
+ * Matchea el texto libre que escribe el cliente contra las ETAPAS (PriceKgType)
+ * de la especie. Como las etapas son pocas (8) y tienen sinónimos (Kitten→Gatito,
+ * ADULT→Adulto), se resuelve por nombre normalizado, sinónimo o substring.
+ * Devuelve hasta 3 candidatas; si hay exactamente UNA con `exact`, el flujo avanza.
+ */
+export const matchStages = async (
+  species: string,
+  query: string,
+): Promise<{ stage: string; id: string; exact: boolean }[]> => {
+  const q = normalizeName(query);
+  if (!q) return [];
+
+  const spec = speciesEnum(species);
+  const types = await prisma.priceKgType.findMany({
+    where: { species: { in: spec } },
+    select: { id: true, name: true, synonyms: true },
+    orderBy: { sortOrder: "asc" },
+  });
+
+  const scored = types
+    .map((t) => {
+      const nameNorm = normalizeName(t.name);
+      const synonyms = (t.synonyms ?? []).map(normalizeName).filter(Boolean);
+      // Exacto: el texto es el nombre o un sinónimo.
+      if (nameNorm === q || synonyms.includes(q)) {
+        return { id: t.id, stage: t.name, score: 100, exact: true };
+      }
+      // Substring: el texto está contenido en el nombre o en un sinónimo.
+      if (nameNorm.includes(q) || synonyms.some((s) => s.includes(q))) {
+        return { id: t.id, stage: t.name, score: 50, exact: false };
+      }
+      return { id: t.id, stage: t.name, score: 0, exact: false };
+    })
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score || a.stage.localeCompare(b.stage));
+
+  const uniqueIds = new Set(scored.map((s) => s.id));
+  if (scored.length === 1 && uniqueIds.size === 1) {
+    return [{ stage: scored[0].stage, id: scored[0].id, exact: true }];
+  }
+  return scored.slice(0, 3).map((s) => ({ stage: s.stage, id: s.id, exact: false }));
+};
+
+/**
  * Marcas que tienen CELDAS de planilla para la especie+etapa dada (PriceKgBrand
  * join PriceKgPrice). Devuelve [{ brand, id }].
  */
@@ -612,6 +656,7 @@ export const findPrice = async (query: string): Promise<string> => {
 export default {
   listSpecies,
   listStages,
+  matchStages,
   listBrands,
   matchBrands,
   listProductsForSelection,

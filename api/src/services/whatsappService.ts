@@ -21,6 +21,7 @@ import {
 import {
   listSpecies,
   listStages,
+  matchStages,
   listBrands,
   matchBrands,
   listProductsForSelection,
@@ -483,6 +484,13 @@ const optionsForStage = async (
   draft: DraftData,
 ): Promise<{ id: string }[]> => {
   if (stage === STAGE_TYPED) {
+    // Si hay candidatas de etapa matcheadas por texto, el número 1..N mapea a esas.
+    if (
+      Array.isArray((draft as any).stageCandidates) &&
+      (draft as any).stageCandidates.length > 0
+    ) {
+      return (draft as any).stageCandidates as { id: string }[];
+    }
     return listStages(draft.selectedSpecies);
   }
   if (stage === STAGE_BRAND) {
@@ -578,7 +586,20 @@ const captureSelectionFor = async (
   }
 
   if (currentStage === STAGE_TYPED && trimmed.length > 0) {
-    return { selectedStageId: trimmed };
+    // Etapa por TEXTO LIBRE ("Adulto", "Cachorro", "Kitten"): resuelve el id real
+    // con matchStages (nombre/sinónimo). Si es exacta (una sola) avanza; si hay
+    // varias candidatas se guardan para confirmar; si no hay, avisamos.
+    const matches = await matchStages(draftBefore.selectedSpecies, trimmed);
+    if (matches.length === 1 && matches[0].exact) {
+      return { selectedStageId: matches[0].id };
+    }
+    if (matches.length > 0) {
+      return {
+        stageCandidates: matches.map((m) => ({ id: m.id, stage: m.stage })),
+        brandTyped: undefined,
+      };
+    }
+    return { stageNotFound: true };
   }
   if (currentStage === STAGE_BRAND && trimmed.length > 0) {
     return { selectedBrandId: trimmed };
@@ -599,7 +620,16 @@ const catalogForStage = async (
     case STAGE_SPECIES:
       return { species: await listSpecies() };
     case STAGE_TYPED:
-      return { stages: await listStages(draft.selectedSpecies) };
+      return {
+        stages:
+          Array.isArray((draft as any).stageCandidates) &&
+          (draft as any).stageCandidates.length > 0
+            ? (draft as any).stageCandidates.map((c: { id: string; stage: string }) => ({
+                id: c.id,
+                stage: c.stage,
+              }))
+            : await listStages(draft.selectedSpecies),
+      };
     case STAGE_BRAND:
       // Si hay candidatas matcheadas por texto (≤3) las mostramos para confirmar;
       // si no, listamos las marcas de la especie+etapa (o pedimos escribir si son
@@ -714,6 +744,26 @@ const applyFlowReply = async (input: {
   const orderType = (mergedDraft.orderType as string) ?? "bolsa";
   let catalog: FlowCatalog = {};
   let cost: { total: number; detail: string } | null = null;
+
+  // Etapa sin match: el cliente escribió una etapa que no encontramos. Le pedimos
+  // que la escriba de nuevo y nos quedamos en el mismo nodo (sin avanzar).
+  if ((selectionPatch as any).stageNotFound) {
+    const msg =
+      "No encontré esa etapa 🐾 ¿Podés escribirla de nuevo? (ej: Adulto, Cachorro, Kitten, Senior) o pedí ayuda con un vendedor.";
+    await sendText(phone, msg).catch(() => {});
+    await persistMessage({
+      conversationId,
+      sender: "OPERATOR",
+      senderUserId: null,
+      isBot: true,
+      body: msg,
+    });
+    await prisma.conversation.updateMany({
+      where: { id: conversationId },
+      data: { whatsappStage: STAGE_TYPED },
+    });
+    return;
+  }
 
   // Marca sin match: el cliente escribió un nombre que no encontramos. Le pedimos
   // que la escriba de nuevo y nos quedamos en el mismo nodo (sin avanzar). Esto

@@ -21,6 +21,7 @@ import { prisma } from "../../src/config/db";
 import {
   listSpecies,
   listStages,
+  matchStages,
   listBrands,
   matchBrands,
   listProductsForSelection,
@@ -346,5 +347,41 @@ describe("whatsappCatalog — matchBrands (FASE 4: marca por texto libre)", () =
       .mockResolvedValueOnce([{ id: "b1", name: "ProPlan", keywords: [] }]);
 
     await expect(matchBrands("perro", "t-adulto", "marca-inexistente")).resolves.toEqual([]);
+  });
+});
+
+describe("whatsappCatalog — matchStages (FASE 4: etapa por texto libre)", () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it("matchea por nombre exacto → exact:true", async () => {
+    mockTypeFindMany.mockResolvedValue([
+      { id: "t-adulto", name: "Adulto", species: "PERRO", synonyms: [] },
+      { id: "t-cachorro", name: "Cachorro", species: "PERRO", synonyms: [] },
+    ]);
+
+    await expect(matchStages("perro", "Adulto")).resolves.toEqual([
+      { stage: "Adulto", id: "t-adulto", exact: true },
+    ]);
+  });
+
+  it("matchea por sinónimo → exact:true", async () => {
+    mockTypeFindMany.mockResolvedValue([
+      { id: "t-adulto", name: "Adulto", species: "PERRO", synonyms: ["adult"] },
+      { id: "t-kitten", name: "Kitten", species: "GATO", synonyms: ["gatito"] },
+    ]);
+
+    await expect(matchStages("perro", "adult")).resolves.toEqual([
+      { stage: "Adulto", id: "t-adulto", exact: true },
+    ]);
+  });
+
+  it("sin match → devuelve []", async () => {
+    mockTypeFindMany.mockResolvedValue([
+      { id: "t-adulto", name: "Adulto", species: "PERRO", synonyms: [] },
+    ]);
+
+    await expect(matchStages("perro", "geriatrico")).resolves.toEqual([]);
   });
 });
