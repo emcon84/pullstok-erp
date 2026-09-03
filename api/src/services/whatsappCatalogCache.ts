@@ -22,11 +22,7 @@
 // request como desde el scheduler del server sin asumir contexto de tenant.
 
 import { basePrisma } from "../config/db";
-import {
-  classifyProduct,
-  findAlimentoSecoCategoryIds,
-  type Species,
-} from "./priceMatchingService";
+import { classifyProduct, normalizeName, type Species } from "./priceMatchingService";
 
 // ---------------------------------------------------------------------------
 // Tipos del snapshot
@@ -99,6 +95,33 @@ const speciesKeysForEnum = (s: Species): SpeciesKey[] => {
 };
 
 /**
+ * Ids de categorías de "Alimento Seco" tolerante al nombre del catálogo real.
+ *
+ * El catálogo usa nombres como "Alimento Seco (Balanceado)", no "Alimento Seco"
+ * exacto (lo que espera findAlimentoSecoCategoryIds del motor de matching). Este
+ * helper del SNAPSHOT busca por substring normalizado "alimento seco" para no
+ * depender del sufijo entre paréntesis. Es LOCAL al bot (no toca el matcher del
+ * ERP, que se deja como está para no arriesgar regresión en planilla↔productos).
+ */
+const secoCategoryIdsForBot = (
+  categories: { id: string; name: string; parentId: string | null }[],
+): string[] => {
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  const isSeco = (name: string | null | undefined) =>
+    !!name && normalizeName(name).includes("alimento seco");
+  const ids = new Set<string>();
+  for (const c of categories) {
+    if (isSeco(c.name)) {
+      ids.add(c.id);
+      continue;
+    }
+    const parent = c.parentId ? byId.get(c.parentId) : undefined;
+    if (parent && isSeco(parent.name)) ids.add(c.id);
+  }
+  return [...ids];
+};
+
+/**
  * Especie enum → clave única del bot (perro/gato).
  * Devuelve null para AMBOS: un producto sin especie clara en su categoría no
  * puede anclarse honestamente a perro o gato (mostrar la selección ambigua sería
@@ -161,7 +184,7 @@ export const loadSnapshot = async (): Promise<CatalogSnapshot> => {
     }),
   ]);
 
-  const secoCategoryIds = findAlimentoSecoCategoryIds(categories);
+  const secoCategoryIds = secoCategoryIdsForBot(categories);
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
   // Formas mínimas que consume classifyProduct (solo los campos que usa).
