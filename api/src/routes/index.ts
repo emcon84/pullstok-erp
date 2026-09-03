@@ -36,6 +36,7 @@ import arcaRoutes from "./arcaRoutes";
 import cashSessionRoutes from "./cashSessionRoutes";
 import landingChatRoutes from "./landingChatRoutes";
 import whatsappRoutes from "./whatsappRoutes";
+import whatsappOrderRoutes from "./whatsappOrderRoutes";
 
 const router = Router();
 
@@ -80,6 +81,8 @@ router.use("/landing-chat", landingChatRoutes);
 // Público SIN auth (webhook Kapso): resuelve org por slug y verifica la firma
 // en el controller. Mismo espíritu que /store y /landing-chat.
 router.use("/whatsapp", whatsappRoutes);
+// Borradores de pedido de WhatsApp (FASE 3): autenticado, los usa el ERP.
+router.use("/whatsapp-orders", whatsappOrderRoutes);
 router.use("/", arcaRoutes);
 
 export default router;
