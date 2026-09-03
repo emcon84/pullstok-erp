@@ -9,12 +9,21 @@
 // - Por kilo / por monto → la CELDA de planilla PriceKgPrice.priceKg (no
 //   Product.priceKgSuelto, que es derivado y puede no coincidir con la planilla).
 //
-// Multi-tenant: TODAS estas funciones corren DENTRO de runWithTenant (el
-// webhook de Kapso lo abre en handleIncomingMessage), así que usan el `prisma`
-// scopeado (extensión anti-fuga que inyecta organizationId automáticamente).
-// Si se llamaran sin contexto de tenant, el scope de la extensión las bloquearía
-// (es el comportamiento deseado: no hay forma honesta de filtrar por org sin
-// conocerla).
+// CACHE DE CATÁLOGO (whatsappCatalogCache): desde la FASE 4 estos helpers se
+// consolidaron dos veces: (1) queries a DB por cada mensaje y (2) re-clasificación
+// con fuzzy matching (Levenshtein marca×tipo) de cientos de productos POR mensaje.
+// Ahora toda la estructura se carga UNA vez en un snapshot con TTL y se
+// PRECLASIFICA al cargar (ver whatsappCatalogCache.ts). Acá todas las lecturas
+// pasan por el snapshot: las funciones SOLO FILTRAN por los ids ya resueltos,
+// sin Levenshtein por interacción. Única excepción mínima y honesta: el STOCK
+// (quantity bolsería / kg suelto) sí cambia y se consulta puntual en
+// resolveProductById (una query chica, no es lo que hacía lento al flujo).
+//
+// Multi-tenant: las queries de stock (looseStock/quantity) corren DENTRO de
+// runWithTenant (el webhook de Kapso lo abre en handleIncomingMessage), así que
+// usan el `prisma` scopeado (extensión anti-fuga que inyecta organizationId
+// automáticamente). El snapshot en sí se carga vía basePrisma con where explícito
+// por la org de KAPSO_ORG_SLUG (ver cabecera del cache).
 //
 // Regla férrea: NO se inventan precios. Si una celda/producto no tiene precio
 // cargado, se devuelve "no tenemos precio" en vez de calcular algo. Todos los
@@ -22,12 +31,20 @@
 
 import { prisma } from "../config/db";
 import { round2 } from "../utils/money";
+import { normalizeName } from "./priceMatchingService";
 import {
-  classifyProduct,
-  findAlimentoSecoCategoryIds,
-  normalizeName,
-  type Species as SpeciesEnum,
-} from "./priceMatchingService";
+  getCatalogSnapshot,
+  getSpecies,
+  getStages,
+  getBrands,
+  getProductsFor,
+  findCell,
+  findCellById,
+  findProductById,
+  getCellLabel,
+  type SpeciesKey,
+  type SnapshotProduct,
+} from "./whatsappCatalogCache";
 
 // ---------------------------------------------------------------------------
 // Helpers de dominio (internos)
@@ -52,15 +69,9 @@ export const normalizeSpeciesAnswer = (answer: string): string | null => {
   return null;
 };
 
-/**
- * Especies enum de la planilla que aplican a una clave de especie del bot.
- * AMBOS aplica a ambas planillas, así que "perro" → [PERRO, AMBOS].
- */
-const speciesEnum = (key: string): SpeciesEnum[] => {
-  if (key === "perro") return ["PERRO", "AMBOS"];
-  if (key === "gato") return ["GATO", "AMBOS"];
-  return ["PERRO", "GATO", "AMBOS"];
-};
+/** Convierte la clave de especie del bot a SpeciesKey (default perro). */
+const toSpeciesKey = (species: string): SpeciesKey =>
+  species === "gato" ? "gato" : "perro";
 
 /** Parsea un Float seguro desde la respuesta del cliente (kg / importe). */
 export const parseDecimal = (answer: string): number | null => {
@@ -90,49 +101,24 @@ export const formatQty = (n: number): string => {
 
 /**
  * Especies disponibles para el bot (perro/gato), derivadas de las especies
- * declaradas en PriceKgType y PriceKgBrand. Devuelve las que tengan data.
+ * declaradas en el snapshot (etapas + marcas). Devuelve las que tengan data.
  */
-export const listSpecies = async (): Promise<string[]> => {
-  const [types, brands] = await Promise.all([
-    prisma.priceKgType.findMany({
-      select: { species: true },
-      distinct: ["species"],
-    }),
-    prisma.priceKgBrand.findMany({
-      select: { species: true },
-      distinct: ["species"],
-    }),
-  ]);
-
-  const set = new Set<string>();
-  for (const row of [...types, ...brands] as { species: SpeciesEnum }[]) {
-    if (row.species === "PERRO" || row.species === "AMBOS") set.add("perro");
-    if (row.species === "GATO" || row.species === "AMBOS") set.add("gato");
-  }
-  return [...set];
-};
+export const listSpecies = async (): Promise<string[]> => getSpecies();
 
 /**
- * Etapas de una especie, desde PriceKgType (Adulto, Cachorro, Kitten, Senior...).
- * Ordenadas por sortOrder. Devuelve [{ stage, id }].
+ * Etapas de una especie (Adulto, Cachorro, Kitten, Senior...), desde el
+ * snapshot, ordenadas por sortOrder. Devuelve [{ stage, id }].
  */
 export const listStages = async (
   species: string,
-): Promise<{ stage: string; id: string }[]> => {
-  const spec = speciesEnum(species);
-  const types = await prisma.priceKgType.findMany({
-    where: { species: { in: spec } },
-    select: { id: true, name: true },
-    orderBy: { sortOrder: "asc" },
-  });
-  return types.map((t) => ({ stage: t.name, id: t.id }));
-};
+): Promise<{ stage: string; id: string }[]> => getStages(toSpeciesKey(species));
 
 /**
  * Matchea el texto libre que escribe el cliente contra las ETAPAS (PriceKgType)
  * de la especie. Como las etapas son pocas (8) y tienen sinónimos (Kitten→Gatito,
- * ADULT→Adulto), se resuelve por nombre normalizado, sinónimo o substring.
- * Devuelve hasta 3 candidatas; si hay exactamente UNA con `exact`, el flujo avanza.
+ * ADULT→Adulto), se resuelve por nombre normalizado, sinónimo o substring,
+ * leído del snapshot (sin DB). Devuelve hasta 3 candidatas; si hay exactamente
+ * UNA con `exact`, el flujo avanza.
  */
 export const matchStages = async (
   species: string,
@@ -141,14 +127,12 @@ export const matchStages = async (
   const q = normalizeName(query);
   if (!q) return [];
 
-  const spec = speciesEnum(species);
-  const types = await prisma.priceKgType.findMany({
-    where: { species: { in: spec } },
-    select: { id: true, name: true, synonyms: true },
-    orderBy: { sortOrder: "asc" },
-  });
+  const snap = await getCatalogSnapshot();
+  const stages = snap.stages
+    .filter((s) => s.species.includes(toSpeciesKey(species)))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
-  const scored = types
+  const scored = stages
     .map((t) => {
       const nameNorm = normalizeName(t.name);
       const synonyms = (t.synonyms ?? []).map(normalizeName).filter(Boolean);
@@ -174,27 +158,13 @@ export const matchStages = async (
 
 /**
  * Marcas que tienen CELDAS de planilla para la especie+etapa dada (PriceKgBrand
- * join PriceKgPrice). Devuelve [{ brand, id }].
+ * join PriceKgPrice), leídas del snapshot. Devuelve [{ brand, id }].
  */
 export const listBrands = async (
   species: string,
   stageId: string,
 ): Promise<{ brand: string; id: string }[]> => {
-  const spec = speciesEnum(species);
-  const cells = await prisma.priceKgPrice.findMany({
-    where: { typeId: stageId, species: { in: spec } },
-    select: { brandId: true },
-    distinct: ["brandId"],
-  });
-  const brandIds = cells.map((c) => c.brandId);
-  if (brandIds.length === 0) return [];
-
-  const brands = await prisma.priceKgBrand.findMany({
-    where: { id: { in: brandIds } },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
-  return brands.map((b) => ({ brand: b.name, id: b.id }));
+  return getBrands(toSpeciesKey(species), stageId);
 };
 
 /**
@@ -203,7 +173,8 @@ export const listBrands = async (
  * Con más de 3 opciones (límite de WhatsApp) NO se muestran botones ni lista
  * numerada: el cliente ESCRIBE la marca. Esta función resuelve ese texto:
  * - Usa el mismo motor de normalización/keywords del matching planilla↔productos
- *   (resolveBrand), así "proplan" → ProPlan, "old prince" → Old Prince.
+ *   (resolveBrand), así "proplan" → ProPlan, "old prince" → Old Prince. Los
+ *   keywords se lean del snapshot (ya cargados al precachear) → sin DB.
  * - Devuelve las marcas que coinciden. Si hay exactamente UNA (el cliente la
  *   definió bien), la fila lleva `exact: true` → el flujo avanza directo.
  * - Si hay varias cercanas (ej. "agility" → AGILITY y AGILITY CORDERO), devuelve
@@ -218,14 +189,12 @@ export const matchBrands = async (
   const q = normalizeName(query);
   if (!q) return [];
 
-  const all = await listBrands(species, stageId);
+  const all = await getBrands(toSpeciesKey(species), stageId);
   if (all.length === 0) return [];
-  // A `listBrands` le falta `keywords`; lo leemos por separado para el match.
-  const brands = await prisma.priceKgBrand.findMany({
-    where: { id: { in: all.map((b) => b.id) } },
-    select: { id: true, name: true, keywords: true },
-  });
-  const byId = new Map(brands.map((b) => [b.id, b]));
+
+  // keywords desde el snapshot (ya cargadas al precachear) → sin query extra.
+  const snap = await getCatalogSnapshot();
+  const byId = new Map(snap.brands.map((b) => [b.id, b]));
 
   const scored = all
     .map((b) => {
@@ -267,108 +236,38 @@ export interface ProductSelection {
   priceKg: number | null;
 }
 
-/** Etiqueta legible de una celda de planilla: "MAXXIUM Adulto suelto". */
-const cellLabel = async (brandId: string, typeId: string): Promise<string> => {
-  const [brand, type] = await Promise.all([
-    prisma.priceKgBrand.findFirst({
-      where: { id: brandId },
-      select: { name: true },
-    }),
-    prisma.priceKgType.findFirst({
-      where: { id: typeId },
-      select: { name: true },
-    }),
-  ]);
-  return `${brand?.name ?? ""} ${type?.name ?? ""} suelto`.trim();
-};
-
 /**
- * Productos que coinciden con especie+etapa+marca. Devuelve:
+ * Productos que coinciden con especie+etapa+marca, leídos del snapshot:
  * - la celda de kilo (PriceKgPrice) con su priceKg, si existe;
- * - los productos de bolsa (Product) que clasifican a la misma marca+etapa+especie
- *   por nombre (reusando classifyProduct de priceMatchingService).
+ * - las bolsas ya PRECLASIFICADAS al cargar el snapshot (su species/brandId/
+ *   typeId se resolvieron UNA vez con classifyProduct al cargar) → acá solo se
+ *   FILTRA, sin Levenshtein ni re-consulta por mensaje.
  */
 export const listProductsForSelection = async (
   species: string,
   stageId: string,
   brandId: string,
 ): Promise<ProductSelection[]> => {
-  const spec = speciesEnum(species);
+  const key = toSpeciesKey(species);
   const result: ProductSelection[] = [];
 
   // ── Celda de kilo: es la fuente autoritativa del precio suelto ──
-  const cell = await prisma.priceKgPrice.findFirst({
-    where: { brandId, typeId: stageId, species: { in: spec } },
-    select: { id: true, priceKg: true },
-  });
+  const cell = await findCell(key, stageId, brandId);
   if (cell && cell.priceKg > 0) {
     result.push({
       type: "kilo",
       id: cell.id,
-      label: await cellLabel(brandId, stageId),
+      label: await getCellLabel(cell.brandId, cell.typeId),
       price: cell.priceKg,
       priceKg: cell.priceKg,
     });
   }
 
-  // ── Bolsas: productos que matchean a la misma marca+etapa+especie ──
-  const bolsa = await bolsaProducts(species, stageId, brandId);
+  // ── Bolsas: solo filtra el snapshot por los ids ya clasificados ──
+  const bolsa = await getProductsFor(key, stageId, brandId);
   result.push(...bolsa);
 
   return result;
-};
-
-/**
- * Productos de bolsa (Alimento Seco) que clasifican a marca+etapa+especie por
- * nombre. Usa classifyProduct (mismo motor que el matching planilla↔productos)
- * → los precios son los REALES del Product (bolsa) y su priceKgSuelto derivado.
- */
-const bolsaProducts = async (
-  species: string,
-  typeId: string,
-  brandId: string,
-): Promise<ProductSelection[]> => {
-  const speciesSet = new Set(speciesEnum(species));
-
-  const [categories, brands, types] = await Promise.all([
-    prisma.category.findMany({ select: { id: true, name: true, parentId: true } }),
-    prisma.priceKgBrand.findMany({
-      select: { id: true, name: true, keywords: true },
-    }),
-    prisma.priceKgType.findMany({
-      select: { id: true, name: true, synonyms: true },
-    }),
-  ]);
-  const categoryById = new Map(categories.map((c) => [c.id, c]));
-  const secoIds = findAlimentoSecoCategoryIds(categories);
-
-  if (secoIds.length === 0) return [];
-
-  const products = await prisma.product.findMany({
-    // Solo los productos "carried" (los que realmente se venden) → evita clasificar
-    // los miles de productos no vendibles con classifyProduct por cada mensaje.
-    where: { categoryId: { in: secoIds }, carried: true },
-    select: { id: true, name: true, price: true, priceKgSuelto: true, categoryId: true },
-  });
-
-  const out: ProductSelection[] = [];
-  for (const p of products) {
-    const ctx = classifyProduct(p, brands, types, categoryById);
-    if (
-      ctx.brand.brand?.id === brandId &&
-      ctx.type.type?.id === typeId &&
-      speciesSet.has(ctx.species)
-    ) {
-      out.push({
-        type: "bolsa",
-        id: p.id,
-        label: p.name,
-        price: p.price,
-        priceKg: p.priceKgSuelto ?? null,
-      });
-    }
-  }
-  return out.sort((a, b) => a.label.localeCompare(b.label));
 };
 
 // Shape de un producto resuelto por id (precio real + stock).
@@ -393,40 +292,34 @@ const looseStockForCell = async (cellId: string): Promise<number | null> => {
 /**
  * Resuelve el precio REAL de un elemento seleccionado por id. El id puede ser
  * de un Product (bolsa) o de una celda PriceKgPrice (kilo) → se prueba el
- * producto primero y la celda después. stock = units (bolsa) / kg (kilo).
+ * producto primero y la celda después. El precio/nombre salen del snapshot;
+ * el stock (quantity de bolsa / kg suelto) es la ÚNICA consulta a DB acá,
+ * porque el stock SÍ cambia y no conviene cachearlo (una query chica puntual).
+ * stock = units (bolsa) / kg (kilo).
  */
 export const resolveProductById = async (
   id: string,
 ): Promise<ResolvedProduct | null> => {
-  const product = await prisma.product.findFirst({
-    where: { id },
-    select: {
-      id: true,
-      name: true,
-      price: true,
-      priceKgSuelto: true,
-      quantity: true,
-    },
-  });
+  const product: SnapshotProduct | null = await findProductById(id);
   if (product) {
+    const stockRow = await prisma.product.findFirst({
+      where: { id },
+      select: { quantity: true },
+    });
     return {
       type: "bolsa",
       name: product.name,
       price: product.price,
-      priceKg: product.priceKgSuelto ?? null,
-      stock: product.quantity ?? null,
+      priceKg: product.priceKgSuelto,
+      stock: stockRow?.quantity ?? null,
     };
   }
 
-  const cell = await prisma.priceKgPrice.findFirst({
-    where: { id },
-    select: { id: true, priceKg: true, brandId: true, typeId: true },
-  });
+  const cell = await findCellById(id);
   if (cell) {
-    const label = await cellLabel(cell.brandId, cell.typeId);
     return {
       type: "kilo",
-      name: label,
+      name: await getCellLabel(cell.brandId, cell.typeId),
       price: cell.priceKg,
       priceKg: cell.priceKg,
       stock: await looseStockForCell(cell.id),
@@ -446,7 +339,7 @@ export interface OrderCostItem {
 }
 
 /**
- * Calcula el costo de un ítem del pedido con el precio REAL de la DB:
+ * Calcula el costo de un ítem del pedido con el precio REAL del snapshot:
  * - bolsa → round2(quantity × Product.price)
  * - kilo → round2(quantity × PriceKgPrice.priceKg)
  * - monto → el total es el monto (el kg, en todo caso, es derivado en otra capa)
@@ -508,17 +401,6 @@ const scoreProduct = (productName: string, query: string): number => {
   return -1;
 };
 
-// Shape de producto que se inyecta en el slug (nombre + clasificación + precios).
-interface CatalogSlugRow {
-  name: string;
-  category: string;
-  brand: string;
-  stage: string;
-  species: string;
-  price: number;
-  priceKg: number | null;
-}
-
 const categoryPath = (
   categoryById: Map<string, { id: string; name: string; parentId: string | null }>,
   categoryId: string | null,
@@ -530,52 +412,35 @@ const categoryPath = (
   return parent ? `${parent.name} > ${cat.name}` : cat.name;
 };
 
-const speciesLabel = (s: SpeciesEnum): string =>
-  s === "AMBOS" ? "Perro/Gato" : s === "PERRO" ? "Perro" : "Gato";
+const brandLabel = (snap: Awaited<ReturnType<typeof getCatalogSnapshot>>, id: string | null): string =>
+  id ? snap.brands.find((b) => b.id === id)?.name ?? "—" : "—";
+
+const stageLabel = (snap: Awaited<ReturnType<typeof getCatalogSnapshot>>, id: string | null): string =>
+  id ? snap.stages.find((s) => s.id === id)?.name ?? "—" : "—";
 
 /**
  * Slug del catálogo (texto plano) que se vierte al system prompt de Groq para que
  * asesore con datos REALES sin inventar. Una línea por producto de bolsa (nombre,
- * categoría, marca, etapa, especie, precio bolsa + por kg). Capado por caracteres
- * para no inflar el contexto.
+ * categoría, marca, etapa, especie, precio bolsa + por kg). Se arma desde el
+ * snapshot (productos ya pre-clasificados) → no re-clasifica ni re-consulta.
+ * Capado por caracteres para no inflar el contexto.
  */
 export const buildCatalogSlug = async (maxChars = 5000): Promise<string> => {
-  const [categories, brands, types] = await Promise.all([
-    prisma.category.findMany({ select: { id: true, name: true, parentId: true } }),
-    prisma.priceKgBrand.findMany({
-      select: { id: true, name: true, keywords: true },
-    }),
-    prisma.priceKgType.findMany({
-      select: { id: true, name: true, synonyms: true },
-    }),
-  ]);
-  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const snap = await getCatalogSnapshot();
+  const categoryById = new Map(snap.categories.map((c) => [c.id, c]));
 
-  const products = await prisma.product.findMany({
-    where: { carried: true },
-    select: {
-      id: true,
-      name: true,
-      price: true,
-      priceKgSuelto: true,
-      categoryId: true,
-    },
-    orderBy: { name: "asc" },
-  });
-
-  const rows: CatalogSlugRow[] = [];
-  for (const p of products) {
-    const ctx = classifyProduct(p, brands, types, categoryById);
-    rows.push({
+  const rows = snap.products
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((p) => ({
       name: p.name,
       category: categoryPath(categoryById, p.categoryId),
-      brand: ctx.brand.brand?.name ?? "—",
-      stage: ctx.type.type?.name ?? "—",
-      species: speciesLabel(ctx.species),
+      brand: brandLabel(snap, p.brandId),
+      stage: stageLabel(snap, p.typeId),
+      species: p.species === "gato" ? "Gato" : "Perro",
       price: p.price,
-      priceKg: p.priceKgSuelto ?? null,
-    });
-  }
+      priceKg: p.priceKgSuelto,
+    }));
   if (rows.length === 0) return "(El catálogo está vacío)";
 
   const lines = rows.slice(0, 60).map((r) => {
@@ -588,40 +453,16 @@ export const buildCatalogSlug = async (maxChars = 5000): Promise<string> => {
 /**
  * Busca un producto real por texto libre (para la tool get_product_info). Devuelve
  * una línea con los datos reales del mejor match, o un texto honesto si no hay.
+ * Lee del snapshot (productos ya pre-clasificados) → sin re-consultar.
  */
 export const searchCatalog = async (query: string): Promise<string> => {
   const q = normalizeName(query);
-  const [categories, brands, types] = await Promise.all([
-    prisma.category.findMany({ select: { id: true, name: true, parentId: true } }),
-    prisma.priceKgBrand.findMany({
-      select: { id: true, name: true, keywords: true },
-    }),
-    prisma.priceKgType.findMany({
-      select: { id: true, name: true, synonyms: true },
-    }),
-  ]);
-  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const snap = await getCatalogSnapshot();
+  const categoryById = new Map(snap.categories.map((c) => [c.id, c]));
 
-  const products = await prisma.product.findMany({
-    where: { carried: true },
-    select: {
-      id: true,
-      name: true,
-      price: true,
-      priceKgSuelto: true,
-      categoryId: true,
-    },
-  });
-
-  let best: {
-    id: string;
-    name: string;
-    price: number;
-    priceKgSuelto: number | null;
-    categoryId: string | null;
-  } | null = null;
+  let best: SnapshotProduct | null = null;
   let bestScore = -1;
-  for (const p of products) {
+  for (const p of snap.products) {
     const sc = scoreProduct(p.name, q);
     if (sc > bestScore) {
       bestScore = sc;
@@ -630,13 +471,12 @@ export const searchCatalog = async (query: string): Promise<string> => {
   }
   if (!best) return "No encontramos productos que coincidan con tu consulta.";
 
-  const ctx = classifyProduct(best, brands, types, categoryById);
   const kg =
     best.priceKgSuelto != null ? `$${formatMoney(best.priceKgSuelto)}/kg` : "sin precio suelto";
   return (
     `${best.name} | Categoría: ${categoryPath(categoryById, best.categoryId) || "s/cat"} | ` +
-    `Marca: ${ctx.brand.brand?.name ?? "—"} | Etapa: ${ctx.type.type?.name ?? "—"} | ` +
-    `Especie: ${speciesLabel(ctx.species)} | Bolsa: $${formatMoney(best.price)} | Suelto: ${kg}`
+    `Marca: ${brandLabel(snap, best.brandId)} | Etapa: ${stageLabel(snap, best.typeId)} | ` +
+    `Especie: ${best.species === "gato" ? "Gato" : "Perro"} | Bolsa: $${formatMoney(best.price)} | Suelto: ${kg}`
   );
 };
 

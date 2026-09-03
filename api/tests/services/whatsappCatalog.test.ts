@@ -1,9 +1,13 @@
 // FASE 4 — test del módulo de consulta de catálogo para el bot de WhatsApp.
 //
-// whatsappCatalog consulta la DB (precios REALES, no inventa). Como no hay BD en
-// local, mockeamos `../config/db` y controlamos qué devuelve cada query. Los
-// helpers puros (formato/species/parseDecimal) no tocan prisma → se testean
-// directo.
+// Antes mockeamos `../config/db` porque el módulo consultaba la DB. Ahora
+// (snapshot en memoria, FASE 4.5) las lecturas pasan por whatsappCatalogCache:
+// todo el catálogo se carga UNA vez (pre-clasificado) y acá solo se filtra. Por
+// eso mockeamos EL CACHE (getCatalogSnapshot y los getters) y le inyectamos un
+// snapshot de prueba fijo. La única query a DB que queda en el módulo es la de
+// STOCK puntual (resolveProductById) → mockeamos prisma.product.findFirst y
+// prisma.looseStock.findMany para esos casos.
+// Los helpers puros (formato/species/parseDecimal) no tocan nada → directo.
 
 jest.mock("../../src/config/db", () => ({
   prisma: {
@@ -17,7 +21,12 @@ jest.mock("../../src/config/db", () => ({
   basePrisma: {},
 }));
 
+// El cache se mockea completo: los getters y getCatalogSnapshot devuelven lo que
+// el snapshot de prueba defina. La lógica que testeamos es la del módulo.
+jest.mock("../../src/services/whatsappCatalogCache");
+
 import { prisma } from "../../src/config/db";
+import * as catalogCache from "../../src/services/whatsappCatalogCache";
 import {
   listSpecies,
   listStages,
@@ -33,28 +42,67 @@ import {
   formatQty,
 } from "../../src/services/whatsappCatalog";
 
-// Referencias a los mocks de prisma (tras el import, sin TDZ).
+type Mock<T> = jest.Mock<Promise<T>, any[]>;
+const mockGetCatalogSnapshot = catalogCache.getCatalogSnapshot as Mock<any>;
+const mockGetSpecies = catalogCache.getSpecies as Mock<any>;
+const mockGetStages = catalogCache.getStages as Mock<any>;
+const mockGetBrands = catalogCache.getBrands as Mock<any>;
+const mockGetProductsFor = catalogCache.getProductsFor as Mock<any>;
+const mockFindCell = catalogCache.findCell as Mock<any>;
+const mockFindCellById = catalogCache.findCellById as Mock<any>;
+const mockFindProductById = catalogCache.findProductById as Mock<any>;
+const mockGetCellLabel = catalogCache.getCellLabel as Mock<any>;
+
 const mockProductFindFirst = prisma.product.findFirst as jest.Mock;
-const mockProductFindMany = prisma.product.findMany as jest.Mock;
-const mockPriceKgFindFirst = prisma.priceKgPrice.findFirst as jest.Mock;
-const mockPriceKgFindMany = prisma.priceKgPrice.findMany as jest.Mock;
-const mockTypeFindMany = prisma.priceKgType.findMany as jest.Mock;
-const mockBrandFindMany = prisma.priceKgBrand.findMany as jest.Mock;
-const mockCategoryFindMany = prisma.category.findMany as jest.Mock;
 const mockLooseFindMany = prisma.looseStock.findMany as jest.Mock;
 
-const catRoot = { id: "alimento", name: "Alimento Seco", parentId: null };
-const catPerro = { id: "perro", name: "Perro", parentId: "alimento" };
+// Snapshot de prueba: lo que el cache ya precargó (pre-clasificado).
+const snapshot = {
+  categories: [
+    { id: "alimento", name: "Alimento Seco", parentId: null },
+    { id: "perro", name: "Perro", parentId: "alimento" },
+  ],
+  brands: [
+    { id: "b-proplan", name: "ProPlan", keywords: ["pro plan", "purina"], species: ["perro"] },
+    { id: "b-agility", name: "AGILITY", keywords: [], species: ["perro"] },
+    { id: "b-agility-cordero", name: "AGILITY CORDERO", keywords: [], species: ["perro"] },
+    { id: "b-agility-salmon", name: "AGILITY SALMON", keywords: [], species: ["perro"] },
+  ],
+  stages: [
+    { id: "t-adulto", name: "Adulto", synonyms: ["adult"], species: ["perro"], sortOrder: 10 },
+    { id: "t-cachorro", name: "Cachorro", synonyms: [], species: ["perro"], sortOrder: 20 },
+  ],
+  cells: [
+    { id: "c-1", brandId: "b-proplan", typeId: "t-adulto", species: "perro", priceKg: 30000 },
+  ],
+  products: [
+    {
+      id: "p-1",
+      name: "Pro Plan Adulto 15kg",
+      price: 45000,
+      priceKgSuelto: 2900.5,
+      categoryId: "perro",
+      species: "perro",
+      brandId: "b-proplan",
+      typeId: "t-adulto",
+    },
+  ],
+  secoCategoryIds: ["alimento", "perro"],
+};
 
 const resetMocks = (): void => {
   jest.clearAllMocks();
-  // Defaults inocuos: findFirst de celda/producto → sin resultado.
+  // Defaults inocuos para que un test suelto no explote.
+  mockGetCatalogSnapshot.mockResolvedValue(snapshot);
+  mockGetSpecies.mockResolvedValue(["perro", "gato"]);
+  mockGetStages.mockResolvedValue([]);
+  mockGetBrands.mockResolvedValue([]);
+  mockGetProductsFor.mockResolvedValue([]);
+  mockFindCell.mockResolvedValue(null);
+  mockFindCellById.mockResolvedValue(null);
+  mockFindProductById.mockResolvedValue(null);
+  mockGetCellLabel.mockResolvedValue("Pro Plan Adulto suelto");
   mockProductFindFirst.mockResolvedValue(null);
-  mockPriceKgFindFirst.mockResolvedValue(null);
-  mockPriceKgFindMany.mockResolvedValue([]);
-  mockTypeFindMany.mockResolvedValue([]);
-  mockBrandFindMany.mockResolvedValue([]);
-  mockCategoryFindMany.mockResolvedValue([]);
   mockLooseFindMany.mockResolvedValue([]);
 };
 
@@ -89,15 +137,8 @@ describe("whatsappCatalog — helpers puros (sin prisma)", () => {
 describe("whatsappCatalog — listSpecies", () => {
   beforeEach(resetMocks);
 
-  it("deriva perro/gato de especies ± AMBOS de tipos y marcas", async () => {
-    mockTypeFindMany.mockResolvedValue([{ species: "PERRO" }, { species: "AMBOS" }]);
-    mockBrandFindMany.mockResolvedValue([{ species: "GATO" }, { species: "AMBOS" }]);
-    await expect(listSpecies()).resolves.toEqual(["perro", "gato"]);
-  });
-
-  it("devuelve solo la especie que tiene data", async () => {
-    mockTypeFindMany.mockResolvedValue([{ species: "PERRO" }]);
-    mockBrandFindMany.mockResolvedValue([]);
+  it("delega en el snapshot", async () => {
+    mockGetSpecies.mockResolvedValue(["perro"]);
     await expect(listSpecies()).resolves.toEqual(["perro"]);
   });
 });
@@ -105,10 +146,10 @@ describe("whatsappCatalog — listSpecies", () => {
 describe("whatsappCatalog — listStages", () => {
   beforeEach(resetMocks);
 
-  it("mapea PriceKgType a {stage, id}", async () => {
-    mockTypeFindMany.mockResolvedValue([
-      { id: "t-adulto", name: "Adulto" },
-      { id: "t-cachorro", name: "Cachorro" },
+  it("mapea etapas del snapshot a {stage, id}", async () => {
+    mockGetStages.mockResolvedValue([
+      { stage: "Adulto", id: "t-adulto" },
+      { stage: "Cachorro", id: "t-cachorro" },
     ]);
     await expect(listStages("perro")).resolves.toEqual([
       { stage: "Adulto", id: "t-adulto" },
@@ -120,11 +161,10 @@ describe("whatsappCatalog — listStages", () => {
 describe("whatsappCatalog — listBrands", () => {
   beforeEach(resetMocks);
 
-  it("filtrar marcas con celdas para especie+etapa", async () => {
-    mockPriceKgFindMany.mockResolvedValue([{ brandId: "b1" }, { brandId: "b2" }]);
-    mockBrandFindMany.mockResolvedValue([
-      { id: "b1", name: "Pro Plan" },
-      { id: "b2", name: "Maxxium" },
+  it("delega en el snapshot (marcas con celda para especie+etapa)", async () => {
+    mockGetBrands.mockResolvedValue([
+      { brand: "Pro Plan", id: "b1" },
+      { brand: "Maxxium", id: "b2" },
     ]);
     await expect(listBrands("perro", "t-adulto")).resolves.toEqual([
       { brand: "Pro Plan", id: "b1" },
@@ -133,7 +173,7 @@ describe("whatsappCatalog — listBrands", () => {
   });
 
   it("sin celdas → array vacío", async () => {
-    mockPriceKgFindMany.mockResolvedValue([]);
+    mockGetBrands.mockResolvedValue([]);
     await expect(listBrands("perro", "t-adulto")).resolves.toEqual([]);
   });
 });
@@ -141,43 +181,23 @@ describe("whatsappCatalog — listBrands", () => {
 describe("whatsappCatalog — listProductsForSelection", () => {
   beforeEach(resetMocks);
 
-  it("devuelve la celda de kilo + las bolsas que clasifican a marca+etapa+especie", async () => {
-    // Celda de kilo.
-    mockPriceKgFindFirst.mockResolvedValue({ id: "c-1", priceKg: 30000 });
-    (prisma.priceKgBrand.findFirst as jest.Mock).mockResolvedValue({
-      name: "Pro Plan",
-    });
-    (prisma.priceKgType.findFirst as jest.Mock).mockResolvedValue({ name: "Adulto" });
-
-    // Datos para clasificar bolsas.
-    mockCategoryFindMany.mockResolvedValue([catRoot, catPerro]);
-    mockBrandFindMany.mockResolvedValue([
-      { id: "b-proplan", name: "Pro Plan", keywords: ["PROPLAN"] },
-    ]);
-    mockTypeFindMany.mockResolvedValue([
-      { id: "t-adulto", name: "Adulto", synonyms: ["ADULT"] },
-    ]);
-    mockProductFindMany.mockResolvedValue([
-      {
-        id: "p-1",
-        name: "Pro Plan Adulto 15kg",
-        price: 45000,
-        priceKgSuelto: null,
-        categoryId: "perro",
-      },
+  it("devuelve la celda de kilo + las bolsas pre-clasificadas del snapshot", async () => {
+    mockFindCell.mockResolvedValue({ id: "c-1", brandId: "b-proplan", typeId: "t-adulto", species: "perro", priceKg: 30000 });
+    mockGetCellLabel.mockResolvedValue("Pro Plan Adulto suelto");
+    mockGetProductsFor.mockResolvedValue([
+      { type: "bolsa", id: "p-1", label: "Pro Plan Adulto 15kg", price: 45000, priceKg: 2900.5 },
     ]);
 
     const products = await listProductsForSelection("perro", "t-adulto", "b-proplan");
     expect(products).toEqual([
       { type: "kilo", id: "c-1", label: "Pro Plan Adulto suelto", price: 30000, priceKg: 30000 },
-      { type: "bolsa", id: "p-1", label: "Pro Plan Adulto 15kg", price: 45000, priceKg: null },
+      { type: "bolsa", id: "p-1", label: "Pro Plan Adulto 15kg", price: 45000, priceKg: 2900.5 },
     ]);
   });
 
   it("sin celda ni producto → array vacío", async () => {
-    mockPriceKgFindFirst.mockResolvedValue(null);
-    mockCategoryFindMany.mockResolvedValue([]);
-    mockProductFindMany.mockResolvedValue([]);
+    mockFindCell.mockResolvedValue(null);
+    mockGetProductsFor.mockResolvedValue([]);
     await expect(listProductsForSelection("perro", "t-adulto", "b")).resolves.toEqual([]);
   });
 });
@@ -185,14 +205,9 @@ describe("whatsappCatalog — listProductsForSelection", () => {
 describe("whatsappCatalog — resolveProductById", () => {
   beforeEach(resetMocks);
 
-  it("bolsa: resuelve Product por id (price + cantidad)", async () => {
-    mockProductFindFirst.mockResolvedValue({
-      id: "p-1",
-      name: "Pro Plan Adulto 15kg",
-      price: 45000,
-      priceKgSuelto: 2900.5,
-      quantity: 20,
-    });
+  it("bolsa: precio del snapshot + stock puntual de la DB", async () => {
+    mockFindProductById.mockResolvedValue(snapshot.products[0]);
+    mockProductFindFirst.mockResolvedValue({ quantity: 20 });
     await expect(resolveProductById("p-1")).resolves.toEqual({
       type: "bolsa",
       name: "Pro Plan Adulto 15kg",
@@ -203,15 +218,9 @@ describe("whatsappCatalog — resolveProductById", () => {
   });
 
   it("kilo: resuelve la celda + stock suelto sumado entre sucursales", async () => {
-    mockProductFindFirst.mockResolvedValue(null);
-    mockPriceKgFindFirst.mockResolvedValue({
-      id: "c-1",
-      priceKg: 30000,
-      brandId: "b-proplan",
-      typeId: "t-adulto",
-    });
-    (prisma.priceKgBrand.findFirst as jest.Mock).mockResolvedValue({ name: "Pro Plan" });
-    (prisma.priceKgType.findFirst as jest.Mock).mockResolvedValue({ name: "Adulto" });
+    mockFindProductById.mockResolvedValue(null);
+    mockFindCellById.mockResolvedValue({ id: "c-1", brandId: "b-proplan", typeId: "t-adulto", species: "perro", priceKg: 30000 });
+    mockGetCellLabel.mockResolvedValue("Pro Plan Adulto suelto");
     mockLooseFindMany.mockResolvedValue([{ quantity: 2 }, { quantity: 0.5 }]);
     await expect(resolveProductById("c-1")).resolves.toEqual({
       type: "kilo",
@@ -223,8 +232,8 @@ describe("whatsappCatalog — resolveProductById", () => {
   });
 
   it("id desconocido → null", async () => {
-    mockProductFindFirst.mockResolvedValue(null);
-    mockPriceKgFindFirst.mockResolvedValue(null);
+    mockFindProductById.mockResolvedValue(null);
+    mockFindCellById.mockResolvedValue(null);
     await expect(resolveProductById("zzz")).resolves.toBeNull();
   });
 });
@@ -233,13 +242,8 @@ describe("whatsappCatalog — calculateOrderCost (round2, sin inventar)", () => 
   beforeEach(resetMocks);
 
   it("bolsa: 2 × 45000 = 90000", async () => {
-    mockProductFindFirst.mockResolvedValue({
-      id: "p-1",
-      name: "Pro Plan Adulto 15kg",
-      price: 45000,
-      priceKgSuelto: null,
-      quantity: 20,
-    });
+    mockFindProductById.mockResolvedValue({ ...snapshot.products[0], price: 45000, priceKgSuelto: null });
+    mockProductFindFirst.mockResolvedValue({ quantity: 20 });
     await expect(
       calculateOrderCost({ type: "bolsa", id: "p-1", quantity: 2 }),
     ).resolves.toEqual({
@@ -249,15 +253,9 @@ describe("whatsappCatalog — calculateOrderCost (round2, sin inventar)", () => 
   });
 
   it("kilo: 1.5 × 30000 = 45000", async () => {
-    mockProductFindFirst.mockResolvedValue(null);
-    mockPriceKgFindFirst.mockResolvedValue({
-      id: "c-1",
-      priceKg: 30000,
-      brandId: "b-proplan",
-      typeId: "t-adulto",
-    });
-    (prisma.priceKgBrand.findFirst as jest.Mock).mockResolvedValue({ name: "Pro Plan" });
-    (prisma.priceKgType.findFirst as jest.Mock).mockResolvedValue({ name: "Adulto" });
+    mockFindProductById.mockResolvedValue(null);
+    mockFindCellById.mockResolvedValue({ id: "c-1", brandId: "b-proplan", typeId: "t-adulto", species: "perro", priceKg: 30000 });
+    mockGetCellLabel.mockResolvedValue("Pro Plan Adulto suelto");
     mockLooseFindMany.mockResolvedValue([]);
     await expect(
       calculateOrderCost({ type: "kilo", id: "c-1", quantity: 1.5 }),
@@ -274,19 +272,16 @@ describe("whatsappCatalog — calculateOrderCost (round2, sin inventar)", () => 
   });
 
   it("bolsa con precio en cero (sin precio) → lo dice honestamente", async () => {
-    mockProductFindFirst.mockResolvedValue({
-      id: "p-1",
-      name: "Sin precio",
-      price: 0,
-      priceKgSuelto: null,
-      quantity: 5,
-    });
+    mockFindProductById.mockResolvedValue({ ...snapshot.products[0], name: "Sin precio", price: 0, priceKgSuelto: null });
+    mockProductFindFirst.mockResolvedValue({ quantity: 5 });
     await expect(
       calculateOrderCost({ type: "bolsa", id: "p-1", quantity: 1 }),
     ).resolves.toEqual({ total: 0, detail: "Todavía no tenemos precio cargado para eso." });
   });
 
   it("producto inexistente → dice que no lo encuentra", async () => {
+    mockFindProductById.mockResolvedValue(null);
+    mockFindCellById.mockResolvedValue(null);
     await expect(
       calculateOrderCost({ type: "bolsa", id: "zzz", quantity: 1 }),
     ).resolves.toEqual({
@@ -297,43 +292,23 @@ describe("whatsappCatalog — calculateOrderCost (round2, sin inventar)", () => 
 });
 
 describe("whatsappCatalog — matchBrands (FASE 4: marca por texto libre)", () => {
-  beforeEach(() => {
-    resetMocks();
-  });
+  beforeEach(resetMocks);
 
   it("matchea por keyword exacto → exact:true", async () => {
-    // listBrands: priceKgPrice.findMany → 1 celda → brandId "b1"; luego
-    // priceKgBrand.findMany (para listBrands) → devuelve la marca.
-    mockPriceKgFindMany.mockResolvedValue([{ brandId: "b1" }]);
-    mockBrandFindMany
-      .mockResolvedValueOnce([
-        { id: "b1", name: "ProPlan", keywords: [] },
-        { id: "b2", name: "Old Prince", keywords: [] },
-      ])
-      // Segundo findMany (en matchBrands, para keywords).
-      .mockResolvedValueOnce([
-        { id: "b1", name: "ProPlan", keywords: ["pro plan", "purina"] },
-        { id: "b2", name: "Old Prince", keywords: ["old prince", "royal"] },
-      ]);
-
+    mockGetBrands.mockResolvedValue([{ brand: "ProPlan", id: "b-proplan" }]);
+    mockGetCatalogSnapshot.mockResolvedValue(snapshot);
     await expect(matchBrands("perro", "t-adulto", "purina")).resolves.toEqual([
-      { brand: "ProPlan", id: "b1", exact: true },
+      { brand: "ProPlan", id: "b-proplan", exact: true },
     ]);
   });
 
   it("texto parcial (varias candidatas) → sin exact, hasta 3", async () => {
-    mockPriceKgFindMany.mockResolvedValue([{ brandId: "b1" }, { brandId: "b2" }, { brandId: "b3" }]);
-    mockBrandFindMany
-      .mockResolvedValueOnce([
-        { id: "b1", name: "AGILITY", keywords: [] },
-        { id: "b2", name: "AGILITY CORDERO", keywords: [] },
-        { id: "b3", name: "AGILITY SALMON", keywords: [] },
-      ])
-      .mockResolvedValueOnce([
-        { id: "b1", name: "AGILITY", keywords: [] },
-        { id: "b2", name: "AGILITY CORDERO", keywords: [] },
-        { id: "b3", name: "AGILITY SALMON", keywords: [] },
-      ]);
+    mockGetBrands.mockResolvedValue([
+      { brand: "AGILITY", id: "b-agility" },
+      { brand: "AGILITY CORDERO", id: "b-agility-cordero" },
+      { brand: "AGILITY SALMON", id: "b-agility-salmon" },
+    ]);
+    mockGetCatalogSnapshot.mockResolvedValue(snapshot);
 
     const res = await matchBrands("perro", "t-adulto", "agility");
     expect(res.length).toBe(3);
@@ -341,47 +316,31 @@ describe("whatsappCatalog — matchBrands (FASE 4: marca por texto libre)", () =
   });
 
   it("sin match → devuelve []", async () => {
-    mockPriceKgFindMany.mockResolvedValue([{ brandId: "b1" }]);
-    mockBrandFindMany
-      .mockResolvedValueOnce([{ id: "b1", name: "ProPlan", keywords: [] }])
-      .mockResolvedValueOnce([{ id: "b1", name: "ProPlan", keywords: [] }]);
-
+    mockGetBrands.mockResolvedValue([{ brand: "ProPlan", id: "b-proplan" }]);
+    mockGetCatalogSnapshot.mockResolvedValue(snapshot);
     await expect(matchBrands("perro", "t-adulto", "marca-inexistente")).resolves.toEqual([]);
   });
 });
 
 describe("whatsappCatalog — matchStages (FASE 4: etapa por texto libre)", () => {
-  beforeEach(() => {
-    resetMocks();
-  });
+  beforeEach(resetMocks);
 
   it("matchea por nombre exacto → exact:true", async () => {
-    mockTypeFindMany.mockResolvedValue([
-      { id: "t-adulto", name: "Adulto", species: "PERRO", synonyms: [] },
-      { id: "t-cachorro", name: "Cachorro", species: "PERRO", synonyms: [] },
-    ]);
-
+    mockGetCatalogSnapshot.mockResolvedValue(snapshot);
     await expect(matchStages("perro", "Adulto")).resolves.toEqual([
       { stage: "Adulto", id: "t-adulto", exact: true },
     ]);
   });
 
   it("matchea por sinónimo → exact:true", async () => {
-    mockTypeFindMany.mockResolvedValue([
-      { id: "t-adulto", name: "Adulto", species: "PERRO", synonyms: ["adult"] },
-      { id: "t-kitten", name: "Kitten", species: "GATO", synonyms: ["gatito"] },
-    ]);
-
+    mockGetCatalogSnapshot.mockResolvedValue(snapshot);
     await expect(matchStages("perro", "adult")).resolves.toEqual([
       { stage: "Adulto", id: "t-adulto", exact: true },
     ]);
   });
 
   it("sin match → devuelve []", async () => {
-    mockTypeFindMany.mockResolvedValue([
-      { id: "t-adulto", name: "Adulto", species: "PERRO", synonyms: [] },
-    ]);
-
+    mockGetCatalogSnapshot.mockResolvedValue(snapshot);
     await expect(matchStages("perro", "geriatrico")).resolves.toEqual([]);
   });
 });
