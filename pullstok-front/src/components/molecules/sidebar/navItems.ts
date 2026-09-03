@@ -112,6 +112,7 @@ export const vendorSimpleNav: NavItem[] = [
   { to: "/dashboard", label: "Vender", icon: ShoppingCart },
   { to: "/pedidos", label: "Pedidos", icon: ClipboardList },
   { to: "/pedidos-whatsapp", label: "Pedidos WhatsApp", icon: MessageCircle },
+  { to: "/mensajes", label: "Mensajes", icon: MessageSquare },
   { to: "/Ventas", label: "Ventas", icon: ShoppingCart },
   { to: "/presupuestos", label: "Presupuestos", icon: FileText },
   { to: "/caja", label: "Caja", icon: Wallet },

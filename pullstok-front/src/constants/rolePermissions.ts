@@ -39,7 +39,7 @@ export const ROLE_VISIBLE_PATHS: Record<string, Role[]> = {
   "/categorias": ["ADMIN", "MANAGEMENT"],
   "/facturas": ["ADMIN", "MANAGEMENT", "CASHIER"], // Remitos
   "/tienda": ["ADMIN", "MANAGEMENT"],
-  "/mensajes": ["ADMIN", "MANAGEMENT"],
+  "/mensajes": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/facturacion": ["ADMIN", "MANAGEMENT"], // gated by plan too
   "/asistente-ia": ["ADMIN", "MANAGEMENT"], // gated by plan too
   "/usuarios": ["ADMIN", "MANAGEMENT"], // NEW — user management
