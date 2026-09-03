@@ -345,7 +345,9 @@ const bolsaProducts = async (
   if (secoIds.length === 0) return [];
 
   const products = await prisma.product.findMany({
-    where: { categoryId: { in: secoIds } },
+    // Solo los productos "carried" (los que realmente se venden) → evita clasificar
+    // los miles de productos no vendibles con classifyProduct por cada mensaje.
+    where: { categoryId: { in: secoIds }, carried: true },
     select: { id: true, name: true, price: true, priceKgSuelto: true, categoryId: true },
   });
 
