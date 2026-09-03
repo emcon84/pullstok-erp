@@ -22,6 +22,7 @@ import {
   listSpecies,
   listStages,
   listBrands,
+  matchBrands,
   listProductsForSelection,
   calculateOrderCost,
   buildCatalogSlug,
@@ -485,6 +486,14 @@ const optionsForStage = async (
     return listStages(draft.selectedSpecies);
   }
   if (stage === STAGE_BRAND) {
+    // Si hay candidatas matcheadas por texto, el número 1..N debe mapear a esas
+    // (no a las 93 marcas). Si no, listamos las de la especie+etapa.
+    if (
+      Array.isArray((draft as any).brandCandidates) &&
+      (draft as any).brandCandidates.length > 0
+    ) {
+      return (draft as any).brandCandidates as { id: string }[];
+    }
     return listBrands(draft.selectedSpecies, draft.selectedStageId);
   }
   if (stage === STAGE_PRODUCT_SELECT) {
@@ -521,6 +530,28 @@ const captureSelectionFor = async (
     if (!opt) return {};
     if (currentStage === STAGE_TYPED) return { selectedStageId: opt.id };
     if (currentStage === STAGE_BRAND) return { selectedBrandId: opt.id };
+  }
+
+  // BRAND con TEXTO LIBRE: como hay muchas marcas (no se listan), el cliente
+  // escribe el nombre y lo matcheamos con matchBrands (mismo motor de keywords
+  // del matching planilla↔productos). Si el match es EXACTO (una sola marca)
+  // avanzamos directo; si no, guardamos las candidatas para que confirme.
+  if (currentStage === STAGE_BRAND && trimmed.length > 0) {
+    const matches = await matchBrands(
+      draftBefore.selectedSpecies,
+      draftBefore.selectedStageId,
+      trimmed,
+    );
+    if (matches.length === 1 && matches[0].exact) {
+      return { selectedBrandId: matches[0].id };
+    }
+    if (matches.length > 0) {
+      return {
+        brandCandidates: matches.map((m) => ({ id: m.id, brand: m.brand })),
+      };
+    }
+    // Sin match → pedimos que la escriba de nuevo (sin avanzar).
+    return { brandNotFound: true };
   }
 
   // Id directo (botón interactivo). PRODUCT_SELECT además arma el objeto completo
@@ -570,8 +601,17 @@ const catalogForStage = async (
     case STAGE_TYPED:
       return { stages: await listStages(draft.selectedSpecies) };
     case STAGE_BRAND:
+      // Si hay candidatas matcheadas por texto (≤3) las mostramos para confirmar;
+      // si no, listamos las marcas de la especie+etapa (o pedimos escribir si son
+      // muchas — ver messageForStage). Evita el payload gigante con +90 marcas.
       return {
-        brands: await listBrands(draft.selectedSpecies, draft.selectedStageId),
+        brands: Array.isArray((draft as any).brandCandidates) &&
+          (draft as any).brandCandidates.length > 0
+          ? (draft as any).brandCandidates.map((c: { id: string; brand: string }) => ({
+              id: c.id,
+              brand: c.brand,
+            }))
+          : await listBrands(draft.selectedSpecies, draft.selectedStageId),
       };
     case STAGE_PRODUCT_SELECT:
       return {
@@ -674,6 +714,27 @@ const applyFlowReply = async (input: {
   const orderType = (mergedDraft.orderType as string) ?? "bolsa";
   let catalog: FlowCatalog = {};
   let cost: { total: number; detail: string } | null = null;
+
+  // Marca sin match: el cliente escribió un nombre que no encontramos. Le pedimos
+  // que la escriba de nuevo y nos quedamos en el mismo nodo (sin avanzar). Esto
+  // evita que el flujo puro intente listar las 93 marcas (payload gigante).
+  if ((selectionPatch as any).brandNotFound) {
+    const msg =
+      "No encontré esa marca 🐾 ¿Podés escribirla de nuevo? (ej: ProPlan, Old Prince, Maxxium) o pedí ayuda con un vendedor.";
+    await sendText(phone, msg).catch(() => {});
+    await persistMessage({
+      conversationId,
+      sender: "OPERATOR",
+      senderUserId: null,
+      isBot: true,
+      body: msg,
+    });
+    await prisma.conversation.updateMany({
+      where: { id: conversationId },
+      data: { whatsappStage: STAGE_BRAND },
+    });
+    return;
+  }
 
   // Armamos el catálogo para el NODO destino usando la selección ya actualizada,
   // para que el flujo puro arme los botones/mensajes del paso siguiente. El costo

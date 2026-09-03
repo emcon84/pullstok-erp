@@ -22,6 +22,7 @@ import {
   listSpecies,
   listStages,
   listBrands,
+  matchBrands,
   listProductsForSelection,
   resolveProductById,
   calculateOrderCost,
@@ -291,5 +292,59 @@ describe("whatsappCatalog — calculateOrderCost (round2, sin inventar)", () => 
       total: 0,
       detail: "No encontramos ese producto en el catálogo. Debería estar cargado.",
     });
+  });
+});
+
+describe("whatsappCatalog — matchBrands (FASE 4: marca por texto libre)", () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it("matchea por keyword exacto → exact:true", async () => {
+    // listBrands: priceKgPrice.findMany → 1 celda → brandId "b1"; luego
+    // priceKgBrand.findMany (para listBrands) → devuelve la marca.
+    mockPriceKgFindMany.mockResolvedValue([{ brandId: "b1" }]);
+    mockBrandFindMany
+      .mockResolvedValueOnce([
+        { id: "b1", name: "ProPlan", keywords: [] },
+        { id: "b2", name: "Old Prince", keywords: [] },
+      ])
+      // Segundo findMany (en matchBrands, para keywords).
+      .mockResolvedValueOnce([
+        { id: "b1", name: "ProPlan", keywords: ["pro plan", "purina"] },
+        { id: "b2", name: "Old Prince", keywords: ["old prince", "royal"] },
+      ]);
+
+    await expect(matchBrands("perro", "t-adulto", "purina")).resolves.toEqual([
+      { brand: "ProPlan", id: "b1", exact: true },
+    ]);
+  });
+
+  it("texto parcial (varias candidatas) → sin exact, hasta 3", async () => {
+    mockPriceKgFindMany.mockResolvedValue([{ brandId: "b1" }, { brandId: "b2" }, { brandId: "b3" }]);
+    mockBrandFindMany
+      .mockResolvedValueOnce([
+        { id: "b1", name: "AGILITY", keywords: [] },
+        { id: "b2", name: "AGILITY CORDERO", keywords: [] },
+        { id: "b3", name: "AGILITY SALMON", keywords: [] },
+      ])
+      .mockResolvedValueOnce([
+        { id: "b1", name: "AGILITY", keywords: [] },
+        { id: "b2", name: "AGILITY CORDERO", keywords: [] },
+        { id: "b3", name: "AGILITY SALMON", keywords: [] },
+      ]);
+
+    const res = await matchBrands("perro", "t-adulto", "agility");
+    expect(res.length).toBe(3);
+    expect(res.every((r) => r.exact === false)).toBe(true);
+  });
+
+  it("sin match → devuelve []", async () => {
+    mockPriceKgFindMany.mockResolvedValue([{ brandId: "b1" }]);
+    mockBrandFindMany
+      .mockResolvedValueOnce([{ id: "b1", name: "ProPlan", keywords: [] }])
+      .mockResolvedValueOnce([{ id: "b1", name: "ProPlan", keywords: [] }]);
+
+    await expect(matchBrands("perro", "t-adulto", "marca-inexistente")).resolves.toEqual([]);
   });
 });

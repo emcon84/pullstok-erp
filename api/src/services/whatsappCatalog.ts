@@ -153,6 +153,67 @@ export const listBrands = async (
   return brands.map((b) => ({ brand: b.name, id: b.id }));
 };
 
+/**
+ * Matchea el texto libre que escribe el cliente contra las marcas del catálogo.
+ *
+ * Con más de 3 opciones (límite de WhatsApp) NO se muestran botones ni lista
+ * numerada: el cliente ESCRIBE la marca. Esta función resuelve ese texto:
+ * - Usa el mismo motor de normalización/keywords del matching planilla↔productos
+ *   (resolveBrand), así "proplan" → ProPlan, "old prince" → Old Prince.
+ * - Devuelve las marcas que coinciden. Si hay exactamente UNA (el cliente la
+ *   definió bien), la fila lleva `exact: true` → el flujo avanza directo.
+ * - Si hay varias cercanas (ej. "agility" → AGILITY y AGILITY CORDERO), devuelve
+ *   hasta 3 con `exact: false` para que el cliente confirme con un número.
+ * - Si no hay ninguna, devuelve [] → el bot pide que la escriba de nuevo.
+ */
+export const matchBrands = async (
+  species: string,
+  stageId: string,
+  query: string,
+): Promise<{ brand: string; id: string; exact: boolean }[]> => {
+  const q = normalizeName(query);
+  if (!q) return [];
+
+  const all = await listBrands(species, stageId);
+  if (all.length === 0) return [];
+  // A `listBrands` le falta `keywords`; lo leemos por separado para el match.
+  const brands = await prisma.priceKgBrand.findMany({
+    where: { id: { in: all.map((b) => b.id) } },
+    select: { id: true, name: true, keywords: true },
+  });
+  const byId = new Map(brands.map((b) => [b.id, b]));
+
+  const scored = all
+    .map((b) => {
+      const full = byId.get(b.id);
+      const keywords = full?.keywords ?? [];
+      // Coincidencia exacta del nombre normalizado o de algún keyword.
+      if (normalizeName(b.brand) === q || keywords.some((k) => normalizeName(k) === q)) {
+        return { ...b, score: 100, exact: true };
+      }
+      // El texto es un substring del nombre de la marca o del keyword.
+      const nameHit = normalizeName(b.brand).includes(q);
+      const kwHit = keywords.some((k) => normalizeName(k).includes(q));
+      if (nameHit || kwHit) return { ...b, score: 50, exact: false };
+      return { ...b, score: 0, exact: false };
+    })
+    .filter((b) => b.score > 0)
+    .sort((a, b) => b.score - a.score || a.brand.localeCompare(b.brand));
+
+  // Decisión de match: el cliente escribe "agility" y hay "AGILITY" (exacto) junto
+  // a "AGILITY CORDERO"/"AGILITY SALMON" (variantes). Como son VARIAS marcas que
+  // participan, mostramos las candidatas para que confirme — no asumimos que la
+  // de nombre exacto es la única. Solo avanzamos directo si hay UNA sola marca
+  // que coincide (la definió bien).
+  const uniqueIds = new Set(scored.map((s) => s.id));
+  if (scored.length === 1 && uniqueIds.size === 1) {
+    return [{ brand: scored[0].brand, id: scored[0].id, exact: true }];
+  }
+  // Varias candidatas (exacto + variantes, o varias parciales) → hasta 3 para
+  // confirmar, sin `exact` (el flujo pide elegir una con número).
+  return scored.slice(0, 3).map((s) => ({ brand: s.brand, id: s.id, exact: false }));
+};
+
 // Shape público de una opción de producto que muestra el bot (bolsa y/o kilo).
 export interface ProductSelection {
   type: "bolsa" | "kilo";
@@ -552,6 +613,7 @@ export default {
   listSpecies,
   listStages,
   listBrands,
+  matchBrands,
   listProductsForSelection,
   resolveProductById,
   calculateOrderCost,

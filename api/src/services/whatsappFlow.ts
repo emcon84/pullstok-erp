@@ -168,12 +168,23 @@ export function buttonsForStage(
  * con botones interactivos. Los menús de FASE 4 llevan las opciones numeradas
  * según el `catalog` resuelto por el service (así el texto funciona también
  * cuando el cliente responde con números).
+ *
+ * REGLA ANTI-PAYLOAD-GIGANTE: si un menú tiene MÁS DE 3 opciones NO se listan
+ * (excede el límite de botones de WhatsApp y un texto numerado grande revienta
+ * el límite de ~4096 chars). En ese caso se le pide al cliente que ESCRIBA el
+ * texto y el service lo matchea (ver matchBrands en whatsappCatalog). Esto aplica
+ * de forma genérica a `withOptions`: si el menú es muy grande, no lo mostramos.
  */
+const MENU_LIMIT = 3;
 export function messageForStage(stage: string, catalog?: FlowCatalog): string {
   const menu = menuOptions(stage, catalog);
   const withOptions = (base: string): string => {
     if (!menu) return base;
     if (menu.length === 0) return `${base}\n\nNo tenemos datos cargados para esa opción todavía. Probá con otra o escribí "otro".`;
+    if (menu.length > MENU_LIMIT) {
+      // No listamos: pedimos que escriba. El service matchea el texto libre.
+      return `${base}\n\nEscribí la opción que buscás y la busco por vos.`;
+    }
     return `${base}\n${numberedList(menu).join("\n")}`;
   };
 
@@ -194,7 +205,11 @@ export function messageForStage(stage: string, catalog?: FlowCatalog): string {
     case STAGE_TYPED:
       return withOptions("¿Qué etapa es? (Adulto, Cachorro, Kitten, Senior...) Elegí una:");
     case STAGE_BRAND:
-      return withOptions("¿Qué marca es? Elegí una:");
+      // Si hay pocas marcas las listamos; si son muchas (típico: +90) pedimos que
+      // escriba el nombre y lo matcheamos → evita el mensaje gigante que colgaba.
+      return menu && menu.length <= MENU_LIMIT
+        ? withOptions("¿Qué marca es? Elegí una:")
+        : "¿Qué marca buscás? Escribí el nombre (ej: ProPlan, Old Prince) y te muestro los productos.";
     case STAGE_PRODUCT_SELECT:
       return withOptions("Elegí el producto:");
     case STAGE_PRODUCT_QUANTITY:
@@ -446,6 +461,13 @@ export function buildDraftData(
   selectedSpecies?: string;
   selectedStageId?: string;
   selectedBrandId?: string;
+  // FASE 4 — matching de marca por texto libre. brandTyped es el texto crudo que
+  // escribió el cliente (el service lo matchea con matchBrands); brandCandidates
+  // son las marcas que coincidieron (≤3) para confirmar; brandNotFound indica que
+  // no hubo match y hay que pedir que la escriba de nuevo.
+  brandTyped?: string;
+  brandCandidates?: { id: string; brand: string }[];
+  brandNotFound?: boolean;
 } {
   const a = norm(answer);
   const isNumeric = /^\d+(\.\d+)?$/.test(a);
@@ -465,7 +487,17 @@ export function buildDraftData(
       // Id de la etapa (botón). Un número → lo resuelve el service (lista).
       return !isNumeric && a.length > 0 ? { selectedStageId: a } : {};
     case STAGE_BRAND:
-      return !isNumeric && a.length > 0 ? { selectedBrandId: a } : {};
+      // El id de la marca puede venir como id de botón (pocas marcas → lo
+      // guardamos directo) o como texto libre natural (muchas marcas → el service
+      // matchea con matchBrands y resuelve exacto/ambiguo/not_found).
+      if (!isNumeric && a.length > 0) {
+        // Un id de botón suele ser un uuid o algo con guiones/código. Si no tiene
+        // espacios (nombre de marca escrito con espacios es texto a matchear) y
+        // parece un id, lo guardamos; si no, lo marcamos como texto tipeado.
+        const looksLikeId = /^[a-z0-9-]{6,}$/i.test(a) && !a.includes(" ");
+        return looksLikeId ? { selectedBrandId: a } : { brandTyped: a };
+      }
+      return {};
     case STAGE_PRODUCT_SELECT:
       // El objeto selectedProduct (id + tipo + nombre + precio) lo arma el service
       // en whatsappService con el catálogo cargado (el flujo es puro y no lo sabe).
