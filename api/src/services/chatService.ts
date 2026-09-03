@@ -260,6 +260,10 @@ export const listConversations = async () => {
     guestName: c.guestName,
     guestEmail: c.guestEmail,
     customerId: c.customerId,
+    // Canal de origen y teléfono del cliente (WHATSAPP via Kapso). Permite que
+    // la bandeja distinga una conversación de WhatsApp y muestre el número real.
+    channel: c.channel,
+    guestPhone: c.guestPhone,
     status: c.status,
     lastMessageAt: c.lastMessageAt ? c.lastMessageAt.toISOString() : null,
     createdAt: c.createdAt.toISOString(),

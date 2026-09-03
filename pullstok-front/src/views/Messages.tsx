@@ -40,8 +40,13 @@ const formatListTime = (date: string | null) => {
     : d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
 };
 
-const guestLabel = (c: ConversationDTO) =>
-  c.guestName?.trim() || c.guestEmail?.trim() || "Invitado";
+// El label del cliente. Para WhatsApp mostramos el teléfono (E.164 sin
+// espacios) en lugar del guestEmail sintético; si no hay teléfono, caemos al
+// guestName/guestEmail. Para el widget web, el guestName/guestEmail normal.
+const guestLabel = (c: ConversationDTO) => {
+  if (c.channel === "WHATSAPP" && c.guestPhone) return c.guestPhone;
+  return c.guestName?.trim() || c.guestEmail?.trim() || "Invitado";
+};
 
 const guestInitial = (c: ConversationDTO) =>
   (guestLabel(c)[0] ?? "?").toUpperCase();
@@ -194,6 +199,14 @@ const ConversationList: React.FC<ConversationListProps> = ({
                     />
                   )}
                   <span className="truncate">{guestLabel(c)}</span>
+                  {c.channel === "WHATSAPP" && (
+                    <Badge
+                      variant="secondary"
+                      className="h-4 shrink-0 px-1.5 text-[9px] leading-none"
+                    >
+                      WhatsApp
+                    </Badge>
+                  )}
                 </p>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {formatListTime(c.lastMessageAt)}
@@ -317,8 +330,22 @@ const ChatThread: React.FC<ChatThreadProps> = ({ conversation, onBack }) => {
             <span className="shrink-0">
               {guestOnline ? "En línea" : "Desconectado"}
             </span>
-            {conversation.guestEmail && (
-              <span className="truncate">· {conversation.guestEmail}</span>
+            {conversation.channel === "WHATSAPP" ? (
+              conversation.guestPhone && (
+                <span className="truncate">· {conversation.guestPhone}</span>
+              )
+            ) : (
+              conversation.guestEmail && (
+                <span className="truncate">· {conversation.guestEmail}</span>
+              )
+            )}
+            {conversation.channel === "WHATSAPP" && (
+              <Badge
+                variant="secondary"
+                className="h-5 shrink-0 px-1.5 text-[10px] leading-none"
+              >
+                WhatsApp
+              </Badge>
             )}
           </p>
         </div>

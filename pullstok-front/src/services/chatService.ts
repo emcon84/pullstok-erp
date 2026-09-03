@@ -23,6 +23,10 @@ export interface ConversationDTO {
   guestName: string | null;
   guestEmail: string | null;
   customerId: string | null;
+  // Canal de origen (WEB = widget tienda, WHATSAPP = Kapso) y teléfono del
+  // cliente para WhatsApp. Permite distinguir y mostrar el número real.
+  channel: "WEB" | "WHATSAPP" | null;
+  guestPhone: string | null;
   status: string;
   lastMessageAt: string | null;
   createdAt: string;
