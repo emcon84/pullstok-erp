@@ -66,7 +66,7 @@ describe("PrintInvoice — comprobante fiscal (CAE presente)", () => {
     render(<PrintInvoice {...fiscalData} />);
 
     const logo = screen.getByTestId("print-invoice-logo") as HTMLImageElement;
-    expect(logo.src).toContain("logo-vertical.png");
+    expect(logo.src).toContain("LogoPullNegroHor");
   });
 
   it("tabla con 7 columnas y filas vacías de relleno", () => {

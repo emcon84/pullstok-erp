@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { login } from "../controllers/authController";
+import LogoPullBlancoHor from "@/assets/LogoPullBlancoHor.svg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,16 +47,9 @@ export const LoginPage = () => {
 
   return (
     <div className="relative z-10 w-full max-w-md">
-        <div className="mb-8 flex flex-col items-center gap-2 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl font-bold text-primary shadow-lg">
-            P
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white">
-            Pullstok
-          </h1>
-          <p className="text-sm text-indigo-100">
-            Sistema de gestión de stock
-          </p>
+        <div className="mb-8 flex flex-col items-center gap-3 text-center">
+          <img src={LogoPullBlancoHor} alt="Pullstok" className="h-12 w-auto" />
+          <p className="text-sm text-indigo-100">Sistema de gestión de stock</p>
         </div>
 
         <Card className="border-white/20 shadow-2xl">

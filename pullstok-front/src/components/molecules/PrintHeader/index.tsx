@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import logoUrl from "@/assets/logo-vertical.png";
+import logoUrl from "@/assets/LogoPullNegroHor.svg";
 
 interface PrintHeaderProps {
   title: ReactNode;
@@ -7,10 +7,10 @@ interface PrintHeaderProps {
 }
 
 /**
- * Encabezado imprimible con el logo oficial de la empresa (logo-vertical.png,
- * (asset estático, siempre en negro pleno). Se usa en todas las áreas
- * imprimibles: listado de productos, planilla mayorista, bulk price y
- * planilla por kg.
+ * Encabezado imprimible con el logo oficial de la empresa (LogoPullNegroHor.svg,
+ * la variante horizontal en negro, apta para imprimir sobre fondo blanco).
+ * Se usa en todas las áreas imprimibles: listado de productos, planilla
+ * mayorista, bulk price y planilla por kg.
  */
 export const PrintHeader = ({ title, subtitle }: PrintHeaderProps) => (
   <div className="mb-4 flex items-center gap-3">

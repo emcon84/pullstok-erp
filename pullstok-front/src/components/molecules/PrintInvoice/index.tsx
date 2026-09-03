@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { InvoicePdfData } from "@/utils/exportToPDF";
 import type { AfipQrPayload } from "@/utils/afipQr";
 import { useAfipQrImage } from "@/components/hooks/useAfipQrImage";
-import logoUrl from "@/assets/logo-vertical.png";
+import logoUrl from "@/assets/LogoPullNegroHor.svg";
 
 /**
  * Comprobante de factura IMPRIMIBLE (patrón print-area + window.print).
