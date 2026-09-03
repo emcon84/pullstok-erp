@@ -183,32 +183,29 @@ export const listBrands = async (
  */
 export const matchBrands = async (
   species: string,
-  stageId: string,
   query: string,
 ): Promise<{ brand: string; id: string; exact: boolean }[]> => {
   const q = normalizeName(query);
   if (!q) return [];
 
-  const all = await getBrands(toSpeciesKey(species), stageId);
-  if (all.length === 0) return [];
-
-  // keywords desde el snapshot (ya cargadas al precachear) → sin query extra.
+  // Buscamos en TODAS las marcas de la especie (sin filtrar por etapa): el cliente
+  // puede pedir una marca de cualquier etapa. Antes se filtraba por stageId y por
+  // eso "Old Prince" no aparecía si no estaba en la etapa elegida.
   const snap = await getCatalogSnapshot();
-  const byId = new Map(snap.brands.map((b) => [b.id, b]));
+  const brands = snap.brands.filter((b) => b.species.includes(toSpeciesKey(species)));
 
-  const scored = all
+  const scored = brands
     .map((b) => {
-      const full = byId.get(b.id);
-      const keywords = full?.keywords ?? [];
+      const keywords = b.keywords ?? [];
       // Coincidencia exacta del nombre normalizado o de algún keyword.
-      if (normalizeName(b.brand) === q || keywords.some((k) => normalizeName(k) === q)) {
-        return { ...b, score: 100, exact: true };
+      if (normalizeName(b.name) === q || keywords.some((k) => normalizeName(k) === q)) {
+        return { brand: b.name, id: b.id, score: 100, exact: true };
       }
       // El texto es un substring del nombre de la marca o del keyword.
-      const nameHit = normalizeName(b.brand).includes(q);
+      const nameHit = normalizeName(b.name).includes(q);
       const kwHit = keywords.some((k) => normalizeName(k).includes(q));
-      if (nameHit || kwHit) return { ...b, score: 50, exact: false };
-      return { ...b, score: 0, exact: false };
+      if (nameHit || kwHit) return { brand: b.name, id: b.id, score: 50, exact: false };
+      return { brand: b.name, id: b.id, score: 0, exact: false };
     })
     .filter((b) => b.score > 0)
     .sort((a, b) => b.score - a.score || a.brand.localeCompare(b.brand));
@@ -245,14 +242,18 @@ export interface ProductSelection {
  */
 export const listProductsForSelection = async (
   species: string,
-  stageId: string,
   brandId: string,
+  stageId?: string | null,
 ): Promise<ProductSelection[]> => {
   const key = toSpeciesKey(species);
   const result: ProductSelection[] = [];
 
-  // ── Celda de kilo: es la fuente autoritativa del precio suelto ──
-  const cell = await findCell(key, stageId, brandId);
+  // ── Celda de kilo: es la fuente autoritativa del precio suelto. Como el flujo
+  // simplificado ya no pide etapa, buscamos la primera celda de la marca+especie.
+  const snap = await getCatalogSnapshot();
+  const cell = stageId
+    ? await findCell(key, stageId, brandId)
+    : (snap.cells.find((c) => c.brandId === brandId && c.species === key) ?? null);
   if (cell && cell.priceKg > 0) {
     result.push({
       type: "kilo",
@@ -263,8 +264,8 @@ export const listProductsForSelection = async (
     });
   }
 
-  // ── Bolsas: solo filtra el snapshot por los ids ya clasificados ──
-  const bolsa = await getProductsFor(key, stageId, brandId);
+  // ── Bolsas: todas las de la marca (sin etapa, o filtradas por etapa) ──
+  const bolsa = await getProductsFor(key, brandId, stageId ?? null);
   result.push(...bolsa);
 
   return result;

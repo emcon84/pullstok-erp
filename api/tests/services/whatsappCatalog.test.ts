@@ -188,7 +188,7 @@ describe("whatsappCatalog — listProductsForSelection", () => {
       { type: "bolsa", id: "p-1", label: "Pro Plan Adulto 15kg", price: 45000, priceKg: 2900.5 },
     ]);
 
-    const products = await listProductsForSelection("perro", "t-adulto", "b-proplan");
+    const products = await listProductsForSelection("perro", "b-proplan", "t-adulto");
     expect(products).toEqual([
       { type: "kilo", id: "c-1", label: "Pro Plan Adulto suelto", price: 30000, priceKg: 30000 },
       { type: "bolsa", id: "p-1", label: "Pro Plan Adulto 15kg", price: 45000, priceKg: 2900.5 },
@@ -198,7 +198,7 @@ describe("whatsappCatalog — listProductsForSelection", () => {
   it("sin celda ni producto → array vacío", async () => {
     mockFindCell.mockResolvedValue(null);
     mockGetProductsFor.mockResolvedValue([]);
-    await expect(listProductsForSelection("perro", "t-adulto", "b")).resolves.toEqual([]);
+    await expect(listProductsForSelection("perro", "b", "t-adulto")).resolves.toEqual([]);
   });
 });
 
@@ -295,30 +295,23 @@ describe("whatsappCatalog — matchBrands (FASE 4: marca por texto libre)", () =
   beforeEach(resetMocks);
 
   it("matchea por keyword exacto → exact:true", async () => {
-    mockGetBrands.mockResolvedValue([{ brand: "ProPlan", id: "b-proplan" }]);
     mockGetCatalogSnapshot.mockResolvedValue(snapshot);
-    await expect(matchBrands("perro", "t-adulto", "purina")).resolves.toEqual([
+    await expect(matchBrands("perro", "purina")).resolves.toEqual([
       { brand: "ProPlan", id: "b-proplan", exact: true },
     ]);
   });
 
   it("texto parcial (varias candidatas) → sin exact, hasta 3", async () => {
-    mockGetBrands.mockResolvedValue([
-      { brand: "AGILITY", id: "b-agility" },
-      { brand: "AGILITY CORDERO", id: "b-agility-cordero" },
-      { brand: "AGILITY SALMON", id: "b-agility-salmon" },
-    ]);
     mockGetCatalogSnapshot.mockResolvedValue(snapshot);
 
-    const res = await matchBrands("perro", "t-adulto", "agility");
+    const res = await matchBrands("perro", "agility");
     expect(res.length).toBe(3);
     expect(res.every((r) => r.exact === false)).toBe(true);
   });
 
   it("sin match → devuelve []", async () => {
-    mockGetBrands.mockResolvedValue([{ brand: "ProPlan", id: "b-proplan" }]);
     mockGetCatalogSnapshot.mockResolvedValue(snapshot);
-    await expect(matchBrands("perro", "t-adulto", "marca-inexistente")).resolves.toEqual([]);
+    await expect(matchBrands("perro", "marca-inexistente")).resolves.toEqual([]);
   });
 });
 

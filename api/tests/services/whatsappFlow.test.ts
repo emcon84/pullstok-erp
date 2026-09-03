@@ -378,13 +378,9 @@ describe("whatsappFlow — normalize helpers (FASE 3)", () => {
   });
 });
 
-describe("whatsappFlow — flujo guiado FASE 4 (especie→etapa→marca→producto)", () => {
-  it("SPECIES → STAGE", () => {
-    expect(nextStageForAnswer(STAGE_SPECIES, "perro")).toBe(STAGE_TYPED);
-  });
-
-  it("STAGE → BRAND", () => {
-    expect(nextStageForAnswer(STAGE_TYPED, "tipo-uuid")).toBe(STAGE_BRAND);
+describe("whatsappFlow — flujo guiado FASE 4 (especie→marca→producto, sin etapa)", () => {
+  it("SPECIES → BRAND (se simplificó: sin paso de etapa)", () => {
+    expect(nextStageForAnswer(STAGE_SPECIES, "perro")).toBe(STAGE_BRAND);
   });
 
   it("BRAND → PRODUCT_SELECT", () => {
@@ -544,18 +540,15 @@ describe("whatsappFlow — menús con catálogo (FASE 4)", () => {
     expect(r.buttons).toEqual([BUTTON_MORE, BUTTON_DONE_MORE]);
   });
 
-  it("planResponse(SPECIES + 'perro') avanza a TYPED con sus botones", () => {
+  it("planResponse(SPECIES + 'perro') avanza a BRAND (sin etapa) con sus botones", () => {
     const r = planResponse({
       currentStage: STAGE_SPECIES,
       answer: "perro",
       catalog,
       orderType: "bolsa",
     });
-    expect(r.nextStage).toBe(STAGE_TYPED);
-    expect(r.buttons).toEqual([
-      { id: "t-adulto", title: "Adulto" },
-      { id: "t-cachorro", title: "Cachorro" },
-    ]);
+    expect(r.nextStage).toBe(STAGE_BRAND);
+    expect(r.buttons).toEqual([{ id: "b-proplan", title: "Pro Plan" }]);
   });
 });
 

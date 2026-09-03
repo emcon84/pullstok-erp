@@ -203,7 +203,7 @@ describe("whatsappCatalogCache — getters sobre el snapshot", () => {
   });
 
   it("getProductsFor filtra el snapshot por especie+etapa+marca (ya clasificados)", async () => {
-    const products = await getProductsFor("perro", "t-cachorro", "b-maxxium");
+    const products = await getProductsFor("perro", "b-maxxium", "t-cachorro");
     expect(products).toEqual([
       {
         type: "bolsa",
@@ -216,7 +216,7 @@ describe("whatsappCatalogCache — getters sobre el snapshot", () => {
   });
 
   it("getProductsFor sin match → []", async () => {
-    await expect(getProductsFor("gato", "t-adulto", "b-proplan")).resolves.toEqual([]);
+    await expect(getProductsFor("gato", "b-proplan", "t-adulto")).resolves.toEqual([]);
   });
 
   it("findCell encuentra la celda correcta (marca×tipo×especie)", async () => {

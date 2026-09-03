@@ -215,7 +215,7 @@ export function messageForStage(stage: string, catalog?: FlowCatalog): string {
         ? withOptions("¿Qué marca es? Elegí una:")
         : "¿Qué marca buscás? Escribí el nombre (ej: ProPlan, Old Prince) y te muestro los productos.";
     case STAGE_PRODUCT_SELECT:
-      return withOptions("Elegí el producto:");
+      return withOptions("Elegí el producto (cada opción muestra su peso y precio):");
     case STAGE_PRODUCT_QUANTITY:
       return "¿Cuánto querés? Decime la cantidad (kg para el suelto, cantidad de bolsas para la cerrada).";
     case STAGE_PRODUCT_AMOUNT:
@@ -292,10 +292,10 @@ export function nextStageForAnswer(
       return STAGE_SPECIES;
 
     case STAGE_SPECIES:
-      // Ya eligió especie (por botón o número) → pasa a etapa.
-      return STAGE_TYPED;
-
-    case STAGE_TYPED:
+      // Ya eligió especie (por botón o número) → pasa DIRECTAMENTE a marca.
+      // Se elimina el paso de ETAPA porque la marca puede no estar en la etapa
+      // que el cliente elige (bug: "Old Prince no está en Light"). El matcher de
+      // marca busca en TODAS las etapas y el cliente elige la bolsa.
       return STAGE_BRAND;
 
     case STAGE_BRAND:

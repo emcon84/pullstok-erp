@@ -334,12 +334,19 @@ export const getBrands = async (
 /** Bolsas pre-clasificadas que matchean especie+etapa+marca (solo filtrado). */
 export const getProductsFor = async (
   species: SpeciesKey,
-  stageId: string,
   brandId: string,
+  stageId?: string | null,
 ): Promise<SnapshotProductSelection[]> => {
   const snap = await getCatalogSnapshot();
   return snap.products
-    .filter((p) => p.species === species && p.typeId === stageId && p.brandId === brandId)
+    .filter(
+      (p) =>
+        p.species === species &&
+        p.brandId === brandId &&
+        // Si no hay etapa (flujo simplificado), listamos TODAS las bolsas de la
+        // marca; si hay, filtramos por etapa.
+        (stageId == null || p.typeId === stageId),
+    )
     .map(
       (p): SnapshotProductSelection => ({
         type: "bolsa",

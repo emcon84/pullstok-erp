@@ -508,8 +508,8 @@ const optionsForStage = async (
   if (stage === STAGE_PRODUCT_SELECT) {
     return listProductsForSelection(
       draft.selectedSpecies,
-      draft.selectedStageId,
       draft.selectedBrandId,
+      draft.selectedStageId ?? null,
     );
   }
   return [];
@@ -546,11 +546,7 @@ const captureSelectionFor = async (
   // del matching planilla↔productos). Si el match es EXACTO (una sola marca)
   // avanzamos directo; si no, guardamos las candidatas para que confirme.
   if (currentStage === STAGE_BRAND && trimmed.length > 0) {
-    const matches = await matchBrands(
-      draftBefore.selectedSpecies,
-      draftBefore.selectedStageId,
-      trimmed,
-    );
+    const matches = await matchBrands(draftBefore.selectedSpecies, trimmed);
     if (matches.length === 1 && matches[0].exact) {
       return { selectedBrandId: matches[0].id };
     }
@@ -568,8 +564,8 @@ const captureSelectionFor = async (
   if (currentStage === STAGE_PRODUCT_SELECT) {
     const products = await listProductsForSelection(
       draftBefore.selectedSpecies,
-      draftBefore.selectedStageId,
       draftBefore.selectedBrandId,
+      draftBefore.selectedStageId ?? null,
     );
     const prod =
       (/^\d+$/.test(trimmed)
@@ -654,8 +650,8 @@ const catalogForStage = async (
       return {
         products: await listProductsForSelection(
           draft.selectedSpecies,
-          draft.selectedStageId,
           draft.selectedBrandId,
+          draft.selectedStageId ?? null,
         ),
       };
     default:
