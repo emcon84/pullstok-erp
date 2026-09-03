@@ -1029,6 +1029,10 @@ model Conversation {
   // escaló de BOT a HUMAN (por botón del widget o porque el bot lo detectó).
   // Null = nunca escalada. Al escalar se setea mode=HUMAN + escalatedAt=now.
   escalatedAt    DateTime?
+  // Nodo actual del flujo de WhatsApp (FASE 2). Null = no está en un flujo
+  // guiado de pedido. Valores en whatsappFlow (constantes de string, no enum,
+  // para no migrar por cada nodo nuevo).
+  whatsappStage  String?
   // Timestamp del último mensaje (para ordenar la bandeja del operador). Null
   // hasta que se escribe el primer mensaje.
   lastMessageAt  DateTime?
