@@ -1,0 +1,192 @@
+---
+// Widget flotante de chat de la landing (asistente IA de Pullstok).
+// Vanilla JS puro (Astro no usa frameworks) + tokens del sistema de diseño para
+// que funcione en claro y oscuro. La conversación es efímera: se guarda en una
+// var de sesión (no se persiste) y se mantiene al cerrar/reabrir el panel.
+// El fetch va al backend (POST /api/landing-chat): la key de Groq jamás llega al front.
+
+const chatIcon = `<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/>`;
+const closeIcon = `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`;
+const sendIcon = `<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>`;
+---
+
+<button
+  id="ps-chat-toggle"
+  type="button"
+  aria-label="Abrir asistente"
+  aria-expanded="false"
+  class="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={chatIcon} />
+</button>
+
+<div
+  id="ps-chat-panel"
+  role="dialog"
+  aria-label="Chat con el asistente"
+  class="fixed bottom-20 right-5 z-50 flex h-[28rem] max-h-[calc(100vh-7rem)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
+  hidden
+>
+  <header class="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+    <span class="text-sm font-semibold">Asistente Pullstok</span>
+    <button
+      id="ps-chat-close"
+      type="button"
+      aria-label="Cerrar asistente"
+      class="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={closeIcon} />
+    </button>
+  </header>
+
+  <div
+    id="ps-chat-messages"
+    role="log"
+    aria-live="polite"
+    class="flex-1 space-y-3 overflow-y-auto px-4 py-4"
+  >
+    <div
+      id="ps-chat-greeting"
+      class="mr-auto max-w-[85%] rounded-2xl bg-secondary px-3 py-2 text-sm text-secondary-foreground"
+    >
+      ¡Hola! Soy el asistente de Pullstok. Contame qué querés saber sobre el
+      sistema, los planes o cómo empezar.
+    </div>
+
+    <div
+      id="ps-chat-status"
+      class="mr-auto max-w-[85%] rounded-2xl bg-secondary px-3 py-2 text-sm text-secondary-foreground"
+      hidden
+    >
+      Escribiendo…
+    </div>
+  </div>
+
+  <form id="ps-chat-form" class="flex items-center gap-2 border-t border-border p-3">
+    <input
+      id="ps-chat-input"
+      type="text"
+      inputmode="text"
+      autocomplete="off"
+      placeholder="Escribí tu consulta…"
+      aria-label="Mensaje para el asistente"
+      class="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+    />
+    <button
+      id="ps-chat-send"
+      type="submit"
+      aria-label="Enviar mensaje"
+      class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={sendIcon} />
+    </button>
+  </form>
+</div>
+
+<style>
+  @media (prefers-reduced-motion: reduce) {
+    #ps-chat-toggle,
+    #ps-chat-close,
+    #ps-chat-send,
+    #ps-chat-input {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  const toggle = document.getElementById("ps-chat-toggle") as HTMLElement;
+  const panel = document.getElementById("ps-chat-panel") as HTMLElement;
+  const closeBtn = document.getElementById("ps-chat-close") as HTMLElement;
+  const messagesEl = document.getElementById("ps-chat-messages") as HTMLElement;
+  const greetingEl = document.getElementById("ps-chat-greeting") as HTMLElement;
+  const statusEl = document.getElementById("ps-chat-status") as HTMLElement;
+  const form = document.getElementById("ps-chat-form") as HTMLFormElement;
+  const input = document.getElementById("ps-chat-input") as HTMLInputElement;
+  const sendBtn = document.getElementById("ps-chat-send") as HTMLButtonElement;
+
+  const API_URL = "https://app.pullstok.com/api/landing-chat";
+  const ERROR_MSG =
+    "No pude responder ahora. Probá de nuevo o escribinos por el formulario de contacto.";
+  const HISTORY_LIMIT = 10;
+
+  let history: { role: string; content: string }[] = [];
+  let open = false;
+  let busy = false;
+
+  function addBubble(role: "user" | "assistant", text: string) {
+    greetingEl.hidden = true;
+    const bubble = document.createElement("div");
+    bubble.setAttribute("data-role", role);
+    bubble.className =
+      role === "user"
+        ? "ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-primary/10 px-3 py-2 text-sm text-foreground"
+        : "mr-auto max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-secondary px-3 py-2 text-sm text-secondary-foreground";
+    bubble.textContent = text;
+    messagesEl.insertBefore(bubble, statusEl);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function setBusy(value: boolean) {
+    busy = value;
+    input.disabled = value;
+    sendBtn.disabled = value;
+    statusEl.hidden = !value;
+  }
+
+  function openPanel() {
+    open = true;
+    panel.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    toggle.setAttribute("aria-label", "Cerrar asistente");
+    input.focus();
+  }
+
+  function closePanel() {
+    open = false;
+    panel.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-label", "Abrir asistente");
+  }
+
+  toggle.addEventListener("click", () => (open ? closePanel() : openPanel()));
+  closeBtn.addEventListener("click", closePanel);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = input.value.trim();
+    if (!text || busy) return;
+    input.value = "";
+
+    addBubble("user", text);
+
+    const historySend = history.slice(-HISTORY_LIMIT);
+    setBusy(true);
+
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history: historySend }),
+      });
+
+      let reply;
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        reply = (data && data.reply) || ERROR_MSG;
+      } else {
+        const data = await res.json().catch(() => null);
+        const apiError = (data && data.error) || "";
+        reply = apiError || ERROR_MSG;
+      }
+
+      addBubble("assistant", reply);
+      history = [...history, { role: "user", content: text }, { role: "assistant", content: reply }].slice(-HISTORY_LIMIT * 2);
+    } catch (err) {
+      addBubble("assistant", ERROR_MSG);
+    } finally {
+      setBusy(false);
+      if (open) input.focus();
+    }
+  });
+</script>
