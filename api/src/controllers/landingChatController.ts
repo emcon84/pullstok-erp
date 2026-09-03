@@ -12,7 +12,17 @@ import { Request, Response } from "express";
 // Endpoint compatible con OpenAI que expone Groq. Plain fetch (Node 20 trae
 // fetch + AbortSignal.timeout globales) para no sumar una dependencia.
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+// Modelos disponibles para esta key de Groq (la lineup cambia según cuenta/plan).
+// Se prueban en orden: si uno devuelve model_not_found, se intenta el siguiente,
+// para que el bot no quede mudo si Groq cambia los modelos habilitados.
+// OJO: dejamos FUERA los gpt-oss (openai/gpt-oss-*) porque son modelos de
+// razonamiento que gastan tokens en "reasoning" y pueden devolver content vacío;
+// los qwen/compound responden directo y en buen español.
+const GROQ_MODELS = [
+  "qwen/qwen3.8-27b",
+  "groq/compound-mini",
+  "groq/compound",
+];
 
 // Límites de la consulta.
 const MAX_MESSAGE_LENGTH = 2000; // máx. de caracteres del mensaje del usuario
@@ -155,36 +165,50 @@ export const landingChat = async (req: Request, res: Response): Promise<void> =>
   ];
 
   try {
-    const groqRes = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        max_tokens: MAX_TOKENS,
-        temperature: 0.3,
-        messages: chatMessages,
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    let content: string | null = null;
 
-    if (!groqRes.ok) {
+    // Probamos los modelos en orden. Si uno devuelve model_not_found seguimos con
+    // el siguiente; cualquier otro error corta con 502. Si todos fallan o
+    // responden vacío, devolvemos 502 (el widget muestra el mensaje amable).
+    for (const model of GROQ_MODELS) {
+      const groqRes = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: MAX_TOKENS,
+          temperature: 0.3,
+          messages: chatMessages,
+        }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+
+      if (groqRes.ok) {
+        const data = (await groqRes.json()) as {
+          choices?: { message?: { content?: string | null } }[];
+        };
+        content = data.choices?.[0]?.message?.content ?? null;
+        if (content && content.trim().length > 0) break;
+        console.error(`[landingChat] modelo ${model} respondió vacío — pruebo el siguiente`);
+        continue;
+      }
+
       const detail = await groqRes.text().catch(() => "");
       console.error(
-        `[landingChat] Groq respondió ${groqRes.status}: ${detail.slice(0, 300)}`,
+        `[landingChat] Groq respondió ${groqRes.status} (${model}): ${detail.slice(0, 200)}`,
       );
+
+      // model_not_found = el modelo no está habilitado para esta key → probamos el siguiente.
+      if (/model_not_found/i.test(detail)) continue;
+
       res
         .status(502)
         .json({ error: "No pude procesar la consulta. Probá de nuevo." });
       return;
     }
-
-    const data = (await groqRes.json()) as {
-      choices?: { message?: { content?: string | null } }[];
-    };
-    const content = data.choices?.[0]?.message?.content;
 
     if (!content || content.trim().length === 0) {
       res
