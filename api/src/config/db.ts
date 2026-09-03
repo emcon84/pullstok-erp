@@ -53,6 +53,10 @@ const TENANT_MODELS = new Set([
   // endpoints del operador (FASE 2). Recordá: en modelos tenant NO se permite
   // findUnique/upsert (la extensión los bloquea) → usar findFirst / updateMany.
   "BotConfig",
+  // Borradores de pedido capturados por el bot de WhatsApp (FASE 3). Tenant-scoped
+  // (organizationId). Mismo patrón multi-tenant: findFirst / updateMany (nunca
+  // findUnique/update) → scope org automático anti-fuga.
+  "WhatsAppOrderDraft",
 ]);
 
 /**

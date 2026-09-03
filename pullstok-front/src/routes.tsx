@@ -44,6 +44,9 @@ const Quotations = lazy(() =>
 const Orders = lazy(() =>
   import("./views/Orders").then((m) => ({ default: m.Orders })),
 );
+const WhatsappOrders = lazy(() =>
+  import("./views/WhatsappOrders").then((m) => ({ default: m.WhatsappOrders })),
+);
 const Comprobations = lazy(() =>
   import("./views/Comprobations").then((m) => ({ default: m.Comprobations })),
 );
@@ -273,6 +276,7 @@ const AppRoutes = () => (
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/presupuestos" element={<Quotations />} />
         <Route path="/pedidos" element={<Orders />} />
+        <Route path="/pedidos-whatsapp" element={<WhatsappOrders />} />
         <Route path="/facturas" element={<Comprobations />} />
         <Route path="/Ventas" element={<SalesPage />} />
         <Route path="/caja" element={<CashSessionPage />} />

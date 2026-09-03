@@ -111,6 +111,7 @@ model Organization {
   priceLists            PriceList[]
   reviewQueueEntries    ReviewQueueEntry[]
   cashSessions          CashSession[]
+  whatsAppOrderDrafts   WhatsAppOrderDraft[]
 
   @@map("organizations")
 }
@@ -196,6 +197,7 @@ model Customer {
   quotations     Quotation[]
   invoices       Invoice[]
   conversations  Conversation[]
+  whatsAppOrderDrafts WhatsAppOrderDraft[]
 
   // Email único POR organización (dos negocios pueden tener el mismo cliente).
   @@unique([organizationId, email])
@@ -580,6 +582,10 @@ model Order {
   // Branch scoping: nullable para backward-compat (existing rows = null = org-wide).
   branchId       String?
   branch         Branch?       @relation(fields: [branchId], references: [id])
+  // Puente a los borradores de WhatsApp que generaron este pedido (FASE 3,
+  // approveDraft). En la práctica es 1:1 pero el schema lo modela como lista
+  // porque orderId NO es unique en la migración (la FK queda sin constraint).
+  whatsAppOrderDrafts WhatsAppOrderDraft[]
 
   @@index([organizationId])
   @@map("orders")
@@ -792,6 +798,17 @@ enum OrderType {
 enum OrderSource {
   STORE
   INTERNAL
+  // Pedido creado al aprobar un borrador capturado por el bot de WhatsApp (FASE 3).
+  WHATSAPP
+}
+
+// Estado de revisión de un borrador de pedido capturado por el bot de WhatsApp
+// (FASE 3). PENDING_REVIEW = esperando que el vendedor lo arme/apruebe;
+// APPROVED = se creó el Order real; REJECTED = el vendedor lo descartó.
+enum WhatsAppDraftStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
 }
 
 // Estado fiscal de una Invoice (sdd/arca-facturacion-electronica).
@@ -1033,12 +1050,18 @@ model Conversation {
   // guiado de pedido. Valores en whatsappFlow (constantes de string, no enum,
   // para no migrar por cada nodo nuevo).
   whatsappStage  String?
+  // Acumulador JSON del borrador de pedido (FASE 3): guarda por mensaje el dato
+  // que el cliente aporta (orderType, productText, address, paymentMethod...)
+  // para, al llegar a un estado terminal, crear el WhatsAppOrderDraft sin
+  // re-parsear la conversación. Null hasta que el bot captura algún dato.
+  whatsappDraftData Json?
   // Timestamp del último mensaje (para ordenar la bandeja del operador). Null
   // hasta que se escribe el primer mensaje.
   lastMessageAt  DateTime?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   messages       Message[]
+  whatsAppOrderDrafts WhatsAppOrderDraft[]
 
   @@index([organizationId, lastMessageAt])
   @@index([organizationId, channel, guestPhone])
@@ -1101,6 +1124,46 @@ model BotConfig {
   updatedAt      DateTime     @updatedAt
 
   @@map("bot_configs")
+}
+
+// ---------------------------------------------------------------------------
+// Borrador de pedido capturado por el bot de WhatsApp (FASE 3)
+// ---------------------------------------------------------------------------
+
+// Borrador de pedido que el bot arma durante el flujo guiado (FASE 2) y que el
+// vendedor aprueba desde el ERP para crear el pedido real. Guarda lo que el
+// cliente dijo en texto libre (producto, dirección, pago) + el Customer linkeado
+// si el phone matcheó. Tenant-scoped (organizationId) → en TENANT_MODELS (db.ts)
+// → scope org automático anti-fuga (findFirst/updateMany, nunca findUnique).
+// El pedido real (Order) se crea en approveDraft; el borrador pasa a APPROVED y
+// queda linkeado vía orderId. `amount` (por monto) y `quantityKg` (por kilo)
+// quedan null en FASE 2 (el flujo no los pide todavía); la rama de cálculo es
+// FASE 4. `orderType` se normaliza a minúscula: "bolsa" | "kilo" | "monto" |
+// "otro"; `paymentMethod` a "qr" | "transferencia" | "efectivo".
+model WhatsAppOrderDraft {
+  id             String            @id @default(uuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  conversationId String
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  phone          String
+  contactName    String?
+  customerId     String?
+  customer       Customer?         @relation(fields: [customerId], references: [id])
+  orderType      String            @default("otro")
+  productText    String?
+  quantityKg     Float?
+  amount         Float?
+  address        String?
+  paymentMethod  String            @default("efectivo")
+  status         WhatsAppDraftStatus @default(PENDING_REVIEW)
+  orderId        String?
+  order          Order?            @relation(fields: [orderId], references: [id])
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([organizationId, status, createdAt])
+  @@map("whatsapp_order_drafts")
 }
 
 // Configuración de branding del ERP por organización, 1:1 con Organization.

@@ -1,4 +1,5 @@
-import React, { useState, useMemo, ChangeEvent } from "react";
+import React, { useState, useMemo, useRef, useEffect, ChangeEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Search } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,11 @@ import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { useCustomers } from "../components/hooks/useCustomer";
 import { usePorducts } from "../components/hooks/useProducts";
 import { useCreateSale } from "../components/hooks/useSales";
+import {
+  useWhatsappDrafts,
+  useApproveDraft,
+} from "../components/hooks/useWhatsappOrders";
+import { WhatsAppOrderDraft } from "../models/whatsappOrderModel";
 import { CartItem } from "../models/salesModel";
 import type { PaymentInput } from "../models/cashSessionModel";
 import { Pagination } from "../components/molecules/pagination";
@@ -87,6 +93,33 @@ export const Orders: React.FC = () => {
   const { deleteOrder } = useDeleteOrder();
   const { createSale } = useCreateSale();
 
+  // ── Pre-carga desde un borrador de WhatsApp (FASE 3) ──
+  // Si llegamos con ?whatsappDraft=<id>, al cargar el borrador se abre el drawer
+  // de "nuevo pedido" con el cliente del borrador preseleccionado y un aviso
+  // con el producto que pidió. Al confirmar, en vez de createOrder se llama
+  // approveDraft (el backend crea el Order real y marca el borrador APPROVED).
+  const [whatsappDraft, setWhatsappDraft] = useState<WhatsAppOrderDraft | null>(
+    null,
+  );
+  const [searchParams] = useSearchParams();
+  const { drafts: whatsappDrafts } = useWhatsappDrafts();
+  const { approve: approveDraft } = useApproveDraft();
+  const draftAppliedRef = useRef(false);
+
+  useEffect(() => {
+    const draftId = searchParams.get("whatsappDraft");
+    // Sin query param, o ya aplicado, o el drawer quedó abierto por otra acción.
+    if (!draftId || draftAppliedRef.current || isOpen) return;
+    const draft = whatsappDrafts.find((d) => d.id === draftId);
+    if (!draft) return;
+    draftAppliedRef.current = true;
+    setWhatsappDraft(draft);
+    setEditingOrderId(null);
+    setInitialCart([]);
+    setInitialCustomer(draft.customerId || "");
+    setIsOpen(true);
+  }, [searchParams, whatsappDrafts, isOpen]);
+
   // Estado del drawer para crear una VENTA desde un pedido
   const [saleDrawerOpen, setSaleDrawerOpen] = useState(false);
   const [saleInitialCart, setSaleInitialCart] = useState<CartItem[]>([]);
@@ -140,6 +173,8 @@ export const Orders: React.FC = () => {
   };
 
   const openCreate = () => {
+    // Acción manual: limpia cualquier pre-carga de borrador de WhatsApp.
+    setWhatsappDraft(null);
     setEditingOrderId(null);
     setInitialCart([]);
     setInitialCustomer("");
@@ -159,6 +194,7 @@ export const Orders: React.FC = () => {
     );
     setInitialCustomer(order.customer?.id || order.customer?._id || "");
     setEditingOrderId(order.id || order._id || "");
+    setWhatsappDraft(null);
     setIsOpen(true);
   };
 
@@ -216,6 +252,31 @@ export const Orders: React.FC = () => {
     _orderId?: string,
     budgetId?: string,
   ) => {
+    if (whatsappDraft) {
+      // Pedido desde un borrador de WhatsApp: el vendedor armó los productos
+      // reales en el drawer; el backend crea el Order (source WHATSAPP) y marca
+      // el borrador APPROVED. No duplicamos la creación acá.
+      if (cart.length === 0) {
+        toast.error("Debes agregar al menos un producto");
+        return;
+      }
+      const productsPayload = cart.map((item) => ({
+        productId: item.product._id || item.product.id || "",
+        quantity: item.quantity,
+        price: item.totalPrice / item.quantity,
+      }));
+      const totalAmount = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+      approveDraft(
+        { id: whatsappDraft.id, data: { products: productsPayload, totalAmount } },
+        {
+          onSuccess: () => toast.success("Pedido aprobado y creado desde WhatsApp"),
+          onError: () => toast.error("No se pudo aprobar el pedido"),
+        },
+      );
+      setWhatsappDraft(null);
+      setIsOpen(false);
+      return;
+    }
     if (editingOrderId) {
       // EDITAR pedido existente
       const productsPayload = cart.map((item) => ({
@@ -413,12 +474,30 @@ export const Orders: React.FC = () => {
         products={products || []}
         customers={customers}
         budgets={budgets}
-        title={editingOrderId ? "Editar Pedido" : "Crear Pedido"}
-        requireCustomer
-        allowBudgetSelection={!editingOrderId}
-        editing={!!editingOrderId}
+        title={
+          whatsappDraft
+            ? "Crear Pedido (WhatsApp)"
+            : editingOrderId
+              ? "Editar Pedido"
+              : "Crear Pedido"
+        }
+        // En un borrador de WhatsApp sin customer linkeado, el backend resuelve
+        // "Consumidor final"; por eso no se exige cliente en ese modo.
+        requireCustomer={!whatsappDraft}
+        allowBudgetSelection={!editingOrderId && !whatsappDraft}
+        // editing=true para que el drawer pre-cargue el cliente del borrador y
+        // oculte las tabs (solo productos). El branch en handleDrawerConfirm
+        // distingue edición vs aprobación de WhatsApp antes de llegar al edit.
+        editing={!!editingOrderId || !!whatsappDraft}
         initialCart={initialCart}
         initialCustomerId={initialCustomer}
+        warning={
+          whatsappDraft
+            ? `Pedido desde WhatsApp: ${
+                whatsappDraft.productText || "producto por confirmar"
+              }. Elegí los productos reales y el total.`
+            : undefined
+        }
         onConfirm={handleDrawerConfirm}
       />
 

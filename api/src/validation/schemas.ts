@@ -437,6 +437,14 @@ export const updateOrderSchema = z.object({
   customer: z.string().optional(),
 });
 
+// ---------- Borradores de pedido de WhatsApp (FASE 3) ----------
+// Aprobación de un borrador: el vendedor arma los productos reales en el ERP y
+// el backend crea el Order (source WHATSAPP) + marca el draft APPROVED.
+export const approveDraftSchema = z.object({
+  products: z.array(orderProductSchema).min(1, "Debe incluir al menos un producto"),
+  totalAmount: z.coerce.number().nonnegative("El total no puede ser negativo"),
+});
+
 // ---------- Presupuestos ----------
 const quotationProductSchema = z.object({
   product: z.string().min(1),

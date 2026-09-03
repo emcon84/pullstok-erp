@@ -25,6 +25,7 @@ import {
   ClipboardCheck,
   PackageOpen,
   Wallet,
+  MessageCircle,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 import type { Role } from "@/constants/rolePermissions";
@@ -66,6 +67,7 @@ export const navGroups: NavGroup[] = [
       { to: "/caja", label: "Caja", icon: Wallet, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"] },
       { to: "/presupuestos", label: "Presupuestos", icon: FileText, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
       { to: "/pedidos", label: "Pedidos", icon: ClipboardList, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
+      { to: "/pedidos-whatsapp", label: "Pedidos WhatsApp", icon: MessageCircle, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
       { to: "/facturas", label: "Remitos", icon: Truck, visibleRoles: ["ADMIN", "MANAGEMENT", "CASHIER"] },
       { to: "/Clientes", label: "Clientes", icon: Users, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
     ],
@@ -109,6 +111,7 @@ export const navItems: NavItem[] = navGroups.flatMap((g) => g.items);
 export const vendorSimpleNav: NavItem[] = [
   { to: "/dashboard", label: "Vender", icon: ShoppingCart },
   { to: "/pedidos", label: "Pedidos", icon: ClipboardList },
+  { to: "/pedidos-whatsapp", label: "Pedidos WhatsApp", icon: MessageCircle },
   { to: "/Ventas", label: "Ventas", icon: ShoppingCart },
   { to: "/presupuestos", label: "Presupuestos", icon: FileText },
   { to: "/caja", label: "Caja", icon: Wallet },

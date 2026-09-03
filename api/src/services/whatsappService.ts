@@ -1,9 +1,12 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { Prisma } from "@prisma/client";
 import { prisma, basePrisma } from "../config/db";
 import { runWithTenant, requireOrganizationId } from "../config/tenantContext";
 import { persistMessage, escalateConversation } from "./chatService";
 import {
   planResponse,
+  buildDraftData,
+  mergeDraftData,
   isHandoffStage,
   isTerminalStage,
 } from "./whatsappFlow";
@@ -214,7 +217,8 @@ const applyFlowReply = async (input: {
   }
 
   // Re-leemos la conversación para validar ownership + mode (y obtener el stage
-  // vigente). Conversation es tenant-model → findFirst (no findUnique).
+  // vigente + el acumulador del borrador). Conversation es tenant-model →
+  // findFirst (no findUnique).
   const conversation = await prisma.conversation.findFirst({
     where: { id: conversationId },
   });
@@ -228,7 +232,7 @@ const applyFlowReply = async (input: {
 
   // Handoff directo (consulta / "otro"): el cliente ve UN único mensaje puente,
   // el que emite escalateConversation. Acá NO mandamos el de planResponse para
-  // no duplicar el aviso.
+  // no duplicar el aviso. Tampoco acumulamos borrador: esto NO es un pedido.
   if (isHandoffStage(plan.nextStage)) {
     await escalateConversation(conversationId, organizationId);
     await prisma.conversation.updateMany({
@@ -236,6 +240,22 @@ const applyFlowReply = async (input: {
       data: { whatsappStage: null },
     });
     return;
+  }
+
+  // FASE 3 — captura del borrador. Del nodo actual + respuesta extraemos el dato
+  // que el cliente acaba de aportar (producto, dirección, pago...) y lo mergeamos
+  // en el acumulador JSON de la conversación. Ese acumulador alimenta el
+  // WhatsAppOrderDraft al llegar a un estado terminal, sin re-parsear el flujo.
+  const draftPatch = buildDraftData(currentStage, answer);
+  const mergedDraft = mergeDraftData(
+    (conversation.whatsappDraftData as Record<string, unknown> | null) ?? {},
+    draftPatch,
+  );
+  if (Object.keys(draftPatch).length > 0) {
+    await prisma.conversation.updateMany({
+      where: { id: conversationId },
+      data: { whatsappDraftData: mergedDraft },
+    });
   }
 
   // Envío de salida. Un fallo de Kapso NO debe romper la persistencia del stage.
@@ -262,15 +282,40 @@ const applyFlowReply = async (input: {
   });
 
   // Avanzar el nodo. En terminales (DONE / PAYMENT_DONE) el flujo se cierra y lo
-  // toma un humano → whatsappStage se limpia (queda fuera del flujo guiado).
+  // toma un humano → whatsappStage se limpia (queda fuera del flujo guiado) y el
+  // acumulador del borrador se resetea (ya se volcó al WhatsAppOrderDraft).
   const terminal = isTerminalStage(plan.nextStage);
   await prisma.conversation.updateMany({
     where: { id: conversationId },
-    data: { whatsappStage: terminal ? null : plan.nextStage },
+    data: {
+      whatsappStage: terminal ? null : plan.nextStage,
+      // Json nullable: para limpiar el acumulador hay que pasar Prisma.DbNull
+      // (SQL NULL), ya que `null` plano no es un valor aceptado por la API de Prisma.
+      ...(terminal ? { whatsappDraftData: Prisma.DbNull } : {}),
+    },
   });
 
-  // Terminal → handoff a humano (flipea mode a HUMAN).
+  // Terminal → crear el borrador de pedido (FASE 3) y handoff a humano. El
+  // pedido real recién se crea cuando el vendedor lo aprueba en el ERP.
   if (terminal) {
+    // guestPhone es el phone normalizado de la conversación (E.164 sin espacios).
+    // contactName usa guestName (la Conversation no tiene "contactName").
+    await prisma.whatsAppOrderDraft.create({
+      data: {
+        organizationId,
+        conversationId,
+        phone: conversation.guestPhone ?? phone,
+        contactName: conversation.guestName,
+        customerId: conversation.customerId ?? null,
+        orderType: (mergedDraft.orderType as string) ?? "otro",
+        productText: (mergedDraft.productText as string) ?? null,
+        quantityKg: (mergedDraft.quantityKg as number) ?? null,
+        amount: (mergedDraft.amount as number) ?? null,
+        address: (mergedDraft.address as string) ?? null,
+        paymentMethod: (mergedDraft.paymentMethod as string) ?? "efectivo",
+        status: "PENDING_REVIEW",
+      },
+    });
     await escalateConversation(conversationId, organizationId);
   }
 };

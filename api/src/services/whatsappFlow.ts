@@ -223,6 +223,117 @@ export function shouldEscalate(stage: string): boolean {
   return isTerminalStage(stage) || isHandoffStage(stage);
 }
 
+// ---------------------------------------------------------------------------
+// Captura de datos del borrador (FASE 3) — funciones PURAS, testeadas.
+// ---------------------------------------------------------------------------
+
+/**
+ * Normaliza la respuesta del nodo TYPE a uno de los 4 tipos del borrador.
+ * Acepta el id de botón (TYPE_BAG/TYPE_KILO/TYPE_AMOUNT/TYPE_OTHER), el número
+ * (1..4) o la palabra libre (bolsa/kilo/monto/otro) — mismo matching que
+ * nextStageForAnswer. Respuesta no reconocida → null (el flujo default cae a
+ * "bolsa", pero acá no inventamos tipo).
+ */
+export function normalizeOrderType(answer: string): string | null {
+  const a = norm(answer);
+  const has = (kw: string) => a.includes(kw);
+  if (a === BUTTON_BOLSA.id.toLowerCase() || a === "1" || has("bolsa")) {
+    return "bolsa";
+  }
+  if (a === BUTTON_KILO.id.toLowerCase() || a === "2" || has("kilo")) {
+    return "kilo";
+  }
+  if (a === BUTTON_MONTO.id.toLowerCase() || a === "3" || has("monto")) {
+    return "monto";
+  }
+  if (a === BUTTON_OTRO.id.toLowerCase() || a === "4" || has("otro")) {
+    return "otro";
+  }
+  return null;
+}
+
+/**
+ * Normaliza la respuesta del nodo PAYMENT a uno de los 3 medios del borrador.
+ * Ids (PAY_QR/PAY_TRANSFER/PAY_CASH) + palabras libres (qr/transferencia/
+ * efectivo). No reconocido → null.
+ */
+export function normalizePaymentMethod(answer: string): string | null {
+  const a = norm(answer);
+  const has = (kw: string) => a.includes(kw);
+  if (a === BUTTON_QR.id.toLowerCase() || has("qr")) return "qr";
+  if (
+    a === BUTTON_TRANSFERENCIA.id.toLowerCase() ||
+    has("transfer") ||
+    has("transf") ||
+    has("banco")
+  ) {
+    return "transferencia";
+  }
+  if (a === BUTTON_EFECTIVO.id.toLowerCase() || has("efectivo") || has("cash")) {
+    return "efectivo";
+  }
+  return null;
+}
+
+/**
+ * Devuelve el dato de borrador que el cliente aportó en su última respuesta, a
+ * partir del nodo en el que estaba (currentStage) y el `answer`. Es la función
+ * MINIMALISTA que evita re-parsear la conversación: el service (whatsappService)
+ * mergea el resultado en el acumulador JSON de la Conversation (FASE 3).
+ *
+ * Nodos informativos (START, QR, terminales) devuelven {} (no aportan datos).
+ * STAGE_AMOUNT / STAGE_PROD_AMOUNT (rama "por monto" con cálculo, FASE 4) se
+ * capturan por completitud aunque hoy el flujo no los alcanza (quedan null).
+ */
+export function buildDraftData(
+  currentStage: string | null,
+  answer: string,
+): {
+  orderType?: string;
+  productText?: string;
+  quantityKg?: number;
+  amount?: number;
+  address?: string;
+  paymentMethod?: string;
+} {
+  const a = norm(answer);
+  switch (currentStage) {
+    case STAGE_TYPE: {
+      const orderType = normalizeOrderType(answer);
+      return orderType ? { orderType } : {};
+    }
+    case STAGE_PRODUCT:
+      // El producto se guarda tal cual lo escribió el cliente (texto libre).
+      return { productText: a };
+    case STAGE_AMOUNT:
+    case STAGE_PROD_AMOUNT: {
+      const amount = parseFloat(a);
+      return Number.isFinite(amount) ? { amount } : {};
+    }
+    case STAGE_ADDRESS:
+      return { address: a };
+    case STAGE_PAYMENT: {
+      const paymentMethod = normalizePaymentMethod(answer);
+      return paymentMethod ? { paymentMethod } : {};
+    }
+    default:
+      return {};
+  }
+}
+
+/**
+ * Mergea los datos previos del borrador con el patch recién capturado. Pura y
+ * defensiva: `existing` puede venir null (Conversation.whatsappDraftData Json?)
+ * y el patch puede ser {} (nodos informativos). El patch PISA (el cliente pudo
+ * corregir un dato al re-contestar el mismo nodo).
+ */
+export function mergeDraftData(
+  existing: Record<string, unknown> | null | undefined,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  return { ...(existing ?? {}), ...patch };
+}
+
 // Texto de respaldo cuando el QR no tiene URL configurada (sin mandar imagen).
 const QR_NO_IMAGE_TEXT =
   "📲 Elegiste pagar con QR. El código QR te lo comparto por este canal en un momento 🙌";
@@ -294,6 +405,10 @@ export default {
   isTerminalStage,
   isHandoffStage,
   shouldEscalate,
+  buildDraftData,
+  mergeDraftData,
+  normalizeOrderType,
+  normalizePaymentMethod,
   STAGE_START,
   STAGE_CONSULTA,
   STAGE_TYPE,

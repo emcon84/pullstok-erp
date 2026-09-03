@@ -13,6 +13,10 @@ import {
   isTerminalStage,
   isHandoffStage,
   shouldEscalate,
+  buildDraftData,
+  mergeDraftData,
+  normalizeOrderType,
+  normalizePaymentMethod,
   STAGE_START,
   STAGE_CONSULTA,
   STAGE_TYPE,
@@ -242,5 +246,111 @@ describe("whatsappFlow — helpers", () => {
     expect(buttonsForStage(STAGE_ADDRESS)).toBeNull();
     expect(buttonsForStage(STAGE_QR)).toBeNull();
     expect(buttonsForStage(STAGE_TYPE)).toBeNull();
+  });
+});
+
+describe("whatsappFlow — buildDraftData (FASE 3)", () => {
+  it("TYPE + botón bolsa → orderType 'bolsa'", () => {
+    expect(buildDraftData(STAGE_TYPE, BUTTON_BOLSA.id)).toEqual({
+      orderType: "bolsa",
+    });
+  });
+
+  it("TYPE + número '2' → orderType 'kilo'", () => {
+    expect(buildDraftData(STAGE_TYPE, "2")).toEqual({ orderType: "kilo" });
+  });
+
+  it("TYPE + texto 'monto' → orderType 'monto'", () => {
+    expect(buildDraftData(STAGE_TYPE, "monto")).toEqual({ orderType: "monto" });
+  });
+
+  it("TYPE + botón otro → orderType 'otro'", () => {
+    expect(buildDraftData(STAGE_TYPE, BUTTON_OTRO.id)).toEqual({
+      orderType: "otro",
+    });
+  });
+
+  it("PRODUCT (texto libre) → productText", () => {
+    expect(buildDraftData(STAGE_PRODUCT, "Royal Canin 15kg")).toEqual({
+      productText: "royal canin 15kg",
+    });
+  });
+
+  it("ADDRESS → address", () => {
+    expect(buildDraftData(STAGE_ADDRESS, "San Martín 123, San Justo")).toEqual({
+      address: "san martín 123, san justo",
+    });
+  });
+
+  it("PAYMENT + QR → paymentMethod 'qr'", () => {
+    expect(buildDraftData(STAGE_PAYMENT, BUTTON_QR.id)).toEqual({
+      paymentMethod: "qr",
+    });
+  });
+
+  it("PAYMENT + transferencia → paymentMethod 'transferencia'", () => {
+    expect(buildDraftData(STAGE_PAYMENT, BUTTON_TRANSFERENCIA.id)).toEqual({
+      paymentMethod: "transferencia",
+    });
+  });
+
+  it("PAYMENT + efectivo (texto) → paymentMethod 'efectivo'", () => {
+    expect(buildDraftData(STAGE_PAYMENT, "en efectivo")).toEqual({
+      paymentMethod: "efectivo",
+    });
+  });
+
+  it("nodos informativos (START / QR / terminales) devuelven {} (sin dato)", () => {
+    expect(buildDraftData(STAGE_START, "hola")).toEqual({});
+    expect(buildDraftData(STAGE_QR, "ya está")).toEqual({});
+    expect(buildDraftData(STAGE_DONE, "gracias")).toEqual({});
+    expect(buildDraftData(null, "hola")).toEqual({});
+  });
+
+  it("AMOUNT (rama por monto, FASE 4) captura el importe en amount", () => {
+    expect(buildDraftData(STAGE_AMOUNT, "50000")).toEqual({ amount: 50000 });
+  });
+});
+
+describe("whatsappFlow — mergeDraftData (FASE 3)", () => {
+  it("mergea patch sobre existing y deja intactos los datos previos", () => {
+    const existing = { orderType: "bolsa", productText: "royal canin" };
+    const merged = mergeDraftData(existing, { address: "san martín 123" });
+    expect(merged).toEqual({
+      orderType: "bolsa",
+      productText: "royal canin",
+      address: "san martín 123",
+    });
+  });
+
+  it("existing null → solo el patch", () => {
+    expect(mergeDraftData(null, { paymentMethod: "qr" })).toEqual({
+      paymentMethod: "qr",
+    });
+  });
+
+  it("el patch pisa datos previos del mismo campo (corrección del cliente)", () => {
+    const merged = mergeDraftData(
+      { address: "av. 1" },
+      { address: "calle 2" },
+    );
+    expect(merged.address).toBe("calle 2");
+  });
+});
+
+describe("whatsappFlow — normalize helpers (FASE 3)", () => {
+  it("normalizeOrderType cubre id, número y palabra", () => {
+    expect(normalizeOrderType(BUTTON_BOLSA.id)).toBe("bolsa");
+    expect(normalizeOrderType("3")).toBe("monto");
+    expect(normalizeOrderType("kilo")).toBe("kilo");
+    expect(normalizeOrderType("otro")).toBe("otro");
+    expect(normalizeOrderType("no sé")).toBeNull();
+  });
+
+  it("normalizePaymentMethod cubre id y palabra", () => {
+    expect(normalizePaymentMethod(BUTTON_QR.id)).toBe("qr");
+    expect(normalizePaymentMethod("transferencia")).toBe("transferencia");
+    expect(normalizePaymentMethod("efectivo")).toBe("efectivo");
+    expect(normalizePaymentMethod("débito")).toBeNull();
   });
 });
