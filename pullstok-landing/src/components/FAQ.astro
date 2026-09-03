@@ -1,21 +1,20 @@
 ---
 // Acordeón accesible con <details>/<summary> nativo — sin JS, sin isla.
-// Cumple semántica e interactividad sin costo de hidratación.
 const faqs = [
   {
     question: "¿Necesito tarjeta para la prueba gratis?",
     answer:
-      "No. Podés crear tu cuenta y usar Pullstok sin poner ningún dato de pago. Cuando quieras pasar a un plan pago, ahí sí te lo vamos a pedir.",
+      "No. Podés crear tu cuenta y usar Pullstok sin ingresar ningún dato de pago. Cuando quieras pasar a un plan pago, ahí sí lo vamos a pedir.",
   },
   {
     question: "¿Puedo cambiar de plan más adelante?",
     answer:
-      "Sí, en cualquier momento. Si tu negocio crece, subís de plan; si necesitás menos, bajás. Sin penalidades ni vueltas.",
+      "Sí, en cualquier momento. Si tu operación crece, subís de plan; si necesitás menos, bajás. Sin penalidades ni vueltas.",
   },
   {
     question: "¿Sirve para mi rubro?",
     answer:
-      "Pullstok está pensado para ferreterías, kioscos, indumentaria, almacenes y comercios en general. En el onboarding elegís tu rubro y te configuramos las categorías sugeridas para arrancar más rápido.",
+      "Pullstok está pensado para comercios y pymes: ferreterías, indumentaria, almacenes, kioscos, gastronomía y comercios en general. En el onboarding elegís tu rubro y se cargan las categorías sugeridas para arrancar más rápido.",
   },
   {
     question: "¿Mis datos están seguros?",
@@ -25,7 +24,7 @@ const faqs = [
   {
     question: "¿Puedo hacer facturas con Pullstok?",
     answer:
-      "Sí. Desde el plan Pro generás facturas y comprobantes con tus datos fiscales y los de tu cliente (CUIT, condición de IVA), con conceptos libres para servicios o directamente a partir de una venta, y los exportás en PDF listos para enviar. La conexión directa con AFIP/ARCA para factura electrónica está en camino.",
+      "Sí. Desde el plan Pro generás facturas y comprobantes con tus datos fiscales y los de tu cliente (CUIT, condición de IVA), con conceptos libres o directamente a partir de una venta, y los exportás en PDF listos para enviar. La conexión con ARCA/AFIP para facturación electrónica se incorpora progresivamente.",
   },
   {
     question: "¿Cómo cargo mis productos?",
@@ -50,7 +49,7 @@ const faqs = [
   {
     question: "¿Hay permanencia mínima?",
     answer:
-      "No. Podés cancelar cuando quieras, no exigimos ningún contrato ni permanencia mínima.",
+      "No. Podés cancelar cuando quieras; no exigimos ningún contrato ni permanencia mínima.",
   },
 ];
 ---
@@ -58,8 +57,8 @@ const faqs = [
 <section id="faq" class="bg-muted/60 px-4 py-20 sm:px-6 lg:px-8">
   <div class="mx-auto max-w-3xl">
     <div class="text-center">
-      <span class="badge bg-brand-red-soft text-[#d62744]">🤔 Dudas</span>
-      <h2 class="mt-4 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
+      <span class="badge bg-accent text-accent-foreground">Dudas frecuentes</span>
+      <h2 class="mt-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
         Preguntas frecuentes
       </h2>
     </div>

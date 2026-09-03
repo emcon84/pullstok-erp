@@ -1,34 +1,33 @@
 ---
-// Sección "Features" rediseñada como BENTO GRID con capturas REALES del
-// producto (tomadas del demo en vivo app.pullstok.com → /public/screenshots/).
-// Reemplaza la grilla genérica de cards con iconos. Cada tile grande muestra un
-// módulo real funcionando; el último tile agrupa el resto de las capacidades.
-// Cada captura es clickeable y abre un visor (lightbox <dialog> nativo).
+// Sección "Features" como BENTO GRID con capturas REALES del producto
+// (tomadas del demo en vivo app.pullstok.com → /public/screenshots/).
+// Cada tile grande muestra un módulo real funcionando; el último agrupa el
+// resto de las capacidades. Cada captura es clickeable y abre un visor
+// (lightbox <dialog> nativo).
 
 const extras = [
   "Presupuestos",
   "Pedidos",
   "Remitos",
+  "Roles y permisos",
   "Reportes y dashboard",
-  "Usuarios y roles",
   "Onboarding guiado",
-  "Tienda online",
+  "Importación por CSV/Excel",
 ];
 
 const check = `<path d="M20 6 9 17l-5-5"/>`;
-// Ícono "ampliar" (maximize) para el afordance de hover sobre las capturas.
 const expand = `<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>`;
 ---
 
 <section id="caracteristicas" class="px-4 py-20 sm:px-6 lg:px-8">
   <div class="mx-auto max-w-7xl">
     <div class="mx-auto max-w-2xl text-center">
-      <span class="badge bg-brand-blue-soft text-brand-blue">✨ Todo en un lugar</span>
-      <h2 class="mt-4 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
+      <span class="badge bg-accent text-accent-foreground">El producto</span>
+      <h2 class="mt-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
         Todo lo que tu negocio necesita
       </h2>
       <p class="mt-4 text-lg text-muted-foreground">
-        No te lo contamos con iconitos: te mostramos el producto real,
+        No te lo contamos con iconos: te mostramos el producto real,
         funcionando. Tocá cualquier captura para verla en grande.
       </p>
     </div>
@@ -38,14 +37,15 @@ const expand = `<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/
       <article class="card overflow-hidden p-0 lg:col-span-4 lg:row-span-2">
         <div class="flex flex-col gap-1 p-6 pb-4">
           <div class="flex items-center gap-2">
-            <span class="badge bg-brand-blue-soft text-brand-blue">Stock</span>
+            <span class="badge bg-accent text-accent-foreground">Stock</span>
           </div>
-          <h3 class="mt-1 text-xl font-extrabold tracking-tight text-foreground">
+          <h3 class="mt-1 text-xl font-bold tracking-tight text-foreground">
             Tu inventario en tiempo real
           </h3>
           <p class="text-sm text-muted-foreground">
-            Cada venta lo actualiza solo. Sabés qué tenés y cuánto, sin contar
-            al depósito ni planillas paralelas.
+            Cada venta actualiza el stock automáticamente. Cargá productos a
+            mano o importá desde CSV/Excel, y consultá disponibilidad real por
+            sucursal al instante.
           </p>
         </div>
         <button
@@ -70,14 +70,15 @@ const expand = `<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/
       <article class="card overflow-hidden p-0 lg:col-span-2">
         <div class="flex flex-col gap-1 p-6 pb-3">
           <div class="flex items-center gap-2">
-            <span class="badge bg-brand-orange-soft text-[#b86e00]">Facturación</span>
-            <span class="badge bg-brand-blue text-white">Pro</span>
+            <span class="badge bg-accent text-accent-foreground">Facturación</span>
+            <span class="badge bg-primary text-primary-foreground">Pro</span>
           </div>
-          <h3 class="mt-1 text-lg font-extrabold tracking-tight text-foreground">
+          <h3 class="mt-1 text-lg font-bold tracking-tight text-foreground">
             Facturás en un clic
           </h3>
           <p class="text-sm text-muted-foreground">
-            Comprobantes con tus datos fiscales, o desde una venta.
+            Comprobantes con tus datos fiscales —y los de tu cliente— desde
+            cualquier venta, con conexión ARCA/AFIP.
           </p>
         </div>
         <button
@@ -101,12 +102,13 @@ const expand = `<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/
       <!-- VENTAS — (2 cols) -->
       <article class="card overflow-hidden p-0 lg:col-span-2">
         <div class="flex flex-col gap-1 p-6 pb-3">
-          <span class="badge w-fit bg-brand-cyan-soft text-[#1796bd]">Ventas</span>
-          <h3 class="mt-1 text-lg font-extrabold tracking-tight text-foreground">
+          <span class="badge w-fit bg-secondary text-secondary-foreground">Ventas</span>
+          <h3 class="mt-1 text-lg font-bold tracking-tight text-foreground">
             Vendé en segundos
           </h3>
           <p class="text-sm text-muted-foreground">
-            Registrás la venta y descuenta stock al toque.
+            Registrás la venta y el stock se descuenta al toque, con la opción
+            de generar el comprobante sobre la marcha.
           </p>
         </div>
         <button
@@ -131,12 +133,13 @@ const expand = `<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/
       <article class="card overflow-hidden p-0 lg:col-span-3">
         <div class="grid h-full sm:grid-cols-2">
           <div class="flex flex-col justify-center gap-1 p-6">
-            <span class="badge w-fit bg-brand-red-soft text-[#d62744]">Clientes</span>
-            <h3 class="mt-1 text-lg font-extrabold tracking-tight text-foreground">
+            <span class="badge w-fit bg-accent text-accent-foreground">Clientes</span>
+            <h3 class="mt-1 text-lg font-bold tracking-tight text-foreground">
               Tu cartera, ordenada
             </h3>
             <p class="text-sm text-muted-foreground">
-              Contacto, historial de compras y cuenta corriente de cada cliente.
+              Contacto, historial de compras y cuenta corriente de cada cliente,
+              con roles y permisos para tu equipo.
             </p>
           </div>
           <button
@@ -160,8 +163,8 @@ const expand = `<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/
 
       <!-- Y ADEMÁS — (3 cols) -->
       <article class="card justify-center gap-4 p-6 lg:col-span-3">
-        <h3 class="text-lg font-extrabold tracking-tight text-foreground">
-          Y todo lo demás que necesitás
+        <h3 class="text-lg font-bold tracking-tight text-foreground">
+          Y todo lo demás que tu operación necesita
         </h3>
         <ul class="flex flex-wrap gap-2.5">
           {
@@ -310,7 +313,6 @@ const expand = `<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/
     dlg.querySelectorAll<HTMLElement>("[data-close]").forEach((b) =>
       b.addEventListener("click", () => dlg.close())
     );
-    // Cerrar al clickear el backdrop (área fuera de la imagen)
     dlg.addEventListener("click", (e) => {
       if (e.target === dlg) dlg.close();
     });

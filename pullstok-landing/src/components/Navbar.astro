@@ -16,7 +16,7 @@ const links = [
 
 <header class="sticky top-0 z-50 w-full px-3 pt-3 sm:px-6">
   <nav
-    class="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-full border-[1.5px] border-border bg-card/85 px-4 py-2.5 shadow-[0_10px_30px_-14px_rgba(120,80,20,0.18)] backdrop-blur-md sm:px-5"
+    class="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-border bg-card/90 px-4 py-2.5 shadow-[0_8px_24px_-16px_rgba(15,23,42,0.25)] backdrop-blur-md sm:px-5"
     aria-label="Navegación principal"
   >
     <a href="#" class="shrink-0" aria-label="Pullstok, ir al inicio">
@@ -29,7 +29,7 @@ const links = [
           <li>
             <a
               href={link.href}
-              class="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              class="rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               {link.label}
             </a>
@@ -39,19 +39,57 @@ const links = [
     </ul>
 
     <div class="hidden items-center gap-2 md:flex">
+      <button
+        type="button"
+        data-theme-toggle
+        aria-label="Cambiar tema claro/oscuro"
+        class="flex h-10 w-10 items-center justify-center rounded-xl border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+      >
+        <!-- Sol (visible en modo oscuro) -->
+        <svg
+          data-theme-icon="sun"
+          class="hidden h-5 w-5 dark:block"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+        </svg>
+        <!-- Luna (visible en modo claro) -->
+        <svg
+          data-theme-icon="moon"
+          class="h-5 w-5 dark:hidden"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
       <a
         href={APP_URL}
-        class="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+        class="rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
       >
         Ingresar
       </a>
-      <a href={DEMO_URL} class="btn btn-accent h-10 px-5 text-sm">Probá el demo</a>
+      <a href={DEMO_URL} class="btn btn-primary h-10 px-5 text-sm">Probá el demo</a>
     </div>
 
     <!-- Toggle mobile -->
     <details class="relative md:hidden">
       <summary
-        class="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-[1.5px] border-border [&::-webkit-details-marker]:hidden"
+        class="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-xl border border-border [&::-webkit-details-marker]:hidden"
         aria-label="Abrir menú"
       >
         <svg
@@ -72,29 +110,77 @@ const links = [
         >
       </summary>
       <div
-        class="absolute right-0 top-12 flex w-60 flex-col gap-1 rounded-3xl border-[1.5px] border-border bg-card p-2.5 shadow-xl"
+        class="absolute right-0 top-12 flex w-60 flex-col gap-1 rounded-2xl border border-border bg-card p-2.5 shadow-xl"
       >
         {
           links.map((link) => (
             <a
               href={link.href}
-              class="rounded-xl px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary"
+              class="rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary"
             >
               {link.label}
             </a>
           ))
         }
+        <button
+          type="button"
+          data-theme-toggle
+          class="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary"
+        >
+          <!-- Sol (visible en modo oscuro) -->
+          <svg
+            data-theme-icon="sun"
+            class="h-5 w-5 dark:block hidden"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+          </svg>
+          <!-- Luna (visible en modo claro) -->
+          <svg
+            data-theme-icon="moon"
+            class="h-5 w-5 dark:hidden"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          Cambiar tema
+        </button>
         <hr class="my-1 border-border" />
         <a
           href={APP_URL}
-          class="rounded-xl px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary"
+          class="rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary"
         >
           Ingresar
         </a>
-        <a href={DEMO_URL} class="btn btn-accent mt-1 h-11 w-full text-sm">
+        <a href={DEMO_URL} class="btn btn-primary mt-1 h-11 w-full text-sm">
           Probá el demo
         </a>
       </div>
     </details>
   </nav>
 </header>
+
+<script is:inline>
+  document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const root = document.documentElement;
+      const isDark = root.classList.toggle("dark");
+      try {
+        localStorage.setItem("theme", isDark ? "dark" : "light");
+      } catch (e) {}
+    });
+  });
+</script>

@@ -7,8 +7,8 @@ interface Props {
 }
 
 const {
-  title = "Pullstok — Gestión y stock para negocios chicos, sin planillas de Excel",
-  description = "Pullstok es el ERP simple para kioscos, almacenes, ferreterías e indumentaria. Controlá stock, ventas, clientes y reportes en tiempo real, sin cuadernos ni planillas. Probalo gratis.",
+  title = "Pullstok — Gestión, stock y facturación para comercios y pymes",
+  description = "Pullstok es el sistema de gestión para comercios y pymes: stock y ventas en tiempo real, facturación electrónica, tienda online y atención con IA. Probalo gratis.",
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
@@ -26,7 +26,7 @@ const jsonLd = {
       url: "https://pullstok.com",
       logo: "https://pullstok.com/og-image.png",
       description:
-        "Sistema de gestión, stock y tienda online para comercios de Argentina y LatAm.",
+        "Sistema de gestión, stock, facturación y tienda online para comercios y pymes.",
       areaServed: "AR",
     },
     {
@@ -36,7 +36,7 @@ const jsonLd = {
       operatingSystem: "Web",
       url: "https://pullstok.com",
       description:
-        "ERP simple para kioscos, almacenes, ferreterías e indumentaria: stock en tiempo real, ventas, clientes, reportes y tienda online.",
+        "Sistema de gestión para comercios y pymes: stock y ventas en tiempo real, facturación electrónica, tienda online, roles y permisos, reportes y atención con IA.",
       offers: [
         { "@type": "Offer", name: "Básico", price: "35000", priceCurrency: "ARS" },
         { "@type": "Offer", name: "Pro", price: "70000", priceCurrency: "ARS" },
@@ -50,6 +50,21 @@ const jsonLd = {
 <!doctype html>
 <html lang="es">
   <head>
+    <!-- Tema: se aplica antes del primer render para evitar parpadeo (FOUC). -->
+    <script is:inline>
+      (function () {
+        try {
+          var t = localStorage.getItem("theme");
+          if (
+            t === "dark" ||
+            (!t && window.matchMedia("(prefers-color-scheme: dark)").matches)
+          ) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -58,7 +73,7 @@ const jsonLd = {
 
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#ff9d00" />
+    <meta name="theme-color" content="#6366f1" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
@@ -79,12 +94,12 @@ const jsonLd = {
     <meta name="twitter:image" content={ogImage} />
 
     <!-- Datos estructurados para Google -->
-    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
   </head>

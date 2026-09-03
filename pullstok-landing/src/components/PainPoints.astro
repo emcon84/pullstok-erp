@@ -1,28 +1,28 @@
 ---
 const pains = [
   {
-    icon: "eye",
-    title: "Stock a ojo",
+    icon: "network",
+    title: "Sucursales desincronizadas",
     description:
-      "No sabés qué te queda hasta que lo vas a buscar al depósito y no está. Comprás de más o te quedás sin vender por las dudas.",
+      "Cada local maneja su stock por su cuenta y la información nunca coincide. Comprás de más para cubrirte, o te quedás sin producto cuando más lo necesitás.",
   },
   {
-    icon: "book",
-    title: "Ventas en cuaderno",
+    icon: "trending",
+    title: "Sin trazabilidad de stock",
     description:
-      "Anotás en una libreta o en una planilla que se desactualiza sola. Si se rompe la compu o se pierde el cuaderno, perdés todo.",
+      "No sabés qué entró, qué salió ni qué quedó realmente. Los errores aparecen recién cuando ya es tarde para corregirlos.",
   },
   {
     icon: "chart",
-    title: "Decisiones a ciegas",
+    title: "Decisiones sin datos",
     description:
-      "No tenés un número real de cuánto vendiste, qué se mueve y qué no. Decidís con la cabeza, no con datos.",
+      "Sin un número confiable de ventas, rotación o rentabilidad, cada decisión es una apuesta. No podés planificar el crecimiento con datos reales.",
   },
 ];
 
 const icons: Record<string, string> = {
-  eye: `<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>`,
-  book: `<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>`,
+  network: `<path d="M5 12h14"/><path d="M5 6h14"/><path d="M5 18h14"/><rect x="3" y="4" width="6" height="4" rx="1"/><rect x="3" y="10" width="6" height="4" rx="1"/><rect x="3" y="16" width="6" height="4" rx="1"/>`,
+  trending: `<path d="M3 3v18h18"/><path d="M18.4 9 12 15.4 8.6 12 3.4 17.2"/>`,
   chart: `<path d="M3 3v18h18"/><path d="M18.4 9 12 15.4 8.6 12 3.4 17.2"/>`,
 };
 ---
@@ -30,13 +30,13 @@ const icons: Record<string, string> = {
 <section class="bg-muted/60 px-4 py-20 sm:px-6 lg:px-8">
   <div class="mx-auto max-w-7xl">
     <div class="mx-auto max-w-2xl text-center">
-      <span class="badge bg-brand-red-soft text-[#d62744]">😮‍💨 El día a día</span>
-      <h2 class="mt-4 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
+      <span class="badge bg-accent text-accent-foreground">El día a día</span>
+      <h2 class="mt-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
         ¿Te suena familiar?
       </h2>
       <p class="mt-4 text-lg text-muted-foreground">
-        Así laburan miles de comercios todos los días. No es tu culpa, es que
-        nadie te dio una herramienta hecha para vos.
+        Así operan hoy muchos comercios y pymes que crecen. No es falta de
+        esfuerzo: es que no tienen una herramienta hecha para su operación.
       </p>
     </div>
 
@@ -44,7 +44,7 @@ const icons: Record<string, string> = {
       {
         pains.map((pain) => (
           <div class="card items-start">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-red-soft text-[#d62744]">
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-accent-foreground">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"

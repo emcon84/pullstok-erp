@@ -3,42 +3,34 @@ const DEMO_URL = "https://app.pullstok.com/?demo=1";
 ---
 
 <section class="relative overflow-hidden px-4 pt-10 pb-16 sm:px-6 sm:pt-16 sm:pb-24 lg:px-8">
-  <!-- Blobs de color de marca, flotando de fondo -->
-  <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
-    <div class="blob -left-24 top-10 h-72 w-72 opacity-25" style="background: var(--brand-orange);"></div>
-    <div class="blob right-[-6rem] top-40 h-80 w-80 opacity-20" style="background: var(--brand-cyan); animation-delay: -4s;"></div>
-    <div class="blob bottom-0 left-1/3 h-64 w-64 opacity-[0.12]" style="background: var(--brand-red); animation-delay: -8s;"></div>
-  </div>
+  <!-- Fondo: grilla sutil (utilitario definido en global.css) -->
+  <div class="bg-grid pointer-events-none absolute inset-0 -z-10" aria-hidden="true"></div>
+  <div class="bg-grid-fade pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-40" aria-hidden="true"></div>
 
   <div class="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.05fr_1fr] lg:gap-10">
     <!-- Columna texto -->
     <div class="text-center lg:text-left">
-      <span class="badge mb-6 border-[1.5px] border-border bg-card text-foreground">
-        <span class="text-base leading-none">🧉</span>
-        Hecho en Argentina, para comercios de barrio
+      <span class="badge mb-6 bg-accent text-accent-foreground">
+        Gestión, stock y facturación para tu negocio
       </span>
 
-      <h1 class="text-[2.7rem] font-extrabold leading-[1.02] text-foreground sm:text-6xl lg:text-[4.25rem]">
-        Del cuaderno<br />
-        al <span class="underline-hand text-primary">control total</span>
-        <span class="inline-block animate-wiggle align-middle text-brand-orange">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="inline h-9 w-9 sm:h-11 sm:w-11"><path d="M12 2l2.2 6.6L21 9l-5.4 4 2 6.8L12 16l-5.6 3.8 2-6.8L3 9l6.8-.4z"/></svg>
-        </span>
+      <h1 class="text-[2.7rem] font-bold leading-[1.05] text-foreground sm:text-6xl lg:text-[4.25rem]">
+        Tu negocio,<br />con control total
       </h1>
 
       <p class="mx-auto mt-6 max-w-xl text-lg text-muted-foreground sm:text-xl lg:mx-0">
-        Pullstok es el sistema de gestión para kioscos, almacenes, ferreterías e
-        indumentaria. Controlá stock, vendé y mirá tus números reales — y si querés,
-        abrí tu <strong class="font-bold text-foreground">tienda online</strong> en un clic.
+        Pullstok centraliza el stock, las ventas, la facturación y tu tienda
+        online en un solo sistema. Tomá decisiones con datos reales y hacé
+        crecer tu comercio o pyme sin fricción.
       </p>
 
       <div class="mt-9 flex flex-col items-center gap-3 sm:flex-row lg:items-start lg:justify-start">
-        <a href={DEMO_URL} class="btn btn-accent w-full sm:w-auto">
+        <a href={DEMO_URL} class="btn btn-primary w-full sm:w-auto">
           Probá el demo gratis
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
         <a href="#caracteristicas" class="btn btn-outline w-full sm:w-auto">
-          Ver cómo funciona
+          Ver el producto
         </a>
       </div>
 
@@ -48,13 +40,21 @@ const DEMO_URL = "https://app.pullstok.com/?demo=1";
       </div>
     </div>
 
-    <!-- Columna visual: foto humana + tarjetas de producto (sticker) -->
+    <!-- Columna visual: app en un marco + tarjetas flotantes -->
     <div class="relative mx-auto w-full max-w-md lg:mx-0 lg:max-w-none">
-      <!-- Foto real de un comerciante (stock Pexels, libre de uso comercial) -->
-      <div class="card-pop relative aspect-[4/5] overflow-hidden rounded-[2rem] p-0">
+      <!-- Marco tipo app con indicadores -->
+      <div class="card-pop relative aspect-[4/5] overflow-hidden rounded-2xl bg-card p-0">
+        <div class="flex items-center gap-2 border-b border-border bg-muted/70 px-4 py-3">
+          <span class="h-3 w-3 rounded-full bg-destructive" />
+          <span class="h-3 w-3 rounded-full bg-warning" />
+          <span class="h-3 w-3 rounded-full bg-success" />
+          <span class="ml-3 flex-1 truncate rounded-full bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+            app.pullstok.com
+          </span>
+        </div>
         <img
           src="/images/comerciante.jpg"
-          alt="Comerciante sonriendo en su negocio, rodeado de sus productos"
+          alt="Comerciante gestionando su negocio con Pullstok"
           width="1000"
           height="1250"
           fetchpriority="high"
@@ -63,9 +63,9 @@ const DEMO_URL = "https://app.pullstok.com/?demo=1";
       </div>
 
       <!-- Tarjeta flotante: ventas de hoy -->
-      <div class="card card-pop absolute -left-4 top-10 w-44 gap-1 p-4 animate-float sm:-left-8">
+      <div class="card card-pop absolute -left-4 top-10 w-44 gap-1 p-4 sm:-left-8">
         <p class="text-xs font-semibold text-muted-foreground">Ventas de hoy</p>
-        <p class="font-display text-2xl font-extrabold text-foreground">$184.350</p>
+        <p class="font-display text-2xl font-bold text-foreground">$184.350</p>
         <p class="flex items-center gap-1 text-xs font-bold text-success">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>
           +12% vs. ayer
@@ -73,17 +73,17 @@ const DEMO_URL = "https://app.pullstok.com/?demo=1";
       </div>
 
       <!-- Tarjeta flotante: stock crítico -->
-      <div class="card card-pop absolute -bottom-5 -right-3 w-48 gap-1 p-4 animate-float-slow sm:-right-6">
+      <div class="card card-pop absolute -bottom-5 -right-3 w-48 gap-1 p-4 sm:-right-6">
         <p class="text-xs font-semibold text-muted-foreground">Stock crítico</p>
-        <p class="font-display text-2xl font-extrabold text-foreground">7 ítems</p>
+        <p class="font-display text-2xl font-bold text-foreground">7 ítems</p>
         <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
-          <div class="h-full w-2/3 rounded-full" style="background: var(--brand-orange);"></div>
+          <div class="h-full w-2/3 rounded-full bg-warning"></div>
         </div>
       </div>
 
       <!-- Pin "tienda online activa" -->
-      <div class="badge absolute -top-3 right-6 rotate-2 bg-brand-cyan text-foreground shadow-[0_10px_24px_-12px_rgba(81,204,238,0.9)]">
-        🛒 Tienda online activa
+      <div class="badge absolute -top-3 right-6 bg-accent text-accent-foreground shadow-[0_8px_20px_-12px_rgba(15,23,42,0.4)]">
+        Tienda online activa
       </div>
     </div>
   </div>

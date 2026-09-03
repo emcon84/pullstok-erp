@@ -2,42 +2,41 @@
 const steps = [
   {
     number: "1",
-    title: "Creá tu cuenta y cargá tu negocio",
+    title: "Configurá tu negocio",
     description:
-      "Un wizard te guía paso a paso: nombre del negocio, rubro (ferretería, kiosco, indumentaria, almacén u otro) y categorías. Cinco minutos y listo.",
+      "Un wizard te guía paso a paso: datos del negocio, rubro (ferretería, indumentaria, almacén, gastronomía u otro) y categorías. En minutos quedás operativo.",
   },
   {
     number: "2",
-    title: "Subí tus productos",
+    title: "Cargá tus productos",
     description:
-      "Cargalos a mano o importá un Excel/CSV con todo de una. Vos elegís lo que te resulte más rápido.",
+      "Ingresalos a mano o importá todo de una desde un archivo Excel/CSV. Vos elegís lo que te resulte más rápido.",
   },
   {
     number: "3",
-    title: "Empezá a vender y mirá los reportes",
+    title: "Vendé y facturá",
     description:
-      "Cada venta actualiza el stock solo. Y desde el dashboard ves qué se mueve, qué no, y cómo te va.",
+      "Cada venta actualiza el stock al instante y podés facturar sobre la marcha. El dashboard te muestra qué se mueve y cómo evolucionan tus números.",
   },
 ];
 
-// Color de marca para cada paso
+// Acento de color para cada paso (tonalidad pro, con tokens)
 const stepColors = [
-  "bg-brand-orange text-[#3b2a00]",
-  "bg-brand-cyan text-[#0c4d61]",
-  "bg-brand-blue text-white",
+  "bg-primary text-primary-foreground",
+  "bg-accent text-accent-foreground",
+  "bg-secondary text-secondary-foreground",
 ];
 ---
 
 <section id="como-funciona" class="bg-muted/60 px-4 py-20 sm:px-6 lg:px-8">
   <div class="mx-auto max-w-7xl">
     <div class="mx-auto max-w-2xl text-center">
-      <span class="badge bg-brand-orange-soft text-[#b86e00]">🚀 Sin vueltas</span>
-      <h2 class="mt-4 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
+      <span class="badge bg-accent text-accent-foreground">Sin vueltas</span>
+      <h2 class="mt-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
         Empezás a usarlo el mismo día
       </h2>
       <p class="mt-4 text-lg text-muted-foreground">
-        Sin curso, sin manual de 50 páginas. Pullstok te acompaña desde el primer
-        click.
+        Sin cursos ni manuales. Pullstok te acompaña desde el primer clic.
       </p>
     </div>
 
@@ -46,12 +45,12 @@ const stepColors = [
         steps.map((step, i) => (
           <div class="relative text-center sm:text-left">
             <div
-              class={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl font-display text-2xl font-extrabold shadow-[0_12px_24px_-12px_rgba(120,80,20,0.5)] sm:mx-0 ${stepColors[i]}`}
+              class={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl font-display text-2xl font-bold sm:mx-0 ${stepColors[i]}`}
               aria-hidden="true"
             >
               {step.number}
             </div>
-            <h3 class="mt-4 text-lg font-bold text-foreground">
+            <h3 class="mt-4 text-lg font-semibold text-foreground">
               {step.title}
             </h3>
             <p class="mt-2 text-sm text-muted-foreground">

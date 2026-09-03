@@ -1,73 +1,102 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 /*
   ──────────────────────────────────────────────────────────────────────────
-  Pullstok — Sistema de diseño "LatAm vibrante / humano"
-  Cálido, cercano y con carácter. Paleta de marca (naranja/cyan/rojo/azul)
-  usada con alegría sobre fondo crema. Tipografía con personalidad
-  (Bricolage Grotesque display + Plus Jakarta Sans cuerpo). Acentos a mano,
-  blobs de color y micro-animaciones suaves. Nada de "SaaS genérico".
+  Pullstok — Sistema de diseño corporativo SaaS
+  Paleta claro/oscuro del sistema (app) para congruencia visual con la app.
+  Tipografía Inter (cuerpo) + Space Grotesk (display). Sin blobs ni acentos
+  a mano. Estilo prolijo, profesional y B2B.
   ──────────────────────────────────────────────────────────────────────────
 */
 :root {
-  --radius: 1.25rem;
+  --radius: 0.75rem;
 
-  /* Fondo crema cálido en vez de blanco clínico */
-  --background: #fff8ef;
-  --foreground: #241c15;
+  --background: #dee3ea;
+  --foreground: #0f172a;
 
   --card: #ffffff;
-  --card-foreground: #241c15;
+  --card-foreground: #0f172a;
 
-  /* Azul de marca como acción principal (cálido y confiable) */
-  --primary: #2a8bea;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  --primary: #6366f1;
   --primary-foreground: #ffffff;
 
-  --secondary: #fff1dd;
-  --secondary-foreground: #6b4b16;
+  --secondary: #d7dde5;
+  --secondary-foreground: #0f172a;
 
-  --muted: #fbf2e6;
-  --muted-foreground: #897a67;
+  --muted: #d5dce4;
+  --muted-foreground: #525d69;
 
-  --accent: #e8f5fd;
-  --accent-foreground: #155a96;
+  --accent: #dfe4fb;
+  --accent-foreground: #4338ca;
 
-  --destructive: #f73c5c;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  --success: #16a34a;
+  --success: #10b981;
   --success-foreground: #ffffff;
-  --warning: #ff9d00;
-  --warning-foreground: #3b2a00;
 
-  --border: #f0e3d0;
-  --input: #f0e3d0;
-  --ring: #2a8bea;
+  --warning: #f59e0b;
+  --warning-foreground: #ffffff;
 
-  /* Colores de marca tomados del isotipo de Pullstok (logo.tsx) */
-  --brand-orange: #ff9d00;
-  --brand-cyan: #51ccee;
-  --brand-red: #f73c5c;
-  --brand-blue: #2a8bea;
+  --border: #bfcad5;
+  --input: #b7c2ce;
+  --ring: #6366f1;
+}
 
-  /* Tinte suave de cada color de marca, para fondos de blobs / chips */
-  --brand-orange-soft: #ffe9c2;
-  --brand-cyan-soft: #d3f1fa;
-  --brand-red-soft: #ffd7de;
-  --brand-blue-soft: #cfe6fb;
+.dark {
+  --background: #0b1120;
+  --foreground: #e2e8f0;
+
+  --card: #111827;
+  --card-foreground: #e2e8f0;
+
+  --popover: #111827;
+  --popover-foreground: #e2e8f0;
+
+  --primary: #818cf8;
+  --primary-foreground: #0b1120;
+
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+
+  --accent: #312e81;
+  --accent-foreground: #e0e7ff;
+
+  --destructive: #f87171;
+  --destructive-foreground: #0b1120;
+
+  --success: #34d399;
+  --success-foreground: #0b1120;
+
+  --warning: #fbbf24;
+  --warning-foreground: #0b1120;
+
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #818cf8;
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 12px);
-  --radius-md: calc(var(--radius) - 8px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 8px);
-  --radius-2xl: calc(var(--radius) + 16px);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -86,57 +115,11 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --color-brand-orange: var(--brand-orange);
-  --color-brand-cyan: var(--brand-cyan);
-  --color-brand-red: var(--brand-red);
-  --color-brand-blue: var(--brand-blue);
-  --color-brand-orange-soft: var(--brand-orange-soft);
-  --color-brand-cyan-soft: var(--brand-cyan-soft);
-  --color-brand-red-soft: var(--brand-red-soft);
-  --color-brand-blue-soft: var(--brand-blue-soft);
+  --color-brand: var(--primary);
+  --color-brand-foreground: var(--primary-foreground);
 
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Bricolage Grotesque", "Plus Jakarta Sans", ui-sans-serif,
-    system-ui, sans-serif;
-
-  /* Animaciones de marca */
-  --animate-float: float 6s ease-in-out infinite;
-  --animate-float-slow: float 9s ease-in-out infinite;
-  --animate-wiggle: wiggle 2.5s ease-in-out infinite;
-  --animate-blob: blob 14s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-14px);
-  }
-}
-
-@keyframes wiggle {
-  0%,
-  100% {
-    transform: rotate(-3deg);
-  }
-  50% {
-    transform: rotate(3deg);
-  }
-}
-
-@keyframes blob {
-  0%,
-  100% {
-    border-radius: 42% 58% 63% 37% / 42% 38% 62% 58%;
-  }
-  33% {
-    border-radius: 64% 36% 37% 63% / 55% 48% 52% 45%;
-  }
-  66% {
-    border-radius: 39% 61% 55% 45% / 61% 38% 62% 39%;
-  }
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
@@ -151,7 +134,7 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-feature-settings: "ss01" 1, "cv11" 1, "calt" 1;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 
   h1,
@@ -163,29 +146,31 @@
   }
 
   ::selection {
-    background-color: var(--brand-orange);
-    color: #3b2a00;
+    background-color: var(--color-primary);
+    color: var(--color-primary-foreground);
   }
 }
 
 @layer components {
-  /* ── Botones chunky con personalidad (pill + sombra de color suave) ── */
+  /* ── Botones pro ── */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     white-space: nowrap;
-    border-radius: 999px;
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 700;
+    border-radius: 0.75rem;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    font-weight: 600;
     transition:
-      transform 150ms ease,
+      background-color 150ms ease,
+      color 150ms ease,
+      border-color 150ms ease,
       box-shadow 150ms ease,
-      background-color 150ms ease;
-    height: 3rem;
-    padding-inline: 1.75rem;
+      opacity 150ms ease;
+    height: 2.75rem;
+    padding-inline: 1.25rem;
     outline: none;
   }
 
@@ -196,60 +181,46 @@
   .btn-primary {
     background-color: var(--color-primary);
     color: var(--color-primary-foreground);
-    box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--brand-blue) 75%, transparent);
   }
   .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 14px 26px -10px color-mix(in srgb, var(--brand-blue) 80%, transparent);
-  }
-  .btn-primary:active {
-    transform: translateY(0);
+    opacity: 0.92;
   }
 
+  /* Alias para compatibilidad con estilos heredados (antes era el naranja). */
   .btn-accent {
-    background-color: var(--brand-orange);
-    color: #3b2a00;
-    box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--brand-orange) 85%, transparent);
+    background-color: var(--color-primary);
+    color: var(--color-primary-foreground);
   }
   .btn-accent:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 14px 26px -10px color-mix(in srgb, var(--brand-orange) 90%, transparent);
-  }
-  .btn-accent:active {
-    transform: translateY(0);
+    opacity: 0.92;
   }
 
   .btn-outline {
     background-color: var(--color-card);
-    border: 1.5px solid var(--color-border);
+    border: 1px solid var(--color-border);
     color: var(--color-foreground);
-    box-shadow: 0 6px 16px -10px rgb(120 80 20 / 0.25);
   }
   .btn-outline:hover {
-    transform: translateY(-2px);
     background-color: var(--color-secondary);
-  }
-  .btn-outline:active {
-    transform: translateY(0);
+    border-color: var(--color-ring);
   }
 
-  /* ── Cards cálidas con borde definido ── */
+  /* ── Cards pro ── */
   .card {
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
     border-radius: var(--radius-lg);
-    border: 1.5px solid var(--color-border);
+    border: 1px solid var(--color-border);
     background-color: var(--color-card);
     color: var(--color-card-foreground);
     padding: 1.5rem;
-    box-shadow: 0 10px 30px -12px rgb(120 80 20 / 0.12);
+    box-shadow: 0 8px 24px -18px rgb(15 23 42 / 0.25);
   }
 
-  /* Card destacada: un poco más elevada y definida que la base, pero suave */
+  /* Card con algo más de elevación (usos puntuales). */
   .card-pop {
-    border: 1.5px solid var(--color-border);
-    box-shadow: 0 18px 44px -20px rgb(120 80 20 / 0.28);
+    box-shadow: 0 18px 44px -24px rgb(15 23 42 / 0.28);
   }
 
   .badge {
@@ -258,17 +229,19 @@
     gap: 0.4rem;
     border-radius: 999px;
     padding: 0.35rem 0.85rem;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: 0.8rem;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1rem;
+    background-color: var(--color-secondary);
+    color: var(--color-secondary-foreground);
   }
 
   /* Inputs de formularios (pedidos + contacto) */
   .lead-input {
     border-radius: 0.75rem;
-    border: 1.5px solid var(--color-border);
-    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    background-color: var(--color-background);
     padding: 0.6rem 0.85rem;
     font-size: 0.95rem;
     font-weight: 500;
@@ -283,37 +256,43 @@
     font-weight: 400;
   }
   .lead-input:focus {
-    border-color: var(--color-primary);
+    border-color: var(--color-ring);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 25%, transparent);
-  }
-
-  /* ── Blob de color decorativo (animado) ── */
-  .blob {
-    position: absolute;
-    border-radius: 42% 58% 63% 37% / 42% 38% 62% 58%;
-    filter: blur(2px);
-    animation: var(--animate-blob);
-    pointer-events: none;
   }
 }
 
 @layer utilities {
-  /* Subrayado "a mano" para resaltar palabras clave */
-  .underline-hand {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='14' viewBox='0 0 120 14' fill='none'%3E%3Cpath d='M2 9c20-5 49-7 78-5 13 .9 26 2.4 38 5' stroke='%23FF9D00' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: bottom left;
-    background-size: 100% 0.5em;
-    padding-bottom: 0.1em;
+  /* Fondo del hero: grilla de líneas finas y muy sutil. */
+  .bg-grid {
+    background-image: linear-gradient(
+        to right,
+        color-mix(in srgb, var(--color-border) 60%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--color-border) 60%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 56px 56px;
+  }
+  .bg-grid-fade {
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      var(--color-background) 100%
+    );
   }
 
   /* Respeta a quien pide menos movimiento */
   @media (prefers-reduced-motion: reduce) {
-    .animate-float,
-    .animate-float-slow,
-    .animate-wiggle,
-    .blob {
-      animation: none !important;
+    html {
+      scroll-behavior: auto;
+    }
+    .btn,
+    .card,
+    .lead-input {
+      transition: none;
     }
   }
 }
