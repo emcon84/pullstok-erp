@@ -162,9 +162,9 @@ export const matchStages = async (
  */
 export const listBrands = async (
   species: string,
-  stageId: string,
+  stageId: string | null | undefined,
 ): Promise<{ brand: string; id: string }[]> => {
-  return getBrands(toSpeciesKey(species), stageId);
+  return getBrands(toSpeciesKey(species), stageId ?? null);
 };
 
 /**
