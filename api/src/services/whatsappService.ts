@@ -575,7 +575,13 @@ const captureSelectionFor = async (
       (/^\d+$/.test(trimmed)
         ? products[parseInt(trimmed, 10) - 1]
         : products.find((p) => p.id === trimmed)) ?? null;
-    if (!prod) return {};
+    if (!prod) {
+      // No se fijó un producto válido: el cliente puede haber escrito texto libre
+      // ("1 bolsa de 15kg") en vez de elegir una opción. Señalamos que NO se pudo
+      // fijar el producto para que el flujo NO avance a cantidad con un pedido
+      // vacío (bug de pedido sin producto).
+      return { productNotFound: true };
+    }
     return {
       selectedProduct: {
         id: prod.id,
@@ -791,7 +797,7 @@ const applyFlowReply = async (input: {
   // evita que el flujo puro intente listar las 93 marcas (payload gigante).
   if ((selectionPatch as any).brandNotFound) {
     const msg =
-      "No encontré esa marca 🐾 ¿Podés escribirla de nuevo? (ej: ProPlan, Old Prince, Maxxium) o pedí ayuda con un vendedor.";
+      "Esa marca no está disponible para la etapa que elegiste 🤔 Probá con otra etapa (ej: Adulto, Cachorro) u otra marca. Si no la encontrás, pedí ayuda con un vendedor.";
     await sendText(phone, msg).catch(() => {});
     await persistMessage({
       conversationId,
@@ -803,6 +809,27 @@ const applyFlowReply = async (input: {
     await prisma.conversation.updateMany({
       where: { id: conversationId },
       data: { whatsappStage: STAGE_BRAND },
+    });
+    return;
+  }
+
+  // Producto sin selección: el cliente no eligió un producto válido en el nodo de
+  // selección (escribió algo distinto a una opción). Frenamos y pedimos que elija
+  // una de las opciones mostradas → evita el pedido SIN producto (bug crítico).
+  if ((selectionPatch as any).productNotFound) {
+    const msg =
+      "Elegí uno de los productos de la lista 👇 (tocá un número) o escribí el nombre exacto. Si no aparece lo que buscás, pedí ayuda con un vendedor.";
+    await sendText(phone, msg).catch(() => {});
+    await persistMessage({
+      conversationId,
+      sender: "OPERATOR",
+      senderUserId: null,
+      isBot: true,
+      body: msg,
+    });
+    await prisma.conversation.updateMany({
+      where: { id: conversationId },
+      data: { whatsappStage: STAGE_PRODUCT_SELECT },
     });
     return;
   }
