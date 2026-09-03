@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import type { InvoicePdfData } from "@/utils/exportToPDF";
 import type { AfipQrPayload } from "@/utils/afipQr";
 import { useAfipQrImage } from "@/components/hooks/useAfipQrImage";
-import logoUrl from "@/assets/LogoPullNegroHor.svg";
+import { useBrandingContext } from "@/contexts/BrandingContext";
+import defaultLogoUrl from "@/assets/LogoPullNegroHor.svg";
 
 /**
  * Comprobante de factura IMPRIMIBLE (patrón print-area + window.print).
@@ -105,6 +106,7 @@ export const PrintInvoice = (data: InvoicePdfData) => {
     [data],
   );
   const qrDataUrl = useAfipQrImage(qrPayload);
+  const { branding } = useBrandingContext();
 
   const tableRows: Array<InvoicePdfData["items"][number] | null> = [
     ...data.items,
@@ -130,7 +132,7 @@ export const PrintInvoice = (data: InvoicePdfData) => {
             {/* Emisor */}
             <div style={styles.colEmisor}>
               <img
-                src={logoUrl}
+                src={branding.logoUrl ?? defaultLogoUrl}
                 alt="Logo"
                 data-testid="print-invoice-logo"
                 style={{ ...styles.logo, marginBottom: 16 }}
