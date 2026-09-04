@@ -17,6 +17,9 @@ import {
   STAGE_PRODUCT_SELECT,
   STAGE_PRODUCT_QUANTITY,
   STAGE_PRODUCT_AMOUNT,
+  STAGE_PRODUCT,
+  STAGE_NEED_MORE,
+  STAGE_CATEGORY,
   STAGE_SIZE,
   STAGE_NOTES,
   type FlowCatalog,
@@ -844,6 +847,45 @@ const applyFlowReply = async (input: {
   if (currentStage) {
     const next = nextStageForAnswer(currentStage, answer, { orderType });
     catalog = await catalogForStage(next, mergedDraft);
+
+    // Al agregar otra línea (NEED_MORE + "sí") el flujo vuelve a CATEGORY: se
+    // limpian los campos de selección del ítem anterior para que la nueva línea no
+    // herede atributos (marca/especie/etapa/peso/producto/observación). Se
+    // conservan `orderType` y `items`. `productCategory` se elige de nuevo en
+    // CATEGORY, así que también se borra.
+    if (currentStage === STAGE_NEED_MORE && next === STAGE_CATEGORY) {
+      delete mergedDraft.selectedSpecies;
+      delete mergedDraft.selectedBrandId;
+      delete mergedDraft.selectedStageId;
+      delete mergedDraft.sizeText;
+      delete mergedDraft.productText;
+      delete mergedDraft.notes;
+      delete mergedDraft.selectedProduct;
+      delete mergedDraft.productCategory;
+    }
+
+    // Categoría no-seco (húmedo/accesorios/otros): la línea va como requerimiento
+    // de texto libre (productId null) para que el operador la arme. Se alcanza solo
+    // vía STAGE_PRODUCT, que ya no existe en el flujo de alimento seco.
+    if (currentStage === STAGE_PRODUCT) {
+      mergedDraft.productText = (answer ?? "").trim().toLowerCase();
+      const reqItems = Array.isArray(mergedDraft.items) ? mergedDraft.items : [];
+      reqItems.push({
+        productId: null,
+        productName: (mergedDraft.productText as string) ?? null,
+        type: (mergedDraft.productCategory as string) ?? "requerimiento",
+        quantity: null,
+        amount: null,
+        detail: null,
+        total: null,
+        marca: null,
+        especie: null,
+        etapa: null,
+        peso: null,
+        observacion: null,
+      });
+      mergedDraft.items = reqItems;
+    }
 
     const isQtyOrAmount =
       currentStage === STAGE_PRODUCT_QUANTITY ||

@@ -18,8 +18,10 @@ import {
   mergeDraftData,
   normalizeOrderType,
   normalizePaymentMethod,
+  normalizeProductCategory,
   STAGE_START,
   STAGE_CONSULTA,
+  STAGE_CATEGORY,
   STAGE_TYPE,
   STAGE_PRODUCT,
   STAGE_AMOUNT,
@@ -50,21 +52,25 @@ import {
   BUTTON_EFECTIVO,
   BUTTON_MORE,
   BUTTON_DONE_MORE,
+  BUTTON_CAT_SECO,
+  BUTTON_CAT_HUMEDO,
+  BUTTON_CAT_ACCESORIOS,
+  BUTTON_CAT_OTROS,
   type FlowCatalog,
 } from "../../src/services/whatsappFlow";
 
 describe("whatsappFlow — nextStageForAnswer", () => {
-  it("START + ACTION_ORDER → TYPE", () => {
-    expect(nextStageForAnswer(STAGE_START, BUTTON_PEDIDO.id)).toBe(STAGE_TYPE);
+  it("START + ACTION_ORDER → CATEGORY", () => {
+    expect(nextStageForAnswer(STAGE_START, BUTTON_PEDIDO.id)).toBe(STAGE_CATEGORY);
   });
 
   it("START + ACTION_CONSULT → CONSULTA", () => {
     expect(nextStageForAnswer(STAGE_START, BUTTON_CONSULTA.id)).toBe(STAGE_CONSULTA);
   });
 
-  it("START + texto 'quiero un pedido' → TYPE", () => {
+  it("START + texto 'quiero un pedido' → CATEGORY", () => {
     expect(nextStageForAnswer(STAGE_START, "quiero un pedido de alimento")).toBe(
-      STAGE_TYPE,
+      STAGE_CATEGORY,
     );
   });
 
@@ -106,8 +112,56 @@ describe("whatsappFlow — nextStageForAnswer", () => {
     expect(nextStageForAnswer(STAGE_TYPE, "4")).toBe(STAGE_OTHER);
   });
 
-  it("PRODUCT (texto libre) → ADDRESS", () => {
-    expect(nextStageForAnswer(STAGE_PRODUCT, "Royal Canin")).toBe(STAGE_ADDRESS);
+  it("CATEGORY + CAT_SECO → TYPE (flujo guiado de alimento seco)", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, BUTTON_CAT_SECO.id)).toBe(STAGE_TYPE);
+  });
+
+  it("CATEGORY + '1' (seco) → TYPE", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, "1")).toBe(STAGE_TYPE);
+  });
+
+  it("CATEGORY + 'seco' (texto) → TYPE", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, "alimento balanceado seco")).toBe(
+      STAGE_TYPE,
+    );
+  });
+
+  it("CATEGORY + CAT_HUMEDO → PRODUCT (requerimiento)", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, BUTTON_CAT_HUMEDO.id)).toBe(STAGE_PRODUCT);
+  });
+
+  it("CATEGORY + '2' (húmedo) → PRODUCT", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, "2")).toBe(STAGE_PRODUCT);
+  });
+
+  it("CATEGORY + 'humedo' (texto) → PRODUCT", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, "humedo")).toBe(STAGE_PRODUCT);
+  });
+
+  it("CATEGORY + CAT_ACCESORIOS → PRODUCT", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, BUTTON_CAT_ACCESORIOS.id)).toBe(
+      STAGE_PRODUCT,
+    );
+  });
+
+  it("CATEGORY + '3' (accesorios) → PRODUCT", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, "3")).toBe(STAGE_PRODUCT);
+  });
+
+  it("CATEGORY + CAT_OTROS → PRODUCT", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, BUTTON_CAT_OTROS.id)).toBe(STAGE_PRODUCT);
+  });
+
+  it("CATEGORY + '4' (otros) → PRODUCT", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, "4")).toBe(STAGE_PRODUCT);
+  });
+
+  it("CATEGORY + respuesta no reconocida → TYPE por default (no corta)", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, "messi")).toBe(STAGE_TYPE);
+  });
+
+  it("PRODUCT (texto libre) → NOTES (requerimiento, ya no ADDRESS)", () => {
+    expect(nextStageForAnswer(STAGE_PRODUCT, "Royal Canin")).toBe(STAGE_NOTES);
   });
 
   it("AMOUNT → ADDRESS (rama sin cálculo, FASE 3)", () => {
@@ -168,9 +222,9 @@ describe("whatsappFlow — planResponse", () => {
     expect(r.sendImage).toBe(false);
   });
 
-  it("START + pedido → TYPE (sin botones, texto numerado)", () => {
+  it("START + pedido → CATEGORY (sin botones, texto numerado)", () => {
     const r = planResponse({ currentStage: STAGE_START, answer: BUTTON_PEDIDO.id });
-    expect(r.nextStage).toBe(STAGE_TYPE);
+    expect(r.nextStage).toBe(STAGE_CATEGORY);
     expect(r.buttons).toBeNull();
     expect(r.sendImage).toBe(false);
   });
@@ -186,9 +240,9 @@ describe("whatsappFlow — planResponse", () => {
     expect(r.nextStage).toBe(STAGE_BRAND);
   });
 
-  it("PRODUCT → ADDRESS", () => {
+  it("PRODUCT → NOTES (requerimiento)", () => {
     const r = planResponse({ currentStage: STAGE_PRODUCT, answer: "Royal Canin" });
-    expect(r.nextStage).toBe(STAGE_ADDRESS);
+    expect(r.nextStage).toBe(STAGE_NOTES);
   });
 
   it("ADDRESS → PAYMENT con botones QR/transferencia/efectivo", () => {
@@ -266,11 +320,58 @@ describe("whatsappFlow — helpers", () => {
     expect(isRestartIntent("")).toBe(false);
   });
 
-  it("buttonsForStage devuelve null en nodos que esperan texto (incluye TYPE)", () => {
+  it("buttonsForStage devuelve null en nodos que esperan texto (incluye TYPE y CATEGORY)", () => {
     expect(buttonsForStage(STAGE_PRODUCT)).toBeNull();
     expect(buttonsForStage(STAGE_ADDRESS)).toBeNull();
     expect(buttonsForStage(STAGE_QR)).toBeNull();
     expect(buttonsForStage(STAGE_TYPE)).toBeNull();
+    expect(buttonsForStage(STAGE_CATEGORY)).toBeNull();
+  });
+});
+
+describe("whatsappFlow — CATEGORY (puerta de tipo de producto)", () => {
+  it("messageForStage(STAGE_CATEGORY) lista las 4 opciones numeradas", () => {
+    const msg = messageForStage(STAGE_CATEGORY);
+    expect(msg).toContain("¿Qué tipo de producto buscás?");
+    expect(msg).toContain("1️⃣ 🐶 Alimento balanceado seco");
+    expect(msg).toContain("2️⃣ 🐱 Alimento húmedo");
+    expect(msg).toContain("3️⃣ 🎾 Accesorios");
+    expect(msg).toContain("4️⃣ 🧺 Otros productos");
+  });
+
+  it("buttonsForStage(STAGE_CATEGORY) es null (va por texto numerado)", () => {
+    expect(buttonsForStage(STAGE_CATEGORY)).toBeNull();
+  });
+
+  it("normalizeProductCategory cubre id, número y palabra", () => {
+    expect(normalizeProductCategory(BUTTON_CAT_SECO.id)).toBe("seco");
+    expect(normalizeProductCategory(BUTTON_CAT_HUMEDO.id)).toBe("humedo");
+    expect(normalizeProductCategory(BUTTON_CAT_ACCESORIOS.id)).toBe("accesorios");
+    expect(normalizeProductCategory(BUTTON_CAT_OTROS.id)).toBe("otros");
+    expect(normalizeProductCategory("1")).toBe("seco");
+    expect(normalizeProductCategory("2")).toBe("humedo");
+    expect(normalizeProductCategory("3")).toBe("accesorios");
+    expect(normalizeProductCategory("4")).toBe("otros");
+    expect(normalizeProductCategory("alimento balanceado seco")).toBe("seco");
+    expect(normalizeProductCategory("húmedo")).toBe("humedo");
+    expect(normalizeProductCategory("humedo")).toBe("humedo");
+    expect(normalizeProductCategory("accesorios")).toBe("accesorios");
+    expect(normalizeProductCategory("otros productos")).toBe("otros");
+    expect(normalizeProductCategory("no sé")).toBeNull();
+  });
+
+  it("buildDraftData(STAGE_CATEGORY, ...) → productCategory", () => {
+    expect(buildDraftData(STAGE_CATEGORY, "1")).toEqual({ productCategory: "seco" });
+    expect(buildDraftData(STAGE_CATEGORY, BUTTON_CAT_HUMEDO.id)).toEqual({
+      productCategory: "humedo",
+    });
+    expect(buildDraftData(STAGE_CATEGORY, "3")).toEqual({
+      productCategory: "accesorios",
+    });
+    expect(buildDraftData(STAGE_CATEGORY, "otros")).toEqual({
+      productCategory: "otros",
+    });
+    expect(buildDraftData(STAGE_CATEGORY, "messi")).toEqual({});
   });
 });
 
@@ -431,8 +532,8 @@ describe("whatsappFlow — flujo guiado FASE 6 (marca→especie→etapa→peso)"
     expect(nextStageForAnswer(STAGE_NOTES, "raza pequeña")).toBe(STAGE_NEED_MORE);
   });
 
-  it("NEED_MORE + 'sí' → BRAND (agregar otra línea)", () => {
-    expect(nextStageForAnswer(STAGE_NEED_MORE, "sí, otro")).toBe(STAGE_BRAND);
+  it("NEED_MORE + 'sí' → CATEGORY (agregar otra línea)", () => {
+    expect(nextStageForAnswer(STAGE_NEED_MORE, "sí, otro")).toBe(STAGE_CATEGORY);
   });
 
   it("NEED_MORE + 'no' → ADDRESS (terminar)", () => {

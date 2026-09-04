@@ -44,6 +44,9 @@ export const STAGE_ADDRESS = "ADDRESS";
 export const STAGE_PAYMENT = "PAYMENT";
 export const STAGE_QR = "QR";
 export const STAGE_OTHER = "OTHER";
+// ── CATEGORÍA de producto: puerta nueva ADELANTE del TYPE. "seco" → flujo guiado;
+//    húmedo/accesorios/otros → requerimiento a operador vía STAGE_PRODUCT.
+export const STAGE_CATEGORY = "CATEGORY";
 // Terminales: el pedido quedó armado → se entrega a un operador humano.
 export const STAGE_PAYMENT_DONE = "PAYMENT_DONE";
 export const STAGE_DONE = "DONE";
@@ -74,6 +77,12 @@ export const BUTTON_EFECTIVO = { id: "PAY_CASH", title: "💵 Efectivo" };
 // vuelve a SPECIES para sumar otra línea al pedido; si no, pasa a dirección.
 export const BUTTON_MORE = { id: "NEED_MORE", title: "➕ Sí, agregar otro" };
 export const BUTTON_DONE_MORE = { id: "NEED_DONE", title: "🛍️ No, terminar" };
+// Categorías de producto (CATEGORY). CATEGORY no va por botones interactivos
+// (tiene 4 opciones, excede el límite de 3 de WhatsApp) → texto numerado como TYPE.
+export const BUTTON_CAT_SECO = { id: "CAT_SECO", title: "Alimento balanceado seco" };
+export const BUTTON_CAT_HUMEDO = { id: "CAT_HUMEDO", title: "Alimento húmedo" };
+export const BUTTON_CAT_ACCESORIOS = { id: "CAT_ACCESORIOS", title: "Accesorios" };
+export const BUTTON_CAT_OTROS = { id: "CAT_OTROS", title: "Otros productos" };
 
 // ---------------------------------------------------------------------------
 // Catálogo resuelto por el service (FASE 4). whatsappFlow es PURO (sin I/O): el
@@ -198,6 +207,15 @@ export function messageForStage(stage: string, catalog?: FlowCatalog): string {
   switch (stage) {
     case STAGE_START:
       return "¡Hola! 👋 Soy el asistente de El Almacén de las Mascotas. ¿Qué necesitás hoy?";
+    case STAGE_CATEGORY:
+      return [
+        "¿Qué tipo de producto buscás? Elegí una opción:",
+        "1️⃣ 🐶 Alimento balanceado seco",
+        "2️⃣ 🐱 Alimento húmedo",
+        "3️⃣ 🎾 Accesorios",
+        "4️⃣ 🧺 Otros productos",
+        "Respondé con el número o el nombre.",
+      ].join("\n");
     case STAGE_TYPE:
       return [
         "¿Qué tipo de pedido querés hacer? Elegí una opción:",
@@ -286,13 +304,25 @@ export function nextStageForAnswer(
   switch (currentStage) {
     case STAGE_START:
       // Botones del nodo START.
-      if (a === BUTTON_PEDIDO.id.toLowerCase()) return STAGE_TYPE;
+      if (a === BUTTON_PEDIDO.id.toLowerCase()) return STAGE_CATEGORY;
       if (a === BUTTON_CONSULTA.id.toLowerCase()) return STAGE_CONSULTA;
-      // Texto libre en START: si pedido → TYPE; si no → consulta (handoff).
+      // Texto libre en START: si pedido → CATEGORY; si no → consulta (handoff).
       if (has("pedido") || has("comprar") || has("orden") || has("encargar")) {
-        return STAGE_TYPE;
+        return STAGE_CATEGORY;
       }
       return STAGE_CONSULTA;
+
+    case STAGE_CATEGORY: {
+      // Puerta de categoría: "seco" → flujo guiado (TYPE); húmedo/accesorios/otros
+      // → requerimiento de texto libre al operador (PRODUCT → NOTES). No reconocido
+      // → default al flujo de alimento (seco) para no cortar la conversación.
+      const cat = normalizeProductCategory(answer);
+      if (cat === "seco") return STAGE_TYPE;
+      if (cat === "humedo" || cat === "accesorios" || cat === "otros") {
+        return STAGE_PRODUCT;
+      }
+      return STAGE_TYPE;
+    }
 
     case STAGE_TYPE:
       // FASE 6: al elegir un tipo de pedido (bolsa/kilo/monto) entramos al flujo
@@ -339,15 +369,15 @@ export function nextStageForAnswer(
       const finish = ["no", "nada", "listo", "gracias", "fin", "done", "terminar", "termine"];
       const more = ["si", "sí", "otro", "mas", "más", "more", "dale", "adicional"];
       if (toks.some((t) => finish.includes(t))) return STAGE_ADDRESS;
-      if (toks.some((t) => more.includes(t))) return STAGE_BRAND;
+      if (toks.some((t) => more.includes(t))) return STAGE_CATEGORY;
       // Respuesta ambigua → asumimos terminar.
       return STAGE_ADDRESS;
     }
 
     case STAGE_PRODUCT:
-      // FASE 2 (simplicidad): tras elegir el producto se pasa directo a dirección.
-      // La rama "por monto con cálculo" (STAGE_PROD_AMOUNT) es FASE 3.
-      return STAGE_ADDRESS;
+      // Categoría no-seco: requerimiento de texto libre → observación (NOTES) y
+      // luego "¿necesitás algo más?" (NEED_MORE). No va a dirección directo.
+      return STAGE_NOTES;
 
     case STAGE_AMOUNT:
     case STAGE_PROD_AMOUNT:
@@ -470,6 +500,45 @@ export function normalizeOrderType(answer: string): string | null {
 }
 
 /**
+ * Normaliza la respuesta del nodo CATEGORY a una de las 4 categorías del borrador.
+ * Acepta el id de botón (CAT_SECO/CAT_HUMEDO/CAT_ACCESORIOS/CAT_OTROS), el número
+ * (1..4) o la palabra libre (seco/húmedo/accesorios/otros). "húmedo" y "humedo"
+ * (con y sin tilde) son válidas. Respuesta no reconocida → null (el flujo default
+ * cae a "seco", acá no inventamos categoría).
+ */
+export function normalizeProductCategory(answer: string): string | null {
+  const a = norm(answer);
+  const has = (kw: string) => a.includes(kw);
+  if (a === BUTTON_CAT_SECO.id.toLowerCase() || a === "1" || has("seco")) {
+    return "seco";
+  }
+  if (
+    a === BUTTON_CAT_HUMEDO.id.toLowerCase() ||
+    a === "2" ||
+    has("humedo") ||
+    has("húmedo")
+  ) {
+    return "humedo";
+  }
+  if (
+    a === BUTTON_CAT_ACCESORIOS.id.toLowerCase() ||
+    a === "3" ||
+    has("accesorio")
+  ) {
+    return "accesorios";
+  }
+  if (
+    a === BUTTON_CAT_OTROS.id.toLowerCase() ||
+    a === "4" ||
+    has("otros") ||
+    has("otro")
+  ) {
+    return "otros";
+  }
+  return null;
+}
+
+/**
  * Normaliza la respuesta del nodo PAYMENT a uno de los 3 medios del borrador.
  * Ids (PAY_QR/PAY_TRANSFER/PAY_CASH) + palabras libres (qr/transferencia/
  * efectivo). No reconocido → null.
@@ -518,6 +587,7 @@ export function buildDraftData(
   amount?: number;
   address?: string;
   paymentMethod?: string;
+  productCategory?: string;
   selectedSpecies?: string;
   selectedStageId?: string;
   selectedBrandId?: string;
@@ -539,6 +609,10 @@ export function buildDraftData(
   const a = norm(answer);
   const isNumeric = /^\d+(\.\d+)?$/.test(a);
   switch (currentStage) {
+    case STAGE_CATEGORY: {
+      const cat = normalizeProductCategory(answer);
+      return cat ? { productCategory: cat } : {};
+    }
     case STAGE_TYPE: {
       const orderType = normalizeOrderType(answer);
       return orderType ? { orderType } : {};
@@ -727,8 +801,10 @@ export default {
   mergeDraftData,
   normalizeOrderType,
   normalizePaymentMethod,
+  normalizeProductCategory,
   STAGE_START,
   STAGE_CONSULTA,
+  STAGE_CATEGORY,
   STAGE_TYPE,
   STAGE_PRODUCT,
   STAGE_AMOUNT,
@@ -759,4 +835,8 @@ export default {
   BUTTON_EFECTIVO,
   BUTTON_MORE,
   BUTTON_DONE_MORE,
+  BUTTON_CAT_SECO,
+  BUTTON_CAT_HUMEDO,
+  BUTTON_CAT_ACCESORIOS,
+  BUTTON_CAT_OTROS,
 };
