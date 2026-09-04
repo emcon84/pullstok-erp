@@ -742,8 +742,20 @@ describe("whatsappFlow — buildDraftData (FASE 4)", () => {
 });
 
 describe("whatsappFlow — FASE 6 (SIZE y NOTES)", () => {
-  it("messageForStage(STAGE_SIZE) pregunta el peso/tamaño", () => {
-    expect(messageForStage(STAGE_SIZE)).toContain("¿Qué peso/tamaño?");
+  it("messageForStage(STAGE_SIZE) pregunta el peso de la BOLSA (no de la mascota)", () => {
+    expect(messageForStage(STAGE_SIZE)).toContain("¿De qué peso es la bolsa?");
+  });
+
+  it("messageForStage(PRODUCT_QUANTITY, bolsa) pregunta cuántas bolsas", () => {
+    expect(messageForStage(STAGE_PRODUCT_QUANTITY, undefined, "bolsa")).toContain(
+      "¿Cuántas bolsas necesitás?",
+    );
+  });
+
+  it("messageForStage(PRODUCT_QUANTITY, kilo) pregunta cuántos kilos", () => {
+    expect(messageForStage(STAGE_PRODUCT_QUANTITY, undefined, "kilo")).toContain(
+      "¿Cuántos kilos necesitás?",
+    );
   });
 
   it("messageForStage(STAGE_NOTES) pregunta la observación", () => {

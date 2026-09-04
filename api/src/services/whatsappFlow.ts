@@ -192,7 +192,11 @@ export function buttonsForStage(
  * productos); las marcas (90+) se manejan aparte como texto libre.
  */
 const MENU_LIMIT = 12;
-export function messageForStage(stage: string, catalog?: FlowCatalog): string {
+export function messageForStage(
+  stage: string,
+  catalog?: FlowCatalog,
+  orderType?: string | null,
+): string {
   const menu = menuOptions(stage, catalog);
   const withOptions = (base: string): string => {
     if (!menu) return base;
@@ -238,11 +242,18 @@ export function messageForStage(stage: string, catalog?: FlowCatalog): string {
     case STAGE_PRODUCT_SELECT:
       return withOptions("Elegí el producto (cada opción muestra su peso y precio):");
     case STAGE_PRODUCT_QUANTITY:
-      return "¿Cuánto querés? Decime la cantidad (kg para el suelto, cantidad de bolsas para la cerrada).";
+      // "¿Cuánto querés?" se adapta al tipo de pedido que eligió el cliente:
+      // bolsa → número de bolsas; kilo → peso en kg. Evita preguntar "cuántas
+      // bolsas" a alguien que va por kilo (y viceversa).
+      return orderType === "kilo"
+        ? "¿Cuántos kilos necesitás? Decime el peso (ej: 1, 2, 5)."
+        : "¿Cuántas bolsas necesitás? Si es más de una, decime la cantidad.";
     case STAGE_PRODUCT_AMOUNT:
       return "¿Cuánto querés gastar? Decime el importe (ej: 15000).";
     case STAGE_SIZE:
-      return "¿Qué peso/tamaño? (ej: 10 kg, 15 kg, 22 kg)";
+      // Solo se alcanza en la rama de bolsa cerrada: es el peso de la BOLSA
+      // (10/15/22 kg), no el peso/tamaño de la mascota. Se aclara para no confundir.
+      return "¿De qué peso es la bolsa? (ej: 10 kg, 15 kg, 22 kg)";
     case STAGE_NOTES:
       return "¿Alguna observación? (ej: raza pequeña, esterilizado, medicado...). Si no, respondé 'no'.";
     case STAGE_NEED_MORE:
@@ -764,7 +775,7 @@ export function planResponse(input: {
     };
   }
 
-  let message = messageForStage(next, catalog);
+  let message = messageForStage(next, catalog, orderType);
 
   // Al confirmar cantidad/importe (salimos hacia NOTES o NEED_MORE) se antepone
   // la confirmación del producto matcheado ("Encontré: X — $Y. ¿Te lo confirmo?")
