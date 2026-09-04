@@ -906,11 +906,14 @@ const applyFlowReply = async (input: {
   // Envío de salida. Un fallo de Kapso NO debe romper la persistencia del stage.
   try {
     if (plan.sendImage && process.env.KAPSO_QR_IMAGE_URL) {
-      await sendImage(phone, process.env.KAPSO_QR_IMAGE_URL, plan.message);
+      const sent = await sendImage(phone, process.env.KAPSO_QR_IMAGE_URL, plan.message);
+      if (!sent) console.error("[whatsapp] sendImage devolvió false — QR/pago no entregado");
     } else if (plan.buttons && plan.buttons.length > 0) {
-      await sendInteractiveButtons(phone, plan.message, plan.buttons);
+      const sent = await sendInteractiveButtons(phone, plan.message, plan.buttons);
+      if (!sent) console.error("[whatsapp] sendInteractiveButtons devolvió false — botones no entregados");
     } else {
-      await sendText(phone, plan.message);
+      const sent = await sendText(phone, plan.message);
+      if (!sent) console.error("[whatsapp] sendText devolvió false — respuesta no entregada");
     }
   } catch (err) {
     console.error("[whatsapp] envío de respuesta del flujo falló", err);
@@ -988,7 +991,15 @@ export const sendText = async (to: string, body: string): Promise<boolean> => {
         text: { body },
       }),
     });
-    return res.ok;
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error(
+        `[kapso] sendText no-2xx (${res.status}) a ${to} — payload ${body.length} chars`,
+        detail,
+      );
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error("[kapso] sendText falló", err);
     return false;
@@ -1030,7 +1041,15 @@ export const sendInteractiveButtons = async (
         },
       }),
     });
-    return res.ok;
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error(
+        `[kapso] sendInteractiveButtons no-2xx (${res.status}) a ${to} — ${buttons.length} botones`,
+        detail,
+      );
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error("[kapso] sendInteractiveButtons falló", err);
     return false;
@@ -1063,7 +1082,15 @@ export const sendImage = async (
         image: { link: imageUrl, ...(caption ? { caption } : {}) },
       }),
     });
-    return res.ok;
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error(
+        `[kapso] sendImage no-2xx (${res.status}) a ${to} — url ${imageUrl}`,
+        detail,
+      );
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error("[kapso] sendImage falló", err);
     return false;
