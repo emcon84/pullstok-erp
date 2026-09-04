@@ -13,6 +13,7 @@ import {
   isTerminalStage,
   isHandoffStage,
   isRestartIntent,
+  isAdvisorIntent,
   shouldEscalate,
   buildDraftData,
   mergeDraftData,
@@ -56,6 +57,7 @@ import {
   BUTTON_CAT_HUMEDO,
   BUTTON_CAT_ACCESORIOS,
   BUTTON_CAT_OTROS,
+  BUTTON_ASESOR,
   type FlowCatalog,
 } from "../../src/services/whatsappFlow";
 
@@ -330,13 +332,14 @@ describe("whatsappFlow — helpers", () => {
 });
 
 describe("whatsappFlow — CATEGORY (puerta de tipo de producto)", () => {
-  it("messageForStage(STAGE_CATEGORY) lista las 4 opciones numeradas", () => {
+  it("messageForStage(STAGE_CATEGORY) lista las 4 opciones numeradas + asesor", () => {
     const msg = messageForStage(STAGE_CATEGORY);
     expect(msg).toContain("¿Qué tipo de producto buscás?");
     expect(msg).toContain("1️⃣ 🐶 Alimento balanceado seco");
     expect(msg).toContain("2️⃣ 🐱 Alimento húmedo");
     expect(msg).toContain("3️⃣ 🎾 Accesorios");
     expect(msg).toContain("4️⃣ 🧺 Otros productos");
+    expect(msg).toContain("5️⃣ 👨‍💼 Hablar con un asesor");
   });
 
   it("buttonsForStage(STAGE_CATEGORY) es null (va por texto numerado)", () => {
@@ -602,10 +605,8 @@ describe("whatsappFlow — menús con catálogo (FASE 4)", () => {
     ]);
   });
 
-  it("buttonsForStage(BRAND, catalog) mapea las marcas", () => {
-    expect(buttonsForStage(STAGE_BRAND, catalog)).toEqual([
-      { id: "b-proplan", title: "Pro Plan" },
-    ]);
+  it("buttonsForStage(BRAND, catalog) ya no lista marcas (el cliente siempre tipea) → null", () => {
+    expect(buttonsForStage(STAGE_BRAND, catalog)).toBeNull();
   });
 
   it("buttonsForStage(PRODUCT_SELECT, catalog) mapea los productos (títulos recortados)", () => {
@@ -615,10 +616,11 @@ describe("whatsappFlow — menús con catálogo (FASE 4)", () => {
     ]);
   });
 
-  it("buttonsForStage(NEED_MORE, catalog) ofrece 'más' y 'terminar' (≤3)", () => {
+  it("buttonsForStage(NEED_MORE, catalog) ofrece 'más', 'terminar' y 'asesor' (≤3)", () => {
     expect(buttonsForStage(STAGE_NEED_MORE, catalog)).toEqual([
       BUTTON_MORE,
       BUTTON_DONE_MORE,
+      BUTTON_ASESOR,
     ]);
   });
 
@@ -779,5 +781,57 @@ describe("whatsappFlow — FASE 6 (SIZE y NOTES)", () => {
 
   it("buildDraftData(STAGE_NOTES, 'no') → notes vacío (se guarda null)", () => {
     expect(buildDraftData(STAGE_NOTES, "no")).toEqual({ notes: "" });
+  });
+});
+
+describe("whatsappFlow — marcas siempre tipeadas (sin lista de opciones)", () => {
+  it("messageForStage(STAGE_BRAND) pide que escriba el nombre y NO lista marcas", () => {
+    const msg = messageForStage(STAGE_BRAND);
+    expect(msg).toContain("¿Qué marca buscás?");
+    expect(msg).toContain("Escribí el nombre");
+    expect(msg).not.toContain("1️⃣");
+  });
+
+  it("messageForStage(STAGE_BRAND, catalog) tampoco lista marcas aunque venga catálogo", () => {
+    const catalog: FlowCatalog = { brands: [{ brand: "Pro Plan", id: "b-proplan" }] };
+    const msg = messageForStage(STAGE_BRAND, catalog);
+    expect(msg).toContain("Escribí el nombre");
+    expect(msg).not.toContain("1️⃣");
+    expect(msg).not.toContain("Pro Plan");
+  });
+});
+
+describe("whatsappFlow — hablar con un asesor (isAdvisorIntent)", () => {
+  it("detecta las palabras clave de asesor", () => {
+    expect(isAdvisorIntent("quiero hablar con una persona")).toBe(true);
+    expect(isAdvisorIntent("asesor")).toBe(true);
+    expect(isAdvisorIntent("asesora")).toBe(true);
+    expect(isAdvisorIntent("vendedor")).toBe(true);
+    expect(isAdvisorIntent("quiero hablar con un humano")).toBe(true);
+    expect(isAdvisorIntent("hablar con un asesor")).toBe(true);
+  });
+
+  it("NO marca como asesor texto de producto ni respuestas vacías", () => {
+    expect(isAdvisorIntent("proplan")).toBe(false);
+    expect(isAdvisorIntent("old prince")).toBe(false);
+    expect(isAdvisorIntent("")).toBe(false);
+  });
+
+  it("CATEGORY + '5' → CONSULTA (handoff)", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, "5")).toBe(STAGE_CONSULTA);
+  });
+
+  it("CATEGORY + botón asesor → CONSULTA", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, BUTTON_ASESOR.id)).toBe(STAGE_CONSULTA);
+  });
+
+  it("CATEGORY + 'quiero hablar con una persona' → CONSULTA", () => {
+    expect(nextStageForAnswer(STAGE_CATEGORY, "quiero hablar con una persona")).toBe(
+      STAGE_CONSULTA,
+    );
+  });
+
+  it("NEED_MORE + botón asesor → CONSULTA", () => {
+    expect(nextStageForAnswer(STAGE_NEED_MORE, BUTTON_ASESOR.id)).toBe(STAGE_CONSULTA);
   });
 });

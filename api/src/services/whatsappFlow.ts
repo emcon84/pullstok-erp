@@ -83,6 +83,9 @@ export const BUTTON_CAT_SECO = { id: "CAT_SECO", title: "Alimento balanceado sec
 export const BUTTON_CAT_HUMEDO = { id: "CAT_HUMEDO", title: "Alimento húmedo" };
 export const BUTTON_CAT_ACCESORIOS = { id: "CAT_ACCESORIOS", title: "Accesorios" };
 export const BUTTON_CAT_OTROS = { id: "CAT_OTROS", title: "Otros productos" };
+// "Hablar con un asesor": opción visible en los menús principales (CATEGORY y
+// NEED_MORE) + palabra clave global (isAdvisorIntent). Escala a un humano.
+export const BUTTON_ASESOR = { id: "ACTION_ASESOR", title: "👨‍💼 Hablar con un asesor" };
 
 // ---------------------------------------------------------------------------
 // Catálogo resuelto por el service (FASE 4). whatsappFlow es PURO (sin I/O): el
@@ -128,15 +131,13 @@ const menuOptions = (
       return SPECIES_OPTIONS.filter((o) => catalog?.species?.includes(o.id));
     case STAGE_TYPED:
       return (catalog?.stages ?? []).map((s) => ({ id: s.id, title: s.stage }));
-    case STAGE_BRAND:
-      return (catalog?.brands ?? []).map((b) => ({ id: b.id, title: b.brand }));
     case STAGE_PRODUCT_SELECT:
       return (catalog?.products ?? []).map((p) => ({
         id: p.id,
         title: clip(p.label, 24),
       }));
     case STAGE_NEED_MORE:
-      return [BUTTON_MORE, BUTTON_DONE_MORE];
+      return [BUTTON_MORE, BUTTON_DONE_MORE, BUTTON_ASESOR];
     default:
       return null;
   }
@@ -218,6 +219,7 @@ export function messageForStage(
         "2️⃣ 🐱 Alimento húmedo",
         "3️⃣ 🎾 Accesorios",
         "4️⃣ 🧺 Otros productos",
+        "5️⃣ 👨‍💼 Hablar con un asesor",
         "Respondé con el número o el nombre.",
       ].join("\n");
     case STAGE_TYPE:
@@ -234,11 +236,9 @@ export function messageForStage(
     case STAGE_TYPED:
       return withOptions("¿Qué etapa es? (Adulto, Cachorro, Kitten, Senior...) Elegí una:");
     case STAGE_BRAND:
-      // Si hay pocas marcas las listamos; si son muchas (típico: +90) pedimos que
-      // escriba el nombre y lo matcheamos → evita el mensaje gigante que colgaba.
-      return menu && menu.length <= MENU_LIMIT
-        ? withOptions("¿Qué marca es? Elegí una:")
-        : "¿Qué marca buscás? Escribí el nombre (ej: ProPlan, Old Prince) y te muestro los productos.";
+      // El cliente SIEMPRE escribe la marca (hay muchísimas): no se listan opciones
+      // ni se arma un menú. El service la matchea por texto (matchBrands).
+      return "¿Qué marca buscás? Escribí el nombre (ej: ProPlan, Old Prince) y te muestro los productos.";
     case STAGE_PRODUCT_SELECT:
       return withOptions("Elegí el producto (cada opción muestra su peso y precio):");
     case STAGE_PRODUCT_QUANTITY:
@@ -324,6 +324,14 @@ export function nextStageForAnswer(
       return STAGE_CONSULTA;
 
     case STAGE_CATEGORY: {
+      // Opción visible "hablar con un asesor" (5) → handoff a humano.
+      if (
+        a === BUTTON_ASESOR.id.toLowerCase() ||
+        a === "5" ||
+        isAdvisorIntent(answer)
+      ) {
+        return STAGE_CONSULTA;
+      }
       // Puerta de categoría: "seco" → flujo guiado (TYPE); húmedo/accesorios/otros
       // → requerimiento de texto libre al operador (PRODUCT → NOTES). No reconocido
       // → default al flujo de alimento (seco) para no cortar la conversación.
@@ -372,6 +380,10 @@ export function nextStageForAnswer(
       return STAGE_NEED_MORE;
 
     case STAGE_NEED_MORE: {
+      // "Hablar con un asesor" → handoff a humano (antes del tokenizador de sí/no).
+      if (a === BUTTON_ASESOR.id.toLowerCase() || isAdvisorIntent(answer)) {
+        return STAGE_CONSULTA;
+      }
       // Loop: "sí" → otra línea (vuelve a BRAND); "no" → a dirección. Usamos
       // TOKENS (no substring) para no caer en falsos positivos ("messi" no es "sí").
       // Los ids de botones NEED_MORE/NEED_DONE arriban como "need_more"/"need_done",
@@ -471,11 +483,24 @@ export function isRestartIntent(answer: string): boolean {
   return false;
 }
 
+/**
+ * Detecta la intención del cliente de HABLAR CON UN ASESOR en cualquier punto
+ * del flujo. Aplica en CUALQUIER nodo: si escribe "asesor"/"asesora"/"persona"/
+ * "vendedor"/"humano" o "hablar con", el service escala la conversación a un
+ * humano (handoff), sin importar el nodo en el que esté.
+ */
+export function isAdvisorIntent(answer: string): boolean {
+  const a = norm(answer);
+  if (!a) return false;
+  return ["asesor", "asesora", "persona", "vendedor", "humano", "hablar con"].some(
+    (kw) => a.includes(kw),
+  );
+}
+
 /** Nodo de handoff directo a humano (consulta / "otro"). */
 export function isHandoffStage(stage: string): boolean {
   return stage === STAGE_CONSULTA || stage === STAGE_OTHER;
 }
-
 /** Escalada a humano en cualquier punto terminal o de handoff. */
 export function shouldEscalate(stage: string): boolean {
   return isTerminalStage(stage) || isHandoffStage(stage);
@@ -807,6 +832,7 @@ export default {
   isTerminalStage,
   isHandoffStage,
   isRestartIntent,
+  isAdvisorIntent,
   shouldEscalate,
   buildDraftData,
   mergeDraftData,
@@ -850,4 +876,5 @@ export default {
   BUTTON_CAT_HUMEDO,
   BUTTON_CAT_ACCESORIOS,
   BUTTON_CAT_OTROS,
+  BUTTON_ASESOR,
 };

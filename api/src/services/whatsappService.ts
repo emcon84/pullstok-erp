@@ -11,6 +11,7 @@ import {
   isHandoffStage,
   isTerminalStage,
   isRestartIntent,
+  isAdvisorIntent,
   STAGE_SPECIES,
   STAGE_TYPED,
   STAGE_BRAND,
@@ -549,7 +550,6 @@ const captureSelectionFor = async (
     const opt = list[parseInt(trimmed, 10) - 1];
     if (!opt) return {};
     if (currentStage === STAGE_TYPED) return { selectedStageId: opt.id };
-    if (currentStage === STAGE_BRAND) return { selectedBrandId: opt.id };
   }
 
   // BRAND con TEXTO LIBRE: como hay muchas marcas (no se listan), el cliente
@@ -784,6 +784,17 @@ const applyFlowReply = async (input: {
       currentStage: null,
       answer: "@start",
     });
+  }
+
+  // Palabra clave de asesor: en cualquier punto del flujo, si el cliente escribe
+  // "asesor"/"persona"/"vendedor"/"hablar con", se escala a un humano.
+  if (isAdvisorIntent(answer)) {
+    await escalateConversation(conversationId, organizationId);
+    await prisma.conversation.updateMany({
+      where: { id: conversationId },
+      data: { whatsappStage: null },
+    });
+    return;
   }
 
   // Consulta de producto ("para qué sirve X", "qué me recomendas"...) → Groq con
