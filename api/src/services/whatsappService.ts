@@ -696,31 +696,43 @@ const computeItemCost = async (
 };
 
 /**
+ * Describe una línea de forma legible: "1 bolsa de Excellent Perro Cachorro
+ * x 15 kg" (o "2 kg de ..." para kilo, o "$15000 de ..." para monto). Usa la
+ * marca/especie/etapa si están; si no, cae a productName o "Producto".
+ */
+const describeItem = (it: any): string => {
+  const desc =
+    [it.marca, it.especie, it.etapa].filter(Boolean).join(" ") ||
+    it.productName ||
+    "Producto";
+  const peso = it.peso ? ` x ${it.peso}` : "";
+  if (it.amount != null) return `$${Math.round(it.amount)} de ${desc}`;
+  if (it.quantity != null) {
+    const unit =
+      it.type === "bolsa"
+        ? it.quantity === 1
+          ? "bolsa"
+          : "bolsas"
+        : it.type === "kilo"
+          ? "kg"
+          : "";
+    return `${it.quantity} ${unit} de ${desc}${peso}`.trim();
+  }
+  return `${desc}${peso}`.trim();
+};
+
+/**
  * Arma el resumen de los ítems acumulados para mostrárselo al cliente antes de
- * confirmar la dirección. Pura (sin I/O). Cada línea: `N. <nombre> x<cantidad>
- * [kg]` (o `N. <nombre> $<importe>` para la rama "por monto"). `nombre` usa
- * productName si existe; si no, compone marca/especie/etapa/peso; si queda vacío
- * → "Producto". La unidad de cantidad es "kg" solo para el tipo kilo (el peso ya
- * va en el nombre compuesto, así no se duplica); si hay total se muestra aparte.
+ * confirmar la dirección. Pura (sin I/O). Cada línea: `N. <descripción legible>`
+ * (ver describeItem) + total si existe.
  */
 export const buildOrderSummary = (items: any[]): string => {
   const lines = items.map((it: any, i: number) => {
-    const name =
-      it.productName ||
-      [it.marca, it.especie, it.etapa, it.peso].filter(Boolean).join(" · ") ||
-      "Producto";
-    let cantidad = "";
-    if (it.quantity != null) {
-      const unit = it.type === "kilo" ? "kg" : "";
-      cantidad = ` x${it.quantity}${unit ? ` ${unit}` : ""}`;
-    } else if (it.amount != null) {
-      cantidad = ` $${Math.round(it.amount)}`;
-    }
     // `total` es el costo del ítem; en la rama "monto" coincide con `amount`, así
     // que ahí no lo repetimos.
     const total =
       it.type !== "monto" && it.total != null ? ` = $${Math.round(it.total)}` : "";
-    return `${i + 1}. ${name}${cantidad}${total}`;
+    return `${i + 1}. ${describeItem(it)}${total}`;
   });
   return `🐾 Te armo el resumen de tu pedido:\n${lines.join("\n")}`;
 };
@@ -976,19 +988,21 @@ const applyFlowReply = async (input: {
           : (mergedDraft.amount as number) ?? null;
 
       // Resolvemos los nombres legibles (marca, etapa) para que el operador lea la
-      // línea completa sin depender de ids del catálogo.
+      // línea completa sin depender de ids del catálogo. Si la marca no se resolvió
+      // a un id (texto ambiguo), usamos lo que tipeó el cliente para no perderla.
       const [marca, etapa] = await Promise.all([
         brandNameById((mergedDraft.selectedBrandId as string) ?? null),
         stageNameById((mergedDraft.selectedStageId as string) ?? null),
       ]);
+      const marcaFallback =
+        marca ?? (mergedDraft.brandTyped as string) ?? null;
 
       const especie =
         SPECIES_LABELS[(mergedDraft.selectedSpecies as string) ?? ""] ?? null;
       const peso = (mergedDraft.sizeText as string) ?? null;
-      // Sin match (selectedProduct null): componemos un nombre legible con los
-      // atributos ya resueltos para que el operador vea qué pidió el cliente aunque
-      // no sea un producto exacto del catálogo.
-      const composedName = [marca, especie, etapa, peso].filter(Boolean).join(" · ");
+      // Nombre legible: "Marca Especie Etapa" (sin peso, que se muestra aparte en
+      // la línea). Se usa cuando no hay match de producto exacto.
+      const composedName = [marcaFallback, especie, etapa].filter(Boolean).join(" ");
 
       // Acumulamos la línea para el multi-producto. Sin match es un requerimiento:
       // productId queda null y el operador lo arma desde los atributos.
@@ -997,11 +1011,7 @@ const applyFlowReply = async (input: {
         productId: sel?.id ?? null,
         productName: sel?.name ?? (composedName || null),
         type: sel?.type ?? (mergedDraft.orderType as string) ?? null,
-        quantity: itemQty,
-        amount: itemAmount,
-        detail: cost?.detail ?? null,
-        total: cost?.total ?? null,
-        marca,
+        marca: marcaFallback,
         especie,
         etapa,
         peso,

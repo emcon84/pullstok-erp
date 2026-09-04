@@ -773,8 +773,8 @@ describe("whatsappFlow — buildDraftData (FASE 4)", () => {
     expect(buildDraftData(STAGE_TYPED, "2")).toEqual({});
   });
 
-  it("BRAND + id → selectedBrandId", () => {
-    expect(buildDraftData(STAGE_BRAND, "b-proplan")).toEqual({ selectedBrandId: "b-proplan" });
+  it("BRAND guarda el texto tipeado (el id lo resuelve el service)", () => {
+    expect(buildDraftData(STAGE_BRAND, "b-proplan")).toEqual({ brandTyped: "b-proplan" });
   });
 
   it("PRODUCT_SELECT no captura nada (el service arma selectedProduct)", () => {

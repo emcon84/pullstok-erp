@@ -302,12 +302,12 @@ describe("whatsappCatalog — matchBrands (FASE 4: marca por texto libre)", () =
     ]);
   });
 
-  it("texto parcial (varias candidatas) → sin exact, hasta 3", async () => {
+  it("prefiere la marca con nombre exacto sobre las variantes", async () => {
     mockGetCatalogSnapshot.mockResolvedValue(snapshot);
 
-    const res = await matchBrands("perro", "agility");
-    expect(res.length).toBe(3);
-    expect(res.every((r) => r.exact === false)).toBe(true);
+    await expect(matchBrands("perro", "agility")).resolves.toEqual([
+      { brand: "AGILITY", id: "b-agility", exact: true },
+    ]);
   });
 
   it("sin match → devuelve []", async () => {

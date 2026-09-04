@@ -127,7 +127,7 @@ describe("whatsappService", () => {
         },
       ];
       expect(buildOrderSummary(items)).toBe(
-        "🐾 Te armo el resumen de tu pedido:\n1. KONGO · Perro · Adulto · 20 kg x1\n2. Gati · Gato · Kitten · 2 kg x2",
+        "🐾 Te armo el resumen de tu pedido:\n1. 1 bolsa de KONGO Perro Adulto x 20 kg\n2. 2 bolsas de Gati Gato Kitten x 2 kg",
       );
     });
 
@@ -148,7 +148,7 @@ describe("whatsappService", () => {
         },
       ];
       expect(buildOrderSummary(items)).toBe(
-        "🐾 Te armo el resumen de tu pedido:\n1. KONGO 15kg Adulto x1 = $45000",
+        "🐾 Te armo el resumen de tu pedido:\n1. 1 bolsa de KONGO Perro Adulto x 15 kg = $45000",
       );
     });
 
@@ -169,7 +169,7 @@ describe("whatsappService", () => {
         },
       ];
       expect(buildOrderSummary(items)).toBe(
-        "🐾 Te armo el resumen de tu pedido:\n1. Perro · Adulto $15000",
+        "🐾 Te armo el resumen de tu pedido:\n1. $15000 de Perro Adulto",
       );
     });
 

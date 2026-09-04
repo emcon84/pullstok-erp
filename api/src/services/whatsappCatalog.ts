@@ -216,11 +216,14 @@ export const matchBrands = async (
     .filter((b) => b.score > 0)
     .sort((a, b) => b.score - a.score || a.brand.localeCompare(b.brand));
 
-  // Decisión de match: el cliente escribe "agility" y hay "AGILITY" (exacto) junto
-  // a "AGILITY CORDERO"/"AGILITY SALMON" (variantes). Como son VARIAS marcas que
-  // participan, mostramos las candidatas para que confirme — no asumimos que la
-  // de nombre exacto es la única. Solo avanzamos directo si hay UNA sola marca
-  // que coincide (la definió bien).
+  // Decisión de match: si el cliente escribió el nombre/keyword EXACTO de UNA sola
+  // marca, la elegimos (aunque haya variantes que compartan substring — ej.
+  // "excellent" → "Excellent", no "Excellent Premium"). Si hay varias exactas o
+  // ninguna exacta, mostramos candidatas para confirmar.
+  const exact = scored.filter((s) => s.score === 100);
+  if (exact.length === 1) {
+    return [{ brand: exact[0].brand, id: exact[0].id, exact: true }];
+  }
   const uniqueIds = new Set(scored.map((s) => s.id));
   if (scored.length === 1 && uniqueIds.size === 1) {
     return [{ brand: scored[0].brand, id: scored[0].id, exact: true }];

@@ -714,19 +714,12 @@ export function buildDraftData(
       // Id de la etapa (botón). Un número → lo resuelve el service (lista).
       return !isNumeric && a.length > 0 ? { selectedStageId: a } : {};
     case STAGE_BRAND:
-      // El id de la marca puede venir como id de botón (pocas marcas → lo
-      // guardamos directo) o como texto libre natural (muchas marcas → el service
-      // matchea con matchBrands y resuelve exacto/ambiguo/not_found). En FASE 6 la
-      // marca va antes que la especie, así que el matcher busca en TODAS las
-      // marcas si todavía no hay especie seleccionada.
-      if (!isNumeric && a.length > 0) {
-        // Un id de botón suele ser un uuid o algo con guiones/código. Si no tiene
-        // espacios (nombre de marca escrito con espacios es texto a matchear) y
-        // parece un id, lo guardamos; si no, lo marcamos como texto tipeado.
-        const looksLikeId = /^[a-z0-9-]{6,}$/i.test(a) && !a.includes(" ");
-        return looksLikeId ? { selectedBrandId: a } : { brandTyped: a };
-      }
-      return {};
+      // Las marcas ahora SIEMPRE se escriben (no hay botones de marca). Guardamos
+      // el texto tipeado (brandTyped) como respaldo para el operador. El id real lo
+      // resuelve captureSelectionFor (matchBrands) y NO debe pisarse con el texto
+      // crudo: antes un nombre como "excellent" (una palabra sin espacios) parecía
+      // un id y pisaba el UUID → la marca se perdía del pedido.
+      return a.length > 0 ? { brandTyped: a } : {};
     case STAGE_SIZE: {
       // Peso/tamaño declarado por el cliente (ej: "15 kg"). Se guarda crudo para
       // que el service lo use en el matcheo por peso / lo muestre al operador.
