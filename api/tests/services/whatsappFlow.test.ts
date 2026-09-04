@@ -10,6 +10,7 @@ import {
   nextStageForAnswer,
   messageForStage,
   buttonsForStage,
+  transitionAckFor,
   isTerminalStage,
   isHandoffStage,
   isRestartIntent,
@@ -212,6 +213,64 @@ describe("whatsappFlow — nextStageForAnswer", () => {
 
   it("OTHER → DONE (terminal)", () => {
     expect(nextStageForAnswer(STAGE_OTHER, "nada más")).toBe(STAGE_DONE);
+  });
+});
+
+describe("whatsappFlow — transitionAckFor", () => {
+  it("CATEGORY + '1' (seco) → reconoce Alimento balanceado seco", () => {
+    const ack = transitionAckFor(STAGE_CATEGORY, "1");
+    expect(ack).toContain("Elegiste Alimento balanceado seco");
+    expect(ack).not.toBeNull();
+  });
+
+  it("CATEGORY + '2' (húmedo) → reconoce húmedo", () => {
+    const ack = transitionAckFor(STAGE_CATEGORY, "2");
+    expect(ack).toContain("húmedo");
+    expect(ack).not.toBeNull();
+  });
+
+  it("TYPE + '1' (bolsa) → reconoce bolsa cerrada", () => {
+    const ack = transitionAckFor(STAGE_TYPE, "1");
+    expect(ack).toContain("bolsa cerrada");
+  });
+
+  it("SPECIES + 'gato' → reconoce al gatito", () => {
+    const ack = transitionAckFor(STAGE_SPECIES, "gato");
+    expect(ack).toContain("gatito");
+  });
+
+  it("BRAND + 'proplan' → reconoce buena elección", () => {
+    const ack = transitionAckFor(STAGE_BRAND, "proplan");
+    expect(ack).toContain("Buena elección");
+  });
+
+  it("PRODUCT_QUANTITY + '2' → null (no duplica la confirmación de cantidad)", () => {
+    expect(transitionAckFor(STAGE_PRODUCT_QUANTITY, "2")).toBeNull();
+  });
+
+  it("NEED_MORE + 'sí, otro' → reconoce que quiere más", () => {
+    const ack = transitionAckFor(STAGE_NEED_MORE, "sí, otro");
+    expect(ack).toContain("¿Qué más");
+  });
+
+  it("TYPED → tranquiliza: no te impacientes, conoce a tu peludito", () => {
+    const ack = transitionAckFor(STAGE_TYPED, "t-adulto");
+    expect(ack).toContain("No te impacientes");
+    expect(ack).toContain("peludito");
+  });
+
+  it("SIZE → avisa que falta poquito", () => {
+    const ack = transitionAckFor(STAGE_SIZE, "15 kg");
+    expect(ack).toContain("Falta poquito");
+  });
+
+  it("NOTES → avisa que falta poco", () => {
+    const ack = transitionAckFor(STAGE_NOTES, "raza grande");
+    expect(ack).toContain("Falta poco");
+  });
+
+  it("START + 'hola' → null (no aplica a nodo inicial)", () => {
+    expect(transitionAckFor(STAGE_START, "hola")).toBeNull();
   });
 });
 

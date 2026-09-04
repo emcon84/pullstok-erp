@@ -224,7 +224,7 @@ export function messageForStage(
       ].join("\n");
     case STAGE_TYPE:
       return [
-        "¿Cómo lo querés? Elegí una opción:",
+        "Vas a necesitar... Elegí una opción:",
         "1️⃣ Bolsa cerrada",
         "2️⃣ Por kilo",
         "3️⃣ Por monto",
@@ -438,6 +438,55 @@ export function nextStageForAnswer(
 
     default:
       return STAGE_START;
+  }
+}
+
+/**
+ * Reconocimiento cálido de la elección que el cliente acaba de hacer en
+ * `currentStage`. Devuelve una o dos líneas entusiastas que se anteponen a la
+ * pregunta siguiente para que el cliente sienta que el bot lo acompaña. Usa los
+ * normalizadores existentes (normalizeProductCategory / normalizeOrderType) para
+ * no duplicar matching. Devuelve `null` cuando no aplica (nodos terminales,
+ * handoff, nodos de confirmación de cantidad/importe, etc.).
+ */
+export function transitionAckFor(currentStage: string, answer: string): string | null {
+  const a = norm(answer);
+  switch (currentStage) {
+    case STAGE_CATEGORY: {
+      const cat = normalizeProductCategory(answer);
+      if (cat === "seco")
+        return "¡Elegiste Alimento balanceado seco! ¡Qué bueno! 😄\nTengo que hacerte algunas preguntas más, no te impacientes, es para darle lo mejor a tu peludito más amado 🐾";
+      if (cat === "humedo") return "¡Elegiste Alimento húmedo! ¡Excelente! 😄";
+      if (cat === "accesorios") return "¡Elegiste Accesorios! ¡Genial! 😄";
+      if (cat === "otros") return "¡Buenísimo, otros productos! Contame qué necesitás 😄";
+      return null;
+    }
+    case STAGE_TYPE: {
+      const t = normalizeOrderType(answer);
+      if (t === "bolsa") return "¡Vas a necesitar una bolsa cerrada! 🐾";
+      if (t === "kilo") return "¡Vas a necesitar por kilo! 🐾";
+      if (t === "monto") return "¡Vas a necesitar por monto! 🐾";
+      return null;
+    }
+    case STAGE_BRAND:
+      return "¡Buena elección de marca! 🐾";
+    case STAGE_SPECIES:
+      if (a.includes("gato")) return "¡Para tu gatito! 🐱";
+      return "¡Para tu perrito! 🐶";
+    case STAGE_TYPED:
+      return "¡Perfecto! No te impacientes, me gusta conocer a tu peludito para darle lo mejor 🐾";
+    case STAGE_SIZE:
+      return "¡Bien! Falta poquito, ya terminamos 😊";
+    case STAGE_NOTES:
+      return "¡Perfecto, anotado! Falta poco, vamos cerrando 🐾";
+    case STAGE_NEED_MORE: {
+      const toks = a.replace(/[^\p{L}\p{N}]+/gu, " ").split(" ").filter(Boolean);
+      const more = ["si","sí","otro","mas","más","more","dale","adicional"];
+      if (toks.some((t) => more.includes(t))) return "¡Dale! ¿Qué más necesitás? 🐾";
+      return null;
+    }
+    default:
+      return null;
   }
 }
 
@@ -802,6 +851,13 @@ export function planResponse(input: {
 
   let message = messageForStage(next, catalog, orderType);
 
+  // Reconocimiento cálido de la elección del cliente (no aplica a terminales ni
+  // handoff, ni a la confirmación de cantidad/importe que ya antepone su propio texto).
+  const ack = transitionAckFor(currentStage, answer);
+  if (ack && !isTerminalStage(next) && !isHandoffStage(next)) {
+    message = `${ack}\n\n${message}`;
+  }
+
   // Al confirmar cantidad/importe (salimos hacia NOTES o NEED_MORE) se antepone
   // la confirmación del producto matcheado ("Encontré: X — $Y. ¿Te lo confirmo?")
   // o, si no hubo match, "Cargué tus datos, un asesor arma el pedido". Si no
@@ -829,6 +885,7 @@ export default {
   nextStageForAnswer,
   messageForStage,
   buttonsForStage,
+  transitionAckFor,
   isTerminalStage,
   isHandoffStage,
   isRestartIntent,
