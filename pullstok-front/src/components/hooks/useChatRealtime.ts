@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { getSocket } from "../../lib/socket";
 import { chatKeys } from "./useChat";
-import { playAlert, showEscalationNotification } from "../../lib/notify";
+import { playDogBark, showEscalationNotification } from "../../lib/notify";
 import { markEscalated } from "../../stores/escalatedConversations";
 import type { ChatSender, MessageDTO } from "../../services/chatService";
 
@@ -85,7 +85,7 @@ export const useChatConversationsRealtime = () => {
       const who =
         evt.guestName?.trim() || evt.guestEmail?.trim() || "Un cliente";
       markEscalated(evt.conversationId);
-      playAlert();
+      playDogBark();
       showEscalationNotification(who);
       toast.info(`🙋 ${who} pidió hablar con una persona`);
       queryClient.invalidateQueries({ queryKey: chatKeys.conversations });

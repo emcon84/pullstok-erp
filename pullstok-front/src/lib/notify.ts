@@ -62,6 +62,26 @@ export function playAlert(): void {
   }
 }
 
+let barkAudio: HTMLAudioElement | null = null;
+
+/**
+ * Ladrido de perro para avisar un pedido nuevo por WhatsApp. Reusa una única
+ * instancia de <audio> apuntando al asset `public/sounds/dog-bark.wav`. Si el
+ * navegador bloquea la reproducción (autoplay) o el asset falla, cae al beep
+ * clásico (playAlert) para no quedarse en silencio.
+ */
+export function playDogBark(): void {
+  try {
+    if (typeof Audio === "undefined") return;
+    if (!barkAudio) barkAudio = new Audio("/sounds/dog-bark.wav");
+    barkAudio.currentTime = 0;
+    const p = barkAudio.play();
+    if (p) p.catch(() => playAlert());
+  } catch {
+    playAlert();
+  }
+}
+
 export function notificationsSupported(): boolean {
   return typeof window !== "undefined" && "Notification" in window;
 }
