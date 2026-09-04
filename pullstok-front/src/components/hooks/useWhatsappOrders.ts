@@ -3,6 +3,7 @@ import {
   getWhatsappDrafts,
   approveWhatsappDraft,
   rejectWhatsappDraft,
+  sendWhatsappConfirmation,
 } from '../../services/whatsappOrderService';
 import {
   WhatsAppOrderDraft,
@@ -61,6 +62,20 @@ export const useRejectDraft = () => {
 
   return {
     reject: mutation.mutate,
+    loading: mutation.isPending,
+    error: mutation.isError ? mutation.error : null,
+  };
+};
+
+// Envío de la confirmación al cliente. No invalida queries: solo entrega un
+// mensaje por WhatsApp, no cambia el estado del borrador ni de los pedidos.
+export const useSendConfirmation = () => {
+  const mutation = useMutation<{ ok: boolean }, Error, { id: string; message: string }>({
+    mutationFn: ({ id, message }) => sendWhatsappConfirmation(id, message),
+  });
+
+  return {
+    send: mutation.mutate,
     loading: mutation.isPending,
     error: mutation.isError ? mutation.error : null,
   };

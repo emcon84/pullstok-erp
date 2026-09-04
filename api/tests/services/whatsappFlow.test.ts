@@ -30,6 +30,8 @@ import {
   STAGE_PRODUCT_SELECT,
   STAGE_PRODUCT_QUANTITY,
   STAGE_PRODUCT_AMOUNT,
+  STAGE_SIZE,
+  STAGE_NOTES,
   STAGE_NEED_MORE,
   STAGE_ADDRESS,
   STAGE_PAYMENT,
@@ -72,28 +74,28 @@ describe("whatsappFlow — nextStageForAnswer", () => {
     );
   });
 
-  it("TYPE + TYPE_BAG → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_BOLSA.id)).toBe(STAGE_SPECIES);
+  it("TYPE + TYPE_BAG → BRAND (FASE 6: la marca va antes que la especie)", () => {
+    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_BOLSA.id)).toBe(STAGE_BRAND);
   });
 
-  it("TYPE + '1' (bolsa) → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, "1")).toBe(STAGE_SPECIES);
+  it("TYPE + '1' (bolsa) → BRAND", () => {
+    expect(nextStageForAnswer(STAGE_TYPE, "1")).toBe(STAGE_BRAND);
   });
 
-  it("TYPE + 'bolsa' (texto libre) → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, "bolsa")).toBe(STAGE_SPECIES);
+  it("TYPE + 'bolsa' (texto libre) → BRAND", () => {
+    expect(nextStageForAnswer(STAGE_TYPE, "bolsa")).toBe(STAGE_BRAND);
   });
 
-  it("TYPE + TYPE_KILO → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_KILO.id)).toBe(STAGE_SPECIES);
+  it("TYPE + TYPE_KILO → BRAND", () => {
+    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_KILO.id)).toBe(STAGE_BRAND);
   });
 
-  it("TYPE + '2' (kilo) → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, "2")).toBe(STAGE_SPECIES);
+  it("TYPE + '2' (kilo) → BRAND", () => {
+    expect(nextStageForAnswer(STAGE_TYPE, "2")).toBe(STAGE_BRAND);
   });
 
-  it("TYPE + TYPE_MONTO → PRODUCT", () => {
-    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_MONTO.id)).toBe(STAGE_SPECIES);
+  it("TYPE + TYPE_MONTO → BRAND", () => {
+    expect(nextStageForAnswer(STAGE_TYPE, BUTTON_MONTO.id)).toBe(STAGE_BRAND);
   });
 
   it("TYPE + TYPE_OTHER → OTHER", () => {
@@ -179,9 +181,9 @@ describe("whatsappFlow — planResponse", () => {
     expect(isHandoffStage(r.nextStage)).toBe(true);
   });
 
-  it("TYPE + '1' → PRODUCT", () => {
+  it("TYPE + '1' → BRAND (FASE 6)", () => {
     const r = planResponse({ currentStage: STAGE_TYPE, answer: "1" });
-    expect(r.nextStage).toBe(STAGE_SPECIES);
+    expect(r.nextStage).toBe(STAGE_BRAND);
   });
 
   it("PRODUCT → ADDRESS", () => {
@@ -378,43 +380,59 @@ describe("whatsappFlow — normalize helpers (FASE 3)", () => {
   });
 });
 
-describe("whatsappFlow — flujo guiado FASE 4 (especie→marca→producto, sin etapa)", () => {
-  it("SPECIES → BRAND (se simplificó: sin paso de etapa)", () => {
-    expect(nextStageForAnswer(STAGE_SPECIES, "perro")).toBe(STAGE_BRAND);
+describe("whatsappFlow — flujo guiado FASE 6 (marca→especie→etapa→peso)", () => {
+  it("BRAND → SPECIES", () => {
+    expect(nextStageForAnswer(STAGE_BRAND, "marca-uuid")).toBe(STAGE_SPECIES);
   });
 
-  it("BRAND → PRODUCT_SELECT", () => {
-    expect(nextStageForAnswer(STAGE_BRAND, "marca-uuid")).toBe(STAGE_PRODUCT_SELECT);
+  it("SPECIES → TYPED (etapa por vida del animal)", () => {
+    expect(nextStageForAnswer(STAGE_SPECIES, "perro")).toBe(STAGE_TYPED);
   });
 
-  it("PRODUCT_SELECT → QUANTITY cuando orderType es bolsa/kilo", () => {
+  it("TYPED → SIZE (bolsa) para preguntar el peso", () => {
     expect(
-      nextStageForAnswer(STAGE_PRODUCT_SELECT, "prod-uuid", { orderType: "bolsa" }),
+      nextStageForAnswer(STAGE_TYPED, "t-adulto", { orderType: "bolsa" }),
+    ).toBe(STAGE_SIZE);
+  });
+
+  it("TYPED → QUANTITY (kilo) salteando SIZE", () => {
+    expect(
+      nextStageForAnswer(STAGE_TYPED, "t-adulto", { orderType: "kilo" }),
     ).toBe(STAGE_PRODUCT_QUANTITY);
   });
 
-  it("PRODUCT_SELECT → AMOUNT cuando orderType es monto", () => {
+  it("TYPED → AMOUNT (monto) salteando SIZE", () => {
     expect(
-      nextStageForAnswer(STAGE_PRODUCT_SELECT, "prod-uuid", { orderType: "monto" }),
+      nextStageForAnswer(STAGE_TYPED, "t-adulto", { orderType: "monto" }),
     ).toBe(STAGE_PRODUCT_AMOUNT);
   });
 
-  it("PRODUCT_SELECT → QUANTITY por default (sin orderType)", () => {
-    expect(nextStageForAnswer(STAGE_PRODUCT_SELECT, "prod-uuid")).toBe(
-      STAGE_PRODUCT_QUANTITY,
-    );
+  it("SIZE → QUANTITY (bolsa/kilo)", () => {
+    expect(
+      nextStageForAnswer(STAGE_SIZE, "15 kg", { orderType: "bolsa" }),
+    ).toBe(STAGE_PRODUCT_QUANTITY);
   });
 
-  it("QUANTITY → NEED_MORE (tras confirmar cantidad)", () => {
-    expect(nextStageForAnswer(STAGE_PRODUCT_QUANTITY, "2")).toBe(STAGE_NEED_MORE);
+  it("SIZE → AMOUNT (monto)", () => {
+    expect(
+      nextStageForAnswer(STAGE_SIZE, "15 kg", { orderType: "monto" }),
+    ).toBe(STAGE_PRODUCT_AMOUNT);
   });
 
-  it("AMOUNT → NEED_MORE (tras confirmar importe)", () => {
-    expect(nextStageForAnswer(STAGE_PRODUCT_AMOUNT, "15000")).toBe(STAGE_NEED_MORE);
+  it("QUANTITY → NOTES (tras confirmar cantidad)", () => {
+    expect(nextStageForAnswer(STAGE_PRODUCT_QUANTITY, "2")).toBe(STAGE_NOTES);
   });
 
-  it("NEED_MORE + 'sí' → SPECIES (agregar otra línea)", () => {
-    expect(nextStageForAnswer(STAGE_NEED_MORE, "sí, otro")).toBe(STAGE_SPECIES);
+  it("AMOUNT → NOTES (tras confirmar importe)", () => {
+    expect(nextStageForAnswer(STAGE_PRODUCT_AMOUNT, "15000")).toBe(STAGE_NOTES);
+  });
+
+  it("NOTES → NEED_MORE", () => {
+    expect(nextStageForAnswer(STAGE_NOTES, "raza pequeña")).toBe(STAGE_NEED_MORE);
+  });
+
+  it("NEED_MORE + 'sí' → BRAND (agregar otra línea)", () => {
+    expect(nextStageForAnswer(STAGE_NEED_MORE, "sí, otro")).toBe(STAGE_BRAND);
   });
 
   it("NEED_MORE + 'no' → ADDRESS (terminar)", () => {
@@ -427,6 +445,12 @@ describe("whatsappFlow — flujo guiado FASE 4 (especie→marca→producto, sin 
 
   it("ADDRESS → PAYMENT se mantiene", () => {
     expect(nextStageForAnswer(STAGE_ADDRESS, "San Martín 123")).toBe(STAGE_PAYMENT);
+  });
+
+  it("PRODUCT_SELECT (legacy) → QUANTITY por default, por compatibilidad", () => {
+    expect(nextStageForAnswer(STAGE_PRODUCT_SELECT, "prod-uuid")).toBe(
+      STAGE_PRODUCT_QUANTITY,
+    );
   });
 });
 
@@ -526,7 +550,7 @@ describe("whatsappFlow — menús con catálogo (FASE 4)", () => {
     expect(msg).toContain("2️⃣ 🐱 Gato");
   });
 
-  it("planResponse antepone el costo al salir de QUANTITY hacia NEED_MORE", () => {
+  it("planResponse antepone el costo al salir de QUANTITY hacia NOTES", () => {
     const r = planResponse({
       currentStage: STAGE_PRODUCT_QUANTITY,
       answer: "2",
@@ -534,21 +558,39 @@ describe("whatsappFlow — menús con catálogo (FASE 4)", () => {
       orderType: "bolsa",
       cost: { total: 90000, detail: "2 × Pro Plan Cachorro 15kg @ $45000 = $90000" },
     });
-    expect(r.nextStage).toBe(STAGE_NEED_MORE);
+    expect(r.nextStage).toBe(STAGE_NOTES);
     expect(r.message).toContain("$90000");
-    expect(r.message).toContain("¿Necesitás algo más?");
-    expect(r.buttons).toEqual([BUTTON_MORE, BUTTON_DONE_MORE]);
+    expect(r.message).toContain("¿Alguna observación?");
+    expect(r.buttons).toBeNull();
   });
 
-  it("planResponse(SPECIES + 'perro') avanza a BRAND (sin etapa) con sus botones", () => {
+  it("planResponse antepone la confirmación del match al salir de QUANTITY", () => {
+    const r = planResponse({
+      currentStage: STAGE_PRODUCT_QUANTITY,
+      answer: "2",
+      catalog,
+      orderType: "bolsa",
+      confirmation: {
+        message: "Encontré: Pro Plan Cachorro 15kg — $90000. ¿Te lo confirmo? 🙌",
+      },
+    });
+    expect(r.nextStage).toBe(STAGE_NOTES);
+    expect(r.message).toContain("Encontré: Pro Plan Cachorro 15kg — $90000");
+    expect(r.message).toContain("¿Alguna observación?");
+  });
+
+  it("planResponse(SPECIES + 'perro') avanza a TYPED (etapa) con sus botones", () => {
     const r = planResponse({
       currentStage: STAGE_SPECIES,
       answer: "perro",
       catalog,
       orderType: "bolsa",
     });
-    expect(r.nextStage).toBe(STAGE_BRAND);
-    expect(r.buttons).toEqual([{ id: "b-proplan", title: "Pro Plan" }]);
+    expect(r.nextStage).toBe(STAGE_TYPED);
+    expect(r.buttons).toEqual([
+      { id: "t-adulto", title: "Adulto" },
+      { id: "t-cachorro", title: "Cachorro" },
+    ]);
   });
 });
 
@@ -595,5 +637,34 @@ describe("whatsappFlow — buildDraftData (FASE 4)", () => {
 
   it("NEED_MORE no aporta dato (es un nodo informativo)", () => {
     expect(buildDraftData(STAGE_NEED_MORE, "no")).toEqual({});
+  });
+});
+
+describe("whatsappFlow — FASE 6 (SIZE y NOTES)", () => {
+  it("messageForStage(STAGE_SIZE) pregunta el peso/tamaño", () => {
+    expect(messageForStage(STAGE_SIZE)).toContain("¿Qué peso/tamaño?");
+  });
+
+  it("messageForStage(STAGE_NOTES) pregunta la observación", () => {
+    expect(messageForStage(STAGE_NOTES)).toContain("¿Alguna observación?");
+  });
+
+  it("buttonsForStage devuelve null en SIZE y NOTES (esperan texto libre)", () => {
+    expect(buttonsForStage(STAGE_SIZE)).toBeNull();
+    expect(buttonsForStage(STAGE_NOTES)).toBeNull();
+  });
+
+  it("buildDraftData(STAGE_SIZE, '15 kg') → sizeText", () => {
+    expect(buildDraftData(STAGE_SIZE, "15 kg")).toEqual({ sizeText: "15 kg" });
+  });
+
+  it("buildDraftData(STAGE_NOTES, 'raza pequeña') → notes", () => {
+    expect(buildDraftData(STAGE_NOTES, "raza pequeña")).toEqual({
+      notes: "raza pequeña",
+    });
+  });
+
+  it("buildDraftData(STAGE_NOTES, 'no') → notes vacío (se guarda null)", () => {
+    expect(buildDraftData(STAGE_NOTES, "no")).toEqual({ notes: "" });
   });
 });

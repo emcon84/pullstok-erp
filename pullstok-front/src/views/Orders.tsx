@@ -7,6 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogHeader,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -31,6 +39,7 @@ import { useCreateSale } from "../components/hooks/useSales";
 import {
   useWhatsappDrafts,
   useApproveDraft,
+  useSendConfirmation,
 } from "../components/hooks/useWhatsappOrders";
 import { WhatsAppOrderDraft } from "../models/whatsappOrderModel";
 import { CartItem } from "../models/salesModel";
@@ -79,6 +88,46 @@ const sourceBadge = (source?: string) => {
   );
 };
 
+const formatMoney = (n: number) => `$${n.toLocaleString("es-AR")}`;
+
+const paymentLabel: Record<string, string> = {
+  qr: "QR",
+  transferencia: "Transferencia",
+  efectivo: "Efectivo",
+};
+
+// Mensaje de confirmación que el vendedor envía al cliente. Se arma con los
+// productos reales (que el vendedor recién eligió en el drawer), el total, la
+// dirección y la forma de pago del borrador. El vendedor puede editarlo antes
+// de enviar (modal confirmOpen, ver abajo).
+const buildOrderConfirmationMessage = (
+  order: Order,
+  draft: WhatsAppOrderDraft,
+): string => {
+  const lines: string[] = [];
+  lines.push(draft.contactName ? `Hola ${draft.contactName}!` : "Hola!");
+  lines.push("Te confirmamos tu pedido:");
+  const items = order.items || order.products || [];
+  items.forEach((item) => {
+    const name = item.product?.name || "Producto";
+    const unitPrice = item.price || 0;
+    const total = item.quantity * unitPrice;
+    lines.push(
+      `- ${name} x${item.quantity} — ${formatMoney(unitPrice)} c/u = ${formatMoney(total)}`,
+    );
+  });
+  lines.push(`Total: ${formatMoney(order.totalAmount || 0)}`);
+  if (draft.address) lines.push(`Dirección: ${draft.address}`);
+  lines.push(
+    `Forma de pago: ${
+      draft.paymentMethod
+        ? paymentLabel[draft.paymentMethod] || draft.paymentMethod
+        : "no especificada"
+    }`,
+  );
+  return lines.join("\n");
+};
+
 export const Orders: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
@@ -104,6 +153,10 @@ export const Orders: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { drafts: whatsappDrafts } = useWhatsappDrafts();
   const { approve: approveDraft } = useApproveDraft();
+  const { send: sendConfirmation, loading: confirmSending } = useSendConfirmation();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmationDraftId, setConfirmationDraftId] = useState("");
   const draftAppliedRef = useRef(false);
 
   useEffect(() => {
@@ -269,7 +322,13 @@ export const Orders: React.FC = () => {
       approveDraft(
         { id: whatsappDraft.id, data: { products: productsPayload, totalAmount } },
         {
-          onSuccess: () => toast.success("Pedido aprobado y creado desde WhatsApp"),
+          onSuccess: ({ order, draft }) => {
+            // Pedido creado: armamos el mensaje de confirmación con los productos
+            // reales y abrimos el modal para que el vendedor lo revise/edite.
+            setConfirmationDraftId(draft.id);
+            setConfirmMessage(buildOrderConfirmationMessage(order, draft));
+            setConfirmOpen(true);
+          },
           onError: () => toast.error("No se pudo aprobar el pedido"),
         },
       );
@@ -512,6 +571,51 @@ export const Orders: React.FC = () => {
         warning="Una vez confirmada, la venta descuenta el stock y no se puede editar ni deshacer."
         onConfirm={handleConfirmSaleFromOrder}
       />
+
+      {/* Modal de envío de confirmación al cliente (WhatsApp). El pedido ya fue
+          creado/approved; acá el vendedor revisa y edita el mensaje antes de
+          mandarlo. Requiere un borrador con teléfono. */}
+      <Dialog
+        open={confirmOpen}
+        onOpenChange={(open) => !open && setConfirmOpen(false)}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Enviar confirmación por WhatsApp</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={confirmMessage}
+            onChange={(e) => setConfirmMessage(e.target.value)}
+            className="min-h-[240px] font-mono text-sm"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() =>
+                sendConfirmation(
+                  { id: confirmationDraftId, message: confirmMessage },
+                  {
+                    onSuccess: (res) => {
+                      if (res.ok) {
+                        toast.success("Confirmación enviada al cliente");
+                        setConfirmOpen(false);
+                      } else {
+                        toast.error("No se pudo enviar la confirmación");
+                      }
+                    },
+                    onError: () => toast.error("No se pudo enviar la confirmación"),
+                  },
+                )
+              }
+              disabled={confirmSending}
+            >
+              {confirmSending ? "Enviando..." : "Enviar confirmación"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

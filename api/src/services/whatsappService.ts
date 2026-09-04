@@ -17,6 +17,8 @@ import {
   STAGE_PRODUCT_SELECT,
   STAGE_PRODUCT_QUANTITY,
   STAGE_PRODUCT_AMOUNT,
+  STAGE_SIZE,
+  STAGE_NOTES,
   type FlowCatalog,
 } from "./whatsappFlow";
 import {
@@ -32,6 +34,11 @@ import {
   findPrice,
   normalizeSpeciesAnswer,
   parseDecimal,
+  matchProductForDraft,
+  brandNameById,
+  stageNameById,
+  formatMoney,
+  SPECIES_LABELS,
 } from "./whatsappCatalog";
 
 /**
@@ -767,6 +774,7 @@ const applyFlowReply = async (input: {
   const orderType = (mergedDraft.orderType as string) ?? "bolsa";
   let catalog: FlowCatalog = {};
   let cost: { total: number; detail: string } | null = null;
+  let confirmation: { message: string } | null = null;
 
   // Etapa sin match: el cliente escribió una etapa que no encontramos. Le pedimos
   // que la escriba de nuevo y nos quedamos en el mismo nodo (sin avanzar).
@@ -836,14 +844,44 @@ const applyFlowReply = async (input: {
   if (currentStage) {
     const next = nextStageForAnswer(currentStage, answer, { orderType });
     catalog = await catalogForStage(next, mergedDraft);
+
+    const isQtyOrAmount =
+      currentStage === STAGE_PRODUCT_QUANTITY ||
+      currentStage === STAGE_PRODUCT_AMOUNT;
+
+    // FASE 6 — MATCHEO del producto. Al confirmar cantidad/importe el bot intenta
+    // resolver un producto real con los atributos capturados (marca×especie×etapa×
+    // peso). Si hay match lo guarda en selectedProduct (para el costo + el ítem);
+    // si no, la línea queda como requerimiento (selectedProduct null) para el
+    // operador.
+    if (isQtyOrAmount) {
+      const match = await matchProductForDraft({
+        species: (mergedDraft.selectedSpecies as string) ?? null,
+        brandId: (mergedDraft.selectedBrandId as string) ?? null,
+        stageId: (mergedDraft.selectedStageId as string) ?? null,
+        sizeText: (mergedDraft.sizeText as string) ?? null,
+        orderType,
+      });
+      if (match) {
+        mergedDraft.selectedProduct = match;
+      } else {
+        delete mergedDraft.selectedProduct;
+      }
+    }
+
     cost = await computeItemCost(currentStage, answer, mergedDraft);
-    if (cost) {
-      // Acumulamos la línea en `items` para no perder un pedido de varios productos;
-      // los campos simples del WhatsAppOrderDraft guardan la última línea (la UI
-      // multi-item se ajusta en una fase posterior sobre el acumulador JSON).
-      const sel = (mergedDraft.selectedProduct as
-        | { id?: string; type?: string; name?: string; price?: number }
-        | undefined);
+    if (isQtyOrAmount) {
+      // Mensaje de confirmación: con match muestra el producto + precio; sin match
+      // avisa que un asesor arma el pedido. Se antepone a la pregunta siguiente.
+      const sel = mergedDraft.selectedProduct as
+        | { id?: string; name?: string; type?: string }
+        | undefined;
+      confirmation = {
+        message: sel
+          ? `Encontré: ${sel.name} — $${formatMoney(cost?.total ?? 0)}. ¿Te lo confirmo? 🙌`
+          : "Cargué tus datos, un asesor arma el pedido. 🙌",
+      };
+
       const itemQty =
         currentStage === STAGE_PRODUCT_QUANTITY
           ? parseDecimal(answer)
@@ -852,15 +890,30 @@ const applyFlowReply = async (input: {
         currentStage === STAGE_PRODUCT_AMOUNT
           ? parseDecimal(answer)
           : (mergedDraft.amount as number) ?? null;
+
+      // Resolvemos los nombres legibles (marca, etapa) para que el operador lea la
+      // línea completa sin depender de ids del catálogo.
+      const [marca, etapa] = await Promise.all([
+        brandNameById((mergedDraft.selectedBrandId as string) ?? null),
+        stageNameById((mergedDraft.selectedStageId as string) ?? null),
+      ]);
+
+      // Acumulamos la línea para el multi-producto. Sin match es un requerimiento:
+      // productId/productName quedan null y el operador lo arma desde los atributos.
       const items = Array.isArray(mergedDraft.items) ? [...mergedDraft.items] : [];
       items.push({
-        product: sel?.name ?? null,
         productId: sel?.id ?? null,
-        type: sel?.type ?? null,
+        productName: sel?.name ?? null,
+        type: sel?.type ?? (mergedDraft.orderType as string) ?? null,
         quantity: itemQty,
         amount: itemAmount,
-        detail: cost.detail,
-        total: cost.total,
+        detail: cost?.detail ?? null,
+        total: cost?.total ?? null,
+        marca,
+        especie: SPECIES_LABELS[(mergedDraft.selectedSpecies as string) ?? ""] ?? null,
+        etapa,
+        peso: (mergedDraft.sizeText as string) ?? null,
+        observacion: (mergedDraft.notes as string | null) ?? null,
       });
       mergedDraft.items = items;
     }
@@ -873,6 +926,7 @@ const applyFlowReply = async (input: {
     catalog,
     cost,
     orderType,
+    confirmation,
   });
 
   // Handoff directo (consulta / "otro"): el cliente ve UN único mensaje puente,
@@ -893,6 +947,17 @@ const applyFlowReply = async (input: {
   const finalDraft = Object.keys(draftPatch).length > 0
     ? mergeDraftData(mergedDraft, draftPatch)
     : mergedDraft;
+  // FASE 6 — la observación (NOTES) se captura DESPUÉS de confirmar cada línea, así
+  // que atrasamos en `observacion` por ítem el valor global del pedido (si el ítem
+  // todavía no lo tenía). Idempotente: no pisa una observación por línea ya definida.
+  if (Array.isArray(finalDraft.items)) {
+    const notesValue = (finalDraft.notes as string | null) ?? null;
+    finalDraft.items = finalDraft.items.map((it: any) =>
+      it && typeof it === "object"
+        ? { ...it, observacion: it.observacion ?? notesValue }
+        : it,
+    );
+  }
   if (
     Object.keys(draftPatch).length > 0 ||
     Object.keys(selectionPatch).length > 0
@@ -949,6 +1014,12 @@ const applyFlowReply = async (input: {
     const selectedProduct = finalDraft.selectedProduct as
       | { id: string; type: string; name: string; price: number }
       | undefined;
+    // `items` es Json? → array que Prisma serializa a JSONB; vacío/ausente se
+    // persiste como SQL NULL (Prisma.DbNull). `notes` vacío → null.
+    const itemsJson = Array.isArray(finalDraft.items)
+      ? (finalDraft.items as unknown as Prisma.JsonValue[])
+      : Prisma.DbNull;
+    const notesValue = ((finalDraft.notes as string) ?? "").trim();
     await prisma.whatsAppOrderDraft.create({
       data: {
         organizationId,
@@ -962,6 +1033,8 @@ const applyFlowReply = async (input: {
         amount: (finalDraft.amount as number) ?? null,
         address: (finalDraft.address as string) ?? null,
         paymentMethod: (finalDraft.paymentMethod as string) ?? "efectivo",
+        items: itemsJson,
+        notes: notesValue || null,
         status: "PENDING_REVIEW",
       },
     });

@@ -337,18 +337,21 @@ export const getStages = async (
     .map((s) => ({ stage: s.name, id: s.id }));
 };
 
-/** Marcas que tienen CELDAS para especie+etapa. [{ brand, id }]. */
+/** Marcas que tienen CELDAS para especie+etapa. [{ brand, id }].
+ *  `species` null/undefined (FASE 6, la marca se elige ANTES que la especie):
+ *  devuelve las marcas de TODAS las especies del snapshot. */
 export const getBrands = async (
-  species: SpeciesKey,
+  species: SpeciesKey | null | undefined,
   stageId: string | null | undefined,
 ): Promise<{ brand: string; id: string }[]> => {
   const snap = await getCatalogSnapshot();
+  const inSpecies = (s: SpeciesKey) => !species || s === species;
 
   // Flujo con etapa: marcas con celda en esa etapa.
   if (stageId) {
     const brandIds = new Set<string>();
     for (const c of snap.cells) {
-      if (c.typeId === stageId && c.species === species) brandIds.add(c.brandId);
+      if (c.typeId === stageId && inSpecies(c.species)) brandIds.add(c.brandId);
     }
     const out = snap.brands
       .filter((b) => brandIds.has(b.id))
@@ -358,11 +361,11 @@ export const getBrands = async (
   }
 
   // Flujo SIMPLIFICADO (sin etapa): marcas que tienen AL MENOS UN producto de
-  // bolsa de esa especie en el snapshot — así elegir una marca siempre muestra
+  // bolsa de la especie en el snapshot — así elegir una marca siempre muestra
   // productos. Si no, «no tenemos datos cargados».
   const brandIds = new Set<string>();
   for (const p of snap.products) {
-    if (p.species === species && p.brandId) brandIds.add(p.brandId);
+    if (inSpecies(p.species) && p.brandId) brandIds.add(p.brandId);
   }
   return snap.brands
     .filter((b) => brandIds.has(b.id))

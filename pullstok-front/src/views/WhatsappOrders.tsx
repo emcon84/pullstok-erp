@@ -11,7 +11,44 @@ import {
   useWhatsappDrafts,
   useRejectDraft,
 } from "../components/hooks/useWhatsappOrders";
-import type { WhatsAppOrderDraft } from "../models/whatsappOrderModel";
+import type {
+  WhatsAppOrderDraft,
+  DraftItem,
+} from "../models/whatsappOrderModel";
+
+// Texto de la "cantidad/tipo" de una línea: prioriza cantidad+unidad (detail o
+// peso), luego monto (ej "$15000") y por último el tipo libre capturado por el bot.
+const itemQtyLabel = (item: DraftItem): string => {
+  if (item.quantity != null) {
+    const unit = item.detail || item.peso || item.type;
+    return unit ? `x${item.quantity} ${unit}` : `x${item.quantity}`;
+  }
+  if (item.amount != null) return `$${item.amount.toLocaleString("es-AR")}`;
+  return item.type || "";
+};
+
+// Línea de un pedido multi-producto: nombre (o "requerimiento a confirmar"),
+// cantidad/tipo, total (si existe) y observación propia de la línea (si existe).
+const DraftItemLine: React.FC<{ item: DraftItem }> = ({ item }) => (
+  <div className="rounded-md border bg-muted/40 p-2 text-sm">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <span className="font-medium text-foreground">
+        {item.productName || "Requerimiento (a confirmar)"}
+      </span>
+      <span className="text-xs text-muted-foreground">{itemQtyLabel(item)}</span>
+      {item.total != null && (
+        <span className="font-semibold">
+          ${item.total.toLocaleString("es-AR")}
+        </span>
+      )}
+    </div>
+    {item.observacion && (
+      <p className="mt-1 text-xs italic text-muted-foreground">
+        Observación: {item.observacion}
+      </p>
+    )}
+  </div>
+);
 
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString("es-AR", {
@@ -126,10 +163,29 @@ const DraftCard: React.FC<{
         </div>
 
         <div className="space-y-1 text-sm">
-          {draft.productText && (
+          {Array.isArray(draft.items) && draft.items.length > 0 ? (
+            <>
+              <p className="font-medium text-foreground">
+                Productos ({draft.items.length}):
+              </p>
+              <div className="space-y-2">
+                {draft.items.map((item, idx) => (
+                  <DraftItemLine key={`${draft.id}-item-${idx}`} item={item} />
+                ))}
+              </div>
+            </>
+          ) : (
+            draft.productText && (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Producto:</span>{" "}
+                {draft.productText}
+              </p>
+            )
+          )}
+          {draft.notes && (
             <p className="text-muted-foreground">
-              <span className="font-medium text-foreground">Producto:</span>{" "}
-              {draft.productText}
+              <span className="font-medium text-foreground">Observación:</span>{" "}
+              {draft.notes}
             </p>
           )}
           {draft.amount != null && (

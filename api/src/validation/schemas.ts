@@ -445,6 +445,15 @@ export const approveDraftSchema = z.object({
   totalAmount: z.coerce.number().nonnegative("El total no puede ser negativo"),
 });
 
+// Envío de confirmación al cliente por WhatsApp (FASE 6): el front manda el texto
+// (o deja que el server lo arme). Message requerido, no vacío, cap 4096.
+export const sendConfirmationSchema = z.object({
+  message: z
+    .string()
+    .min(1, "El mensaje no puede estar vacío")
+    .max(4096, "El mensaje no puede superar los 4096 caracteres"),
+});
+
 // ---------- Presupuestos ----------
 const quotationProductSchema = z.object({
   product: z.string().min(1),

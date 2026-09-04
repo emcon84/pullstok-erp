@@ -3,6 +3,7 @@ import {
   listDrafts,
   approveDraft,
   rejectDraft,
+  sendConfirmation as sendConfirmationService,
 } from "../services/whatsappOrderService";
 
 /** GET /whatsapp-orders — lista los borradores pendientes de revisión. */
@@ -42,4 +43,21 @@ export const reject = async (req: Request, res: Response) => {
   }
 };
 
-export default { list, approve, reject };
+/** POST /whatsapp-orders/:id/send-confirmation — envía la confirmación al cliente. */
+export const sendConfirmation = async (req: Request, res: Response) => {
+  try {
+    const { message } = req.body;
+    const result = await sendConfirmationService(req.params.id, message);
+    res.status(200).json(result);
+  } catch (error: any) {
+    if (error?.status === 404) {
+      return res.status(404).json({ message: error.message });
+    }
+    if (error?.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export default { list, approve, reject, sendConfirmation };

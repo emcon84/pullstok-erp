@@ -159,12 +159,14 @@ export const matchStages = async (
 /**
  * Marcas que tienen CELDAS de planilla para la especie+etapa dada (PriceKgBrand
  * join PriceKgPrice), leídas del snapshot. Devuelve [{ brand, id }].
+ * FASE 6: `species` puede venir null (la marca se elige ANTES que la especie) →
+ * devuelve las marcas de todas las especies.
  */
 export const listBrands = async (
-  species: string,
+  species: string | null | undefined,
   stageId: string | null | undefined,
 ): Promise<{ brand: string; id: string }[]> => {
-  return getBrands(toSpeciesKey(species), stageId ?? null);
+  return getBrands(species ? toSpeciesKey(species) : null, stageId ?? null);
 };
 
 /**
@@ -182,7 +184,7 @@ export const listBrands = async (
  * - Si no hay ninguna, devuelve [] → el bot pide que la escriba de nuevo.
  */
 export const matchBrands = async (
-  species: string,
+  species: string | null | undefined,
   query: string,
 ): Promise<{ brand: string; id: string; exact: boolean }[]> => {
   const q = normalizeName(query);
@@ -191,8 +193,12 @@ export const matchBrands = async (
   // Buscamos en TODAS las marcas de la especie (sin filtrar por etapa): el cliente
   // puede pedir una marca de cualquier etapa. Antes se filtraba por stageId y por
   // eso "Old Prince" no aparecía si no estaba en la etapa elegida.
+  // FASE 6: si `species` es null (la marca va antes que la especie), buscamos en
+  // las marcas de TODAS las especies.
   const snap = await getCatalogSnapshot();
-  const brands = snap.brands.filter((b) => b.species.includes(toSpeciesKey(species)));
+  const brands = snap.brands.filter((b) =>
+    !species || b.species.includes(toSpeciesKey(species)),
+  );
 
   const scored = brands
     .map((b) => {
@@ -269,6 +275,107 @@ export const listProductsForSelection = async (
   result.push(...bolsa);
 
   return result;
+};
+
+// ---------------------------------------------------------------------------
+// Matcheo de producto por atributos (FASE 6: marca × especie × etapa × peso)
+// ---------------------------------------------------------------------------
+
+/** Resultado de un match de producto para confirmar con precio. */
+export interface ProductMatch {
+  id: string;
+  type: "bolsa" | "kilo";
+  name: string;
+  price: number;
+}
+
+/** Extrae el peso numérico de un texto de tamaño ("15 kg" → 15, "7,5kg" → 7.5). */
+const parseWeight = (sizeText: string | null | undefined): number | null => {
+  const raw = (sizeText ?? "").replace(/,/g, ".").toLowerCase();
+  const m = raw.match(/\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const n = parseFloat(m[0]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/** ¿El nombre del producto contiene un peso aproximadamente igual al pedido?
+ *  Compara los tokens numéricos del nombre contra el peso ("X15KG"→15, "X7,5KG"→7.5). */
+const likeWeight = (label: string, weight: number): boolean => {
+  const tokens =
+    normalizeName(label).replace(/,/g, ".").match(/\d+(?:\.\d+)?/g) ?? [];
+  return tokens.some((t) => Math.abs(parseFloat(t) - weight) < 0.01);
+};
+
+/** Convierte una opción de selección a un match (id + tipo + nombre + precio). */
+const toProductMatch = (c: ProductSelection): ProductMatch => ({
+  id: c.id,
+  type: c.type,
+  name: c.label,
+  price: c.price,
+});
+
+/**
+ * Matcheo de producto del flujo de captura estructurada (FASE 6): a partir de
+ * los atributos que declaró el cliente (marca, especie, etapa y peso/tamaño)
+ * busca un producto real en el catálogo para confirmarlo CON precio.
+ *
+ * - Bolsa: exige que el peso declarado matchee el nombre de la bolsa (o que haya
+ *   una sola bolsa de la marca/etapa). Varias sin desambiguar → null (requerimiento).
+ * - Kilo / monto: preferimos la celda suelta (kilo) si existe; si no, una única
+ *   bolsa; si hay varias y no se puede desambiguar → null (requerimiento).
+ *
+ * Devuelve null cuando no se pudo resolver → el ítem queda como requerimiento y
+ * un asesor lo arma en el ERP.
+ */
+export const matchProductForDraft = async (input: {
+  species?: string | null;
+  brandId?: string | null;
+  stageId?: string | null;
+  sizeText?: string | null;
+  orderType?: string | null;
+}): Promise<ProductMatch | null> => {
+  const { species, brandId, stageId, sizeText, orderType } = input;
+  if (!species || !brandId) return null;
+
+  const candidates = await listProductsForSelection(species, brandId, stageId ?? null);
+  if (candidates.length === 0) return null;
+
+  const isBolsaOrder = orderType === "bolsa";
+  const weight = parseWeight(sizeText);
+
+  // Bolsa: el peso desambigua. Si el cliente declaró peso, exigimos un match en el
+  // nombre; si no, y hay UNA sola bolsa para la marca/etapa, la usamos.
+  if (isBolsaOrder) {
+    const bolsas = candidates.filter((c) => c.type === "bolsa");
+    if (weight != null) {
+      const hit = bolsas.find((c) => likeWeight(c.label, weight));
+      return hit ? toProductMatch(hit) : null;
+    }
+    return bolsas.length === 1 ? toProductMatch(bolsas[0]) : null;
+  }
+
+  // Kilo / monto: preferimos la celda suelta (la fuente autoritativa del precio).
+  const kilo = candidates.find((c) => c.type === "kilo");
+  if (kilo) return toProductMatch(kilo);
+  return candidates.length === 1 ? toProductMatch(candidates[0]) : null;
+};
+
+/** Nombre de marca por id, del snapshot (para pintar la línea del pedido). */
+export const brandNameById = async (
+  id: string | null | undefined,
+): Promise<string | null> => {
+  if (!id) return null;
+  const snap = await getCatalogSnapshot();
+  return snap.brands.find((b) => b.id === id)?.name ?? null;
+};
+
+/** Nombre de etapa por id, del snapshot (para pintar la línea del pedido). */
+export const stageNameById = async (
+  id: string | null | undefined,
+): Promise<string | null> => {
+  if (!id) return null;
+  const snap = await getCatalogSnapshot();
+  return snap.stages.find((s) => s.id === id)?.name ?? null;
 };
 
 // Shape de un producto resuelto por id (precio real + stock).
@@ -512,4 +619,7 @@ export default {
   parseDecimal,
   formatMoney,
   formatQty,
+  matchProductForDraft,
+  brandNameById,
+  stageNameById,
 };

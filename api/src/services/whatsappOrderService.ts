@@ -2,6 +2,7 @@ import { prisma } from "../config/db";
 import getNextSequenceValue from "./secuenceService";
 import { requireOrganizationId } from "../config/tenantContext";
 import { emitOrdersChanged } from "../realtime/socket";
+import { sendText } from "./whatsappService";
 
 // Notifica a los clientes del comercio que la lista de pedidos cambió. Envuelto
 // en try/catch: un fallo del socket NUNCA debe romper la operación HTTP.
@@ -105,7 +106,7 @@ export const approveDraft = async (
           })),
         },
       },
-      include: { items: true, customer: true },
+      include: { items: { include: { product: true } }, customer: true },
     });
 
     await tx.receipt.create({
@@ -141,8 +142,84 @@ export const rejectDraft = async (id: string) => {
   return { ok: true };
 };
 
+/** Etiqueta de medio de pago para el mensaje de confirmación. */
+const PAYMENT_LABELS: Record<string, string> = {
+  qr: "QR",
+  transferencia: "Transferencia",
+  efectivo: "Efectivo",
+};
+
+/**
+ * Arma el mensaje de confirmación DEFAULT con los ítems del pedido + dirección +
+ * forma de pago. El front puede mandar un `message` custom; si no, se arma acá.
+ */
+export const buildOrderConfirmationMessage = (draft: any): string => {
+  const lines = Array.isArray(draft?.items)
+    ? draft.items
+        .map((it: any) => {
+          const name = it?.productName ?? it?.product ?? "ítem";
+          const qty = it?.quantity != null ? ` x${it.quantity}` : "";
+          const tot = it?.total != null ? ` — $${it.total}` : "";
+          return `- ${name}${qty}${tot}`;
+        })
+        .join("\n")
+    : "";
+  const address = draft?.address ? `\n📦 Dirección: ${draft.address}` : "";
+  const payment =
+    draft?.paymentMethod && PAYMENT_LABELS[draft.paymentMethod]
+      ? `\n💳 Pago: ${PAYMENT_LABELS[draft.paymentMethod]}`
+      : "";
+  return [
+    `¡Hola ${draft?.contactName ?? ""}! 🙌 Te confirmamos tu pedido:`,
+    lines || "· pedido a confirmar por un asesor",
+    address,
+    payment,
+    "Cualquier consulta, te respondemos por este canal. 😊",
+  ]
+    .filter(Boolean)
+    .join("\n");
+};
+
+/**
+ * Envía una confirmación al cliente por WhatsApp (FASE 6). Busca el borrador por
+ * id (404 si no existe), exigiendo teléfono. El envío va en try/catch y NUNCA
+ * rompe la respuesta HTTP (patrón de postOperatorMessage en chatController):
+ * devuelve { ok: true } si Kapso entregó, { ok: false } si no.
+ */
+export const sendConfirmation = async (id: string, message?: string) => {
+  const draft = await prisma.whatsAppOrderDraft.findFirst({ where: { id } });
+  if (!draft) {
+    const err = new Error("Borrador de pedido no encontrado") as Error & {
+      status: number;
+    };
+    err.status = 404;
+    throw err;
+  }
+  if (!draft.phone) {
+    const err = new Error(
+      "El borrador no tiene teléfono para enviar la confirmación",
+    ) as Error & { status: number };
+    err.status = 400;
+    throw err;
+  }
+
+  const finalMessage = (message ?? "").trim() || buildOrderConfirmationMessage(draft);
+  try {
+    const sent = await sendText(draft.phone, finalMessage);
+    return { ok: sent };
+  } catch (err: any) {
+    console.error(
+      "[whatsappOrderService] no se pudo enviar la confirmación",
+      err?.message ?? err,
+    );
+    return { ok: false };
+  }
+};
+
 export default {
   listDrafts,
   approveDraft,
   rejectDraft,
+  sendConfirmation,
+  buildOrderConfirmationMessage,
 };

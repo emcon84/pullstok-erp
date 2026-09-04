@@ -3,7 +3,7 @@ import whatsappOrderController from "../controllers/whatsappOrderController";
 import { authenticateJWT } from "../middlewares/authMiddleware";
 import { checkBusinessHours } from "../middlewares/checkBusinessHours";
 import { validate } from "../middlewares/validate";
-import { approveDraftSchema } from "../validation/schemas";
+import { approveDraftSchema, sendConfirmationSchema } from "../validation/schemas";
 
 // Rutas de borradores de pedido de WhatsApp (FASE 3). Autenticadas (las usa el
 // ERP) + gate de horario comercial, igual que /orders.
@@ -22,6 +22,13 @@ router.post(
   authenticateJWT,
   checkBusinessHours,
   whatsappOrderController.reject,
+);
+router.post(
+  "/:id/send-confirmation",
+  authenticateJWT,
+  checkBusinessHours,
+  validate(sendConfirmationSchema),
+  whatsappOrderController.sendConfirmation,
 );
 
 export default router;

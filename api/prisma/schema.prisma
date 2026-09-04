@@ -1156,6 +1156,12 @@ model WhatsAppOrderDraft {
   amount         Float?
   address        String?
   paymentMethod  String            @default("efectivo")
+  // FASE 6 — multi-producto + observación. `items` es el array JSON de líneas del
+  // pedido (cada línea: productId, productName, type, quantity, amount, detail,
+  // total, marca, especie, etapa, peso, observacion). `notes` es la observación
+  // libre del pedido (null si el cliente respondió "no" / vacío).
+  items          Json?
+  notes          String?
   status         WhatsAppDraftStatus @default(PENDING_REVIEW)
   orderId        String?
   order          Order?            @relation(fields: [orderId], references: [id])

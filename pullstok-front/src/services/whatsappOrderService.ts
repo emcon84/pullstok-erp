@@ -45,3 +45,17 @@ export const rejectWhatsappDraft = async (
   );
   return response.data;
 };
+
+// Envía al cliente la confirmación del pedido por WhatsApp. El mensaje lo arma
+// el vendedor en el front (editable) y el server lo entrega (o arma uno default).
+export const sendWhatsappConfirmation = async (
+  id: string,
+  message: string,
+): Promise<{ ok: boolean }> => {
+  const response = await axios.post<{ ok: boolean }>(
+    `${API_URL}/whatsapp-orders/${id}/send-confirmation`,
+    { message },
+    { headers: authHeaders() },
+  );
+  return response.data;
+};

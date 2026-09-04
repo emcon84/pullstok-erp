@@ -36,6 +36,7 @@ import {
   listProductsForSelection,
   resolveProductById,
   calculateOrderCost,
+  matchProductForDraft,
   normalizeSpeciesAnswer,
   parseDecimal,
   formatMoney,
@@ -335,5 +336,85 @@ describe("whatsappCatalog — matchStages (FASE 4: etapa por texto libre)", () =
   it("sin match → devuelve []", async () => {
     mockGetCatalogSnapshot.mockResolvedValue(snapshot);
     await expect(matchStages("perro", "geriatrico")).resolves.toEqual([]);
+  });
+});
+
+describe("whatsappCatalog — matchProductForDraft (FASE 6: atributos → producto)", () => {
+  beforeEach(resetMocks);
+
+  it("bolsa con peso que matchea el nombre → devuelve el producto", async () => {
+    mockGetCatalogSnapshot.mockResolvedValue(snapshot);
+    mockFindCell.mockResolvedValue(null);
+    mockGetProductsFor.mockResolvedValue([
+      {
+        type: "bolsa",
+        id: "p-1",
+        label: "Pro Plan Adulto 15kg",
+        price: 45000,
+        priceKg: null,
+      },
+    ]);
+
+    const res = await matchProductForDraft({
+      species: "perro",
+      brandId: "b-proplan",
+      stageId: "t-adulto",
+      sizeText: "15 kg",
+      orderType: "bolsa",
+    });
+    expect(res).toEqual({
+      id: "p-1",
+      type: "bolsa",
+      name: "Pro Plan Adulto 15kg",
+      price: 45000,
+    });
+  });
+
+  it("bolsa con peso que NO matchea → null (queda como requerimiento)", async () => {
+    mockGetCatalogSnapshot.mockResolvedValue(snapshot);
+    mockFindCell.mockResolvedValue(null);
+    mockGetProductsFor.mockResolvedValue([
+      {
+        type: "bolsa",
+        id: "p-1",
+        label: "Pro Plan Adulto 15kg",
+        price: 45000,
+        priceKg: null,
+      },
+    ]);
+
+    const res = await matchProductForDraft({
+      species: "perro",
+      brandId: "b-proplan",
+      stageId: "t-adulto",
+      sizeText: "10 kg",
+      orderType: "bolsa",
+    });
+    expect(res).toBeNull();
+  });
+
+  it("kilo: prefiere la celda suelta (precio autoritativo)", async () => {
+    mockGetCatalogSnapshot.mockResolvedValue(snapshot);
+    mockFindCell.mockResolvedValue({
+      id: "c-1",
+      brandId: "b-proplan",
+      typeId: "t-adulto",
+      species: "perro",
+      priceKg: 30000,
+    });
+    mockGetCellLabel.mockResolvedValue("Pro Plan Adulto suelto");
+
+    const res = await matchProductForDraft({
+      species: "perro",
+      brandId: "b-proplan",
+      stageId: "t-adulto",
+      orderType: "kilo",
+    });
+    expect(res).toEqual({
+      id: "c-1",
+      type: "kilo",
+      name: "Pro Plan Adulto suelto",
+      price: 30000,
+    });
   });
 });

@@ -36,6 +36,9 @@ export const STAGE_BRAND = "BRAND";
 export const STAGE_PRODUCT_SELECT = "PRODUCT_SELECT";
 export const STAGE_PRODUCT_QUANTITY = "PRODUCT_QUANTITY";
 export const STAGE_PRODUCT_AMOUNT = "PRODUCT_AMOUNT";
+// ── FASE 6: captura estructurada (sin lista de productos) + observación ──
+export const STAGE_SIZE = "SIZE";
+export const STAGE_NOTES = "NOTES";
 export const STAGE_NEED_MORE = "NEED_MORE";
 export const STAGE_ADDRESS = "ADDRESS";
 export const STAGE_PAYMENT = "PAYMENT";
@@ -220,6 +223,10 @@ export function messageForStage(stage: string, catalog?: FlowCatalog): string {
       return "¿Cuánto querés? Decime la cantidad (kg para el suelto, cantidad de bolsas para la cerrada).";
     case STAGE_PRODUCT_AMOUNT:
       return "¿Cuánto querés gastar? Decime el importe (ej: 15000).";
+    case STAGE_SIZE:
+      return "¿Qué peso/tamaño? (ej: 10 kg, 15 kg, 22 kg)";
+    case STAGE_NOTES:
+      return "¿Alguna observación? (ej: raza pequeña, esterilizado, medicado...). Si no, respondé 'no'.";
     case STAGE_NEED_MORE:
       return withOptions("¿Necesitás algo más? Elegí una opción:");
     case STAGE_PRODUCT:
@@ -272,6 +279,10 @@ export function nextStageForAnswer(
   const has = (kw: string) => a.includes(kw);
   const orderType = ctx?.orderType ?? null;
 
+  // Nodo cantidad/importe según el tipo de pedido: monto → importe; resto → cantidad.
+  const quantityOrAmount = (): string =>
+    orderType === "monto" ? STAGE_PRODUCT_AMOUNT : STAGE_PRODUCT_QUANTITY;
+
   switch (currentStage) {
     case STAGE_START:
       // Botones del nodo START.
@@ -284,35 +295,43 @@ export function nextStageForAnswer(
       return STAGE_CONSULTA;
 
     case STAGE_TYPE:
-      // Botones (por si Kapso mandara alguno) + números + palabras libres. En
-      // FASE 4 TODOS los pedidos entran al flujo guiado por taxonomía → SPECIES.
+      // FASE 6: al elegir un tipo de pedido (bolsa/kilo/monto) entramos al flujo
+      // de captura estructurada → BRAND (la marca va ANTES que la especie para
+      // desambiguar el producto por peso/tamaño sin lista de productos).
       if (a === BUTTON_OTRO.id.toLowerCase() || has("otro") || a === "4") {
         return STAGE_OTHER;
       }
-      return STAGE_SPECIES;
-
-    case STAGE_SPECIES:
-      // Ya eligió especie (por botón o número) → pasa DIRECTAMENTE a marca.
-      // Se elimina el paso de ETAPA porque la marca puede no estar en la etapa
-      // que el cliente elige (bug: "Old Prince no está en Light"). El matcher de
-      // marca busca en TODAS las etapas y el cliente elige la bolsa.
       return STAGE_BRAND;
 
     case STAGE_BRAND:
-      return STAGE_PRODUCT_SELECT;
+      return STAGE_SPECIES;
+
+    case STAGE_SPECIES:
+      return STAGE_TYPED;
+
+    case STAGE_TYPED:
+      // Etapa elegida: si es una bolsa cerrada preguntamos el peso/tamaño (SIZE);
+      // kilo/monto saltean SIZE e invierten directo a cantidad/importe.
+      return orderType === "bolsa" ? STAGE_SIZE : quantityOrAmount();
+
+    case STAGE_SIZE:
+      return quantityOrAmount();
 
     case STAGE_PRODUCT_SELECT:
       // Según el tipo de pedido (orderType): bolsa/kilo → cantidad; monto → importe.
-      return orderType === "monto" ? STAGE_PRODUCT_AMOUNT : STAGE_PRODUCT_QUANTITY;
+      return quantityOrAmount();
 
     case STAGE_PRODUCT_QUANTITY:
     case STAGE_PRODUCT_AMOUNT:
-      // Tras confirmar cantidad/importe se muestra el costo y se pregunta si
-      // necesita algo más.
+      // Tras confirmar cantidad/importe se matchea el producto y se pregunta la
+      // observación (NOTES) antes de saber si sigue o termina.
+      return STAGE_NOTES;
+
+    case STAGE_NOTES:
       return STAGE_NEED_MORE;
 
     case STAGE_NEED_MORE: {
-      // Loop: "sí" → otra línea (vuelve a especie); "no" → a dirección. Usamos
+      // Loop: "sí" → otra línea (vuelve a BRAND); "no" → a dirección. Usamos
       // TOKENS (no substring) para no caer en falsos positivos ("messi" no es "sí").
       // Los ids de botones NEED_MORE/NEED_DONE arriban como "need_more"/"need_done",
       // que tokenizan a ["need","more"] / ["need","done"].
@@ -320,7 +339,7 @@ export function nextStageForAnswer(
       const finish = ["no", "nada", "listo", "gracias", "fin", "done", "terminar", "termine"];
       const more = ["si", "sí", "otro", "mas", "más", "more", "dale", "adicional"];
       if (toks.some((t) => finish.includes(t))) return STAGE_ADDRESS;
-      if (toks.some((t) => more.includes(t))) return STAGE_SPECIES;
+      if (toks.some((t) => more.includes(t))) return STAGE_BRAND;
       // Respuesta ambigua → asumimos terminar.
       return STAGE_ADDRESS;
     }
@@ -513,6 +532,9 @@ export function buildDraftData(
   // que coincidieron (≤3) para confirmar; stageNotFound indica que no se encontró.
   stageCandidates?: { id: string; stage: string }[];
   stageNotFound?: boolean;
+  // FASE 6 — peso/tamaño (SIZE) y observación (NOTES).
+  sizeText?: string;
+  notes?: string;
 } {
   const a = norm(answer);
   const isNumeric = /^\d+(\.\d+)?$/.test(a);
@@ -534,7 +556,9 @@ export function buildDraftData(
     case STAGE_BRAND:
       // El id de la marca puede venir como id de botón (pocas marcas → lo
       // guardamos directo) o como texto libre natural (muchas marcas → el service
-      // matchea con matchBrands y resuelve exacto/ambiguo/not_found).
+      // matchea con matchBrands y resuelve exacto/ambiguo/not_found). En FASE 6 la
+      // marca va antes que la especie, así que el matcher busca en TODAS las
+      // marcas si todavía no hay especie seleccionada.
       if (!isNumeric && a.length > 0) {
         // Un id de botón suele ser un uuid o algo con guiones/código. Si no tiene
         // espacios (nombre de marca escrito con espacios es texto a matchear) y
@@ -543,6 +567,17 @@ export function buildDraftData(
         return looksLikeId ? { selectedBrandId: a } : { brandTyped: a };
       }
       return {};
+    case STAGE_SIZE: {
+      // Peso/tamaño declarado por el cliente (ej: "15 kg"). Se guarda crudo para
+      // que el service lo use en el matcheo por peso / lo muestre al operador.
+      return a.length > 0 ? { sizeText: a } : {};
+    }
+    case STAGE_NOTES: {
+      // Observación libre ("raza pequeña, esterilizado..."). "no"/"nada" y vacío
+      // quedan como '' → el service lo guarda como null en el borrador.
+      const no = a === "no" || a === "nada" || a === "no se";
+      return no ? { notes: "" } : { notes: a };
+    }
     case STAGE_PRODUCT_SELECT:
       // El objeto selectedProduct (id + tipo + nombre + precio) lo arma el service
       // en whatsappService con el catálogo cargado (el flujo es puro y no lo sabe).
@@ -614,13 +649,16 @@ export function planResponse(input: {
   catalog?: FlowCatalog;
   cost?: { total: number; detail: string } | null;
   orderType?: string | null;
+  // FASE 6: mensaje de confirmación del producto matcheado (o del requerimiento
+  // sin match) que se antepone al preguntar la observación / "necesitás algo más".
+  confirmation?: { message: string } | null;
 }): {
   nextStage: string;
   message: string;
   buttons: { id: string; title: string }[] | null;
   sendImage: boolean;
 } {
-  const { currentStage, answer, qrImageUrl, catalog, cost, orderType } = input;
+  const { currentStage, answer, qrImageUrl, catalog, cost, orderType, confirmation } = input;
 
   // Nunca estuvo en flujo → saludar y plantar los botones de START.
   if (!currentStage) {
@@ -654,16 +692,18 @@ export function planResponse(input: {
 
   let message = messageForStage(next, catalog);
 
-  // Costo recién confirmado (salimos de cantidad/importe hacia NEED_MORE): se
-  // antepone al mensaje para que el cliente vea el desglose ANTES de decidir si
-  // sigue o termina.
+  // Al confirmar cantidad/importe (salimos hacia NOTES o NEED_MORE) se antepone
+  // la confirmación del producto matcheado ("Encontré: X — $Y. ¿Te lo confirmo?")
+  // o, si no hubo match, "Cargué tus datos, un asesor arma el pedido". Si no
+  // viene `confirmation`, cae al desglose de costo para mantener el comportamiento.
+  const confirmMessage = confirmation?.message ?? cost?.detail ?? null;
   if (
-    cost &&
+    confirmMessage &&
     (currentStage === STAGE_PRODUCT_QUANTITY ||
       currentStage === STAGE_PRODUCT_AMOUNT) &&
-    next === STAGE_NEED_MORE
+    (next === STAGE_NEED_MORE || next === STAGE_NOTES)
   ) {
-    message = `${cost.detail}\n\n${message}`;
+    message = `${confirmMessage}\n\n${message}`;
   }
 
   return {
@@ -699,6 +739,8 @@ export default {
   STAGE_PRODUCT_SELECT,
   STAGE_PRODUCT_QUANTITY,
   STAGE_PRODUCT_AMOUNT,
+  STAGE_SIZE,
+  STAGE_NOTES,
   STAGE_NEED_MORE,
   STAGE_ADDRESS,
   STAGE_PAYMENT,
