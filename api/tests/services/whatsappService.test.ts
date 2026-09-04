@@ -3,6 +3,7 @@ import {
   normalizePhone,
   verifyWebhookSignature,
   isCatalogQuery,
+  buildOrderSummary,
 } from "../../src/services/whatsappService";
 
 // Las funciones puras que testeamos no tocan DB; mockeamos los módulos pesados
@@ -92,6 +93,91 @@ describe("whatsappService", () => {
       expect(isCatalogQuery("NEED_MORE")).toBe(false);
       expect(isCatalogQuery("45")).toBe(false);
       expect(isCatalogQuery("ok")).toBe(false);
+    });
+  });
+
+  describe("buildOrderSummary (Punto 2)", () => {
+    it("arma el resumen con ítem sin match compuesto por marca/especie/etapa/peso", () => {
+      const items = [
+        {
+          productId: null,
+          productName: null,
+          type: "bolsa",
+          quantity: 1,
+          amount: null,
+          detail: null,
+          total: null,
+          marca: "KONGO",
+          especie: "Perro",
+          etapa: "Adulto",
+          peso: "20 kg",
+        },
+        {
+          productId: null,
+          productName: null,
+          type: "bolsa",
+          quantity: 2,
+          amount: null,
+          detail: null,
+          total: null,
+          marca: "Gati",
+          especie: "Gato",
+          etapa: "Kitten",
+          peso: "2 kg",
+        },
+      ];
+      expect(buildOrderSummary(items)).toBe(
+        "🛒 Resumen de tu pedido:\n1. KONGO · Perro · Adulto · 20 kg x1\n2. Gati · Gato · Kitten · 2 kg x2",
+      );
+    });
+
+    it("usa productName y la unidad de detail cuando hay match", () => {
+      const items = [
+        {
+          productId: "p1",
+          productName: "KONGO 15kg Adulto",
+          type: "bolsa",
+          quantity: 1,
+          amount: null,
+          detail: "x1 15 kg",
+          total: 45000,
+          marca: "KONGO",
+          especie: "Perro",
+          etapa: "Adulto",
+          peso: "15 kg",
+        },
+      ];
+      expect(buildOrderSummary(items)).toBe(
+        "🛒 Resumen de tu pedido:\n1. KONGO 15kg Adulto x1 = $45000",
+      );
+    });
+
+    it("usa el importe ($) para la rama por monto", () => {
+      const items = [
+        {
+          productId: null,
+          productName: null,
+          type: "monto",
+          quantity: null,
+          amount: 15000,
+          detail: null,
+          total: 15000,
+          marca: null,
+          especie: "Perro",
+          etapa: "Adulto",
+          peso: null,
+        },
+      ];
+      expect(buildOrderSummary(items)).toBe(
+        "🛒 Resumen de tu pedido:\n1. Perro · Adulto $15000",
+      );
+    });
+
+    it("cae a 'Producto' cuando no hay nombre ni atributos en un ítem vacío", () => {
+      const items = [{ productId: null, productName: null }];
+      expect(buildOrderSummary(items)).toBe(
+        "🛒 Resumen de tu pedido:\n1. Producto",
+      );
     });
   });
 });

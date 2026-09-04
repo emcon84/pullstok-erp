@@ -22,6 +22,7 @@ import {
   STAGE_CATEGORY,
   STAGE_SIZE,
   STAGE_NOTES,
+  STAGE_ADDRESS,
   type FlowCatalog,
 } from "./whatsappFlow";
 import {
@@ -695,6 +696,36 @@ const computeItemCost = async (
 };
 
 /**
+ * Arma el resumen de los ítems acumulados para mostrárselo al cliente antes de
+ * confirmar la dirección. Pura (sin I/O). Cada línea: `N. <nombre> x<cantidad>
+ * [kg]` (o `N. <nombre> $<importe>` para la rama "por monto"). `nombre` usa
+ * productName si existe; si no, compone marca/especie/etapa/peso; si queda vacío
+ * → "Producto". La unidad de cantidad es "kg" solo para el tipo kilo (el peso ya
+ * va en el nombre compuesto, así no se duplica); si hay total se muestra aparte.
+ */
+export const buildOrderSummary = (items: any[]): string => {
+  const lines = items.map((it: any, i: number) => {
+    const name =
+      it.productName ||
+      [it.marca, it.especie, it.etapa, it.peso].filter(Boolean).join(" · ") ||
+      "Producto";
+    let cantidad = "";
+    if (it.quantity != null) {
+      const unit = it.type === "kilo" ? "kg" : "";
+      cantidad = ` x${it.quantity}${unit ? ` ${unit}` : ""}`;
+    } else if (it.amount != null) {
+      cantidad = ` $${Math.round(it.amount)}`;
+    }
+    // `total` es el costo del ítem; en la rama "monto" coincide con `amount`, así
+    // que ahí no lo repetimos.
+    const total =
+      it.type !== "monto" && it.total != null ? ` = $${Math.round(it.total)}` : "";
+    return `${i + 1}. ${name}${cantidad}${total}`;
+  });
+  return `🛒 Resumen de tu pedido:\n${lines.join("\n")}`;
+};
+
+/**
  * FASE 2 — lógica de auto-respuesta del flujo guiado. Corre SIEMPRE dentro del
  * runWithTenant abierto por handleIncomingMessage (ya hay org activa). Envuelve
  * el I/O (enviar por Kapso + persistir la respuesta del bot + avanzar el stage)
@@ -940,21 +971,29 @@ const applyFlowReply = async (input: {
         stageNameById((mergedDraft.selectedStageId as string) ?? null),
       ]);
 
+      const especie =
+        SPECIES_LABELS[(mergedDraft.selectedSpecies as string) ?? ""] ?? null;
+      const peso = (mergedDraft.sizeText as string) ?? null;
+      // Sin match (selectedProduct null): componemos un nombre legible con los
+      // atributos ya resueltos para que el operador vea qué pidió el cliente aunque
+      // no sea un producto exacto del catálogo.
+      const composedName = [marca, especie, etapa, peso].filter(Boolean).join(" · ");
+
       // Acumulamos la línea para el multi-producto. Sin match es un requerimiento:
-      // productId/productName quedan null y el operador lo arma desde los atributos.
+      // productId queda null y el operador lo arma desde los atributos.
       const items = Array.isArray(mergedDraft.items) ? [...mergedDraft.items] : [];
       items.push({
         productId: sel?.id ?? null,
-        productName: sel?.name ?? null,
+        productName: sel?.name ?? (composedName || null),
         type: sel?.type ?? (mergedDraft.orderType as string) ?? null,
         quantity: itemQty,
         amount: itemAmount,
         detail: cost?.detail ?? null,
         total: cost?.total ?? null,
         marca,
-        especie: SPECIES_LABELS[(mergedDraft.selectedSpecies as string) ?? ""] ?? null,
+        especie,
         etapa,
-        peso: (mergedDraft.sizeText as string) ?? null,
+        peso,
         observacion: (mergedDraft.notes as string | null) ?? null,
       });
       mergedDraft.items = items;
@@ -1000,14 +1039,26 @@ const applyFlowReply = async (input: {
         : it,
     );
   }
+  // El borrador SIEMPRE se persiste al final: finalDraft es el acumulado correcto.
+  // (Punto 3) Antes había un guard que solo persistía si había patch en este turno,
+  // y eso perdía el reset de NEED_MORE→CATEGORY al "sí, agregar otro" (la DB quedaba
+  // con especie/etapa/marca del ítem 1 y el ítem 2 los heredaba). Es idempotente:
+  // los nodos informativos persisten el mismo acumulado.
+  await prisma.conversation.updateMany({
+    where: { id: conversationId },
+    data: { whatsappDraftData: finalDraft },
+  });
+
+  // Punto 2 — al terminar de agregar ítems (NEED_MORE → ADDRESS, eligió "no,
+  // terminar") se antepone al mensaje un resumen del pedido para que el cliente
+  // confirme lo que está por pedir. NO aplica a nodos de pago/QR/terminal.
   if (
-    Object.keys(draftPatch).length > 0 ||
-    Object.keys(selectionPatch).length > 0
+    currentStage === STAGE_NEED_MORE &&
+    plan.nextStage === STAGE_ADDRESS &&
+    Array.isArray(finalDraft.items) &&
+    finalDraft.items.length > 0
   ) {
-    await prisma.conversation.updateMany({
-      where: { id: conversationId },
-      data: { whatsappDraftData: finalDraft },
-    });
+    plan.message = `${buildOrderSummary(finalDraft.items)}\n\n${plan.message}`;
   }
 
   // Envío de salida. Un fallo de Kapso NO debe romper la persistencia del stage.
@@ -1219,6 +1270,7 @@ export default {
   getOrCreateWhatsAppConversation,
   handleIncomingMessage,
   isCatalogQuery,
+  buildOrderSummary,
   sendText,
   sendInteractiveButtons,
   sendImage,

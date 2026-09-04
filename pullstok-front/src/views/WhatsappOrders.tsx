@@ -29,26 +29,36 @@ const itemQtyLabel = (item: DraftItem): string => {
 
 // Línea de un pedido multi-producto: nombre (o "requerimiento a confirmar"),
 // cantidad/tipo, total (si existe) y observación propia de la línea (si existe).
-const DraftItemLine: React.FC<{ item: DraftItem }> = ({ item }) => (
-  <div className="rounded-md border bg-muted/40 p-2 text-sm">
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <span className="font-medium text-foreground">
-        {item.productName || "Requerimiento (a confirmar)"}
-      </span>
-      <span className="text-xs text-muted-foreground">{itemQtyLabel(item)}</span>
-      {item.total != null && (
-        <span className="font-semibold">
-          ${item.total.toLocaleString("es-AR")}
-        </span>
+// Si no hay productName (borrador con ítem sin match), se compone desde los
+// atributos capturados (marca/especie/etapa/peso) para que el operador vea qué
+// pidió el cliente; si nada → "Requerimiento (a confirmar)".
+const DraftItemLine: React.FC<{ item: DraftItem }> = ({ item }) => {
+  const displayName =
+    item.productName ||
+    [item.marca, item.especie, item.etapa, item.peso]
+      .filter(Boolean)
+      .join(" · ") ||
+    "Requerimiento (a confirmar)";
+
+  return (
+    <div className="rounded-md border bg-muted/40 p-2 text-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="font-medium text-foreground">{displayName}</span>
+        <span className="text-xs text-muted-foreground">{itemQtyLabel(item)}</span>
+        {item.total != null && (
+          <span className="font-semibold">
+            ${item.total.toLocaleString("es-AR")}
+          </span>
+        )}
+      </div>
+      {item.observacion && (
+        <p className="mt-1 text-xs italic text-muted-foreground">
+          Observación: {item.observacion}
+        </p>
       )}
     </div>
-    {item.observacion && (
-      <p className="mt-1 text-xs italic text-muted-foreground">
-        Observación: {item.observacion}
-      </p>
-    )}
-  </div>
-);
+  );
+};
 
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString("es-AR", {
