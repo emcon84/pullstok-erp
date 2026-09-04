@@ -1183,6 +1183,11 @@ export const sendText = async (to: string, body: string): Promise<boolean> => {
   }
 };
 
+// WhatsApp limita el título de un botón a 20 caracteres (code points). Si un
+// título se pasa, Kapso responde 400 y el mensaje completo se cae → el chat queda
+// "colgado". Recortamos por defensa para que nunca vuelva a pasar.
+const clipTitle = (s: string): string => [...s].slice(0, 20).join("") || s;
+
 /**
  * Gateway de salida: manda botones interactivos (FASE 2, listo). Máx. 3 botones
  * (lo exige WhatsApp). Igual que sendText: true si 2xx, false en error.
@@ -1212,7 +1217,7 @@ export const sendInteractiveButtons = async (
           action: {
             buttons: buttons.map((b) => ({
               type: "reply",
-              reply: { id: b.id, title: b.title },
+              reply: { id: b.id, title: clipTitle(b.title) },
             })),
           },
         },

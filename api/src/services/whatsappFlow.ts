@@ -85,7 +85,8 @@ export const BUTTON_CAT_ACCESORIOS = { id: "CAT_ACCESORIOS", title: "Accesorios"
 export const BUTTON_CAT_OTROS = { id: "CAT_OTROS", title: "Otros productos" };
 // "Hablar con un asesor": opción visible en los menús principales (CATEGORY y
 // NEED_MORE) + palabra clave global (isAdvisorIntent). Escala a un humano.
-export const BUTTON_ASESOR = { id: "ACTION_ASESOR", title: "👨‍💼 Hablar con un asesor" };
+// OJO: el título del botón NO puede superar 20 caracteres (límite de WhatsApp).
+export const BUTTON_ASESOR = { id: "ACTION_ASESOR", title: "👤 Hablar con asesor" };
 
 // ---------------------------------------------------------------------------
 // Catálogo resuelto por el service (FASE 4). whatsappFlow es PURO (sin I/O): el
