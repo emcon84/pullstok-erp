@@ -787,7 +787,7 @@ describe("whatsappFlow — FASE 6 (SIZE y NOTES)", () => {
 describe("whatsappFlow — marcas siempre tipeadas (sin lista de opciones)", () => {
   it("messageForStage(STAGE_BRAND) pide que escriba el nombre y NO lista marcas", () => {
     const msg = messageForStage(STAGE_BRAND);
-    expect(msg).toContain("¿Qué marca buscás?");
+    expect(msg).toContain("¿De qué marca lo buscás?");
     expect(msg).toContain("Escribí el nombre");
     expect(msg).not.toContain("1️⃣");
   });

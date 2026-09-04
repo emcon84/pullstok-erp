@@ -201,20 +201,20 @@ export function messageForStage(
   const menu = menuOptions(stage, catalog);
   const withOptions = (base: string): string => {
     if (!menu) return base;
-    if (menu.length === 0) return `${base}\n\nNo tenemos datos cargados para esa opción todavía. Probá con otra o escribí "otro".`;
+    if (menu.length === 0) return `${base}\n\nUy, todavía no tenemos datos para esa opción 😅 Probá con otra o escribí "otro".`;
     if (menu.length > MENU_LIMIT) {
       // No listamos: pedimos que escriba. El service matchea el texto libre.
-      return `${base}\n\nEscribí la opción que buscás y la busco por vos.`;
+      return `${base}\n\nEscribí la opción que buscás y te la busco 🐾`;
     }
     return `${base}\n${numberedList(menu).join("\n")}`;
   };
 
   switch (stage) {
     case STAGE_START:
-      return "¡Hola! 👋 Soy el asistente de El Almacén de las Mascotas. ¿Qué necesitás hoy?";
+      return "¡Hola! 🐶 Soy Alma, tu asistente de El Almacén de las Mascotas. ¿En qué te puedo ayudar hoy? Contame 😊";
     case STAGE_CATEGORY:
       return [
-        "¿Qué tipo de producto buscás? Elegí una opción:",
+        "¡Buenísimo que quieras armar tu pedido! 🐾 ¿Qué tipo de producto buscás? Elegí una opción:",
         "1️⃣ 🐶 Alimento balanceado seco",
         "2️⃣ 🐱 Alimento húmedo",
         "3️⃣ 🎾 Accesorios",
@@ -224,7 +224,7 @@ export function messageForStage(
       ].join("\n");
     case STAGE_TYPE:
       return [
-        "¿Qué tipo de pedido querés hacer? Elegí una opción:",
+        "¿Cómo lo querés? Elegí una opción:",
         "1️⃣ Bolsa cerrada",
         "2️⃣ Por kilo",
         "3️⃣ Por monto",
@@ -232,55 +232,55 @@ export function messageForStage(
         "Respondé con el número o el nombre.",
       ].join("\n");
     case STAGE_SPECIES:
-      return withOptions("¿Para qué especie es el alimento? Elegí una opción:");
+      return withOptions("¿Para qué peludito es el alimento? 🐶🐱 Elegí una opción:");
     case STAGE_TYPED:
-      return withOptions("¿Qué etapa es? (Adulto, Cachorro, Kitten, Senior...) Elegí una:");
+      return withOptions("Contame, ¿qué etapa es? (Adulto, Cachorro, Kitten, Senior...) Elegí una:");
     case STAGE_BRAND:
       // El cliente SIEMPRE escribe la marca (hay muchísimas): no se listan opciones
       // ni se arma un menú. El service la matchea por texto (matchBrands).
-      return "¿Qué marca buscás? Escribí el nombre (ej: ProPlan, Old Prince) y te muestro los productos.";
+      return "¿De qué marca lo buscás? Escribí el nombre (ej: ProPlan, Old Prince) y te lo busco 🐾";
     case STAGE_PRODUCT_SELECT:
-      return withOptions("Elegí el producto (cada opción muestra su peso y precio):");
+      return withOptions("¡Mirá lo que encontré! Elegí el que más te guste (te muestro peso y precio) 🐾");
     case STAGE_PRODUCT_QUANTITY:
       // "¿Cuánto querés?" se adapta al tipo de pedido que eligió el cliente:
       // bolsa → número de bolsas; kilo → peso en kg. Evita preguntar "cuántas
       // bolsas" a alguien que va por kilo (y viceversa).
       return orderType === "kilo"
-        ? "¿Cuántos kilos necesitás? Decime el peso (ej: 1, 2, 5)."
-        : "¿Cuántas bolsas necesitás? Si es más de una, decime la cantidad.";
+        ? "¿Cuántos kilos necesitás? Decime el peso (ej: 1, 2, 5) 🐾"
+        : "¿Cuántas bolsas necesitás? Si es más de una, decime la cantidad 🐾";
     case STAGE_PRODUCT_AMOUNT:
-      return "¿Cuánto querés gastar? Decime el importe (ej: 15000).";
+      return "¿Cuánto querés gastar? Decime el importe (ej: 15000) 🐾";
     case STAGE_SIZE:
       // Solo se alcanza en la rama de bolsa cerrada: es el peso de la BOLSA
       // (10/15/22 kg), no el peso/tamaño de la mascota. Se aclara para no confundir.
-      return "¿De qué peso es la bolsa? (ej: 10 kg, 15 kg, 22 kg)";
+      return "¿De qué peso es la bolsa? (ej: 10 kg, 15 kg, 22 kg) 🐾";
     case STAGE_NOTES:
-      return "¿Alguna observación? (ej: raza pequeña, esterilizado, medicado...). Si no, respondé 'no'.";
+      return "¿Alguna observación? (ej: raza pequeña, esterilizado, medicado...). Si no hay, respondé 'no' 😊";
     case STAGE_NEED_MORE:
-      return withOptions("¿Necesitás algo más? Elegí una opción:");
+      return withOptions("¿Querés sumar algo más? Elegí una opción:");
     case STAGE_PRODUCT:
-      return "¿Qué producto estás buscando? Contame el nombre o la marca.";
+      return "Contame qué buscás (nombre o marca) y lo anoto para vos 🐾";
     case STAGE_AMOUNT:
       return "¿Cuánto querés gastar? Decime el importe (ej: 50000).";
     case STAGE_PROD_AMOUNT:
       return "¿Por cuánto lo querés? Decime el importe (ej: 50000) o el peso.";
     case STAGE_ADDRESS:
-      return "¿A qué dirección lo llevamos? Decime calle, número y localidad.";
+      return "¡Último pasito! ¿A qué dirección lo llevamos? Decime calle, número y localidad 🚚";
     case STAGE_PAYMENT:
-      return "¿Cómo querés pagar?";
+      return "¿Cómo querés abonar? Elegí una opción 🐾";
     case STAGE_QR:
-      return "📲 Escaneá este código QR para pagar. Cuando esté listo, confirmame 🙌";
+      return "📲 Escaneá este código QR para pagar. Cuando esté listo, avisame 🙌";
     // Handoff a humano: el client NO ve estos por planResponse (los emite
     // escalateConversation como puente único). Se definen por completitud.
     case STAGE_CONSULTA:
-      return "¡Buenísimo! Te conecto con una persona del equipo para responderte 🙌";
+      return "¡Con gusto! Te conecto con una persona del equipo para ayudarte 🐾";
     case STAGE_OTHER:
-      return "¡Buenísimo! Te conecto con una persona del equipo para ayudarte 🙌";
+      return "¡Con gusto! Te conecto con una persona del equipo para ayudarte 🐾";
     case STAGE_PAYMENT_DONE:
     case STAGE_DONE:
-      return "¡Listo! 👍 Pedido registrado, un asesor te lo confirma en breve.";
+      return "¡Gracias por tu compra! 🐾 Tu pedido quedó registrado y un asesor te lo confirma enseguida. ¡Que lo disfruten con tu peludito! 💛";
     default:
-      return "¿En qué más te puedo ayudar?";
+      return "¿En qué más te puedo ayudar? 🐾";
   }
 }
 

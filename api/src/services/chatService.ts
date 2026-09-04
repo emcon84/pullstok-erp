@@ -113,7 +113,7 @@ export const persistMessage = async (input: {
 // Mensaje puente que ve el visitante al escalar a humano. Lo emite el bot como
 // último acto antes de callarse (sender=OPERATOR, isBot=true).
 const HANDOFF_BRIDGE_BODY =
-  "Te conecto con una persona del equipo 🙌 En un momento te responden.";
+  "¡Dale! Te conecto con una persona del equipo 🙌 En un momento te responden. Cualquier cosa, contame 🐾";
 
 /**
  * FASE 2 — HANDOFF A HUMANO. Escala una conversación de BOT a HUMAN: el bot deja

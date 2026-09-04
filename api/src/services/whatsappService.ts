@@ -722,7 +722,7 @@ export const buildOrderSummary = (items: any[]): string => {
       it.type !== "monto" && it.total != null ? ` = $${Math.round(it.total)}` : "";
     return `${i + 1}. ${name}${cantidad}${total}`;
   });
-  return `🛒 Resumen de tu pedido:\n${lines.join("\n")}`;
+  return `🐾 Te armo el resumen de tu pedido:\n${lines.join("\n")}`;
 };
 
 /**
@@ -825,7 +825,7 @@ const applyFlowReply = async (input: {
   // que la escriba de nuevo y nos quedamos en el mismo nodo (sin avanzar).
   if ((selectionPatch as any).stageNotFound) {
     const msg =
-      "No encontré esa etapa 🐾 ¿Podés escribirla de nuevo? (ej: Adulto, Cachorro, Kitten, Senior) o pedí ayuda con un vendedor.";
+      "No encontré esa etapa 😅 ¿Podés escribirla de nuevo? (ej: Adulto, Cachorro, Kitten, Senior) o pedí hablar con un asesor 🐾";
     await sendText(phone, msg).catch(() => {});
     await persistMessage({
       conversationId,
@@ -846,7 +846,7 @@ const applyFlowReply = async (input: {
   // evita que el flujo puro intente listar las 93 marcas (payload gigante).
   if ((selectionPatch as any).brandNotFound) {
     const msg =
-      "Esa marca no está disponible para la etapa que elegiste 🤔 Probá con otra etapa (ej: Adulto, Cachorro) u otra marca. Si no la encontrás, pedí ayuda con un vendedor.";
+      "Esa marca no está disponible para esa etapa 🤔 Probá con otra etapa (ej: Adulto, Cachorro) u otra marca. Si no la encontrás, pedí hablar con un asesor 🐾";
     await sendText(phone, msg).catch(() => {});
     await persistMessage({
       conversationId,
@@ -867,7 +867,7 @@ const applyFlowReply = async (input: {
   // una de las opciones mostradas → evita el pedido SIN producto (bug crítico).
   if ((selectionPatch as any).productNotFound) {
     const msg =
-      "Elegí uno de los productos de la lista 👇 (tocá un número) o escribí el nombre exacto. Si no aparece lo que buscás, pedí ayuda con un vendedor.";
+      "Elegí uno de los productos de la lista 👇 (tocá un número) o escribí el nombre exacto. Si no aparece lo que buscás, pedí hablar con un asesor 🐾";
     await sendText(phone, msg).catch(() => {});
     await persistMessage({
       conversationId,
@@ -962,8 +962,8 @@ const applyFlowReply = async (input: {
         | undefined;
       confirmation = {
         message: sel
-          ? `Encontré: ${sel.name} — $${formatMoney(cost?.total ?? 0)}. ¿Te lo confirmo? 🙌`
-          : "Cargué tus datos, un asesor arma el pedido. 🙌",
+          ? `¡Encontré lo que buscabas! 🐶 ${sel.name} — $${formatMoney(cost?.total ?? 0)}. ¿Te lo confirmo? 🙌`
+          : "¡Listo! Cargué tus datos, un asesor arma el pedido 🐾",
       };
 
       const itemQty =
