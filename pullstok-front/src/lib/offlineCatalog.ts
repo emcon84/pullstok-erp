@@ -38,7 +38,7 @@ export interface OfflineProduct {
 const DB_NAME = "pullstok-offline-v1";
 const STORE = "products";
 const META = "meta";
-const SYNC_TTL_MS = 10 * 60 * 1000; // re-sincronizar si el snapshot tiene >10 min
+const SYNC_TTL_MS = 3 * 60 * 1000; // re-sincronizar si el snapshot tiene >3 min
 
 let products: OfflineProduct[] = [];
 let byCode = new Map<string, OfflineProduct>();

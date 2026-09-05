@@ -323,22 +323,27 @@ export const StockScannerPage = () => {
   const searchProducts = useCallback(async (q: string) => {
     if (q.length < 2) { setSearchResults([]); return; }
     setSearching(true);
-    // 1) LOCAL primero (instantáneo + offline).
-    const local = searchOfflineProducts(q, 12);
-    if (!navigator.onLine || local.length >= 12) {
-      setSearchResults(local.map(mapOfflineProduct));
+    if (navigator.onLine) {
+      // ONLINE: la API es la fuente de verdad (refleja productos borrados).
+      // Si la API vuelve vacía, mostramos vacío — NO caemos al catálogo local,
+      // porque ese snapshot puede estar desactualizado y mostrar un producto
+      // que ya se eliminó (bug: "el producto sigue apareciendo").
+      try {
+        const res = await fetch(`${API_URL}/products?name=${encodeURIComponent(q)}`, { headers });
+        const data = await res.json();
+        const apiHits = (Array.isArray(data) ? data : []).slice(0, 12) as Product[];
+        setSearchResults(apiHits);
+      } catch {
+        // Error de conexión → usamos el catálogo local como respaldo.
+        const local = searchOfflineProducts(q, 12);
+        setSearchResults(local.map(mapOfflineProduct));
+      }
       setSearching(false);
       return;
     }
-    // 2) ONLINE: si lo local no alcanzó, consultar la API (más completo).
-    try {
-      const res = await fetch(`${API_URL}/products?name=${encodeURIComponent(q)}`, { headers });
-      const data = await res.json();
-      const apiHits = (Array.isArray(data) ? data : []).slice(0, 12) as Product[];
-      setSearchResults(apiHits.length ? apiHits : local.map(mapOfflineProduct));
-    } catch {
-      setSearchResults(local.map(mapOfflineProduct));
-    }
+    // OFFLINE: solo el catálogo local (snapshot).
+    const local = searchOfflineProducts(q, 12);
+    setSearchResults(local.map(mapOfflineProduct));
     setSearching(false);
   }, [headers]);
 
