@@ -244,14 +244,10 @@ export const useDeleteProduct = () => {
       queryClient.invalidateQueries({queryKey: ['product-facets']});
     },
     onError: (error: Error) => {
-      // Manejo de errores más específico basado en el mensaje del backend
-      if (error.message.includes('associated orders')) {
-        toast.error('El producto no se puede eliminar porque tiene órdenes asociadas');
-      } else if (error.message.includes('associated budgets')) {
-        toast.error('El producto no se puede eliminar porque tiene presupuestos asociados');
-      } else {
-        toast.error('Error al eliminar el producto');
-      }
+      // Mostramos el mensaje real del backend (ya en español). Antes se mapeaban
+      // los textos en inglés y, si el backend devolvía 200 sin borrar, se veía
+      // "borrado bien" aunque el producto siguiera en la base.
+      toast.error(error.message || 'Error al eliminar el producto');
     },
   });
 

@@ -898,7 +898,7 @@ const deleteProduct = async (req: Request, res: Response) => {
     });
     if (hasOrders) {
       return res.status(400).json({
-        message: "Cannot delete product because it has associated orders",
+        message: "No se puede eliminar: el producto tiene órdenes asociadas",
       });
     }
 
@@ -907,13 +907,26 @@ const deleteProduct = async (req: Request, res: Response) => {
     });
     if (hasBudgets) {
       return res.status(400).json({
-        message: "Cannot delete product because it has associated budgets",
+        message: "No se puede eliminar: el producto tiene presupuestos asociados",
       });
     }
 
-    await prisma.product.deleteMany({ where: { id } });
+    const result = await prisma.product.deleteMany({ where: { id } });
+    // Si deleteMany borró 0 filas, el id no existía → NO es éxito. Antes se
+    // devolvía 200 "deleted" aunque no se borrara nada (el front mostraba éxito).
+    if (result.count === 0) {
+      return res.status(404).json({ message: "Product not found" });
+    }
     res.status(200).json({ message: "Product deleted successfully" });
   } catch (error: any) {
+    // FK constraint: el producto tiene dependencias sin onDelete Cascade
+    // (variantes, stock, listas de precio) → avisar claro en vez del 500 crudo.
+    if (error?.code === "P2003") {
+      return res.status(400).json({
+        message:
+          "No se puede eliminar: el producto tiene datos asociados (variantes, stock o listas de precio)",
+      });
+    }
     res.status(500).json({ message: error.message });
   }
 };
