@@ -20,6 +20,7 @@ import {
   mergeDraftData,
   normalizeOrderType,
   normalizePaymentMethod,
+  normalizeWeight,
   normalizeProductCategory,
   STAGE_START,
   STAGE_CONSULTA,
@@ -348,6 +349,14 @@ describe("whatsappFlow — planResponse", () => {
 });
 
 describe("whatsappFlow — helpers", () => {
+  it("normalizeWeight agrega kg a un número pelado", () => {
+    expect(normalizeWeight("15")).toBe("15 kg");
+    expect(normalizeWeight("15kg")).toBe("15kg");
+    expect(normalizeWeight("15 kilos")).toBe("15 kilos");
+    expect(normalizeWeight("grande")).toBe("grande");
+    expect(normalizeWeight("")).toBe("");
+  });
+
   it("isTerminalStage", () => {
     expect(isTerminalStage(STAGE_DONE)).toBe(true);
     expect(isTerminalStage(STAGE_PAYMENT_DONE)).toBe(true);

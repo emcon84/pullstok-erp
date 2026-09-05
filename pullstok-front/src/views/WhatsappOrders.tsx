@@ -16,6 +16,16 @@ import type {
   DraftItem,
 } from "../models/whatsappOrderModel";
 
+// Normaliza un peso para que se lea claro: "15" → "15 kg"; "15kg"/"15 kilos" se
+// dejan; otro texto se deja tal cual.
+const normalizeWeight = (raw?: string | null): string => {
+  const s = (raw ?? "").trim();
+  if (!s) return "";
+  if (/\b(kg|kilos?|grs?|gramos?)\b/i.test(s)) return s;
+  if (/^\d+(?:[.,]\d+)?\s*$/.test(s)) return `${s} kg`;
+  return s;
+};
+
 // Descripción legible de una línea: "1 bolsa de Excellent Perro Cachorro x 15 kg"
 // (o "2 kg de ..." para kilo, o "$15000 de ..." para monto). Usa la marca/especie/
 // etapa del ítem; si no, cae a productName o "Requerimiento (a confirmar)".
@@ -24,7 +34,7 @@ const describeItem = (item: DraftItem): string => {
     [item.marca, item.especie, item.etapa].filter(Boolean).join(" ") ||
     item.productName ||
     "Requerimiento (a confirmar)";
-  const peso = item.peso ? ` x ${item.peso}` : "";
+  const peso = item.peso ? ` x ${normalizeWeight(item.peso)}` : "";
   if (item.amount != null) return `$${item.amount.toLocaleString("es-AR")} de ${desc}`;
   if (item.quantity != null) {
     const unit =

@@ -23,6 +23,7 @@ import {
   STAGE_CATEGORY,
   STAGE_SIZE,
   STAGE_NOTES,
+  normalizeWeight,
   STAGE_ADDRESS,
   type FlowCatalog,
 } from "./whatsappFlow";
@@ -705,7 +706,7 @@ const describeItem = (it: any): string => {
     [it.marca, it.especie, it.etapa].filter(Boolean).join(" ") ||
     it.productName ||
     "Producto";
-  const peso = it.peso ? ` x ${it.peso}` : "";
+  const peso = it.peso ? ` x ${normalizeWeight(String(it.peso))}` : "";
   if (it.amount != null) return `$${Math.round(it.amount)} de ${desc}`;
   if (it.quantity != null) {
     const unit =
@@ -1011,6 +1012,10 @@ const applyFlowReply = async (input: {
         productId: sel?.id ?? null,
         productName: sel?.name ?? (composedName || null),
         type: sel?.type ?? (mergedDraft.orderType as string) ?? null,
+        quantity: itemQty,
+        amount: itemAmount,
+        detail: cost?.detail ?? null,
+        total: cost?.total ?? null,
         marca: marcaFallback,
         especie,
         etapa,

@@ -290,6 +290,20 @@ export function messageForStage(
 const norm = (answer: string): string => (answer ?? "").trim().toLowerCase();
 
 /**
+ * Normaliza un peso declarado por el cliente para que se lea claro en el pedido:
+ * - "15" → "15 kg" (número pelado → le agregamos la unidad).
+ * - "15kg" / "15 kg" / "15 kilos" → se deja como está.
+ * - Otro texto (ej. "grande") → se deja tal cual.
+ */
+export const normalizeWeight = (raw: string): string => {
+  const s = (raw ?? "").trim();
+  if (!s) return s;
+  if (/\b(kg|kilos?|grs?|gramos?)\b/i.test(s)) return s;
+  if (/^\d+(?:[.,]\d+)?\s*$/.test(s)) return `${s} kg`;
+  return s;
+};
+
+/**
  * Nodo siguiente según la respuesta del cliente. La respuesta puede venir como
  * un id de botón (interactive.button_reply.id) o como texto libre (los nodos que
  * esperan texto las responden con palabras). Para los nodos de texto aceptamos
@@ -721,9 +735,9 @@ export function buildDraftData(
       // un id y pisaba el UUID → la marca se perdía del pedido.
       return a.length > 0 ? { brandTyped: a } : {};
     case STAGE_SIZE: {
-      // Peso/tamaño declarado por el cliente (ej: "15 kg"). Se guarda crudo para
-      // que el service lo use en el matcheo por peso / lo muestre al operador.
-      return a.length > 0 ? { sizeText: a } : {};
+      // Peso/tamaño declarado por el cliente (ej: "15 kg"). Si tipea solo un número
+      // ("15") le agregamos la unidad "kg" para que el pedido se lea claro.
+      return a.length > 0 ? { sizeText: normalizeWeight(a) } : {};
     }
     case STAGE_NOTES: {
       // Observación libre ("raza pequeña, esterilizado..."). "no"/"nada" y vacío
