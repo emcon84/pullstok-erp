@@ -27,6 +27,7 @@ import {
   STAGE_CATEGORY,
   STAGE_TYPE,
   STAGE_PRODUCT,
+  STAGE_NAME,
   STAGE_AMOUNT,
   STAGE_PROD_AMOUNT,
   STAGE_SPECIES,
@@ -164,8 +165,18 @@ describe("whatsappFlow — nextStageForAnswer", () => {
     expect(nextStageForAnswer(STAGE_CATEGORY, "messi")).toBe(STAGE_TYPE);
   });
 
-  it("PRODUCT (texto libre) → NEED_MORE (pregunta si es todo o agrega algo más)", () => {
-    expect(nextStageForAnswer(STAGE_PRODUCT, "Royal Canin")).toBe(STAGE_NEED_MORE);
+  it("PRODUCT (texto libre, sin nombre aún) → NAME (pide el nombre)", () => {
+    expect(nextStageForAnswer(STAGE_PRODUCT, "Royal Canin")).toBe(STAGE_NAME);
+  });
+
+  it("PRODUCT (con nombre ya capturado) → NEED_MORE", () => {
+    expect(
+      nextStageForAnswer(STAGE_PRODUCT, "Royal Canin", { hasName: true }),
+    ).toBe(STAGE_NEED_MORE);
+  });
+
+  it("NAME → NEED_MORE (pregunta si es todo o agrega algo más)", () => {
+    expect(nextStageForAnswer(STAGE_NAME, "Ana")).toBe(STAGE_NEED_MORE);
   });
 
   it("AMOUNT → ADDRESS (rama sin cálculo, FASE 3)", () => {
@@ -302,9 +313,15 @@ describe("whatsappFlow — planResponse", () => {
     expect(r.nextStage).toBe(STAGE_BRAND);
   });
 
-  it("PRODUCT → NEED_MORE (¿es todo o querés agregar algo más?)", () => {
+  it("PRODUCT → NAME (sin nombre aún) y con hasName → NEED_MORE", () => {
     const r = planResponse({ currentStage: STAGE_PRODUCT, answer: "Royal Canin" });
-    expect(r.nextStage).toBe(STAGE_NEED_MORE);
+    expect(r.nextStage).toBe(STAGE_NAME);
+    const r2 = planResponse({
+      currentStage: STAGE_PRODUCT,
+      answer: "Royal Canin",
+      hasName: true,
+    });
+    expect(r2.nextStage).toBe(STAGE_NEED_MORE);
   });
 
   it("ADDRESS → PAYMENT con botones QR/transferencia/efectivo", () => {
@@ -471,6 +488,14 @@ describe("whatsappFlow — buildDraftData (FASE 3)", () => {
     expect(buildDraftData(STAGE_PRODUCT, "Royal Canin 15kg")).toEqual({
       productText: "royal canin 15kg",
     });
+  });
+
+  it("NAME + nombre → clientName", () => {
+    expect(buildDraftData(STAGE_NAME, "Ana")).toEqual({ clientName: "ana" });
+  });
+
+  it("NAME + 'no' → clientName vacío (sin nombre)", () => {
+    expect(buildDraftData(STAGE_NAME, "no")).toEqual({ clientName: "" });
   });
 
   it("ADDRESS → address", () => {

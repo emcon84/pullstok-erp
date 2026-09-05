@@ -40,6 +40,7 @@ export const STAGE_PRODUCT_AMOUNT = "PRODUCT_AMOUNT";
 export const STAGE_SIZE = "SIZE";
 export const STAGE_NOTES = "NOTES";
 export const STAGE_NEED_MORE = "NEED_MORE";
+export const STAGE_NAME = "NAME";
 export const STAGE_ADDRESS = "ADDRESS";
 export const STAGE_PAYMENT = "PAYMENT";
 export const STAGE_QR = "QR";
@@ -258,9 +259,11 @@ export function messageForStage(
     case STAGE_NOTES:
       return "¿Alguna observación? (ej: raza pequeña, esterilizado, medicado...). Si no hay, respondé 'no' 😊";
     case STAGE_NEED_MORE:
-      return withOptions("¿Es todo o querés agregar algo más? Elegí una opción:");
+      return withOptions("¿Es todo o querés sumar algo más? 🐾 Elegí una opción:");
     case STAGE_PRODUCT:
       return "¡Contame qué necesitás! Por ejemplo: '1 bolsa de Excellent perro cachorro 15kg' 🐾";
+    case STAGE_NAME:
+      return "¡Qué lindo! 😊 ¿Me dejás tu nombre para asesorarte mejor? Si no querés, escribí 'no'.";
     case STAGE_AMOUNT:
       return "¿Cuánto querés gastar? Decime el importe (ej: 50000).";
     case STAGE_PROD_AMOUNT:
@@ -317,7 +320,7 @@ export const normalizeWeight = (raw: string): string => {
 export function nextStageForAnswer(
   currentStage: string,
   answer: string,
-  ctx?: { orderType?: string | null },
+  ctx?: { orderType?: string | null; hasName?: boolean },
 ): string {
   const a = norm(answer);
   const has = (kw: string) => a.includes(kw);
@@ -413,8 +416,13 @@ export function nextStageForAnswer(
     }
 
     case STAGE_PRODUCT:
-      // Flujo SIMPLE: el cliente escribe libremente qué necesita → lo anotamos
-      // como requerimiento y preguntamos si es todo o quiere agregar algo más.
+      // Flujo SIMPLE: el cliente escribe libremente qué necesita → lo anotamos.
+      // La primera vez le pedimos el nombre (opcional); si ya lo dio, pasamos
+      // directo a "¿es todo o agregás algo más?".
+      return ctx?.hasName ? STAGE_NEED_MORE : STAGE_NAME;
+
+    case STAGE_NAME:
+      // Tras el nombre (o "no"), pasamos a "¿es todo o querés agregar algo más?".
       return STAGE_NEED_MORE;
 
     case STAGE_AMOUNT:
@@ -685,6 +693,7 @@ export function buildDraftData(
 ): {
   orderType?: string;
   productText?: string;
+  clientName?: string;
   quantityKg?: number;
   amount?: number;
   address?: string;
@@ -722,6 +731,12 @@ export function buildDraftData(
     case STAGE_PRODUCT:
       // El producto se guarda tal cual lo escribió el cliente (texto libre).
       return { productText: a };
+    case STAGE_NAME: {
+      // Nombre del cliente (opcional). "no"/"nada"/vacío → clientName: "" (no
+      // guarda nombre) para que el service lo trate como "sin nombre".
+      const no = a === "no" || a === "nada" || a === "no se" || a === "no, gracias";
+      return no ? { clientName: "" } : a.length > 0 ? { clientName: a } : {};
+    }
     case STAGE_SPECIES: {
       const species = speciesKey(a);
       return species ? { selectedSpecies: species } : {};
@@ -818,6 +833,7 @@ export function planResponse(input: {
   catalog?: FlowCatalog;
   cost?: { total: number; detail: string } | null;
   orderType?: string | null;
+  hasName?: boolean;
   // FASE 6: mensaje de confirmación del producto matcheado (o del requerimiento
   // sin match) que se antepone al preguntar la observación / "necesitás algo más".
   confirmation?: { message: string } | null;
@@ -827,7 +843,7 @@ export function planResponse(input: {
   buttons: { id: string; title: string }[] | null;
   sendImage: boolean;
 } {
-  const { currentStage, answer, qrImageUrl, catalog, cost, orderType, confirmation } = input;
+  const { currentStage, answer, qrImageUrl, catalog, cost, orderType, hasName, confirmation } = input;
 
   // Nunca estuvo en flujo → saludar y plantar los botones de START.
   if (!currentStage) {
@@ -839,7 +855,7 @@ export function planResponse(input: {
     };
   }
 
-  const next = nextStageForAnswer(currentStage, answer, { orderType });
+  const next = nextStageForAnswer(currentStage, answer, { orderType, hasName });
 
   // Nodo QR: si hay URL mandamos la imagen; si no, texto de respaldo.
   if (next === STAGE_QR) {
@@ -911,6 +927,7 @@ export default {
   STAGE_CATEGORY,
   STAGE_TYPE,
   STAGE_PRODUCT,
+  STAGE_NAME,
   STAGE_AMOUNT,
   STAGE_PROD_AMOUNT,
   STAGE_SPECIES,

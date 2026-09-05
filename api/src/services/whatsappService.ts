@@ -21,6 +21,7 @@ import {
   STAGE_PRODUCT,
   STAGE_NEED_MORE,
   STAGE_CATEGORY,
+  STAGE_NAME,
   STAGE_SIZE,
   STAGE_NOTES,
   normalizeWeight,
@@ -900,7 +901,10 @@ const applyFlowReply = async (input: {
   // para que el flujo puro arme los botones/mensajes del paso siguiente. El costo
   // REAL del ítem se calcula al confirmar la cantidad/importe (fuente: la DB).
   if (currentStage) {
-    const next = nextStageForAnswer(currentStage, answer, { orderType });
+    const next = nextStageForAnswer(currentStage, answer, {
+      orderType,
+      hasName: !!mergedDraft.clientName,
+    });
     catalog = await catalogForStage(next, mergedDraft);
 
     // Al agregar otra línea (NEED_MORE + "sí") el flujo vuelve a PRODUCT (texto
@@ -1031,6 +1035,7 @@ const applyFlowReply = async (input: {
     catalog,
     cost,
     orderType,
+    hasName: !!mergedDraft.clientName,
     confirmation,
   });
 
@@ -1142,7 +1147,9 @@ const applyFlowReply = async (input: {
         organizationId,
         conversationId,
         phone: conversation.guestPhone ?? phone,
-        contactName: conversation.guestName,
+        contactName:
+          (finalDraft.clientName as string | null) ||
+          conversation.guestName,
         customerId: conversation.customerId ?? null,
         orderType: (finalDraft.orderType as string) ?? "otro",
         productText: selectedProduct?.name ?? (finalDraft.productText as string) ?? null,
