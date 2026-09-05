@@ -903,12 +903,10 @@ const applyFlowReply = async (input: {
     const next = nextStageForAnswer(currentStage, answer, { orderType });
     catalog = await catalogForStage(next, mergedDraft);
 
-    // Al agregar otra línea (NEED_MORE + "sí") el flujo vuelve a CATEGORY: se
-    // limpian los campos de selección del ítem anterior para que la nueva línea no
-    // herede atributos (marca/especie/etapa/peso/producto/observación). Se
-    // conservan `orderType` y `items`. `productCategory` se elige de nuevo en
-    // CATEGORY, así que también se borra.
-    if (currentStage === STAGE_NEED_MORE && next === STAGE_CATEGORY) {
+    // Al agregar otra línea (NEED_MORE + "sí") el flujo vuelve a PRODUCT (texto
+    // libre): limpiamos los campos de la línea anterior para que la nueva no
+    // herede atributos (marca/especie/etapa/peso/producto). Se conservan `items`.
+    if (currentStage === STAGE_NEED_MORE && next === STAGE_PRODUCT) {
       delete mergedDraft.selectedSpecies;
       delete mergedDraft.selectedBrandId;
       delete mergedDraft.selectedStageId;

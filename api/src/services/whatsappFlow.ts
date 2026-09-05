@@ -258,9 +258,9 @@ export function messageForStage(
     case STAGE_NOTES:
       return "¿Alguna observación? (ej: raza pequeña, esterilizado, medicado...). Si no hay, respondé 'no' 😊";
     case STAGE_NEED_MORE:
-      return withOptions("¿Querés sumar algo más? Elegí una opción:");
+      return withOptions("¿Es todo o querés agregar algo más? Elegí una opción:");
     case STAGE_PRODUCT:
-      return "Contame qué buscás (nombre o marca) y lo anoto para vos 🐾";
+      return "¡Contame qué necesitás! Por ejemplo: '1 bolsa de Excellent perro cachorro 15kg' 🐾";
     case STAGE_AMOUNT:
       return "¿Cuánto querés gastar? Decime el importe (ej: 50000).";
     case STAGE_PROD_AMOUNT:
@@ -330,11 +330,11 @@ export function nextStageForAnswer(
   switch (currentStage) {
     case STAGE_START:
       // Botones del nodo START.
-      if (a === BUTTON_PEDIDO.id.toLowerCase()) return STAGE_CATEGORY;
+      if (a === BUTTON_PEDIDO.id.toLowerCase()) return STAGE_PRODUCT;
       if (a === BUTTON_CONSULTA.id.toLowerCase()) return STAGE_CONSULTA;
-      // Texto libre en START: si pedido → CATEGORY; si no → consulta (handoff).
+      // Texto libre en START: si pedido → PRODUCT (texto libre); si no → consulta.
       if (has("pedido") || has("comprar") || has("orden") || has("encargar")) {
-        return STAGE_CATEGORY;
+        return STAGE_PRODUCT;
       }
       return STAGE_CONSULTA;
 
@@ -407,15 +407,15 @@ export function nextStageForAnswer(
       const finish = ["no", "nada", "listo", "gracias", "fin", "done", "terminar", "termine"];
       const more = ["si", "sí", "otro", "mas", "más", "more", "dale", "adicional"];
       if (toks.some((t) => finish.includes(t))) return STAGE_ADDRESS;
-      if (toks.some((t) => more.includes(t))) return STAGE_CATEGORY;
+      if (toks.some((t) => more.includes(t))) return STAGE_PRODUCT;
       // Respuesta ambigua → asumimos terminar.
       return STAGE_ADDRESS;
     }
 
     case STAGE_PRODUCT:
-      // Categoría no-seco: requerimiento de texto libre → observación (NOTES) y
-      // luego "¿necesitás algo más?" (NEED_MORE). No va a dirección directo.
-      return STAGE_NOTES;
+      // Flujo SIMPLE: el cliente escribe libremente qué necesita → lo anotamos
+      // como requerimiento y preguntamos si es todo o quiere agregar algo más.
+      return STAGE_NEED_MORE;
 
     case STAGE_AMOUNT:
     case STAGE_PROD_AMOUNT:
@@ -494,6 +494,8 @@ export function transitionAckFor(currentStage: string, answer: string): string |
       return "¡Bien! Falta poquito, ya terminamos 😊";
     case STAGE_NOTES:
       return "¡Perfecto, anotado! Falta poco, vamos cerrando 🐾";
+    case STAGE_PRODUCT:
+      return "¡Perfecto, lo anoto! 🐾";
     case STAGE_NEED_MORE: {
       const toks = a.replace(/[^\p{L}\p{N}]+/gu, " ").split(" ").filter(Boolean);
       const more = ["si","sí","otro","mas","más","more","dale","adicional"];
