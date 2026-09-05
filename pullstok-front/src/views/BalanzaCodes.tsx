@@ -4,6 +4,7 @@ import { Printer, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/atoms/loader";
 import { getBalanzaCodes, type BalanzaCode } from "@/services/priceKgPlan";
+import type { PriceKgSpecies } from "@/services/priceKgTypes";
 
 /**
  * Listado imprimible de códigos de balanza (celdas sueltas con scaleCode),
@@ -22,15 +23,24 @@ export const BalanzaCodes = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const byBrand = new Map<string, BalanzaCode[]>();
-  for (const it of items) {
-    const arr = byBrand.get(it.brand) ?? [];
-    arr.push(it);
-    byBrand.set(it.brand, arr);
-  }
-  const brands = [...byBrand.keys()].sort((a, b) =>
-    a.localeCompare(b, "es", { sensitivity: "base" }),
-  );
+  // Dos listas separadas por especie: Perro y Gato. Los productos "AMBOS"
+  // aplican a las dos (se incluyen en ambas para no perderlos de vista).
+  const sections: { title: string; match: (s: PriceKgSpecies) => boolean }[] = [
+    { title: "🐶 Perro", match: (s) => s === "PERRO" || s === "AMBOS" },
+    { title: "🐱 Gato", match: (s) => s === "GATO" || s === "AMBOS" },
+  ];
+
+  const groupByBrand = (list: BalanzaCode[]) => {
+    const byBrand = new Map<string, BalanzaCode[]>();
+    for (const it of list) {
+      const arr = byBrand.get(it.brand) ?? [];
+      arr.push(it);
+      byBrand.set(it.brand, arr);
+    }
+    return [...byBrand.keys()].sort((a, b) =>
+      a.localeCompare(b, "es", { sensitivity: "base" }),
+    );
+  };
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6">
@@ -63,41 +73,54 @@ export const BalanzaCodes = () => {
             <Loader />
           </div>
         ) : (
-          <div className="space-y-5">
-            {brands.length === 0 && (
+          <div className="space-y-6">
+            {items.length === 0 && (
               <p className="text-muted-foreground">No hay códigos de balanza cargados.</p>
             )}
-            {brands.map((brand) => {
-              const rows = (byBrand.get(brand) ?? [])
-                .slice()
-                .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+            {sections.map((section) => {
+              const sectionItems = items.filter((it) => section.match(it.species));
+              if (sectionItems.length === 0) return null;
+              const brands = groupByBrand(sectionItems);
               return (
-                <div key={brand}>
-                  <h2 className="mb-1 rounded bg-blue-50 px-2 py-1 font-semibold">
-                    {brand}
-                  </h2>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr>
-                        <th className="text-left font-medium text-muted-foreground">Código</th>
-                        <th className="text-left font-medium text-muted-foreground">Producto</th>
-                        <th className="text-right font-medium text-muted-foreground">Precio/kg</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((it) => (
-                        <tr key={it.code} className="border-b">
-                          <td className="py-1 pr-2 font-mono font-bold">{it.code}</td>
-                          <td>
-                            {it.brand} {it.type} {it.species}
-                          </td>
-                          <td className="py-1 text-right whitespace-nowrap">
-                            ${it.priceKg.toLocaleString("es-AR")}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div key={section.title} className="space-y-3">
+                  <h2 className="text-lg font-bold">{section.title}</h2>
+                  {brands.map((brand) => {
+                    const rows = sectionItems
+                      .filter((it) => it.brand === brand)
+                      .sort((a, b) =>
+                        a.code.localeCompare(b.code, undefined, { numeric: true }),
+                      );
+                    return (
+                      <div key={brand}>
+                        <h3 className="mb-1 rounded bg-blue-50 px-2 py-1 font-semibold">
+                          {brand}
+                        </h3>
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr>
+                              <th className="text-left font-medium text-muted-foreground">Código</th>
+                              <th className="text-left font-medium text-muted-foreground">Producto</th>
+                              <th className="text-right font-medium text-muted-foreground">Precio/kg</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map((it) => (
+                              <tr key={it.code} className="border-b">
+                                <td className="py-1 pr-2 font-mono font-bold">{it.code}</td>
+                                <td>
+                                  {it.type}
+                                  {it.species === "AMBOS" ? " (Ambos)" : ""}
+                                </td>
+                                <td className="py-1 text-right whitespace-nowrap">
+                                  ${it.priceKg.toLocaleString("es-AR")}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
