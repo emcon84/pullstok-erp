@@ -8,8 +8,9 @@ import type { PriceKgSpecies } from "@/services/priceKgTypes";
 
 /**
  * Listado imprimible de códigos de balanza (celdas sueltas con scaleCode),
- * agrupado por marca. Para que los vendedores lo tengan a mano e impriman
- * desde el sistema (Ctrl+P / botón Imprimir).
+ * separado en dos listas (Perro y Gato) con la descripción completa del
+ * producto (marca + especie + etapa). Para que los vendedores lo tengan a mano
+ * e impriman desde el sistema (Ctrl+P / botón Imprimir).
  */
 export const BalanzaCodes = () => {
   const navigate = useNavigate();
@@ -26,21 +27,12 @@ export const BalanzaCodes = () => {
   // Dos listas separadas por especie: Perro y Gato. Los productos "AMBOS"
   // aplican a las dos (se incluyen en ambas para no perderlos de vista).
   const sections: { title: string; match: (s: PriceKgSpecies) => boolean }[] = [
-    { title: "🐶 Perro", match: (s) => s === "PERRO" || s === "AMBOS" },
-    { title: "🐱 Gato", match: (s) => s === "GATO" || s === "AMBOS" },
+    { title: "🐶 PERRO", match: (s) => s === "PERRO" || s === "AMBOS" },
+    { title: "🐱 GATO", match: (s) => s === "GATO" || s === "AMBOS" },
   ];
 
-  const groupByBrand = (list: BalanzaCode[]) => {
-    const byBrand = new Map<string, BalanzaCode[]>();
-    for (const it of list) {
-      const arr = byBrand.get(it.brand) ?? [];
-      arr.push(it);
-      byBrand.set(it.brand, arr);
-    }
-    return [...byBrand.keys()].sort((a, b) =>
-      a.localeCompare(b, "es", { sensitivity: "base" }),
-    );
-  };
+  const speciesLabel = (s: PriceKgSpecies): string =>
+    s === "PERRO" ? "Perro" : s === "GATO" ? "Gato" : "Ambos";
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6">
@@ -78,49 +70,41 @@ export const BalanzaCodes = () => {
               <p className="text-muted-foreground">No hay códigos de balanza cargados.</p>
             )}
             {sections.map((section) => {
-              const sectionItems = items.filter((it) => section.match(it.species));
+              const sectionItems = items
+                .filter((it) => section.match(it.species))
+                .sort(
+                  (a, b) =>
+                    a.brand.localeCompare(b.brand, "es", { sensitivity: "base" }) ||
+                    a.code.localeCompare(b.code, undefined, { numeric: true }),
+                );
               if (sectionItems.length === 0) return null;
-              const brands = groupByBrand(sectionItems);
               return (
-                <div key={section.title} className="space-y-3">
-                  <h2 className="text-lg font-bold">{section.title}</h2>
-                  {brands.map((brand) => {
-                    const rows = sectionItems
-                      .filter((it) => it.brand === brand)
-                      .sort((a, b) =>
-                        a.code.localeCompare(b.code, undefined, { numeric: true }),
-                      );
-                    return (
-                      <div key={brand}>
-                        <h3 className="mb-1 rounded bg-blue-50 px-2 py-1 font-semibold">
-                          {brand}
-                        </h3>
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr>
-                              <th className="text-left font-medium text-muted-foreground">Código</th>
-                              <th className="text-left font-medium text-muted-foreground">Producto</th>
-                              <th className="text-right font-medium text-muted-foreground">Precio/kg</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rows.map((it) => (
-                              <tr key={it.code} className="border-b">
-                                <td className="py-1 pr-2 font-mono font-bold">{it.code}</td>
-                                <td>
-                                  {it.type}
-                                  {it.species === "AMBOS" ? " (Ambos)" : ""}
-                                </td>
-                                <td className="py-1 text-right whitespace-nowrap">
-                                  ${it.priceKg.toLocaleString("es-AR")}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    );
-                  })}
+                <div key={section.title} className="space-y-2">
+                  <h2 className="rounded-lg bg-primary px-4 py-2 text-2xl font-extrabold tracking-tight text-primary-foreground">
+                    {section.title}
+                  </h2>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th className="text-left font-medium text-muted-foreground">Código</th>
+                        <th className="text-left font-medium text-muted-foreground">Producto</th>
+                        <th className="text-right font-medium text-muted-foreground">Precio/kg</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sectionItems.map((it) => (
+                        <tr key={it.code} className="border-b">
+                          <td className="py-1 pr-2 font-mono font-bold">{it.code}</td>
+                          <td>
+                            {it.brand} {speciesLabel(it.species)} {it.type}
+                          </td>
+                          <td className="py-1 text-right whitespace-nowrap">
+                            ${it.priceKg.toLocaleString("es-AR")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               );
             })}
