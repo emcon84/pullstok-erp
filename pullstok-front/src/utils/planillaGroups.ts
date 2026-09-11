@@ -112,6 +112,60 @@ export const RAZAS_COLORS: Record<string, [number, number, number]> = {
   "RAZAS GRANDES": [14, 116, 144],
 };
 
+/** Especie de un producto (para no mezclar perros/gatos/medicados en la
+ * planilla). Prioridad: keywords del NOMBRE (más explícitas) → línea/sublínea de
+ * la sección → categoría. Los medicados/terapéuticos van primero y unifican
+ * VETERINARY FELINE + CANINE. */
+const VET_KEY = /\b(VETERINARY|HYPOALLERGENIC|ANALLERGENIC|RENAL|GASTRO|HEPATIC|URINARY|DIABETIC|CARDIAC|MOBILITY|SATIETY|RECOVERY|FIBRE|CALM|DERMATO|NEUTERED|MATURE|ALLERGENIC|WEIGHT CONTROL|THERAPY)\b/i;
+const DOG_KEY = /\b(PUPPY|CACHORRO|ADULT|ADULTO|SENIOR|DOG|PERRO|CANINE|FIT BODY|OVEJERO|LABRADOR|GOLDEN|BULLDOG|POODLE|CANICHE|YORKSHIRE|DACHSHUND|CHIHUAHUA|SCHNAUZER|PUG|BOXER|SIZE|MINI|MAXI|GIANT)\b/i;
+const CAT_KEY = /\b(KITTEN|GATITO|GATO|CAT|BABYCAT|FELINE|INDOOR|PERSIAN|SIAMESE|LONGHAIR|MOUSSE|POUCH|LATA)\b/i;
+
+export const speciesOf = (
+  name: string,
+  line: string | null | undefined,
+  subline: string | null | undefined,
+  categoryName?: string | null,
+): "PERRO" | "GATO" | "MEDICADOS" | "OTROS" => {
+  const n = (name ?? "").toUpperCase();
+  const l = (line ?? "").toUpperCase();
+  const s = (subline ?? "").toUpperCase();
+  const c = (categoryName ?? "").toUpperCase();
+  const section = `${l} ${s}`;
+  // Medicados/terapéuticos primero (marca la ganancia distinta); si el nombre o
+  // la línea lo dicen, es MEDICADOS aunque no traiga FELINE/CANINE en el name.
+  if (VET_KEY.test(n) || VET_KEY.test(section) || VET_KEY.test(c)) return "MEDICADOS";
+  // Perro (nombre más explícito que la línea: "EUKANUBA PUPPY" no dice PERRO
+  // pero sí PUPPY/ADULT/SENIOR).
+  if (DOG_KEY.test(n)) return "PERRO";
+  // Gato.
+  if (CAT_KEY.test(n)) return "GATO";
+  // Respaldo por línea/sublínea/categoría.
+  if (/FELINE|CAT|GATO|KITTEN|BABYCAT|LONGHAIR|POUCH|LATA|MOUSSE/.test(section) || /GATO|CAT|FELINE|KITTEN/.test(c)) return "GATO";
+  if (/CANINE|PERRO|DOG|PUPPY|CACHORRO|ADULT|SENIOR|FIT BODY|SIZE/.test(section) || /PERRO|DOG|CANINE/.test(c)) return "PERRO";
+  return "OTROS";
+};
+
+/** Gama/sublínea para la bandita bajo la especie. Unifica VETERINARY
+ * FELINE/CANINE en una sola "VETERINARY". */
+export const gamaOf = (
+  name: string,
+  line: string | null | undefined,
+): string => {
+  const lin = normalizeLine(line ?? null);
+  if (lin) {
+    if (/VETERINARY/i.test(lin)) return "VETERINARY";
+    return tallaOf(lin) || lin || "";
+  }
+  return tallaFromName(name) ?? "";
+};
+
+export const SPECIES_COLORS: Record<string, [number, number, number]> = {
+  PERRO: [17, 24, 39],
+  GATO: [126, 34, 206],
+  MEDICADOS: [146, 64, 14],
+  OTROS: [100, 116, 139],
+};
+
 export const BRAND_COLORS: Record<string, [number, number, number]> = {
   EUKANUBA: [16, 122, 87],
   "ROYAL CANIN": [157, 23, 77],
