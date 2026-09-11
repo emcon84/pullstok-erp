@@ -86,3 +86,90 @@ describe("parsePriceList — limpieza de nombres raros", () => {
     expect(rows[0].linea).toBe("VETERINARY FELINE");
   });
 });
+
+describe("parsePriceList — gama/tipo por sección (planilla mayorista)", () => {
+  // Reproduce la estructura de la planilla ROYAL CANIN (periodo 2026-08-18):
+  // secciones EUK (etapas, gama null → fallback a línea), secciones RC con
+  // gama de header, secciones RC sin header (gama derivada de la línea) y una
+  // línea basura "IVA)" que NO debe filtrarse a sublinea/tipo.
+  const planilla = [
+    "EUKANUBA",
+    "PUPPY",
+    "EUKANUBA PUPPY SMALL BREED X 3 KG\t20000\t$24200\t$",
+    "ADULT",
+    "EUKANUBA ADULT MEDIUM BREED X 15 KG\t35000\t$42350\t$",
+    "ROYAL CANIN",
+    "URINARY",
+    "3390102 URINARY SO FELINE WET POUCH (12X85G) X 1.02 KG\t1120\t$1355\t$",
+    "FELINE HEALTH NUTRITION",
+    "DERMATOLOGY",
+    "CW34H DERMATOLOGY POUCH (12X85G) X 1.02 KG\t10642\t$12877\t$",
+    "GASTROINTESTINAL",
+    "CW35H GASTROINTESTINAL POUCH (12X85G) X 1.02 KG\t11200\t$13552\t$",
+    "VITAL SUPPORT",
+    "CW36H VITAL SUPPORT POUCH (12X85G) X 1.02 KG\t12000\t$14520\t$",
+    "WEIGHT MANAGEMENT",
+    "3390110 WEIGHT MANAGEMENT FELINE X 3 KG\t20000\t$24200\t$",
+    "FELINE BREED NUTRITION",
+    "RAZAS PEQUEÑAS",
+    "CW55H RAZAS PEQUEÑAS X 3 KG\t18000\t$21780\t$",
+    "GATO",
+    "EUKANUBA GATOADULTO TOP CONDITION X 1.5 KG\t18426\t$22295\t$",
+    "IVA)",
+    "EUKANUBA GATOCACHORRO X 2 KG\t20000\t$24200\t$",
+  ].join("\n");
+
+  const rows = () => royalCanin(planilla).rows;
+
+  it("Eukanuba usa la etapa como fallback (gama/tipo null, no hereda RC)", () => {
+    const r = rows();
+    expect(r[0].marca).toBe("EUKANUBA");
+    expect(r[0].linea).toBe("PUPPY");
+    expect(r[0].gama).toBeNull();
+    expect(r[0].tipo).toBeNull();
+    expect(r[1].linea).toBe("ADULT");
+    expect(r[1].gama).toBeNull();
+    expect(r[1].tipo).toBeNull();
+  });
+
+  it("RC sin header de gama deriva la gama de la línea (URINARY → VETERINARY FELINE)", () => {
+    const r = rows();
+    const urinary = r.find((x) => x.tipo === "URINARY")!;
+    expect(urinary.marca).toBe("ROYAL CANIN");
+    expect(urinary.gama).toBe("VETERINARY FELINE");
+    expect(urinary.tipo).toBe("URINARY");
+  });
+
+  it("productos veterinarios NO quedan bajo el catch-all 'FELINE HEALTH NUTRITION'", () => {
+    const r = rows();
+    const vet = r.filter((x) => x.tipo === "DERMATOLOGY" || x.tipo === "GASTROINTESTINAL");
+    expect(vet).toHaveLength(2);
+    for (const x of vet) expect(x.gama).toBe("VETERINARY FELINE");
+    expect(vet[0].tipo).toBe("DERMATOLOGY");
+    expect(vet[1].tipo).toBe("GASTROINTESTINAL");
+  });
+
+  it("productos de salud nutricional conservan su gama 'FELINE HEALTH NUTRITION'", () => {
+    const r = rows();
+    const vital = r.find((x) => x.tipo === "VITAL SUPPORT")!;
+    const weight = r.find((x) => x.tipo === "WEIGHT MANAGEMENT")!;
+    expect(vital.gama).toBe("FELINE HEALTH NUTRITION");
+    expect(weight.gama).toBe("FELINE HEALTH NUTRITION");
+  });
+
+  it("productos de razas conservan su gama 'FELINE BREED NUTRITION'", () => {
+    const r = rows();
+    const razas = r.find((x) => x.tipo === "RAZAS PEQUEÑAS")!;
+    expect(razas.gama).toBe("FELINE BREED NUTRITION");
+    expect(razas.tipo).toBe("RAZAS PEQUEÑAS");
+  });
+
+  it("la línea basura 'IVA)' NO se filtra a sublinea/tipo", () => {
+    const r = rows();
+    const gatos = r.filter((x) => x.marca === "EUKANUBA" && x.linea === "EUKANUBA");
+    expect(gatos).toHaveLength(1);
+    expect(gatos[0].sublinea).toBeNull();
+    expect(gatos[0].tipo).toBeNull();
+    expect(r.some((x) => /IVA/.test(x.tipo ?? "") || /IVA/.test(x.sublinea ?? ""))).toBe(false);
+  });
+});

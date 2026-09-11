@@ -194,9 +194,9 @@ export function isNoiseLine(line: string): boolean {
   if (/MODALIDAD DE VENTA/i.test(t)) return true;
   if (/%/.test(t)) return true;
   if (/^PRECIOS\b/i.test(t)) return true;
-  if (/^(SIN IVA|CON IVA)$/i.test(t)) return true;
+  if (/^(SIN IVA|CON IVA)\)?$/i.test(t)) return true;
   if (/^SUGERIDO/i.test(t) || /^PÚBLICO/i.test(t) || /^PUBLICO/i.test(t)) return true;
-  if (/^(IVA|EMPAQUE|UNIDAD DE)\s*$/i.test(t)) return true;
+  if (/^(IVA|IVAB|EMPAQUE|UNIDAD DE)\)?\s*$/i.test(t)) return true;
   if (/^DESCRIPCIÓN|^DESCRIPCION/i.test(t)) return true;
   if (/^LÍNEA DE ALIMENTOS/i.test(t)) return true;
   return false;
@@ -745,19 +745,36 @@ export function parsePriceList(text: string, detected?: DetectedLayout): ParsedP
       // Es Royal Canin solo si la línea es una línea RC reconocida (FELINE,
       // CANINE, SIZE..., no el fallback). La marca EUKANUBA/marca extra va
       // primero por nombre.
+      const esEukanuba = /EUKANUBA/i.test(nombre);
       const esLineaRC =
         lineaInferida !== null && lineaInferida !== "ROYAL CANIN";
-      const marcaInferida = /EUKANUBA/i.test(nombre)
+      const marcaInferida = esEukanuba
         ? "EUKANUBA"
         : knownExtraBrand(nombre) || (esLineaRC ? "ROYAL CANIN" : null);
+
+      // Gama por sección, NO heredada entre secciones. EUK cae al fallback
+      // (línea). RC: una gama específica derivada del producto (VETERINARY /
+      // SIZE) tiene prioridad sobre un encabezado amplio que mezclaría gamas
+      // distintas (catch-all "FELINE HEALTH NUTRITION"); si no hay header
+      // explícito, cae a la línea inferida.
+      const gamaEspecifica = /^(VETERINARY|SIZE\b)/i.test(lineaInferida ?? "")
+        ? lineaInferida
+        : null;
+      const gama = esEukanuba
+        ? null
+        : parsed.gama ??
+          gamaEspecifica ??
+          currentGama ??
+          (esLineaRC ? lineaInferida : null);
+      const tipo = esEukanuba ? null : parsed.tipo ?? currentTipo;
 
       rows.push({
         nombre,
         marca: parsed.marca ?? marcaInferida,
         linea: lineaInferida,
         sublinea: currentSublinea,
-        gama: parsed.gama ?? currentGama,
-        tipo: parsed.tipo ?? currentTipo,
+        gama,
+        tipo,
         codigo: parsed.codigo,
         unidadEmpaque: extractUnit(nombre),
         precioSinIva: parsed.precioSinIva,
@@ -769,16 +786,29 @@ export function parsePriceList(text: string, detected?: DetectedLayout): ParsedP
     // Otherwise, treat as hierarchy / section marker (no prices, no code)
     if (line && !/^\d{5,}/.test(line)) {
       const upper = line.toUpperCase();
-      // GAMAs del Royal Canin (FELINE/CANINE/SIZE/VETERINARY) → línea
-      if (/(FELINE|CANINE|VETERINARY|SIZE HEALTH|HEALTH NUTRITION)/i.test(line) && !/^\d/.test(line)) {
-        currentLinea = line;
-        currentGama = line;
+      // Marca (EUKANUBA / ROYAL CANIN / extra) → reinicia la sección para que
+      // la gama/tipo del proveedor anterior no se herede a la siguiente marca.
+      if (/^(EUKANUBA|ROYAL CANIN)$/i.test(upper) || knownExtraBrand(line)) {
+        currentLinea = null;
+        currentGama = null;
+        currentTipo = null;
         currentSublinea = null;
         continue;
       }
-      // Etapas de Eukanuba (PUPPY/ADULT/SENIOR/FIT BODY) → línea
+      // GAMAs del Royal Canin (FELINE/CANINE/SIZE/VETERINARY) → nueva sección.
+      if (/(FELINE|CANINE|VETERINARY|SIZE HEALTH|HEALTH NUTRITION)/i.test(line) && !/^\d/.test(line)) {
+        currentLinea = line;
+        currentGama = line;
+        currentTipo = null;
+        currentSublinea = null;
+        continue;
+      }
+      // Etapas de Eukanuba (PUPPY/ADULT/SENIOR/FIT BODY) → nueva sección sin
+      // gama (fallback a línea) y sin heredar tipo de la sección anterior.
       if (/^(PUPPY|ADULT|ADULTO|SENIOR|FIT BODY|PREMIUM PERFORMANCE|LAMB|KITTEN|GATO)/i.test(upper)) {
         currentLinea = line;
+        currentGama = null;
+        currentTipo = null;
         currentSublinea = null;
         continue;
       }
