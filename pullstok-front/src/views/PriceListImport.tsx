@@ -312,6 +312,8 @@ export const PriceListImport = () => {
           marca: row.marca,
           linea: row.linea,
           sublinea: row.sublinea,
+          gama: row.gama,
+          tipo: row.tipo,
           unidadEmpaque: row.unidadEmpaque,
           precioSinIva: row.precioSinIva,
           precioConIva: row.precioConIva,

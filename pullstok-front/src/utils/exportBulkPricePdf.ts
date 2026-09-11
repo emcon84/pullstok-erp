@@ -71,19 +71,22 @@ const buildBody = (rows: BulkPricePreviewRow[]): (string | GroupRow)[][] => {
   const withGroups: RowWithGroups[] = rows
     .filter((r) => !isNonFood(r.name, null))
     .map((r) => {
+      const gama = (r.gama ?? "").trim();
+      const tipo = (r.tipo ?? "").trim();
       const sub = (r.subline ?? "").trim();
       const line = normalizeLine(r.line ?? null) ?? "";
       const isEtapa = /^(CACHORROS?|ADULTOS?|SENIOR)$/i.test(line);
       const group =
-        sub && (isEtapa || /^RAZAS/i.test(sub))
+        gama ||
+        (sub && (isEtapa || /^RAZAS/i.test(sub))
           ? `${sub} - ${line}`
-          : line || sub || brandOf(r);
+          : line || sub || brandOf(r));
       return {
         r,
         brand: brandOf(r),
         sub,
         group,
-        cat: sub || tallaOf(line) || tallaFromName(r.name) || "-",
+        cat: tipo || sub || tallaOf(line) || tallaFromName(r.name) || "-",
       };
     });
 

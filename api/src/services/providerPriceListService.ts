@@ -966,6 +966,8 @@ export interface PreviewRow {
   marca: string | null;
   linea: string | null;
   sublinea: string | null;
+  gama: string | null;
+  tipo: string | null;
   precioSinIva: number | null;
   precioConIva: number | null;
   sugerido: number | null; // round2(conIva × 1.3334); fallback 1.21; null si nada
@@ -1119,6 +1121,8 @@ export function matchRows(rows: ParsedRow[], index: CatalogIndex): PreviewRow[] 
       marca: row.marca,
       linea: row.linea,
       sublinea: row.sublinea,
+      gama: row.gama ?? null,
+      tipo: row.tipo ?? null,
       precioSinIva: row.precioSinIva,
       precioConIva: row.precioConIva,
       sugerido: computeSuggestedPrice(row.precioConIva, row.precioSinIva),

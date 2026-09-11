@@ -468,6 +468,8 @@ export interface BulkPricePreviewRow {
   brand?: string | null;
   line?: string | null;
   subline?: string | null;
+  gama?: string | null;
+  tipo?: string | null;
   oldPrice: number;
   newPrice: number;
   delta: number;

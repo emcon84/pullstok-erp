@@ -192,6 +192,8 @@ export interface PdfHierarchySection<T> {
   brand: string | null;
   line: string | null;
   subline: string | null;
+  gama?: string | null;
+  tipo?: string | null;
   position: number;
   entries: T[];
 }

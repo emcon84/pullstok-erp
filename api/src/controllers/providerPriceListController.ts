@@ -76,28 +76,36 @@ interface SectionGroup {
   brand: string | null;
   line: string | null;
   subline: string | null;
+  gama: string | null;
+  tipo: string | null;
   entries: ApplyDecision[];
 }
 
 /**
- * Agrupa las filas a importar por jerarquía DEL PDF (marca → línea → sublínea)
- * en orden de aparición: cada grupo es una PriceListSection. Sin jerarquía
- * (WET, D9) → una sola sección plana.
+ * Agrupa las filas a importar por jerarquía DEL PDF (marca → gama → tipo) en
+ * orden de aparición: cada grupo es una PriceListSection. Cuando el proveedor
+ * NO setea gama/tipo (ej. Eukanuba) cae al fallback (línea → sublínea) para no
+ * romper el agrupamiento legacy. Sin jerarquía (WET, D9) → una sola sección
+ * plana.
  */
 export function buildSections(rows: ApplyDecision[]): SectionGroup[] {
-  // Fusiona por (marca|línea|sublínea): el PDF repite grupos no consecutivos,
-  // y la versión anterior creaba una sección cada vez que cambiaba la clave →
+  // Fusiona por (marca|gama|tipo): el PDF repite grupos no consecutivos, y la
+  // versión anterior creaba una sección cada vez que cambiaba la clave →
   // "ROYAL CANIN · FELINE · RAZAS PEQUEÑAS" aparecía varias veces. Con el Map
   // por clave se consolida todo bajo UNA sección (orden de primera aparición).
   const byKey = new Map<string, SectionGroup>();
   for (const r of rows) {
-    const key = `${r.marca ?? ""}\u0000${r.linea ?? ""}\u0000${r.sublinea ?? ""}`;
+    const gama = r.gama ?? null;
+    const tipo = r.tipo ?? null;
+    const key = `${r.marca ?? ""}\u0000${gama ?? r.linea ?? ""}\u0000${tipo ?? r.sublinea ?? ""}`;
     let section = byKey.get(key);
     if (!section) {
       section = {
         brand: r.marca ?? null,
         line: r.linea ?? null,
         subline: r.sublinea ?? null,
+        gama,
+        tipo,
         entries: [],
       };
       byKey.set(key, section);
@@ -156,6 +164,8 @@ function defaultDecisions(preview: PreviewRow[]): ApplyDecision[] {
     marca: r.marca,
     linea: r.linea,
     sublinea: r.sublinea,
+    gama: r.gama,
+    tipo: r.tipo,
     unidadEmpaque: r.unidadEmpaque,
     precioSinIva: r.precioSinIva,
     precioConIva: r.precioConIva,
@@ -566,6 +576,8 @@ async function applyPriceListCore(
           brand: section.brand,
           line: section.line,
           subline: section.subline,
+          gama: section.gama ?? null,
+          tipo: section.tipo ?? null,
           position: sectionPosition++,
         },
       });
@@ -708,6 +720,8 @@ export const getPriceList = async (req: Request, res: Response) => {
         brand: s.brand,
         line: s.line,
         subline: s.subline,
+        gama: s.gama,
+        tipo: s.tipo,
         position: s.position,
         entries: s.entries.map((e) => ({
           id: e.id,

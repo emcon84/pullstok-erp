@@ -1499,7 +1499,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
       // entrada de planilla matcheada del producto.
       const sectionByProduct = new Map<
         string,
-        { brand: string | null; line: string | null; subline: string | null }
+        { brand: string | null; line: string | null; subline: string | null; gama: string | null; tipo: string | null }
       >();
       if (products.length > 0) {
         const entries = await prisma.priceListEntry.findMany({
@@ -1509,7 +1509,7 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
           },
           select: {
             productId: true,
-            section: { select: { brand: true, line: true, subline: true } },
+            section: { select: { brand: true, line: true, subline: true, gama: true, tipo: true } },
           },
         });
         for (const e of entries) {
@@ -1518,6 +1518,8 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
               brand: e.section.brand,
               line: e.section.line,
               subline: e.section.subline,
+              gama: e.section.gama,
+              tipo: e.section.tipo,
             });
           }
         }
@@ -1547,6 +1549,8 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
           brand: sec?.brand ?? null,
           line: sec?.line ?? null,
           subline: sec?.subline ?? null,
+          gama: sec?.gama ?? null,
+          tipo: sec?.tipo ?? null,
           oldPrice,
           newPrice,
           delta: Math.round((newPrice - oldPrice) * 100) / 100,

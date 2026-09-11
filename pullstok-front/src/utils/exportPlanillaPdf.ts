@@ -5,7 +5,7 @@
  */
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { PriceListDetail } from "@/services/priceLists";
+import type { PriceListDetail, PriceListEntryDetail } from "@/services/priceLists";
 import { groupByPdfHierarchy } from "@/lib/printGrouping";
 import orgLogoUrl from "@/assets/logo-horizontal-almacen.png";
 import {
@@ -83,40 +83,61 @@ const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
   const cols = 5;
   const body: (string | GroupRow)[][] = [];
 
-  const byBrand = new Map<string, typeof sections>();
+  const flat: { e: PriceListEntryDetail; brand: string; gama: string; tipo: string; line: string; sub: string }[] = [];
   for (const s of sections) {
     const brand = s.brand ?? "Sin marca";
-    if (!byBrand.has(brand)) byBrand.set(brand, []);
-    byBrand.get(brand)!.push(s);
+    const gama = (s.gama ?? "").trim();
+    const tipo = (s.tipo ?? "").trim();
+    const line = (s.line ?? "").trim();
+    const sub = (s.subline ?? "").trim();
+    for (const e of s.entries) {
+      if (isNonFood(e.name, e.unit)) continue;
+      flat.push({ e, brand, gama, tipo, line, sub });
+    }
   }
 
-  for (const [brand, brandSections] of byBrand) {
+  const byBrand = new Map<string, typeof flat>();
+  for (const it of flat) {
+    if (!byBrand.has(it.brand)) byBrand.set(it.brand, []);
+    byBrand.get(it.brand)!.push(it);
+  }
+
+  for (const [brand, list] of byBrand) {
     const bColor = BRAND_COLORS[brand.toUpperCase()] ?? [30, 41, 59];
     body.push([{ content: brand, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
 
-    for (const s of brandSections) {
-      const entries = s.entries.filter((e) => !isNonFood(e.name, e.unit));
-      if (entries.length === 0) continue;
-      const sub = (s.subline ?? "").trim();
-      const line = (s.line ?? "").trim();
-      // Rótulo de grupo: si la línea es una etapa (CACHORROS/ADULTOS/SENIOR) se
-      // combina "Razas X - Etapa"; si es una gama larga (Feline Health Nutrition)
-      // el grupo es la línea y la categoría va en la columna A.
-      const isEtapa = /^(CACHORROS?|ADULTOS?|SENIOR)$/i.test(line);
-      const group =
-        sub && (isEtapa || /^RAZAS/i.test(sub))
-          ? `${sub} - ${line}`
-          : line || sub || brand;
-      body.push([{ content: group, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
+    // UNA fila de grupo por GAMA (si hay) o por sección (line|sub) si no. Así la
+    // GAMA "Feline Veterinary Health Nutrition" sale UNA vez con todos sus tipos
+    // debajo, sin repetir el título.
+    const groups = new Map<string, { title: string; items: typeof flat }>();
+    for (const it of list) {
+      let key: string;
+      let title: string;
+      if (it.gama) {
+        key = it.gama;
+        title = it.gama;
+      } else {
+        key = `${it.brand}\u0000${it.line}\u0000${it.sub}`;
+        const isEtapa = /^(CACHORROS?|ADULTOS?|SENIOR)$/i.test(it.line);
+        title =
+          it.sub && (isEtapa || /^RAZAS/i.test(it.sub))
+            ? `${it.sub} - ${it.line}`
+            : it.line || it.sub || brand;
+      }
+      if (!groups.has(key)) groups.set(key, { title, items: [] });
+      groups.get(key)!.items.push(it);
+    }
 
-      for (const e of entries) {
-        const cat = sub || tallaOf(s.line) || "-";
+    for (const { title, items } of groups.values()) {
+      body.push([{ content: title, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
+      for (const it of items) {
+        const cat = it.tipo || it.sub || tallaOf(it.line) || "-";
         body.push([
           cat,
-          displayName(e.name, brand),
-          e.unit ?? "-",
-          formatPrice(precioMayorista(e.priceSinIva)),
-          formatPrice(publico(e.priceSinIva)),
+          displayName(it.e.name, brand),
+          it.e.unit ?? "-",
+          formatPrice(precioMayorista(it.e.priceSinIva)),
+          formatPrice(publico(it.e.priceSinIva)),
         ]);
       }
     }

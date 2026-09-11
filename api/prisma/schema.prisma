@@ -1268,6 +1268,8 @@ model PriceListSection {
   brand       String?          // marca DEL PDF (no la variante del sistema)
   line        String?          // ej. "SUPER PREMIUM PARA PERROS" (sin prefijo "LÍNEA")
   subline     String?          // ej. "SIEGER PUPPY"
+  gama        String?          // GAMA del proveedor (encabezado, ej. "Feline Veterinary Health Nutrition")
+  tipo        String?          // TIPO/categoría (ej. "Urinary Húmedo", "Growth", "Razas Pequeñas")
   position    Int              // orden de aparición en el PDF
   entries     PriceListEntry[]
 

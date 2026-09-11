@@ -21,6 +21,8 @@ export interface PreviewRow {
   marca: string | null;
   linea: string | null;
   sublinea: string | null;
+  gama?: string | null;
+  tipo?: string | null;
   precioSinIva: number | null;
   precioConIva: number | null;
   sugerido: number | null;
@@ -46,6 +48,8 @@ export interface ApplyDecision {
   marca?: string | null;
   linea?: string | null;
   sublinea?: string | null;
+  gama?: string | null;
+  tipo?: string | null;
   unidadEmpaque?: string | null;
   precioSinIva?: number | null;
   precioConIva?: number | null;
@@ -105,6 +109,8 @@ export interface PriceListSectionDetail {
   brand: string | null;
   line: string | null;
   subline: string | null;
+  gama?: string | null;
+  tipo?: string | null;
   position: number;
   entries: PriceListEntryDetail[];
 }
