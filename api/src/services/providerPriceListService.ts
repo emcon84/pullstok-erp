@@ -754,10 +754,10 @@ export function parsePriceList(text: string, detected?: DetectedLayout): ParsedP
 
       // Gama por sección, NO heredada entre secciones. EUK cae al fallback
       // (línea). RC: una gama específica derivada del producto (VETERINARY /
-      // SIZE) tiene prioridad sobre un encabezado amplio que mezclaría gamas
-      // distintas (catch-all "FELINE HEALTH NUTRITION"); si no hay header
-      // explícito, cae a la línea inferida.
-      const gamaEspecifica = /^(VETERINARY|SIZE\b)/i.test(lineaInferida ?? "")
+      // SIZE / CANINE) tiene prioridad sobre un encabezado amplio que mezclaría
+      // gamas/especies distintas (p. ej. perros CANINE bajo "FELINE HEALTH
+      // NUTRITION"); si no hay header explícito, cae a la línea inferida.
+      const gamaEspecifica = /^(VETERINARY|SIZE\b|CANINE\b)/i.test(lineaInferida ?? "")
         ? lineaInferida
         : null;
       const gama = esEukanuba
