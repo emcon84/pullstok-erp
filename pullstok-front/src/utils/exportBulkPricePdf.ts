@@ -16,6 +16,8 @@ import {
   tallaOf,
   tallaFromName,
   abbreviateCategoria,
+  subCategoryFromName,
+  gamaBySpecies,
   BRAND_COLORS,
 } from "./planillaGroups";
 
@@ -78,7 +80,7 @@ const buildBody = (rows: BulkPricePreviewRow[]): (string | GroupRow)[][] => {
       const line = normalizeLine(r.line ?? null) ?? "";
       const isEtapa = /^(CACHORROS?|ADULTOS?|SENIOR)$/i.test(line);
       const group =
-        gama ||
+        gamaBySpecies(gama, r.name) ||
         (sub && (isEtapa || /^RAZAS/i.test(sub))
           ? `${sub} - ${line}`
           : line || sub || brandOf(r));
@@ -87,7 +89,7 @@ const buildBody = (rows: BulkPricePreviewRow[]): (string | GroupRow)[][] => {
         brand: brandOf(r),
         sub,
         group,
-        cat: tipo || sub || tallaOf(line) || tallaFromName(r.name) || "-",
+        cat: subCategoryFromName(r.name) || tipo || sub || tallaOf(line) || tallaFromName(r.name) || "-",
       };
     });
 

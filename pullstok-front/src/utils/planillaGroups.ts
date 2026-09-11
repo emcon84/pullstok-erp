@@ -89,6 +89,65 @@ export const lineFromName = (nombre: string): string | null => {
   return null;
 };
 
+/** Especie (PERRO/GATO) derivada del NOMBRE del producto. Los keywords de
+ * Royal Canin (y afines) distinguen claramente la especie. Devuelve "" si no
+ * hay match o si hay ambos (ambiguo). */
+const CAT_SPECIES_KEYWORDS =
+  /\b(CAT|GATO|FELINE|KITTEN|BABYCAT|INDOOR|PERSIAN|SIAMESE|LONGHAIR|MOUSSE|POUCH|LATA)\b/i;
+const DOG_SPECIES_KEYWORDS =
+  /\b(PUPPY|DOG|CANINE|PERRO|CACHORRO|JACK RUSSELL|GOLDEN RETRIEVER|PUG|BULLDOG|CYNOTECHNIC|YORKSHIRE|DACHSHUND|CHIHUAHUA|POODLE|CANICHE|LABRADOR|BOXER|SCHNAUZER)\b/i;
+
+export const speciesOfName = (name: string): "PERRO" | "GATO" | "" => {
+  const n = (name ?? "").toUpperCase();
+  const cat = CAT_SPECIES_KEYWORDS.test(n);
+  const dog = DOG_SPECIES_KEYWORDS.test(n);
+  if (cat && dog) return "";
+  if (cat) return "GATO";
+  if (dog) return "PERRO";
+  return "";
+};
+
+/** Sub-categoría limpia derivada del NOMBRE (para la columna Categoría/Talla).
+ * Reemplaza el `tipo` genérico del parser (ej. "RAZAS PEQ") por la sub-categoría
+ * real del producto (Kitten/Indoor/Sensory/Húmedos...). Devuelve "" si no
+ * matchea. El orden importa: primero HÚMEDOS, luego etapas/razas. */
+const SUB_CATEGORY_RULES: [RegExp, string][] = [
+  [/\b(POUCH|LATA|WET|HÚMEDO|HUMEDO|MOUSSE)\b/i, "HÚMEDOS"],
+  [/\b(KITTEN|BABYCAT)\b/i, "KITTEN"],
+  [/\bINDOOR\b/i, "INDOOR"],
+  [/\bSENSORY\b/i, "SENSORY"],
+  [/\b(GROWTH|MOTHER|BABYCAT)\b/i, "GROWTH"],
+  [/\bFIT\b/i, "FIT"],
+  [/\b(X-SMALL|XSMALL|MINI)\b/i, "MINI"],
+  [/\bMEDIUM\b/i, "MEDIUM"],
+  [/\bMAXI\b/i, "MAXI"],
+  [/\bGIANT\b/i, "GIANT"],
+];
+
+export const subCategoryFromName = (name: string): string => {
+  const n = (name ?? "").toUpperCase();
+  for (const [re, cat] of SUB_CATEGORY_RULES) {
+    if (re.test(n)) return cat;
+  }
+  return "";
+};
+
+/** Corrige la GAMA según la especie derivada del nombre, para que los gatos no
+ * queden bajo una gama canina (y viceversa). Si el parser etiquetó mal, se
+ * normaliza a FELINE/CANINE (o VETERINARY FELINE/CANINE). */
+export const gamaBySpecies = (gama: string, name: string): string => {
+  const species = speciesOfName(name);
+  const g = (gama ?? "").trim().toUpperCase();
+  if (!species || !g) return gama ?? "";
+  if (species === "GATO" && /\bCANINE\b/.test(g)) {
+    return g === "VETERINARY CANINE" ? "VETERINARY FELINE" : "FELINE";
+  }
+  if (species === "PERRO" && /\bFELINE\b/.test(g)) {
+    return g === "VETERINARY FELINE" ? "VETERINARY CANINE" : "CANINE";
+  }
+  return gama ?? "";
+};
+
 /** Razas (Pequeñas/Medianas/Grandes) derivadas del nombre o sublínea. */
 export const razasOf = (nombre: string, subline: string | null): string | null => {
   const n = nombre.toUpperCase();

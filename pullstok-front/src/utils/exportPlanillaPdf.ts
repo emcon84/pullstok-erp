@@ -16,6 +16,8 @@ import {
   isNonFood,
   tallaOf,
   abbreviateCategoria,
+  subCategoryFromName,
+  gamaBySpecies,
   BRAND_COLORS,
 } from "./planillaGroups";
 
@@ -112,11 +114,12 @@ const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
     // debajo, sin repetir el título.
     const groups = new Map<string, { title: string; items: typeof flat }>();
     for (const it of list) {
+      const gama = gamaBySpecies(it.gama, it.e.name);
       let key: string;
       let title: string;
-      if (it.gama) {
-        key = it.gama;
-        title = it.gama;
+      if (gama) {
+        key = gama;
+        title = gama;
       } else {
         key = `${it.brand}\u0000${it.line}\u0000${it.sub}`;
         const isEtapa = /^(CACHORROS?|ADULTOS?|SENIOR)$/i.test(it.line);
@@ -132,7 +135,7 @@ const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
     for (const { title, items } of groups.values()) {
       body.push([{ content: title, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
       for (const it of items) {
-        const cat = it.tipo || it.sub || tallaOf(it.line) || "-";
+        const cat = subCategoryFromName(it.e.name) || it.tipo || it.sub || tallaOf(it.line) || "-";
         body.push([
           abbreviateCategoria(cat),
           displayName(it.e.name, brand),

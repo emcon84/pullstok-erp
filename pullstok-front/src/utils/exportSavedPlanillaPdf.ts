@@ -16,6 +16,8 @@ import {
   isNonFood,
   tallaFromName,
   abbreviateCategoria,
+  subCategoryFromName,
+  gamaBySpecies,
   BRAND_COLORS,
 } from "./planillaGroups";
 
@@ -62,9 +64,10 @@ const brandOf = (r: SavedPlanillaRow): string => {
   return raw === "Sin marca" ? "Sin marca" : raw.toUpperCase();
 };
 
-/** Categoría/Talla de una fila guardada: `tipo` del snapshot o talla del nombre. */
+/** Categoría/Talla de una fila guardada: sub-categoría del nombre, o `tipo`
+ * del snapshot, o talla del nombre. */
 const categoriaOf = (r: SavedPlanillaRow): string =>
-  (r.tipo ?? "").trim() || tallaFromName(r.name) || "-";
+  subCategoryFromName(r.name) || (r.tipo ?? "").trim() || tallaFromName(r.name) || "-";
 
 /**
  * Arma el body estilo planilla (formato Excel): marca → fila de grupo por
@@ -79,7 +82,7 @@ const buildBody = (rows: SavedPlanillaRow[], pricesLen: number): (string | Group
       const gama = (r.gama ?? "").trim();
       const tipo = (r.tipo ?? "").trim();
       const brand = brandOf(r);
-      const group = gama || tipo || brand;
+      const group = gamaBySpecies(gama, r.name) || tipo || brand;
       return { r, brand, group, cat: categoriaOf(r) };
     });
 
