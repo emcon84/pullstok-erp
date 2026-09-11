@@ -138,18 +138,25 @@ const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
 
       for (const { title, items } of groups.values()) {
         body.push([{ content: title, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
-        const sorted = [...items].sort(
-          (a, b) => weightKgOf(a.e.name) - weightKgOf(b.e.name) || a.e.name.localeCompare(b.e.name),
-        );
-        for (const it of sorted) {
+        const byCat = new Map<string, typeof items>();
+        for (const it of items) {
           const cat = subCategoryFromName(it.e.name) || it.tipo || it.sub || tallaOf(it.line) || "-";
-          body.push([
-            abbreviateCategoria(cat),
-            displayName(it.e.name, brand),
-            it.e.unit ?? "-",
-            formatPrice(precioMayorista(it.e.priceSinIva)),
-            formatPrice(publico(it.e.priceSinIva)),
-          ]);
+          if (!byCat.has(cat)) byCat.set(cat, []);
+          byCat.get(cat)!.push(it);
+        }
+        for (const cat of [...byCat.keys()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))) {
+          const sorted = [...byCat.get(cat)!].sort(
+            (a, b) => weightKgOf(a.e.name) - weightKgOf(b.e.name) || a.e.name.localeCompare(b.e.name),
+          );
+          for (const it of sorted) {
+            body.push([
+              abbreviateCategoria(cat),
+              displayName(it.e.name, brand),
+              it.e.unit ?? "-",
+              formatPrice(precioMayorista(it.e.priceSinIva)),
+              formatPrice(publico(it.e.priceSinIva)),
+            ]);
+          }
         }
       }
     }

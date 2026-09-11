@@ -113,7 +113,8 @@ const buildBody = (rows: SavedPlanillaRow[], pricesLen: number): (string | Group
           if (!byCat.has(p.cat)) byCat.set(p.cat, []);
           byCat.get(p.cat)!.push(p);
         }
-        for (const [cat, catItems] of byCat) {
+        for (const cat of [...byCat.keys()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))) {
+          const catItems = byCat.get(cat)!;
           const sorted = [...catItems].sort(
             (a, b) => weightKgOf(a.r.name) - weightKgOf(b.r.name) || a.r.name.localeCompare(b.r.name),
           );
