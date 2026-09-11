@@ -4,6 +4,7 @@ import {
   subCategoryFromName,
   weightKgOf,
   gamaBySpecies,
+  brandOrder,
 } from "@/utils/planillaGroups";
 
 describe("speciesOfName — especie derivada del nombre", () => {
@@ -101,5 +102,23 @@ describe("gamaBySpecies — corrección de gama según especie", () => {
     expect(gamaBySpecies("CANINE", "ROYAL CANIN PUPPY")).toBe("CANINE");
     expect(gamaBySpecies("", "ROYAL CANIN KITTEN")).toBe("");
     expect(gamaBySpecies("CANINE", "Producto Suelto")).toBe("CANINE");
+  });
+});
+
+describe("brandOrder — orden de marcas en la planilla impresa", () => {
+  it("pone ROYAL CANIN primero", () => {
+    expect(brandOrder("ROYAL CANIN")).toBe(0);
+    expect(brandOrder("royal canin")).toBe(0);
+  });
+
+  it("pone EUKANUBA al final", () => {
+    expect(brandOrder("EUKANUBA")).toBe(999);
+    expect(brandOrder("eukanuba")).toBe(999);
+  });
+
+  it("pone las demás marcas en el medio", () => {
+    expect(brandOrder("SIEGER")).toBe(100);
+    expect(brandOrder("MONKCAT")).toBe(100);
+    expect(brandOrder("")).toBe(100);
   });
 });

@@ -21,6 +21,7 @@ import {
   weightKgOf,
   gamaBySpecies,
   BRAND_COLORS,
+  brandOrder,
 } from "./planillaGroups";
 
 /** Carga un asset local como data URL + tamaño natural (para no deformar). */
@@ -90,58 +91,63 @@ const buildBody = (rows: SavedPlanillaRow[], pricesLen: number): (string | Group
 
   const body: (string | GroupRow)[][] = [];
 
-  const pushBlock = (label: string, list: RowWithGroups[]) => {
+  const pushBrandSubBlock = (label: string, list: RowWithGroups[]) => {
     if (list.length === 0) return;
     body.push([{ content: label, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 4 } }]);
-    const byBrand = new Map<string, RowWithGroups[]>();
+    const byGroup = new Map<string, RowWithGroups[]>();
     for (const p of list) {
-      if (!byBrand.has(p.brand)) byBrand.set(p.brand, []);
-      byBrand.get(p.brand)!.push(p);
+      if (!byGroup.has(p.group)) byGroup.set(p.group, []);
+      byGroup.get(p.group)!.push(p);
     }
-    for (const [brand, prods] of byBrand) {
-      const bColor = BRAND_COLORS[brand] ?? [30, 41, 59];
-      body.push([{ content: brand, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
-      const byGroup = new Map<string, RowWithGroups[]>();
-      for (const p of prods) {
-        if (!byGroup.has(p.group)) byGroup.set(p.group, []);
-        byGroup.get(p.group)!.push(p);
+    for (const [group, items] of byGroup) {
+      body.push([{ content: group, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
+      const byCat = new Map<string, RowWithGroups[]>();
+      for (const p of items) {
+        if (!byCat.has(p.cat)) byCat.set(p.cat, []);
+        byCat.get(p.cat)!.push(p);
       }
-      for (const [group, items] of byGroup) {
-        body.push([{ content: group, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
-        const byCat = new Map<string, RowWithGroups[]>();
-        for (const p of items) {
-          if (!byCat.has(p.cat)) byCat.set(p.cat, []);
-          byCat.get(p.cat)!.push(p);
-        }
-        for (const cat of [...byCat.keys()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))) {
-          const catItems = byCat.get(cat)!;
-          const sorted = [...catItems].sort(
-            (a, b) => weightKgOf(a.r.name) - weightKgOf(b.r.name) || a.r.name.localeCompare(b.r.name),
-          );
-          for (const p of sorted) {
-            if (pricesLen === 2) {
-              body.push([
-                abbreviateCategoria(cat),
-                displayName(p.r.name, p.brand),
-                p.r.unit ?? "-",
-                formatPrice(p.r.prices[0]),
-                formatPrice(p.r.prices[1]),
-              ]);
-            } else {
-              body.push([
-                abbreviateCategoria(cat),
-                displayName(p.r.name, p.brand),
-                formatPrice(p.r.prices[0]),
-              ]);
-            }
+      for (const cat of [...byCat.keys()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))) {
+        const catItems = byCat.get(cat)!;
+        const sorted = [...catItems].sort(
+          (a, b) => weightKgOf(a.r.name) - weightKgOf(b.r.name) || a.r.name.localeCompare(b.r.name),
+        );
+        for (const p of sorted) {
+          if (pricesLen === 2) {
+            body.push([
+              abbreviateCategoria(cat),
+              displayName(p.r.name, p.brand),
+              p.r.unit ?? "-",
+              formatPrice(p.r.prices[0]),
+              formatPrice(p.r.prices[1]),
+            ]);
+          } else {
+            body.push([
+              abbreviateCategoria(cat),
+              displayName(p.r.name, p.brand),
+              formatPrice(p.r.prices[0]),
+            ]);
           }
         }
       }
     }
   };
 
-  pushBlock("ALIMENTO SECO", withGroups.filter((p) => !esHumedito(p.r.name)));
-  pushBlock("ALIMENTO HÚMEDO", withGroups.filter((p) => esHumedito(p.r.name)));
+  // Marca primero (ROYAL CANIN, resto, EUKANUBA), y dentro de cada marca los
+  // sub-bloques SECO y HÚMEDO (solo si hay items de ese tipo).
+  const byBrand = new Map<string, RowWithGroups[]>();
+  for (const p of withGroups) {
+    if (!byBrand.has(p.brand)) byBrand.set(p.brand, []);
+    byBrand.get(p.brand)!.push(p);
+  }
+  for (const brand of [...byBrand.keys()].sort(
+    (a, b) => brandOrder(a) - brandOrder(b) || a.localeCompare(b, "es", { sensitivity: "base" }),
+  )) {
+    const prods = byBrand.get(brand)!;
+    const bColor = BRAND_COLORS[brand] ?? [30, 41, 59];
+    body.push([{ content: brand, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
+    pushBrandSubBlock("ALIMENTO SECO", prods.filter((p) => !esHumedito(p.r.name)));
+    pushBrandSubBlock("ALIMENTO HÚMEDO", prods.filter((p) => esHumedito(p.r.name)));
+  }
   return body;
 };
 

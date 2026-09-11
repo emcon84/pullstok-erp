@@ -21,6 +21,7 @@ import {
   weightKgOf,
   gamaBySpecies,
   BRAND_COLORS,
+  brandOrder,
 } from "./planillaGroups";
 
 /** Precio mayorista = sin IVA + 21% (IVA) + 15% de ganancia (todos). La base
@@ -101,69 +102,72 @@ const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
     }
   }
 
-  const pushBlock = (label: string, list: typeof flat) => {
+  const pushBrandSubBlock = (label: string, list: typeof flat) => {
     if (list.length === 0) return;
     body.push([{ content: label, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 4 } }]);
 
-    const byBrand = new Map<string, typeof flat>();
+    // UNA fila de grupo por GAMA (si hay) o por sección (line|sub) si no.
+    const groups = new Map<string, { title: string; items: typeof flat }>();
     for (const it of list) {
-      if (!byBrand.has(it.brand)) byBrand.set(it.brand, []);
-      byBrand.get(it.brand)!.push(it);
+      const gama = gamaBySpecies(it.gama, it.e.name);
+      let key: string;
+      let title: string;
+      if (gama) {
+        key = gama;
+        title = gama;
+      } else {
+        key = `${it.brand}\u0000${it.line}\u0000${it.sub}`;
+        const isEtapa = /^(CACHORROS?|ADULTOS?|SENIOR)$/i.test(it.line);
+        title =
+          it.sub && (isEtapa || /^RAZAS/i.test(it.sub))
+            ? `${it.sub} - ${it.line}`
+            : it.line || it.sub || it.brand;
+      }
+      if (!groups.has(key)) groups.set(key, { title, items: [] });
+      groups.get(key)!.items.push(it);
     }
 
-    for (const [brand, prods] of byBrand) {
-      const bColor = BRAND_COLORS[brand.toUpperCase()] ?? [30, 41, 59];
-      body.push([{ content: brand, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
-
-      // UNA fila de grupo por GAMA (si hay) o por sección (line|sub) si no.
-      const groups = new Map<string, { title: string; items: typeof flat }>();
-      for (const it of prods) {
-        const gama = gamaBySpecies(it.gama, it.e.name);
-        let key: string;
-        let title: string;
-        if (gama) {
-          key = gama;
-          title = gama;
-        } else {
-          key = `${it.brand}\u0000${it.line}\u0000${it.sub}`;
-          const isEtapa = /^(CACHORROS?|ADULTOS?|SENIOR)$/i.test(it.line);
-          title =
-            it.sub && (isEtapa || /^RAZAS/i.test(it.sub))
-              ? `${it.sub} - ${it.line}`
-              : it.line || it.sub || brand;
-        }
-        if (!groups.has(key)) groups.set(key, { title, items: [] });
-        groups.get(key)!.items.push(it);
+    for (const { title, items } of groups.values()) {
+      body.push([{ content: title, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
+      const byCat = new Map<string, typeof items>();
+      for (const it of items) {
+        const cat = subCategoryFromName(it.e.name) || it.tipo || it.sub || tallaOf(it.line) || "-";
+        if (!byCat.has(cat)) byCat.set(cat, []);
+        byCat.get(cat)!.push(it);
       }
-
-      for (const { title, items } of groups.values()) {
-        body.push([{ content: title, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
-        const byCat = new Map<string, typeof items>();
-        for (const it of items) {
-          const cat = subCategoryFromName(it.e.name) || it.tipo || it.sub || tallaOf(it.line) || "-";
-          if (!byCat.has(cat)) byCat.set(cat, []);
-          byCat.get(cat)!.push(it);
-        }
-        for (const cat of [...byCat.keys()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))) {
-          const sorted = [...byCat.get(cat)!].sort(
-            (a, b) => weightKgOf(a.e.name) - weightKgOf(b.e.name) || a.e.name.localeCompare(b.e.name),
-          );
-          for (const it of sorted) {
-            body.push([
-              abbreviateCategoria(cat),
-              displayName(it.e.name, brand),
-              it.e.unit ?? "-",
-              formatPrice(precioMayorista(it.e.priceSinIva)),
-              formatPrice(publico(it.e.priceSinIva)),
-            ]);
-          }
+      for (const cat of [...byCat.keys()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))) {
+        const sorted = [...byCat.get(cat)!].sort(
+          (a, b) => weightKgOf(a.e.name) - weightKgOf(b.e.name) || a.e.name.localeCompare(b.e.name),
+        );
+        for (const it of sorted) {
+          body.push([
+            abbreviateCategoria(cat),
+            displayName(it.e.name, it.brand),
+            it.e.unit ?? "-",
+            formatPrice(precioMayorista(it.e.priceSinIva)),
+            formatPrice(publico(it.e.priceSinIva)),
+          ]);
         }
       }
     }
   };
 
-  pushBlock("ALIMENTO SECO", flat.filter((it) => !esHumedito(it.e.name)));
-  pushBlock("ALIMENTO HÚMEDO", flat.filter((it) => esHumedito(it.e.name)));
+  // Marca primero (ROYAL CANIN, resto, EUKANUBA), y dentro de cada marca los
+  // sub-bloques SECO y HÚMEDO (solo si hay items de ese tipo).
+  const byBrand = new Map<string, typeof flat>();
+  for (const it of flat) {
+    if (!byBrand.has(it.brand)) byBrand.set(it.brand, []);
+    byBrand.get(it.brand)!.push(it);
+  }
+  for (const brand of [...byBrand.keys()].sort(
+    (a, b) => brandOrder(a) - brandOrder(b) || a.localeCompare(b, "es", { sensitivity: "base" }),
+  )) {
+    const prods = byBrand.get(brand)!;
+    const bColor = BRAND_COLORS[brand.toUpperCase()] ?? [30, 41, 59];
+    body.push([{ content: brand, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
+    pushBrandSubBlock("ALIMENTO SECO", prods.filter((it) => !esHumedito(it.e.name)));
+    pushBrandSubBlock("ALIMENTO HÚMEDO", prods.filter((it) => esHumedito(it.e.name)));
+  }
   return body;
 };
 

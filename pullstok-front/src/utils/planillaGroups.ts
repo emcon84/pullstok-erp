@@ -240,3 +240,12 @@ export const BRAND_COLORS: Record<string, [number, number, number]> = {
   WIPUP: [2, 132, 199],
   ASADITOS: [190, 24, 93],
 };
+
+/** Orden de marcas en la planilla impresa: ROYAL CANIN primero, las demás en
+ * el medio (orden de primera aparición), EUKANUBA al final. */
+export const brandOrder = (brand: string): number => {
+  const b = (brand ?? "").toUpperCase();
+  if (b === "ROYAL CANIN") return 0;
+  if (b === "EUKANUBA") return 999;
+  return 100;
+};
