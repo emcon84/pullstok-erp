@@ -38,6 +38,7 @@ import landingChatRoutes from "./landingChatRoutes";
 import whatsappRoutes from "./whatsappRoutes";
 import whatsappOrderRoutes from "./whatsappOrderRoutes";
 import moduleRoutes from "./moduleRoutes";
+import savedPlanillaRoutes from "./savedPlanillaRoutes";
 
 const router = Router();
 
@@ -85,6 +86,7 @@ router.use("/whatsapp", whatsappRoutes);
 // Borradores de pedido de WhatsApp (FASE 3): autenticado, los usa el ERP.
 router.use("/whatsapp-orders", whatsappOrderRoutes);
 router.use("/modules", moduleRoutes);
+router.use("/saved-planillas", savedPlanillaRoutes);
 router.use("/", arcaRoutes);
 
 export default router;

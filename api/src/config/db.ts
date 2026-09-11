@@ -57,6 +57,10 @@ const TENANT_MODELS = new Set([
   // (organizationId). Mismo patrón multi-tenant: findFirst / updateMany (nunca
   // findUnique/update) → scope org automático anti-fuga.
   "WhatsAppOrderDraft",
+  // Planillas guardadas por el usuario (saved planillas). Tenant-scoped
+  // (organizationId). Mismo patrón multi-tenant: findFirst / updateMany /
+  // deleteMany (nunca findUnique/update/delete) → scope org automático anti-fuga.
+  "SavedPlanilla",
 ]);
 
 /**

@@ -28,6 +28,7 @@ import {
 import { CategoryTreePickerMulti } from "@/components/molecules/CategoryTreePickerMulti";
 import { CategoryOverridesPanel } from "@/components/molecules/CategoryOverridesPanel";
 import { exportBulkPricePdf } from "@/utils/exportBulkPricePdf";
+import { savePlanilla, type SavedPlanillaRow } from "@/services/savedPlanillas";
 import {
   Select,
   SelectContent,
@@ -503,6 +504,34 @@ export const BulkPriceUpdate = () => {
     }
   };
 
+  // Guarda la planilla (vista previa COMPLETA) como snapshot reabrible desde
+  // otro dispositivo. Para ACTUALIZACION cada fila lleva prices = [newPrice].
+  const handleSavePlanilla = async () => {
+    const p = payload();
+    if (!p) return;
+    setSubmitting(true);
+    try {
+      const data = await bulkPriceUpdate(p, true, 1, true);
+      const rows = (data as BulkPricePreview).rows;
+      const savedRows: SavedPlanillaRow[] = rows.map((r) => ({
+        brand: r.brand?.trim() || r.brandValues?.join(", ") || "Sin marca",
+        gama: r.gama ?? null,
+        tipo: r.tipo ?? null,
+        name: r.name,
+        unit: null,
+        prices: [r.newPrice],
+      }));
+      const title = `Actualización de precios · ${new Date().toLocaleDateString("es-AR")}`;
+      await savePlanilla({ type: "ACTUALIZACION", title, rows: savedRows });
+      toast.success("Planilla guardada");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al guardar la planilla";
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const pct = parseFloat(percentage);
   const isNegative = !Number.isNaN(pct) && pct < 0;
   const hasMore = preview
@@ -855,14 +884,24 @@ export const BulkPriceUpdate = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Vista previa</CardTitle>
               {preview && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={submitting}
-                  onClick={handlePrint}
-                >
-                  Imprimir listado
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={submitting}
+                    onClick={handleSavePlanilla}
+                  >
+                    Guardar planilla
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={submitting}
+                    onClick={handlePrint}
+                  >
+                    Imprimir listado
+                  </Button>
+                </div>
               )}
             </div>
           </CardHeader>

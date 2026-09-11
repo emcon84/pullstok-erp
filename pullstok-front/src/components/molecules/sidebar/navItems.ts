@@ -26,6 +26,7 @@ import {
   PackageOpen,
   Wallet,
   MessageCircle,
+  Save,
 } from "lucide-react";
 import { PLAN_LIMITS, type Plan } from "@/constants/planLimits";
 import type { Role } from "@/constants/rolePermissions";
@@ -57,6 +58,7 @@ export const navGroups: NavGroup[] = [
       { to: "/revision-precios-kg", label: "Revisión precios kg", icon: ClipboardCheck, moduleKey: "suelto", visibleRoles: ["ADMIN"] },
       { to: "/stock-suelto", label: "Stock suelto", icon: PackageOpen, moduleKey: "suelto", visibleRoles: ["ADMIN", "MANAGEMENT"] },
       { to: "/planilla-mayorista", label: "Planilla mayorista", icon: FileSpreadsheet, moduleKey: "suelto", visibleRoles: ["ADMIN", "SUPERADMIN"] },
+      { to: "/saved-planillas", label: "Planillas guardadas", icon: Save, moduleKey: "suelto", visibleRoles: ["ADMIN", "SUPERADMIN"] },
     ],
   },
   {

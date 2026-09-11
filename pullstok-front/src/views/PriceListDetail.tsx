@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { exportPlanillaPdf } from "@/utils/exportPlanillaPdf";
+import { savePlanilla, type SavedPlanillaRow } from "@/services/savedPlanillas";
 import { groupByPdfHierarchy } from "@/lib/printGrouping";
 import {
   adjustPriceList,
@@ -48,6 +49,17 @@ const formatPrice = (n: number | null | undefined) =>
 const precioMayorista = (sinIva: number | null | undefined): number | null => {
   if (sinIva == null) return null;
   const bruto = Math.round(sinIva * 1.21 * 1.15 * 100) / 100;
+  return bruto >= 500 ? Math.round(bruto / 100) * 100 : bruto;
+};
+
+/** Margen al público: el Sugerido se deriva del Precio mayorista × 1.3334
+ * (mismo factor que exportPlanillaPdf). */
+const SUGERIDO_FACTOR = 1.3334;
+const publico = (sinIva: number | null | undefined): number | null => {
+  if (sinIva == null) return null;
+  const mayorista = precioMayorista(sinIva);
+  if (mayorista == null) return null;
+  const bruto = Math.round(mayorista * SUGERIDO_FACTOR * 100) / 100;
   return bruto >= 500 ? Math.round(bruto / 100) * 100 : bruto;
 };
 
@@ -148,6 +160,40 @@ export const PriceListDetail = () => {
     });
   };
 
+  // Guarda la planilla mayorista como snapshot reabrible desde otro dispositivo.
+  // Cada fila lleva prices = [precioMayorista(sinIva), publico(sinIva)].
+  const handleSavePlanilla = async () => {
+    if (!plan) return;
+    setSubmitting(true);
+    try {
+      const rows: SavedPlanillaRow[] = [];
+      for (const s of plan.sections) {
+        const brand = s.brand ?? null;
+        const gama = s.gama ?? null;
+        const tipo = s.tipo ?? null;
+        for (const e of s.entries) {
+          const pMay = precioMayorista(e.priceSinIva);
+          const pPub = publico(e.priceSinIva);
+          rows.push({
+            brand,
+            gama,
+            tipo,
+            name: e.name,
+            unit: e.unit ?? null,
+            prices: [pMay ?? 0, pPub ?? 0],
+          });
+        }
+      }
+      const title = `Planilla mayorista · ${plan.type} · ${plan.period ?? new Date().toLocaleDateString("es-AR")}`;
+      await savePlanilla({ type: "MAYORISTA", title, rows });
+      toast.success("Planilla guardada");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar la planilla");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading && !plan) {
     return <div className="p-6 text-muted-foreground">Cargando planilla…</div>;
   }
@@ -173,24 +219,33 @@ export const PriceListDetail = () => {
             importada el {formatDate(plan.importedAt)} · {plan.sourceFilename}
           </p>
         </div>
-        <Button
-          variant="outline"
-          disabled={submitting}
-          onClick={async () => {
-            setSubmitting(true);
-            try {
-              const name = await exportPlanillaPdf(plan);
-              if (name) toast.success("PDF descargado");
-            } catch (e) {
-              const m = e instanceof Error ? e.message : "Error al generar el PDF";
-              toast.error(m);
-            } finally {
-              setSubmitting(false);
-            }
-          }}
-        >
-          Descargar PDF
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            disabled={submitting}
+            onClick={handleSavePlanilla}
+          >
+            Guardar planilla
+          </Button>
+          <Button
+            variant="outline"
+            disabled={submitting}
+            onClick={async () => {
+              setSubmitting(true);
+              try {
+                const name = await exportPlanillaPdf(plan);
+                if (name) toast.success("PDF descargado");
+              } catch (e) {
+                const m = e instanceof Error ? e.message : "Error al generar el PDF";
+                toast.error(m);
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+          >
+            Descargar PDF
+          </Button>
+        </div>
       </div>
 
       {/* Jerarquía del PDF: marca → línea → sublínea → tabla */}

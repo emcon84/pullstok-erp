@@ -28,6 +28,16 @@ vi.mock("@/utils/exportBulkPricePdf", () => ({
   exportBulkPricePdf: vi.fn().mockResolvedValue("actualizacion_precios.pdf"),
 }));
 
+vi.mock("@/services/savedPlanillas", () => ({
+  savePlanilla: vi.fn().mockResolvedValue({
+    id: "sp-1",
+    type: "ACTUALIZACION",
+    title: "Actualización de precios",
+    rows: [],
+    createdAt: "2026-09-11T00:00:00.000Z",
+  }),
+}));
+
 import { BulkPriceUpdate } from "@/views/BulkPriceUpdate";
 import { bulkPriceUpdate } from "@/services/productService";
 import { exportBulkPricePdf } from "@/utils/exportBulkPricePdf";

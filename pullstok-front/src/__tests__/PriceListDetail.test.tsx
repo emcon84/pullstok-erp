@@ -25,6 +25,16 @@ vi.mock("@/utils/exportPlanillaPdf", () => ({
   exportPlanillaPdf: vi.fn().mockResolvedValue("planilla_mayorista.pdf"),
 }));
 
+vi.mock("@/services/savedPlanillas", () => ({
+  savePlanilla: vi.fn().mockResolvedValue({
+    id: "sp-1",
+    type: "MAYORISTA",
+    title: "Planilla mayorista",
+    rows: [],
+    createdAt: "2026-09-11T00:00:00.000Z",
+  }),
+}));
+
 import { PriceListDetail } from "@/views/PriceListDetail";
 import { getPriceList, adjustPriceList } from "@/services/priceLists";
 import { exportPlanillaPdf } from "@/utils/exportPlanillaPdf";

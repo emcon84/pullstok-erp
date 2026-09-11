@@ -1227,3 +1227,27 @@ export const updateModulesSchema = z
     modules: z.array(z.string(), "modules debe ser un array de strings"),
   })
   .strict();
+
+// ---------- Planillas guardadas (saved planillas) ----------
+// Body del POST /saved-planillas: snapshot inmutable de la planilla mayorista o
+// de la vista previa de actualización de precios. `type` es la variante
+// ("MAYORISTA" | "ACTUALIZACION"), `rows` es el snapshot genérico de filas
+// ({ brand, gama, tipo, name, unit, prices }).
+export const savePlanillaSchema = z
+  .object({
+    type: z.enum(["MAYORISTA", "ACTUALIZACION"]),
+    title: z.string().trim().min(1, "El título es requerido"),
+    rows: z
+      .array(
+        z.object({
+          brand: z.string().nullable().optional(),
+          gama: z.string().nullable().optional(),
+          tipo: z.string().nullable().optional(),
+          name: z.string().min(1, "El nombre de la fila es requerido"),
+          unit: z.string().nullable().optional(),
+          prices: z.array(z.number()).min(1, "Debe haber al menos un precio"),
+        }),
+      )
+      .min(1, "Debe enviar al menos una fila"),
+  })
+  .strip();

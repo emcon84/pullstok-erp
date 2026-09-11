@@ -1298,3 +1298,22 @@ model PriceListEntry {
   @@index([sectionId, position])
   @@map("price_list_entries")
 }
+
+// Planilla guardada por el usuario (saved planillas). Snapshot inmutable de la
+// planilla mayorista o de la vista previa de actualización de precios, para
+// poder reabrirla/imprimirla desde otro dispositivo. Tenant-scoped
+// (organizationId) y en TENANT_MODELS (db.ts) → scope org automático anti-fuga
+// (findFirst / updateMany / deleteMany, nunca findUnique/update/delete).
+// `type`: "MAYORISTA" | "ACTUALIZACION". `rows` es un snapshot JSON de las
+// filas ({ brand, gama, tipo, name, unit, prices }).
+model SavedPlanilla {
+  id             String   @id @default(uuid())
+  organizationId String
+  type           String
+  title          String
+  rows           Json
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@map("saved_planillas")
+}
