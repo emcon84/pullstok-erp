@@ -15,10 +15,8 @@ import {
   normalizeLine,
   displayName,
   isNonFood,
-  speciesOf,
-  gamaOf,
+  tallaOf,
   razasOf,
-  SPECIES_COLORS,
   TALLA_COLORS,
   RAZAS_COLORS,
   BRAND_COLORS,
@@ -105,8 +103,7 @@ const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
       s.entries.map((e) => ({
         e,
         brand: s.brand ?? "Sin marca",
-        species: speciesOf(e.name, s.line, s.subline),
-        gama: gamaOf(e.name, s.line),
+        talla: tallaOf(s.line),
         razas: razasOf(e.name, s.subline),
       })),
     );
@@ -120,42 +117,32 @@ const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
     for (const [brand, prods] of byBrand) {
       const bColor = BRAND_COLORS[brand.toUpperCase()] ?? [30, 41, 59];
       body.push([{ content: brand, colSpan: 4, styles: { fontSize: 10.5, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
-      const bySpecies = new Map<string, typeof prods>();
+      const byTalla = new Map<string, typeof prods>();
       for (const p of prods) {
-        if (!bySpecies.has(p.species)) bySpecies.set(p.species, []);
-        bySpecies.get(p.species)!.push(p);
+        if (!byTalla.has(p.talla)) byTalla.set(p.talla, []);
+        byTalla.get(p.talla)!.push(p);
       }
-      for (const [species, sp] of bySpecies) {
-        const spColor = SPECIES_COLORS[species] ?? [100, 116, 139];
-        body.push([{ content: species, colSpan: 4, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: spColor, textColor: [255, 255, 255], cellPadding: 3.5 } }]);
-        const byGama = new Map<string, typeof sp>();
-        for (const p of sp) {
-          const k = p.gama || species;
-          if (!byGama.has(k)) byGama.set(k, []);
-          byGama.get(k)!.push(p);
+      for (const [talla, tp] of byTalla) {
+        const tColor = TALLA_COLORS[talla] ?? [30, 41, 59];
+        body.push([{ content: talla || brand, colSpan: 4, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: tColor, textColor: [255, 255, 255], cellPadding: 3.5 } }]);
+        const byRazas = new Map<string | null, typeof tp>();
+        for (const p of tp) {
+          const k = p.razas;
+          if (!byRazas.has(k)) byRazas.set(k, []);
+          byRazas.get(k)!.push(p);
         }
-        for (const [gama, gp] of byGama) {
-          const gColor = TALLA_COLORS[gama] ?? [30, 41, 59];
-          body.push([{ content: gama, colSpan: 4, styles: { fontSize: 8.5, fontStyle: "bold", fillColor: gColor, textColor: [255, 255, 255], cellPadding: 3 } }]);
-          const byRazas = new Map<string | null, typeof gp>();
-          for (const p of gp) {
-            const k = p.razas;
-            if (!byRazas.has(k)) byRazas.set(k, []);
-            byRazas.get(k)!.push(p);
+        for (const [razas, rp] of byRazas) {
+          if (razas) {
+            const rColor = RAZAS_COLORS[razas] ?? [100, 116, 139];
+            body.push([{ content: razas, colSpan: 4, styles: { fontSize: 8.5, fontStyle: "bold", fillColor: rColor, textColor: [255, 255, 255], cellPadding: 3 } }]);
           }
-          for (const [razas, rp] of byRazas) {
-            if (razas) {
-              const rColor = RAZAS_COLORS[razas] ?? [100, 116, 139];
-              body.push([{ content: razas, colSpan: 4, styles: { fontSize: 8, fontStyle: "bold", fillColor: rColor, textColor: [255, 255, 255], cellPadding: 2.8 } }]);
-            }
-            for (const p of rp) {
-              body.push([
-                displayName(p.e.name, p.brand),
-                p.e.unit ?? "-",
-                formatPrice(precioMayorista(p.e.priceSinIva)),
-                formatPrice(publico(p.e.priceSinIva)),
-              ] as unknown as GroupRow[]);
-            }
+          for (const p of rp) {
+            body.push([
+              displayName(p.e.name, p.brand),
+              p.e.unit ?? "-",
+              formatPrice(precioMayorista(p.e.priceSinIva)),
+              formatPrice(publico(p.e.priceSinIva)),
+            ] as unknown as GroupRow[]);
           }
         }
       }
