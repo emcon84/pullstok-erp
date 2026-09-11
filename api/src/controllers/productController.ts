@@ -1507,6 +1507,10 @@ export const bulkPriceUpdate = async (req: Request, res: Response) => {
             productId: { in: products.map((p) => p.id) },
             section: { priceList: { organizationId } },
           },
+          // Preferir la sección de la planilla MÁS RECIENTE (la reimportada, que
+          // ya trae gama/tipo); si el producto está en varias planillas, la
+          // primera por fecha es la vigente.
+          orderBy: { section: { priceList: { importedAt: "desc" } } },
           select: {
             productId: true,
             section: { select: { brand: true, line: true, subline: true, gama: true, tipo: true } },
