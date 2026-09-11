@@ -12,6 +12,7 @@ import {
   formatPrice,
   displayName,
   isNonFood,
+  esHumedito,
   normalizeLine,
   tallaOf,
   tallaFromName,
@@ -96,39 +97,44 @@ const buildBody = (rows: BulkPricePreviewRow[]): (string | GroupRow)[][] => {
   const body: (string | GroupRow)[][] = [];
   const cols = 3;
 
-  const byBrand = new Map<string, RowWithGroups[]>();
-  for (const p of withGroups) {
-    if (!byBrand.has(p.brand)) byBrand.set(p.brand, []);
-    byBrand.get(p.brand)!.push(p);
-  }
-  for (const [brand, prods] of byBrand) {
-    const bColor = BRAND_COLORS[brand] ?? [30, 41, 59];
-    body.push([{ content: brand, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
-    const byGroup = new Map<string, RowWithGroups[]>();
-    for (const p of prods) {
-      if (!byGroup.has(p.group)) byGroup.set(p.group, []);
-      byGroup.get(p.group)!.push(p);
+  const pushBlock = (label: string, list: RowWithGroups[]) => {
+    if (list.length === 0) return;
+    body.push([{ content: label, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 4 } }]);
+    const byBrand = new Map<string, RowWithGroups[]>();
+    for (const p of list) {
+      if (!byBrand.has(p.brand)) byBrand.set(p.brand, []);
+      byBrand.get(p.brand)!.push(p);
     }
-    for (const [group, items] of byGroup) {
-      body.push([{ content: group, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
-      // Dentro de cada gama, agrupar por Categoría/Talla para que los tipos
-      // salgan juntos y ordenados (no intercalados).
-      const byCat = new Map<string, RowWithGroups[]>();
-      for (const p of items) {
-        if (!byCat.has(p.cat)) byCat.set(p.cat, []);
-        byCat.get(p.cat)!.push(p);
+    for (const [brand, prods] of byBrand) {
+      const bColor = BRAND_COLORS[brand] ?? [30, 41, 59];
+      body.push([{ content: brand, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
+      const byGroup = new Map<string, RowWithGroups[]>();
+      for (const p of prods) {
+        if (!byGroup.has(p.group)) byGroup.set(p.group, []);
+        byGroup.get(p.group)!.push(p);
       }
-      for (const [cat, catItems] of byCat) {
-        for (const p of catItems) {
-          body.push([
-            abbreviateCategoria(cat),
-            displayName(p.r.name, p.brand),
-            formatPrice(p.r.newPrice),
-          ]);
+      for (const [group, items] of byGroup) {
+        body.push([{ content: group, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
+        const byCat = new Map<string, RowWithGroups[]>();
+        for (const p of items) {
+          if (!byCat.has(p.cat)) byCat.set(p.cat, []);
+          byCat.get(p.cat)!.push(p);
+        }
+        for (const [cat, catItems] of byCat) {
+          for (const p of catItems) {
+            body.push([
+              abbreviateCategoria(cat),
+              displayName(p.r.name, p.brand),
+              formatPrice(p.r.newPrice),
+            ]);
+          }
         }
       }
     }
-  }
+  };
+
+  pushBlock("ALIMENTO SECO", withGroups.filter((p) => !esHumedito(p.r.name)));
+  pushBlock("ALIMENTO HÚMEDO", withGroups.filter((p) => esHumedito(p.r.name)));
   return body;
 };
 

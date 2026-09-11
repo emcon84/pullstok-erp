@@ -14,6 +14,7 @@ import {
   normalizeLine,
   displayName,
   isNonFood,
+  esHumedito,
   tallaOf,
   abbreviateCategoria,
   subCategoryFromName,
@@ -99,53 +100,59 @@ const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
     }
   }
 
-  const byBrand = new Map<string, typeof flat>();
-  for (const it of flat) {
-    if (!byBrand.has(it.brand)) byBrand.set(it.brand, []);
-    byBrand.get(it.brand)!.push(it);
-  }
+  const pushBlock = (label: string, list: typeof flat) => {
+    if (list.length === 0) return;
+    body.push([{ content: label, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 4 } }]);
 
-  for (const [brand, list] of byBrand) {
-    const bColor = BRAND_COLORS[brand.toUpperCase()] ?? [30, 41, 59];
-    body.push([{ content: brand, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
-
-    // UNA fila de grupo por GAMA (si hay) o por sección (line|sub) si no. Así la
-    // GAMA "Feline Veterinary Health Nutrition" sale UNA vez con todos sus tipos
-    // debajo, sin repetir el título.
-    const groups = new Map<string, { title: string; items: typeof flat }>();
+    const byBrand = new Map<string, typeof flat>();
     for (const it of list) {
-      const gama = gamaBySpecies(it.gama, it.e.name);
-      let key: string;
-      let title: string;
-      if (gama) {
-        key = gama;
-        title = gama;
-      } else {
-        key = `${it.brand}\u0000${it.line}\u0000${it.sub}`;
-        const isEtapa = /^(CACHORROS?|ADULTOS?|SENIOR)$/i.test(it.line);
-        title =
-          it.sub && (isEtapa || /^RAZAS/i.test(it.sub))
-            ? `${it.sub} - ${it.line}`
-            : it.line || it.sub || brand;
-      }
-      if (!groups.has(key)) groups.set(key, { title, items: [] });
-      groups.get(key)!.items.push(it);
+      if (!byBrand.has(it.brand)) byBrand.set(it.brand, []);
+      byBrand.get(it.brand)!.push(it);
     }
 
-    for (const { title, items } of groups.values()) {
-      body.push([{ content: title, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
-      for (const it of items) {
-        const cat = subCategoryFromName(it.e.name) || it.tipo || it.sub || tallaOf(it.line) || "-";
-        body.push([
-          abbreviateCategoria(cat),
-          displayName(it.e.name, brand),
-          it.e.unit ?? "-",
-          formatPrice(precioMayorista(it.e.priceSinIva)),
-          formatPrice(publico(it.e.priceSinIva)),
-        ]);
+    for (const [brand, prods] of byBrand) {
+      const bColor = BRAND_COLORS[brand.toUpperCase()] ?? [30, 41, 59];
+      body.push([{ content: brand, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
+
+      // UNA fila de grupo por GAMA (si hay) o por sección (line|sub) si no.
+      const groups = new Map<string, { title: string; items: typeof flat }>();
+      for (const it of prods) {
+        const gama = gamaBySpecies(it.gama, it.e.name);
+        let key: string;
+        let title: string;
+        if (gama) {
+          key = gama;
+          title = gama;
+        } else {
+          key = `${it.brand}\u0000${it.line}\u0000${it.sub}`;
+          const isEtapa = /^(CACHORROS?|ADULTOS?|SENIOR)$/i.test(it.line);
+          title =
+            it.sub && (isEtapa || /^RAZAS/i.test(it.sub))
+              ? `${it.sub} - ${it.line}`
+              : it.line || it.sub || brand;
+        }
+        if (!groups.has(key)) groups.set(key, { title, items: [] });
+        groups.get(key)!.items.push(it);
+      }
+
+      for (const { title, items } of groups.values()) {
+        body.push([{ content: title, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
+        for (const it of items) {
+          const cat = subCategoryFromName(it.e.name) || it.tipo || it.sub || tallaOf(it.line) || "-";
+          body.push([
+            abbreviateCategoria(cat),
+            displayName(it.e.name, brand),
+            it.e.unit ?? "-",
+            formatPrice(precioMayorista(it.e.priceSinIva)),
+            formatPrice(publico(it.e.priceSinIva)),
+          ]);
+        }
       }
     }
-  }
+  };
+
+  pushBlock("ALIMENTO SECO", flat.filter((it) => !esHumedito(it.e.name)));
+  pushBlock("ALIMENTO HÚMEDO", flat.filter((it) => esHumedito(it.e.name)));
   return body;
 };
 
