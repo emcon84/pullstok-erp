@@ -11,14 +11,10 @@ import orgLogoUrl from "@/assets/logo-horizontal-almacen.png";
 import {
   formatPrice,
   redondearPrecio,
-  esHumedito,
   normalizeLine,
   displayName,
   isNonFood,
   tallaOf,
-  razasOf,
-  TALLA_COLORS,
-  RAZAS_COLORS,
   BRAND_COLORS,
 } from "./planillaGroups";
 
@@ -74,83 +70,57 @@ export interface GroupRow {
   styles?: Record<string, unknown>;
 }
 
-/** Arma el body de autoTable: SECO/HÚMEDO → marca → talla → razas → productos. */
+/**
+ * Formato estilo planilla (Excel de referencia): fila de grupo por sección,
+ * columna Categoría/Talla, y columnas Descripción / KG / Precio / Sugerido.
+ * Precios: los cálculos existentes (mayorista y público). Solo cambia el orden.
+ */
 const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
   const sections = groupByPdfHierarchy(
     plan.sections.map((s) => ({ ...s, line: normalizeLine(s.line) })),
   ).filter((s) => !/^IVA$/i.test(s.subline ?? ""));
 
-  const seco = sections
-    .map((s) => ({
-      ...s,
-      entries: s.entries.filter((e) => !esHumedito(e.name) && !isNonFood(e.name, e.unit)),
-    }))
-    .filter((s) => s.entries.length > 0);
-  const humedo = sections
-    .map((s) => ({
-      ...s,
-      entries: s.entries.filter((e) => esHumedito(e.name) && !isNonFood(e.name, e.unit)),
-    }))
-    .filter((s) => s.entries.length > 0);
-
+  const cols = 5;
   const body: (string | GroupRow)[][] = [];
 
-  const pushBlock = (label: string, list: typeof sections) => {
-    if (list.length === 0) return;
-    body.push([{ content: label, colSpan: 4, styles: { fontSize: 11, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 4 } }]);
+  const byBrand = new Map<string, typeof sections>();
+  for (const s of sections) {
+    const brand = s.brand ?? "Sin marca";
+    if (!byBrand.has(brand)) byBrand.set(brand, []);
+    byBrand.get(brand)!.push(s);
+  }
 
-    const products = list.flatMap((s) =>
-      s.entries.map((e) => ({
-        e,
-        brand: s.brand ?? "Sin marca",
-        talla: tallaOf(s.line),
-        razas: razasOf(e.name, s.subline),
-      })),
-    );
+  for (const [brand, brandSections] of byBrand) {
+    const bColor = BRAND_COLORS[brand.toUpperCase()] ?? [30, 41, 59];
+    body.push([{ content: brand, colSpan: cols, styles: { fontSize: 11, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
 
-    const byBrand = new Map<string, typeof products>();
-    for (const p of products) {
-      if (!byBrand.has(p.brand)) byBrand.set(p.brand, []);
-      byBrand.get(p.brand)!.push(p);
-    }
+    for (const s of brandSections) {
+      const entries = s.entries.filter((e) => !isNonFood(e.name, e.unit));
+      if (entries.length === 0) continue;
+      const sub = (s.subline ?? "").trim();
+      const line = (s.line ?? "").trim();
+      // Rótulo de grupo: si la línea es una etapa (CACHORROS/ADULTOS/SENIOR) se
+      // combina "Razas X - Etapa"; si es una gama larga (Feline Health Nutrition)
+      // el grupo es la línea y la categoría va en la columna A.
+      const isEtapa = /^(CACHORROS?|ADULTOS?|SENIOR)$/i.test(line);
+      const group =
+        sub && (isEtapa || /^RAZAS/i.test(sub))
+          ? `${sub} - ${line}`
+          : line || sub || brand;
+      body.push([{ content: group, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
 
-    for (const [brand, prods] of byBrand) {
-      const bColor = BRAND_COLORS[brand.toUpperCase()] ?? [30, 41, 59];
-      body.push([{ content: brand, colSpan: 4, styles: { fontSize: 10.5, fontStyle: "bold", fillColor: bColor, textColor: [255, 255, 255], cellPadding: 4 } }]);
-      const byTalla = new Map<string, typeof prods>();
-      for (const p of prods) {
-        if (!byTalla.has(p.talla)) byTalla.set(p.talla, []);
-        byTalla.get(p.talla)!.push(p);
-      }
-      for (const [talla, tp] of byTalla) {
-        const tColor = TALLA_COLORS[talla] ?? [30, 41, 59];
-        body.push([{ content: talla || brand, colSpan: 4, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: tColor, textColor: [255, 255, 255], cellPadding: 3.5 } }]);
-        const byRazas = new Map<string | null, typeof tp>();
-        for (const p of tp) {
-          const k = p.razas;
-          if (!byRazas.has(k)) byRazas.set(k, []);
-          byRazas.get(k)!.push(p);
-        }
-        for (const [razas, rp] of byRazas) {
-          if (razas) {
-            const rColor = RAZAS_COLORS[razas] ?? [100, 116, 139];
-            body.push([{ content: razas, colSpan: 4, styles: { fontSize: 8.5, fontStyle: "bold", fillColor: rColor, textColor: [255, 255, 255], cellPadding: 3 } }]);
-          }
-          for (const p of rp) {
-            body.push([
-              displayName(p.e.name, p.brand),
-              p.e.unit ?? "-",
-              formatPrice(precioMayorista(p.e.priceSinIva)),
-              formatPrice(publico(p.e.priceSinIva)),
-            ] as unknown as GroupRow[]);
-          }
-        }
+      for (const e of entries) {
+        const cat = sub || tallaOf(s.line) || "-";
+        body.push([
+          cat,
+          displayName(e.name, brand),
+          e.unit ?? "-",
+          formatPrice(precioMayorista(e.priceSinIva)),
+          formatPrice(publico(e.priceSinIva)),
+        ]);
       }
     }
-  };
-
-  pushBlock("ALIMENTO SECO", seco);
-  pushBlock("ALIMENTO HÚMEDO", humedo);
+  }
   return body;
 };
 
@@ -181,15 +151,16 @@ export const exportPlanillaPdf = async (plan: PriceListDetail): Promise<string |
 
   autoTable(doc, {
     startY: y,
-    head: [["Descripción", "Kg x U.", "Precio", "Sugerido"]],
+    head: [["Categoría/Talla", "Descripción", "KG", "Precio", "Sugerido"]],
     body: body as never,
     margin: { left: margin, right: margin, top: margin, bottom: 24 },
     styles: { ...ROW_STYLES, cellPadding: 2.5, lineColor: [0, 0, 0], lineWidth: 0.15 },
-    headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: "bold", fontSize: 9, halign: "left" },
+    headStyles: { fillColor: [229, 231, 235], textColor: [0, 0, 0], fontStyle: "bold", fontSize: 9, halign: "left" },
     columnStyles: {
-      1: { halign: "right", cellWidth: 46 },
-      2: { halign: "right", cellWidth: 60 },
+      0: { cellWidth: 70 },
+      2: { halign: "center", cellWidth: 46 },
       3: { halign: "right", cellWidth: 60 },
+      4: { halign: "right", cellWidth: 60 },
     },
     theme: "grid",
   });
