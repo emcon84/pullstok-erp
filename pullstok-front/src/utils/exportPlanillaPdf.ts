@@ -15,6 +15,7 @@ import {
   displayName,
   isNonFood,
   tallaOf,
+  abbreviateCategoria,
   BRAND_COLORS,
 } from "./planillaGroups";
 
@@ -133,7 +134,7 @@ const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
       for (const it of items) {
         const cat = it.tipo || it.sub || tallaOf(it.line) || "-";
         body.push([
-          cat,
+          abbreviateCategoria(cat),
           displayName(it.e.name, brand),
           it.e.unit ?? "-",
           formatPrice(precioMayorista(it.e.priceSinIva)),

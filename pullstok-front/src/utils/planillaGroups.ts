@@ -112,6 +112,27 @@ export const RAZAS_COLORS: Record<string, [number, number, number]> = {
   "RAZAS GRANDES": [14, 116, 144],
 };
 
+/** Abrevia palabras largas de las categorías para que no se partan en la
+ * columna Categoría/Talla (ej. GASTROINTESTINAL → GASTRO). */
+const CAT_WORD_ABBREV: Record<string, string> = {
+  PEQUEÑAS: "PEQ",
+  PEQUENAS: "PEQ",
+  MEDIANAS: "MED",
+  GRANDES: "GR",
+  MANAGEMENT: "MGMT",
+  GASTROINTESTINAL: "GASTRO",
+  DERMATOLOGY: "DERM",
+  VETERINARY: "VET",
+  SUPPORT: "SUP",
+};
+export const abbreviateCategoria = (cat: string): string =>
+  cat
+    .toUpperCase()
+    .trim()
+    .split(/\s+/)
+    .map((w) => CAT_WORD_ABBREV[w] ?? w)
+    .join(" ");
+
 export const BRAND_COLORS: Record<string, [number, number, number]> = {
   EUKANUBA: [16, 122, 87],
   "ROYAL CANIN": [157, 23, 77],

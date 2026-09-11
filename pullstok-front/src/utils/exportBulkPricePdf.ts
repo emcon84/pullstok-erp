@@ -15,6 +15,7 @@ import {
   normalizeLine,
   tallaOf,
   tallaFromName,
+  abbreviateCategoria,
   BRAND_COLORS,
 } from "./planillaGroups";
 
@@ -118,7 +119,7 @@ const buildBody = (rows: BulkPricePreviewRow[]): (string | GroupRow)[][] => {
       for (const [cat, catItems] of byCat) {
         for (const p of catItems) {
           body.push([
-            cat,
+            abbreviateCategoria(cat),
             displayName(p.r.name, p.brand),
             formatPrice(p.r.newPrice),
           ]);
