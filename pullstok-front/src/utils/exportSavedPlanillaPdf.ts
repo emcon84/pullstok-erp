@@ -18,6 +18,7 @@ import {
   tallaFromName,
   abbreviateCategoria,
   subCategoryFromName,
+  weightKgOf,
   gamaBySpecies,
   BRAND_COLORS,
 } from "./planillaGroups";
@@ -113,7 +114,10 @@ const buildBody = (rows: SavedPlanillaRow[], pricesLen: number): (string | Group
           byCat.get(p.cat)!.push(p);
         }
         for (const [cat, catItems] of byCat) {
-          for (const p of catItems) {
+          const sorted = [...catItems].sort(
+            (a, b) => weightKgOf(a.r.name) - weightKgOf(b.r.name) || a.r.name.localeCompare(b.r.name),
+          );
+          for (const p of sorted) {
             if (pricesLen === 2) {
               body.push([
                 abbreviateCategoria(cat),

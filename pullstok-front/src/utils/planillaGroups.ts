@@ -110,18 +110,49 @@ export const speciesOfName = (name: string): "PERRO" | "GATO" | "" => {
 /** Sub-categoría limpia derivada del NOMBRE (para la columna Categoría/Talla).
  * Reemplaza el `tipo` genérico del parser (ej. "RAZAS PEQ") por la sub-categoría
  * real del producto (Kitten/Indoor/Sensory/Húmedos...). Devuelve "" si no
- * matchea. El orden importa: primero HÚMEDOS, luego etapas/razas. */
+ * matchea. El orden importa: las reglas más específicas van PRIMERO para que
+ * ganen sobre las genéricas (ej. GATO ADULTO antes de ADULTOS; tallas MINI/
+ * MEDIUM/MAXI/GIANT antes de las etapas genéricas PUPPY/ADULT). */
 const SUB_CATEGORY_RULES: [RegExp, string][] = [
+  // Húmedos primero: POUCH/LATA/WET/HÚMEDO/HUMEDO/MOUSSE ganan siempre.
   [/\b(POUCH|LATA|WET|HÚMEDO|HUMEDO|MOUSSE)\b/i, "HÚMEDOS"],
+  // Líneas y razas felinas / veterinarias específicas.
   [/\b(KITTEN|BABYCAT)\b/i, "KITTEN"],
+  [/\bGATO\s*ADULTO\b/i, "GATO ADULTO"],
+  [/\b(TRAINING\s*TREATS|TREATS)\b/i, "TREATS"],
   [/\bINDOOR\b/i, "INDOOR"],
   [/\bSENSORY\b/i, "SENSORY"],
-  [/\b(GROWTH|MOTHER|BABYCAT)\b/i, "GROWTH"],
+  [/\bPERSIAN\b/i, "PERSIAN"],
+  [/\bSIAMESE\b/i, "SIAMESE"],
+  [/\bSENSIBLE\b/i, "SENSIBLE"],
+  [/\bEXIGENT\b/i, "EXIGENT"],
+  [/\bAPPETITE\b/i, "APPETITE"],
+  [/\bHAIRBALL\b/i, "HAIRBALL"],
+  [/\bHAIR\s*&\s*SKIN\b/i, "HAIR & SKIN"],
+  [/\bWEIGHT\b/i, "WEIGHT"],
+  [/\bURINARY\b/i, "URINARY"],
+  [/\bDIGEST/i, "DIGEST"],
+  [/\bGASTRO/i, "GASTRO"],
+  [/\bHEPATIC\b/i, "HEPATIC"],
+  [/\bRENAL\b/i, "RENAL"],
+  [/\bCARDIAC\b/i, "CARDIAC"],
+  [/\bMOBILITY\b/i, "MOBILITY"],
+  [/\bDIABETIC\b/i, "DIABETIC"],
+  [/\bSATIETY\b/i, "SATIETY"],
+  [/\b(HYPOALLERGENIC|ANALLERGENIC|ALLERGENIC)\b/i, "ALLERGENIC"],
   [/\bFIT\b/i, "FIT"],
+  [/\bACTIVE\s*7\b/i, "ACTIVE 7+"],
+  [/\b(GROWTH|MOTHER)\b/i, "GROWTH"],
+  // Tallas (perro): antes que las etapas genéricas para que "MINI ADULT" y
+  // "X-SMALL PUPPY" queden en MINI.
   [/\b(X-SMALL|XSMALL|MINI)\b/i, "MINI"],
   [/\bMEDIUM\b/i, "MEDIUM"],
   [/\bMAXI\b/i, "MAXI"],
   [/\bGIANT\b/i, "GIANT"],
+  // Etapas genéricas al final (después de GATO ADULTO y de las tallas).
+  [/\bSENIOR\b/i, "SENIOR"],
+  [/\b(PUPPY|CACHORRO|CACHORROS)\b/i, "CACHORROS"],
+  [/\b(ADULT|ADULTO|ADULTOS)\b/i, "ADULTOS"],
 ];
 
 export const subCategoryFromName = (name: string): string => {
@@ -130,6 +161,16 @@ export const subCategoryFromName = (name: string): string => {
     if (re.test(n)) return cat;
   }
   return "";
+};
+
+/** Peso en KG extraído del nombre (ej. "X 1.5 KG", "X 15 KG", "X 1,5 Kg").
+ * Devuelve Infinity si no hay peso, para que los productos sin peso vayan al
+ * final al ordenar dentro de una sub-categoría. */
+export const weightKgOf = (name: string): number => {
+  const m = (name ?? "").match(/X\s*([\d.,]+)\s*KG/i);
+  if (!m) return Infinity;
+  const n = parseFloat(m[1].replace(",", "."));
+  return Number.isFinite(n) ? n : Infinity;
 };
 
 /** Corrige la GAMA según la especie derivada del nombre, para que los gatos no

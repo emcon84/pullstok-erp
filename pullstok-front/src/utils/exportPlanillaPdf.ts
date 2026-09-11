@@ -18,6 +18,7 @@ import {
   tallaOf,
   abbreviateCategoria,
   subCategoryFromName,
+  weightKgOf,
   gamaBySpecies,
   BRAND_COLORS,
 } from "./planillaGroups";
@@ -137,7 +138,10 @@ const buildBody = (plan: PriceListDetail): (string | GroupRow)[][] => {
 
       for (const { title, items } of groups.values()) {
         body.push([{ content: title, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
-        for (const it of items) {
+        const sorted = [...items].sort(
+          (a, b) => weightKgOf(a.e.name) - weightKgOf(b.e.name) || a.e.name.localeCompare(b.e.name),
+        );
+        for (const it of sorted) {
           const cat = subCategoryFromName(it.e.name) || it.tipo || it.sub || tallaOf(it.line) || "-";
           body.push([
             abbreviateCategoria(cat),
