@@ -108,12 +108,21 @@ const buildBody = (rows: BulkPricePreviewRow[]): (string | GroupRow)[][] => {
     }
     for (const [group, items] of byGroup) {
       body.push([{ content: group, colSpan: cols, styles: { fontSize: 9.5, fontStyle: "bold", fillColor: [17, 24, 39], textColor: [255, 255, 255], cellPadding: 3.5 } }]);
+      // Dentro de cada gama, agrupar por Categoría/Talla para que los tipos
+      // salgan juntos y ordenados (no intercalados).
+      const byCat = new Map<string, RowWithGroups[]>();
       for (const p of items) {
-        body.push([
-          p.cat,
-          displayName(p.r.name, p.brand),
-          formatPrice(p.r.newPrice),
-        ]);
+        if (!byCat.has(p.cat)) byCat.set(p.cat, []);
+        byCat.get(p.cat)!.push(p);
+      }
+      for (const [cat, catItems] of byCat) {
+        for (const p of catItems) {
+          body.push([
+            cat,
+            displayName(p.r.name, p.brand),
+            formatPrice(p.r.newPrice),
+          ]);
+        }
       }
     }
   }
