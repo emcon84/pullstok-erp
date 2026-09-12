@@ -441,6 +441,7 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
   const mockedPrisma = prisma as unknown as {
     product: { findMany: jest.Mock };
     category: { findMany: jest.Mock };
+    priceListEntry: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
 
@@ -534,6 +535,10 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
       { id: "a", parentId: null },
       { id: "b", parentId: "a" },
     ]);
+    // Default: sin entradas de planilla. El controller recorre
+    // priceListEntry.findMany al mapear secciones; sin default devuelve
+    // undefined y el for...of rompe (500).
+    mockedPrisma.priceListEntry.findMany.mockResolvedValue([]);
   });
 
   describe("dryRun (preview)", () => {
@@ -682,10 +687,13 @@ describe("bulkPriceUpdate — preview (dryRun) and authoritative apply", () => {
         prodWithCat("p-c", "ccc", "Aves", 100),
       ]);
       // Mapeo sección → producto (resolveSectionPercentageByProduct sobre prisma).
-      (prisma.priceListEntry.findMany as unknown as jest.Mock).mockResolvedValue([
-        { productId: "p-a", sectionId: "sec-1" },
-        { productId: "p-b", sectionId: "sec-1" },
-      ]);
+      // 1ª llamada: el mapeo; 2ª (sectionByProduct, para agrupar por planilla): [].
+      (prisma.priceListEntry.findMany as unknown as jest.Mock)
+        .mockResolvedValueOnce([
+          { productId: "p-a", sectionId: "sec-1" },
+          { productId: "p-b", sectionId: "sec-1" },
+        ])
+        .mockResolvedValueOnce([]);
       const res = mockResponse();
 
       await productController.bulkPriceUpdate(

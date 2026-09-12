@@ -63,7 +63,7 @@ describe("productController.getProducts — mapProduct unitsPerBox/perUnitPrice"
 
     const body = (res.json as jest.Mock).mock.calls[0][0];
     expect(body[0].unitsPerBox).toBe(15);
-    expect(body[0].perUnitPrice).toBe(1226.67); // round2(18400/15)
+    expect(body[0].perUnitPrice).toBe(1300); // ceil(18400/15 a múltiplo de $100)
   });
 
   it("deja unitsPerBox y perUnitPrice en null para un producto box-only", async () => {
@@ -101,6 +101,6 @@ describe("productController.getProducts — mapProduct unitsPerBox/perUnitPrice"
     await productController.getProducts(query({ page: "1", pageSize: "30" }), res);
 
     const body = (res.json as jest.Mock).mock.calls[0][0];
-    expect(body.items[0].perUnitPrice).toBe(1226.67);
+    expect(body.items[0].perUnitPrice).toBe(1300);
   });
 });

@@ -22,6 +22,13 @@ jest.mock("../../src/config/tenantContext", () => ({
   requireOrganizationId: jest.fn().mockReturnValue("org-1"),
 }));
 
+// savePriceKgPlan llama a assignMissingScaleCodes DESPUÉS del $transaction.
+// Sin mock, el service real corre contra el prisma mockeado y accede a modelos
+// no definidos (priceKgBrand/priceKgType) → TypeError + unhandled rejection.
+jest.mock("../../src/services/scaleCodeService", () => ({
+  assignMissingScaleCodes: jest.fn().mockResolvedValue({ assigned: 0 }),
+}));
+
 const mockedPrisma = prisma as unknown as {
   priceKgPrice: {
     findMany: jest.Mock;
@@ -80,6 +87,7 @@ describe("PriceKgPlan Controller", () => {
           typeId: true,
           species: true,
           priceKg: true,
+          scaleCode: true,
         },
       });
       expect(res.status).toHaveBeenCalledWith(200);

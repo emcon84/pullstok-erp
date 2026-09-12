@@ -174,7 +174,7 @@ describe("importPriceList — preview (dryRun default true)", () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     const body = (res.json as jest.Mock).mock.calls[0][0];
-    expect(body.layout).toBe("SECO");
+    expect(body.layout).toBe("seco");
     expect(body.period).toBe("2026-08-10");
     expect(body.sourceFilename).toBe("planilla.pdf");
     expect(body.total).toBe(3);
@@ -218,7 +218,7 @@ describe("importPriceList — preview (dryRun default true)", () => {
     const res = fakeRes();
     await importPriceList(fakeReq({ query: { dryRun: "true" } }), res);
     const body = (res.json as jest.Mock).mock.calls[0][0];
-    expect(body.layout).toBe("WET");
+    expect(body.layout).toBe("wet");
     expect(body.total).toBe(2);
     expect(body.rows[0].precioConIva).toBe(2571.7);
   });
@@ -321,7 +321,7 @@ describe("applyPriceList — transacción idempotente (precios del proveedor int
     );
     const entryCall = tx.priceListEntry.create.mock.calls[0][0].data;
     expect(entryCall).toMatchObject({
-      name: "SIEGER Puppy Mini x 1 Kg.",
+      name: "SIEGER PUPPY MINI X 1 KG.",
       productId: uuid,
       priceSinIva: 8795,
       priceConIva: 10642,
@@ -470,7 +470,7 @@ describe("applyPriceList — transacción idempotente (precios del proveedor int
     expect(res.status).toHaveBeenCalledWith(200);
     const entryData = tx.priceListEntry.create.mock.calls[0][0].data;
     expect(entryData).toMatchObject({
-      name: "Producto Sin Match x 3 Kg.",
+      name: "PRODUCTO SIN MATCH X 3 KG.",
       productId: null,
       matched: false,
       priceSinIva: 8795,
@@ -638,13 +638,13 @@ describe("applyPriceList — aplicar precios al catálogo (applyPrices=true)", (
 
     // Matched: UNA escritura con suggestedPrice + price (Con IVA directo).
     const matchedUpdate = tx.product.updateMany.mock.calls.find((c) => c[0].where.id === uuid);
-    expect(matchedUpdate[0].data).toEqual({ suggestedPrice: 14190.04, price: 10642 });
+    expect(matchedUpdate[0].data).toEqual({ suggestedPrice: 14190.04, price: 10600 });
     // Sin match: se crea el producto (name, price, sin categoría) con su marca.
     expect(tx.product.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          name: "GOOSTER Adultos x 15 Kg.",
-          price: 10642,
+          name: "GOOSTER ADULTOS X 15 KG.",
+          price: 10600,
           categoryId: null,
           quantity: 0,
         }),
@@ -657,7 +657,7 @@ describe("applyPriceList — aplicar precios al catálogo (applyPrices=true)", (
     );
     // La entry del creado queda vinculada a su productId (ciclo mensual).
     const createdEntry = tx.priceListEntry.create.mock.calls[1][0].data;
-    expect(createdEntry).toMatchObject({ name: "GOOSTER Adultos x 15 Kg.", productId: "new-1", matched: true });
+    expect(createdEntry).toMatchObject({ name: "GOOSTER ADULTOS X 15 KG.", productId: "new-1", matched: true });
     // El producto creado NO pasa por updateMany (ya llevó price+sugerido en el create).
     expect(tx.product.updateMany).toHaveBeenCalledTimes(1);
 
@@ -747,7 +747,7 @@ describe("applyPriceList — aplicar precios al catálogo (applyPrices=true)", (
     expect(entryData.productId).toBe("existente-1");
     // El producto reutilizado recibe price + suggestedPrice (tratado como matched).
     expect(tx.product.updateMany).toHaveBeenCalledWith(
-      { where: { id: "existente-1" }, data: { suggestedPrice: 14190.04, price: 10642 } },
+      { where: { id: "existente-1" }, data: { suggestedPrice: 14190.04, price: 10600 } },
     );
     expect(res.json).toHaveBeenCalledWith({
       priceListId: "pl-1",
@@ -780,7 +780,7 @@ describe("applyPriceList — aplicar precios al catálogo (applyPrices=true)", (
     expect(tx.product.create).not.toHaveBeenCalled();
     // El reutilizado conserva el sugerido manual (15000), no el recalculado (14190.04).
     expect(tx.product.updateMany).toHaveBeenCalledWith(
-      { where: { id: "existente-1" }, data: { suggestedPrice: 15000, price: 10642 } },
+      { where: { id: "existente-1" }, data: { suggestedPrice: 15000, price: 10600 } },
     );
     // La entry de la planilla nueva imprime el valor conservado.
     const entryData = tx.priceListEntry.create.mock.calls[0][0].data;
@@ -849,13 +849,13 @@ describe("applyPriceList — proveedor de la planilla (providerName)", () => {
     const matchedUpdate = tx.product.updateMany.mock.calls.find((c) => c[0].where.id === uuid);
     expect(matchedUpdate[0].data).toEqual({
       suggestedPrice: 14190.04,
-      price: 10642,
+      price: 10600,
       providerId: "prov-1",
     });
     // Producto creado: providerId en el create.
     expect(tx.product.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ providerId: "prov-1", name: "GOOSTER Adultos x 15 Kg." }),
+        data: expect.objectContaining({ providerId: "prov-1", name: "GOOSTER ADULTOS X 15 KG." }),
       }),
     );
     expect(res.status).toHaveBeenCalledWith(200);

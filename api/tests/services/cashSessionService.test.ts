@@ -114,7 +114,6 @@ describe("cashSessionService.openCash", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           branchId: "b-1",
-          cashierId: "u-1",
           status: "OPEN",
         }),
       }),
@@ -280,7 +279,12 @@ describe("cashSessionService.closeCash", () => {
 });
 
 describe("cashSessionService.getCurrent / getOne / list", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // clearAllMocks NO resetea implementaciones: un test previo dejó
+    // branchAssignment en [] y se filtraba acá. Se fija la sucursal del operativo.
+    mockedBase.branchAssignment.findMany.mockResolvedValue([{ branchId: "b-1" }]);
+  });
 
   it("R4: getCurrent returns the OPEN session for the cashier", async () => {
     mockedPrisma.cashSession.findFirst.mockResolvedValue({ ...openSession });
@@ -289,7 +293,7 @@ describe("cashSessionService.getCurrent / getOne / list", () => {
 
     expect(mockedPrisma.cashSession.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ cashierId: "u-1", status: "OPEN" }),
+        where: expect.objectContaining({ branchId: "b-1", status: "OPEN" }),
       }),
     );
     expect(result!.id).toBe("cs-1");
@@ -315,7 +319,7 @@ describe("cashSessionService.getCurrent / getOne / list", () => {
 
     expect(mockedPrisma.cashSession.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ id: "cs-1", cashierId: "u-1" }),
+        where: expect.objectContaining({ id: "cs-1", branchId: "b-1" }),
       }),
     );
     expect(result).toBeDefined();
@@ -331,7 +335,7 @@ describe("cashSessionService.getCurrent / getOne / list", () => {
 
     expect(mockedPrisma.cashSession.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ id: "cs-1", cashierId: "u-1" }),
+        where: expect.objectContaining({ id: "cs-1", branchId: "b-1" }),
       }),
     );
     expect(err.code).toBe("CASH_SESSION_NOT_FOUND");
@@ -354,7 +358,7 @@ describe("cashSessionService.getCurrent / getOne / list", () => {
 
     expect(mockedPrisma.cashSession.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ cashierId: "u-1" }),
+        where: expect.objectContaining({ branchId: "b-1" }),
       }),
     );
     expect(result).toHaveLength(1);

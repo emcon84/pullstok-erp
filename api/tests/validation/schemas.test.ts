@@ -930,8 +930,13 @@ describe("openBagSchema / setLooseStockSchema / listLooseStocksQuerySchema (loos
     require("../../src/validation/schemas");
 
   it("accepts a valid open-bag payload (branchId optional — vendedor la resuelve)", () => {
-    expect(openBagSchema.safeParse({ productId: "p-1" }).success).toBe(true);
-    expect(openBagSchema.safeParse({ productId: "p-1", branchId: "b-1" }).success).toBe(true);
+    expect(
+      openBagSchema.safeParse({ productId: "p-1", priceKgPriceId: "c-1" }).success,
+    ).toBe(true);
+    expect(
+      openBagSchema.safeParse({ productId: "p-1", branchId: "b-1", priceKgPriceId: "c-1" })
+        .success,
+    ).toBe(true);
   });
 
   it("rejects open-bag without productId", () => {
@@ -943,7 +948,11 @@ describe("openBagSchema / setLooseStockSchema / listLooseStocksQuerySchema (loos
   });
 
   it("strips unknown open-bag fields", () => {
-    const result = openBagSchema.safeParse({ productId: "p-1", extra: 1 });
+    const result = openBagSchema.safeParse({
+      productId: "p-1",
+      priceKgPriceId: "c-1",
+      extra: 1,
+    });
     expect(result.success).toBe(true);
     if (result.success) expect((result.data as any).extra).toBeUndefined();
   });

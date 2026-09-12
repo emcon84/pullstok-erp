@@ -175,11 +175,11 @@ describe("multi-pack: POR_UNIDAD server-authoritative recompute", () => {
 
     const createCall = tx.sale.create.mock.calls[0][0];
     const storedItem = createCall.data.items.create[0];
-    // Precio autoritativo = round2(18400/15) = 1226.67, NO 999999.
-    expect(storedItem.price).toBe(1226.67);
+    // Precio autoritativo = ceil(18400/15 a $100) = 1300, NO 999999.
+    expect(storedItem.price).toBe(1300);
     expect(storedItem.quantity).toBe(3);
     expect(storedItem.saleMode).toBe("POR_UNIDAD");
-    expect(createCall.data.totalAmount).toBe(3680.01); // round2(3 × 1226.67) = 3680.01
+    expect(createCall.data.totalAmount).toBe(3900); // 3 × 1300
     // Stock en unidades: 3 unidades × 1 = −3.
     expect(tx.productStock.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: { quantity: { decrement: 3 } } }),
@@ -270,7 +270,7 @@ describe("multi-pack: POR_UNIDAD server-authoritative recompute", () => {
 
     const createCall = tx.sale.create.mock.calls[0][0];
     expect(createCall.data.items.create).toHaveLength(2);
-    expect(createCall.data.totalAmount).toBe(22080.01); // round2(1×18400) + round2(3×1226.67)
+    expect(createCall.data.totalAmount).toBe(22300); // 1×18400 + 3×ceil(18400/15 a $100)=1300
     // Ambas líneas descuentan del ProductStock: caja −15, unidad −3.
     expect(tx.productStock.updateMany).toHaveBeenCalledTimes(2);
   });

@@ -274,18 +274,20 @@ describe("salesService.createSale — loose decimal flow", () => {
 
     const saleCreateCall = tx.sale.create.mock.calls[0][0];
     const storedItem = saleCreateCall.data.items.create[0];
-    expect(storedItem.quantity).toBe(3.33); // round2(500 ÷ 150.25)
+    // POR_MONTO (2a479a7): el kg = monto ÷ precio SIN redondear (solo para
+    // descontar stock); el total es el monto DECLARADO, no kg × precio.
+    expect(storedItem.quantity).toBeCloseTo(500 / 150.25, 10);
     expect(storedItem.price).toBe(150.25); // snapshot del precio de la celda
-    expect(saleCreateCall.data.totalAmount).toBe(500.33); // round2(3.33 × 150.25)
-    // Reconciliation: stored kg × stored priceKg reproduces total exactly.
+    expect(saleCreateCall.data.totalAmount).toBe(500); // el monto declarado
+    // Reconciliation: stored kg × stored priceKg reproduce el total.
     expect(Math.round(storedItem.quantity * storedItem.price * 100) / 100).toBe(
       saleCreateCall.data.totalAmount,
     );
     // El descuento de LooseStock usa los kg de la celda.
     expect(tx.looseStock.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ quantity: { gte: 3.33 } }),
-        data: { quantity: { decrement: 3.33 } },
+        where: expect.objectContaining({ quantity: { gte: 500 / 150.25 } }),
+        data: { quantity: { decrement: 500 / 150.25 } },
       }),
     );
   });
@@ -323,20 +325,20 @@ describe("salesService.createSale — loose decimal flow", () => {
       ...vendorArgs,
     );
 
-    // LooseStock descontado por el kg de la CELDA: round2(15000 ÷ 9200) = 1.63,
-    // NO round2(15000 ÷ 7500) = 2.00 del priceKgSuelto almacenado.
+    // LooseStock descontado por el kg de la CELDA (15000 ÷ 9200), NO por el
+    // priceKgSuelto almacenado (15000 ÷ 7500). Sin redondear (2a479a7).
     expect(tx.looseStock.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ quantity: { gte: 1.63 } }),
-        data: { quantity: { decrement: 1.63 } },
+        where: expect.objectContaining({ quantity: { gte: 15000 / 9200 } }),
+        data: { quantity: { decrement: 15000 / 9200 } },
       }),
     );
 
     const saleCreateCall = tx.sale.create.mock.calls[0][0];
     const storedItem = saleCreateCall.data.items.create[0];
-    expect(storedItem.quantity).toBe(1.63); // round2(15000 ÷ 9200)
+    expect(storedItem.quantity).toBeCloseTo(15000 / 9200, 10);
     expect(storedItem.price).toBe(9200); // snapshot = precio de la celda, NO 7500
-    expect(saleCreateCall.data.totalAmount).toBe(14996); // round2(1.63 × 9200)
+    expect(saleCreateCall.data.totalAmount).toBe(15000); // el monto declarado
     // Reconciliation: kg de la celda × precio de la celda reproduce el total.
     expect(Math.round(storedItem.quantity * storedItem.price * 100) / 100).toBe(
       saleCreateCall.data.totalAmount,
