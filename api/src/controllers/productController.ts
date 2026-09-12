@@ -291,7 +291,9 @@ const normalizeSearchToken = (value: string): string =>
 export function buildProductSearchWhere(
   searchTerm: string,
   synonymGroups: string[][] = [],
+  options: { fuzzy?: boolean } = {},
 ): any {
+  const fuzzy = options.fuzzy === true;
   const variantMatch = (w: string) => ({
     variantAssignments: {
       some: {
@@ -330,8 +332,31 @@ export function buildProductSearchWhere(
     variantMatch(w),
   ];
 
-  // OR completo de un token, expandido por sinónimos cuando corresponde.
-  const tokenClauses = (w: string) => expandToken(w).flatMap(fieldClauses);
+  /**
+   * Variantes fuzzy de un token: los typos de tipeo más comunes.
+   *  - letra de más:         "rroyal" → borrar 1 → "royal"
+   *  - letra doble faltante: "kiten"  → duplicar 1 → "kitten"
+   *  - letras invertidas:    "roayl"  → swap 1 → "royal"
+   * Solo para tokens largos (>= 4): los cortos generan ruido. Se usa como
+   * FALLBACK (la búsqueda estricta va primero), nunca en el camino normal.
+   */
+  const fuzzyVariants = (w: string): string[] => {
+    if (w.length < 4) return [];
+    const set = new Set<string>();
+    for (let i = 0; i < w.length; i++) {
+      set.add(w.slice(0, i) + w.slice(i + 1)); // letra de más
+      set.add(w.slice(0, i + 1) + w[i] + w.slice(i + 1)); // doble faltante
+    }
+    for (let i = 0; i < w.length - 1; i++) {
+      set.add(w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2)); // invertidas
+    }
+    set.delete(w);
+    return Array.from(set).filter(Boolean).slice(0, 60);
+  };
+
+  // OR completo de un token: sinónimos + (opcional) variantes fuzzy.
+  const tokenClauses = (w: string) =>
+    [...expandToken(w), ...(fuzzy ? fuzzyVariants(w) : [])].flatMap(fieldClauses);
 
   // Detección de raza dentro de un término. Devuelve las palabras "regulares"
   // (AND) y los tokens de búsqueda de raza (OR). Con breedTokens vacío el
@@ -458,6 +483,9 @@ const getProducts = async (req: Request, res: Response) => {
     }
 
     const where: any = {};
+    // WHERE alternativo tolerante a typos (fuzzy). Solo se rellena si hay
+    // búsqueda por nombre y se usa como FALLBACK cuando el estricto da 0.
+    let nameFuzzy: any = null;
 
     if (title) {
       const candidates = planTitleWhereCandidates(title as string);
@@ -507,6 +535,8 @@ const getProducts = async (req: Request, res: Response) => {
       });
       const synonymGroups = typeRows.map((t) => [t.name, ...(t.synonyms ?? [])]);
       Object.assign(where, buildProductSearchWhere(searchTerm, synonymGroups));
+      // Fallback fuzzy (typos comunes): se aplica solo si el estricto da 0.
+      nameFuzzy = buildProductSearchWhere(searchTerm, synonymGroups, { fuzzy: true });
     }
     // "Solo lo que trabajo": ?carriedOnly=1 (o true) → solo productos con
     // carried=true (oculta los que se pueden pedir pero no se venden aún).
@@ -527,6 +557,17 @@ const getProducts = async (req: Request, res: Response) => {
         mode: "insensitive",
       };
     }
+
+    // WHERE fuzzy: mismos filtros, pero con la cláusula de nombre tolerante a
+    // typos (reemplaza el OR/AND estricto). Solo se usa como fallback.
+    const whereFuzzy: any = nameFuzzy
+      ? (() => {
+          const clone: any = { ...where };
+          delete clone.OR;
+          delete clone.AND;
+          return { ...clone, ...nameFuzzy };
+        })()
+      : where;
     const include = {
       category: { select: { id: true, name: true } },
       provider: { select: { id: true, name: true } },
@@ -610,10 +651,17 @@ const getProducts = async (req: Request, res: Response) => {
       const take = pageSize;
       const skip = (page - 1) * pageSize;
 
-      const [items, total] = await Promise.all([
+      let [items, total] = await Promise.all([
         prisma.product.findMany({ where, include, take, skip, orderBy: { name: "asc" } }),
         prisma.product.count({ where }),
       ]);
+      if (total === 0 && nameFuzzy) {
+        // Fallback fuzzy: reintenta tolerando typos comunes (solo si el estricto dio 0).
+        [items, total] = await Promise.all([
+          prisma.product.findMany({ where: whereFuzzy, include, take, skip, orderBy: { name: "asc" } }),
+          prisma.product.count({ where: whereFuzzy }),
+        ]);
+      }
 
       res.status(200).json({
         items: items.map(mapProduct),
@@ -625,7 +673,11 @@ const getProducts = async (req: Request, res: Response) => {
       return;
     }
 
-    const products = await prisma.product.findMany({ where, include });
+    let products = await prisma.product.findMany({ where, include });
+    if (products.length === 0 && nameFuzzy) {
+      // Fallback fuzzy: reintenta tolerando typos comunes (solo si el estricto dio 0).
+      products = await prisma.product.findMany({ where: whereFuzzy, include });
+    }
     res.status(200).json(products.map(mapProduct));
   } catch (error: any) {
     res.status(500).json({ message: error.message });

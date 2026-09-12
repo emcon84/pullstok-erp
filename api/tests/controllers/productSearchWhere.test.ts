@@ -160,4 +160,42 @@ describe('buildProductSearchWhere', () => {
     expect(secondNames).toContain('Cachorro');
     expect(secondNames).toContain('puppy');
   });
+
+  it('fuzzy (letra de más): "rroyal" incluye la variante "royal"', () => {
+    const where = buildProductSearchWhere('rroyal', [], { fuzzy: true });
+    const names = where.OR
+      .map((o: { name?: { contains: string } }) => o.name?.contains)
+      .filter(Boolean);
+    expect(names).toContain('royal');
+  });
+
+  it('fuzzy (letra doble faltante): "kiten" incluye la variante "kitten"', () => {
+    const where = buildProductSearchWhere('kiten', [], { fuzzy: true });
+    const names = where.OR
+      .map((o: { name?: { contains: string } }) => o.name?.contains)
+      .filter(Boolean);
+    expect(names).toContain('kitten');
+  });
+
+  it('fuzzy (letras invertidas): "roayl" incluye la variante "royal"', () => {
+    const where = buildProductSearchWhere('roayl', [], { fuzzy: true });
+    const names = where.OR
+      .map((o: { name?: { contains: string } }) => o.name?.contains)
+      .filter(Boolean);
+    expect(names).toContain('royal');
+  });
+
+  it('fuzzy NO aplica a tokens cortos (< 4) ni cuando fuzzy=false', () => {
+    const short = buildProductSearchWhere('abc', [], { fuzzy: true });
+    const shortNames = short.OR
+      .map((o: { name?: { contains: string } }) => o.name?.contains)
+      .filter(Boolean);
+    expect(shortNames).toEqual(['abc']);
+
+    const strict = buildProductSearchWhere('rroyal', [], { fuzzy: false });
+    const strictNames = strict.OR
+      .map((o: { name?: { contains: string } }) => o.name?.contains)
+      .filter(Boolean);
+    expect(strictNames).toEqual(['rroyal']);
+  });
 });

@@ -113,4 +113,36 @@ describe("productController.getProducts — branchId filter", () => {
     expect(callArgs.where.OR).toBeDefined();
     expect(callArgs.where.OR[0].name.contains).toBe("Zap");
   });
+
+  it("usa el fallback fuzzy cuando la búsqueda estricta no devuelve nada", async () => {
+    mockedPrisma.product.findMany
+      .mockResolvedValueOnce([]) // estricto: 0 resultados
+      .mockResolvedValueOnce([{ id: "p-1", name: "ROYAL CANIN Kitten" }]); // fuzzy
+
+    const req = { query: { name: "rroyal" } } as unknown as Request;
+    const res = mockResponse();
+
+    await productController.getProducts(req, res);
+
+    expect(mockedPrisma.product.findMany).toHaveBeenCalledTimes(2);
+    const fuzzyArgs = mockedPrisma.product.findMany.mock.calls[1][0];
+    const names = (fuzzyArgs.where.OR as { name?: { contains: string } }[])
+      .map((o) => o.name?.contains)
+      .filter(Boolean);
+    expect(names).toContain("royal"); // variante fuzzy presente en el WHERE
+    const body = (res.json as jest.Mock).mock.calls[0][0];
+    expect(body).toHaveLength(1);
+    expect(body[0].name).toBe("ROYAL CANIN Kitten");
+  });
+
+  it("no usa el fallback fuzzy cuando la búsqueda estricta devuelve resultados", async () => {
+    mockedPrisma.product.findMany.mockResolvedValue([{ id: "p-1", name: "Royal" }]);
+
+    const req = { query: { name: "royal" } } as unknown as Request;
+    const res = mockResponse();
+
+    await productController.getProducts(req, res);
+
+    expect(mockedPrisma.product.findMany).toHaveBeenCalledTimes(1);
+  });
 });
