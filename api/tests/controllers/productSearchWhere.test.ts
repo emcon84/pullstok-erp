@@ -1,11 +1,14 @@
 import { buildProductSearchWhere } from '../../src/controllers/productController';
 
 describe('buildProductSearchWhere', () => {
-  it('palabra suelta → OR entre nombre, código y variante', () => {
+  it('palabra suelta → OR entre nombre, código, categoría y variante', () => {
     const where = buildProductSearchWhere('Purina');
-    expect(where.OR).toHaveLength(3);
+    expect(where.OR).toHaveLength(4);
     expect(where.OR[0]).toEqual({ name: { contains: 'Purina', mode: 'insensitive' } });
     expect(where.OR[2]).toEqual({
+      category: { name: { contains: 'Purina', mode: 'insensitive' } },
+    });
+    expect(where.OR[3]).toEqual({
       variantAssignments: {
         some: {
           option: { value: { contains: 'Purina', mode: 'insensitive' } },
@@ -21,6 +24,7 @@ describe('buildProductSearchWhere', () => {
       OR: [
         { name: { contains: 'cat', mode: 'insensitive' } },
         { code: { contains: 'cat', mode: 'insensitive' } },
+        { category: { name: { contains: 'cat', mode: 'insensitive' } } },
         {
           variantAssignments: {
             some: {
@@ -35,8 +39,8 @@ describe('buildProductSearchWhere', () => {
   it('coma → OR entre términos (multi-marca)', () => {
     const where = buildProductSearchWhere('Purina, Proplan');
     expect(where.OR).toHaveLength(2);
-    // Cada término es un OR propio de nombre/código/variante
-    expect(where.OR[0].OR).toHaveLength(3);
+    // Cada término es un OR propio de nombre/código/categoría/variante
+    expect(where.OR[0].OR).toHaveLength(4);
     expect(where.OR[0].OR[0]).toEqual({ name: { contains: 'Purina', mode: 'insensitive' } });
     expect(where.OR[1].OR[0]).toEqual({ name: { contains: 'Proplan', mode: 'insensitive' } });
   });
@@ -44,7 +48,7 @@ describe('buildProductSearchWhere', () => {
   it('término con espacios dentro de la coma → AND dentro de ese término', () => {
     const where = buildProductSearchWhere('Purina, cat chow');
     expect(where.OR).toHaveLength(2);
-    expect(where.OR[0].OR).toHaveLength(3);
+    expect(where.OR[0].OR).toHaveLength(4);
     expect(where.OR[1].AND).toHaveLength(2);
   });
 
@@ -107,5 +111,53 @@ describe('buildProductSearchWhere', () => {
     expect(where.AND).toHaveLength(2);
     expect(where.AND[0].OR[0]).toEqual({ name: { contains: 'cat', mode: 'insensitive' } });
     expect(where.AND[1].OR[0]).toEqual({ name: { contains: 'chow', mode: 'insensitive' } });
+  });
+
+  it('incluye la categoría entre los campos buscados', () => {
+    const where = buildProductSearchWhere('perros');
+    expect(where.OR).toEqual(
+      expect.arrayContaining([
+        { category: { name: { contains: 'perros', mode: 'insensitive' } } },
+      ]),
+    );
+  });
+
+  it('expande por sinónimos: un token del grupo busca por todo el grupo', () => {
+    const where = buildProductSearchWhere('cachorro', [
+      ['Cachorro', 'puppy', 'cachorros'],
+    ]);
+    const names = where.OR
+      .map((o: { name?: { contains: string } }) => o.name?.contains)
+      .filter(Boolean);
+    expect(names).toContain('Cachorro');
+    expect(names).toContain('puppy');
+    expect(names).toContain('cachorros');
+  });
+
+  it('sin grupo que contenga el token → no expande (comportamiento intacto)', () => {
+    const where = buildProductSearchWhere('adulto', [['Cachorro', 'puppy']]);
+    expect(where.OR).toHaveLength(4);
+    const names = where.OR
+      .map((o: { name?: { contains: string } }) => o.name?.contains)
+      .filter(Boolean);
+    expect(names).toEqual(['adulto']);
+  });
+
+  it('cruza el token con el grupo ignorando tildes y mayúsculas', () => {
+    const where = buildProductSearchWhere('CÁCHORRO', [['cachorro', 'PUPPY']]);
+    const names = where.OR
+      .map((o: { name?: { contains: string } }) => o.name?.contains)
+      .filter(Boolean);
+    expect(names).toContain('cachorro');
+    expect(names).toContain('PUPPY');
+  });
+
+  it('los sinónimos también aplican en búsquedas de varias palabras', () => {
+    const where = buildProductSearchWhere('royal cachorro', [['Cachorro', 'puppy']]);
+    const secondNames = where.AND[1].OR
+      .map((o: { name?: { contains: string } }) => o.name?.contains)
+      .filter(Boolean);
+    expect(secondNames).toContain('Cachorro');
+    expect(secondNames).toContain('puppy');
   });
 });

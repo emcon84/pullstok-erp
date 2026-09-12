@@ -10,6 +10,7 @@ jest.mock("../../src/config/db", () => ({
     productVariant: { createMany: jest.fn() },
     branch: { findMany: jest.fn(), findFirst: jest.fn() },
     productStock: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn(), findMany: jest.fn() },
+    priceKgType: { findMany: jest.fn() },
     $transaction: jest.fn(),
   },
   basePrisma: {},
@@ -38,6 +39,7 @@ const mockedPrisma = prisma as unknown as {
   category: { findFirst: jest.Mock };
   categoryVariantOption: { findMany: jest.Mock };
   productVariant: { createMany: jest.Mock };
+  priceKgType: { findMany: jest.Mock };
   $transaction: jest.Mock;
 };
 
@@ -51,6 +53,7 @@ const mockResponse = () => {
 describe("productController.getProducts — branchId filter", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedPrisma.priceKgType.findMany.mockResolvedValue([]);
   });
 
   it("adds stocks include with branchId filter when branchId is provided", async () => {

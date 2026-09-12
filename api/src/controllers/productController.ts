@@ -281,7 +281,17 @@ const LARGE_BREED_PHRASES = [
 const SMALL_REMOVE = ["razas", "raza", "pequeña", "pequeñas", "pequena", "pequenas", "peq", "chicas", "mini", "talla", "small", "breed"];
 const LARGE_REMOVE = ["razas", "raza", "mediana", "medianas", "grande", "grandes", "m&g", "o", "y", "talla", "large", "breed"];
 
-export function buildProductSearchWhere(searchTerm: string): any {
+/** Normaliza un token para compararlo con los sinónimos (minúsculas, sin tildes). */
+const normalizeSearchToken = (value: string): string =>
+  value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+export function buildProductSearchWhere(
+  searchTerm: string,
+  synonymGroups: string[][] = [],
+): any {
   const variantMatch = (w: string) => ({
     variantAssignments: {
       some: {
@@ -291,6 +301,37 @@ export function buildProductSearchWhere(searchTerm: string): any {
       },
     },
   });
+
+  // Expansión por sinónimos: cada grupo es un conjunto de palabras equivalentes
+  // (name del tipo + `synonyms` de PriceKgType). Si un token de la búsqueda
+  // coincide con CUALQUIER palabra del grupo, se busca por TODAS: así "cachorro"
+  // encuentra productos que el catálogo nombra "PUPPY".
+  const expansion = new Map<string, string[]>();
+  for (const group of synonymGroups) {
+    const uniq = Array.from(
+      new Set(group.map((g) => (g ?? "").trim()).filter((g) => g.length > 0)),
+    );
+    if (uniq.length < 2) continue;
+    for (const word of uniq) {
+      const key = normalizeSearchToken(word);
+      if (key) expansion.set(key, uniq);
+    }
+  }
+  const expandToken = (token: string): string[] => {
+    const found = expansion.get(normalizeSearchToken(token));
+    return found && found.length > 0 ? found : [token];
+  };
+
+  // Campos donde matchea un token: nombre, código, categoría o valor de variante.
+  const fieldClauses = (w: string) => [
+    { name: { contains: w, mode: "insensitive" } },
+    { code: { contains: w, mode: "insensitive" } },
+    { category: { name: { contains: w, mode: "insensitive" } } },
+    variantMatch(w),
+  ];
+
+  // OR completo de un token, expandido por sinónimos cuando corresponde.
+  const tokenClauses = (w: string) => expandToken(w).flatMap(fieldClauses);
 
   // Detección de raza dentro de un término. Devuelve las palabras "regulares"
   // (AND) y los tokens de búsqueda de raza (OR). Con breedTokens vacío el
@@ -315,13 +356,7 @@ export function buildProductSearchWhere(searchTerm: string): any {
   // AND de palabras dentro de un término, integrando los tokens de raza.
   const buildAndWhere = (words: string[]) => {
     const { regular, breedTokens } = extractBreed(words);
-    const regularWhere = regular.map(w => ({
-      OR: [
-        { name: { contains: w, mode: "insensitive" } },
-        { code: { contains: w, mode: "insensitive" } },
-        variantMatch(w),
-      ],
-    }));
+    const regularWhere = regular.map(w => ({ OR: tokenClauses(w) }));
     if (breedTokens.length === 0) {
       return { AND: regularWhere };
     }
@@ -329,13 +364,7 @@ export function buildProductSearchWhere(searchTerm: string): any {
       AND: [
         ...regularWhere,
         {
-          OR: breedTokens.map(t => ({
-            OR: [
-              { name: { contains: t, mode: "insensitive" } },
-              { code: { contains: t, mode: "insensitive" } },
-              variantMatch(t),
-            ],
-          })),
+          OR: breedTokens.map(t => ({ OR: fieldClauses(t) })),
         },
       ],
     };
@@ -345,13 +374,7 @@ export function buildProductSearchWhere(searchTerm: string): any {
     const termWords = term.split(/\s+/).filter(w => w.length > 0);
     return termWords.length > 1
       ? buildAndWhere(termWords)
-      : {
-          OR: [
-            { name: { contains: term, mode: "insensitive" } },
-            { code: { contains: term, mode: "insensitive" } },
-            variantMatch(term),
-          ],
-        };
+      : { OR: tokenClauses(term) };
   };
 
   const terms = searchTerm
@@ -365,13 +388,7 @@ export function buildProductSearchWhere(searchTerm: string): any {
   if (words.length > 1) {
     return buildAndWhere(words);
   }
-  return {
-    OR: [
-      { name: { contains: searchTerm, mode: "insensitive" } },
-      { code: { contains: searchTerm, mode: "insensitive" } },
-      variantMatch(searchTerm),
-    ],
-  };
+  return { OR: tokenClauses(searchTerm) };
 }
 
 /**
@@ -483,7 +500,13 @@ const getProducts = async (req: Request, res: Response) => {
 
     if (name) {
       const searchTerm = name as string;
-      Object.assign(where, buildProductSearchWhere(searchTerm));
+      // Expansión por sinónimos de los tipos de la planilla (PriceKgType.synonyms,
+      // tenant-scoped): busca por conceptos equivalentes ("cachorro" → "PUPPY").
+      const typeRows = await prisma.priceKgType.findMany({
+        select: { name: true, synonyms: true },
+      });
+      const synonymGroups = typeRows.map((t) => [t.name, ...(t.synonyms ?? [])]);
+      Object.assign(where, buildProductSearchWhere(searchTerm, synonymGroups));
     }
     // "Solo lo que trabajo": ?carriedOnly=1 (o true) → solo productos con
     // carried=true (oculta los que se pueden pedir pero no se venden aún).
