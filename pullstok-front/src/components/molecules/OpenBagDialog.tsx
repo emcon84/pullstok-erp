@@ -5,7 +5,7 @@ import { useOpenBag } from "@/components/hooks/useOpenBag";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Dialog,
   DialogContent,
@@ -52,13 +52,7 @@ export const OpenBagDialog = ({
   const [selectedCellId, setSelectedCellId] = useState("");
   const [barcode, setBarcode] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [cellSearch, setCellSearch] = useState("");
   const barcodeInputRef = useRef<HTMLInputElement>(null);
-
-  // Filtrar celdas por búsqueda (case-insensitive)
-  const filteredCellOptions = cellOptions.filter((opt) =>
-    opt.label.toLowerCase().includes(cellSearch.toLowerCase())
-  );
 
   // Focus barcode input when dialog opens
   useEffect(() => {
@@ -73,7 +67,6 @@ export const OpenBagDialog = ({
       setScannedProduct(null);
       setSelectedCellId("");
       setBarcode("");
-      setCellSearch("");
       clearError();
     }
   }, [open, clearError]);
@@ -209,25 +202,16 @@ export const OpenBagDialog = ({
             <Label htmlFor="cell-select" className="text-sm font-medium">
               Celda destino
             </Label>
-            {/* Filtro de búsqueda para las celdas */}
-            <Input
-              id="cell-search"
-              type="text"
-              placeholder="Filtrar celdas..."
-              className="mb-1"
-              onChange={(e) => setCellSearch(e.target.value)}
-              value={cellSearch}
-              disabled={loadingCells || !scannedProduct}
-              aria-label="Buscar celda por marca, tipo o especie"
-            />
-            <NativeSelect
+            <SearchableSelect
               id="cell-select"
+              ariaLabel="Celda destino para abrir bolsa"
               value={selectedCellId}
               onValueChange={setSelectedCellId}
-              options={filteredCellOptions}
+              options={cellOptions}
               placeholder="Seleccioná una celda"
+              searchPlaceholder="Buscar marca, tipo o especie…"
+              emptyMessage="Sin celdas que coincidan"
               disabled={!scannedProduct || loadingCells}
-              aria-label="Celda destino para abrir bolsa"
             />
             {loadingCells && <p className="text-xs text-muted-foreground">Cargando celdas…</p>}
           </div>
