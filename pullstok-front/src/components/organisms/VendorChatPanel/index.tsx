@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/sheet";
 import {
   useGetMessages,
-  useSendVendorMessage,
 } from "@/hooks/useVendorChat";
 import type { VendorChat } from "@/services/vendorChatService";
 
@@ -28,7 +27,6 @@ export function VendorChatPanel({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const messagesQuery = useGetMessages(conversation?.id ?? null);
-  const sendMsg = useSendVendorMessage();
 
   const messages = messagesQuery.data ?? [];
   const isLoadingMessages = messagesQuery.isLoading;
@@ -41,14 +39,9 @@ export function VendorChatPanel({
     const body = draft.trim();
     if (!body || !conversation) return;
     onSendMessage(body);
-    sendMsg.mutate(
-      { conversationId: conversation.id, sender: "SELLER", body },
-      {
-        onSuccess: () => setDraft(""),
-      },
-    );
+    setDraft("");
     inputRef.current?.focus();
-  }, [draft, conversation, onSendMessage, sendMsg]);
+  }, [draft, conversation, onSendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -146,7 +139,7 @@ export function VendorChatPanel({
           <Button
             size="sm"
             onClick={handleSend}
-            disabled={!draft.trim() || sendMsg.isPending}
+            disabled={!draft.trim()}
           >
             <Send className="h-4 w-4" />
           </Button>

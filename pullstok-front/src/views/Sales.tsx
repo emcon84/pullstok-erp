@@ -35,7 +35,6 @@ import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
 import { CartItem, Sale } from "../models/salesModel";
 import { isLooseSale, isUnitSale } from "../models/saleModeHelpers";
-import { VendorChatWidget } from "@/components/organisms/VendorChat";
 import type { PaymentInput } from "../models/cashSessionModel";
 
 const TAX_CONDITIONS = [
@@ -585,7 +584,6 @@ export const SalesPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <VendorChatWidget sellerId={currentUser?.id ?? ""} />
     </div>
   );
 };

@@ -47,6 +47,7 @@ import type { Role } from "@/constants/rolePermissions";
 import { UnifiedPos } from "./UnifiedPos";
 import { FilterChips } from "../components/molecules/FilterChips";
 import { planTitleKeyOf } from "@/lib/printGrouping";
+import { VendorChatWidget } from "@/components/organisms/VendorChat";
 import {
   parseFilterTerms,
   matchesProductFilter,
@@ -109,8 +110,14 @@ export const Dashboard = () => {
   const branchFilter = searchParams.get("branch") || undefined;
 
   // ── Vendor/Cashier quick-sale POS unificado ──
+  // Widget de chat de asistente de ventas (FAB flotante)
   if (branchMode.kind === "single") {
-    return <UnifiedPos branchId={branchMode.branchId} />;
+    return (
+      <>
+        <UnifiedPos branchId={branchMode.branchId} />
+        <VendorChatWidget sellerId={currentUser?.id ?? ""} />
+      </>
+    );
   }
 
   const {
@@ -554,6 +561,7 @@ export const Dashboard = () => {
       <GenericModal isOpen={isModalUploadOpen} onClose={closeModalUpload}>
         <ModalContentUploadCsv />
       </GenericModal>
+      <VendorChatWidget sellerId={currentUser?.id ?? ""} />
     </div>
   );
 };
