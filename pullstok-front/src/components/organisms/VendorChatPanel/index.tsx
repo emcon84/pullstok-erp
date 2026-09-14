@@ -9,8 +9,8 @@ import {
 import {
   useGetMessages,
   useSendVendorMessage,
-  type VendorChat,
 } from "@/hooks/useVendorChat";
+import type { VendorChat } from "@/services/vendorChatService";
 
 interface VendorChatPanelProps {
   conversation?: VendorChat | null;
