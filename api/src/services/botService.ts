@@ -4,6 +4,7 @@ import { runWithTenant } from "../config/tenantContext";
 import { persistMessage, escalateConversation } from "./chatService";
 import { emitChatTyping } from "../realtime/socket";
 import getNextSequenceValue from "./secuenceService";
+import * as vendorChatService from "./vendorChatService";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -103,7 +104,7 @@ const buildSystemPrompt = (org: Organization, botConfig: BotConfig): string => {
   ].join("\n");
 };
 
-const buildVendorSystemPrompt = (
+export const buildVendorSystemPrompt = (
   org: Organization,
   ragContext?: string,
 ): string => {
@@ -225,6 +226,99 @@ export const generateBotReply = async ({
   }
 };
 
+export const replyToVendorChat = async ({
+  vendorChatId,
+}: {
+  vendorChatId: string;
+}): Promise<void> => {
+  const vendorChat = await prisma.vendorChat.findFirst({
+    where: { id: vendorChatId },
+    include: { messages: { orderBy: { createdAt: "asc" } } },
+  });
+  if (!vendorChat || vendorChat.status !== "ACTIVE") return;
+
+  const messages = vendorChat.messages ?? [];
+
+  const lastSellerMsg = [...messages]
+    .reverse()
+    .find((m) => m.sender === "SELLER");
+  if (!lastSellerMsg) return;
+
+  const ragContext = await vendorChatService.buildRAGContext(
+    lastSellerMsg.body,
+    vendorChat.organizationId,
+  );
+
+  const botConfig = await prisma.botConfig.findFirst();
+  if (!botConfig || !botConfig.enabled) return;
+
+  const apiKey = resolveGroqKey(botConfig);
+  if (!apiKey) return;
+
+  const org = await basePrisma.organization.findFirst({
+    where: { id: vendorChat.organizationId },
+  });
+  if (!org) return;
+
+  const history = messages.slice(-HISTORY_LIMIT).map((m) => ({
+    role: (m.sender === "SELLER" ? "user" : "assistant") as "user" | "assistant",
+    content: m.body,
+  }));
+
+  const systemPrompt = buildVendorSystemPrompt(org, ragContext);
+
+  const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
+    { role: "system", content: systemPrompt },
+    ...history,
+  ];
+
+  let res = await fetch(GROQ_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: botConfig.model,
+      max_tokens: MAX_TOKENS,
+      temperature: 0.4,
+      messages: chatMessages,
+    }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: botConfig.model,
+        max_tokens: MAX_TOKENS,
+        temperature: 0.4,
+        messages: chatMessages,
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) return;
+  }
+
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string | null } }[];
+  };
+  const content = data.choices?.[0]?.message?.content ?? "";
+  if (!content?.trim()) return;
+
+  await vendorChatService.sendVendorMessage({
+    vendorChatId,
+    organizationId: vendorChat.organizationId,
+    sender: "ASSISTANT",
+    body: content,
+  });
+};
+
 const handleBotReply = async (
   conversationId: string,
   organizationId: string,
@@ -315,4 +409,5 @@ export default {
   resolveGroqKey,
   getVendorChatUsageToday,
   incrementVendorChatUsage,
+  replyToVendorChat,
 };

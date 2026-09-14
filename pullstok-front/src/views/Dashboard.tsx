@@ -556,7 +556,7 @@ export const Dashboard = () => {
         <ModalContentUploadCsv />
       </GenericModal>
 
-      <VendorChatWidget />
+      <VendorChatWidget sellerId={currentUser?.id ?? ""} />
     </div>
   );
 };

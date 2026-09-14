@@ -18,7 +18,11 @@ import {
 } from "@/components/organisms/VendorChatPanel";
 import type { VendorChat } from "@/services/vendorChatService";
 
-export function VendorChatWidget() {
+interface VendorChatWidgetProps {
+  sellerId: string;
+}
+
+export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
   const [chatOpen, setChatOpen] = useState(false);
   const [selectedChat, setSelectedChat] = useState<VendorChat | null>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -91,7 +95,7 @@ export function VendorChatWidget() {
                   setSelectedChat(chat);
                 }}
                 onCreate={async () => {
-                  const created = await createChat.mutateAsync({ sellerId: "" });
+                  const created = await createChat.mutateAsync({ sellerId });
                   setSelectedChat(created);
                 }}
               />

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 import { requireOrganizationId } from "../config/tenantContext";
 import * as vendorChatService from "../services/vendorChatService";
+import botService from "../services/botService";
 import {
   createVendorChat,
   listVendorChats,
@@ -78,6 +79,11 @@ const postMessage = async (req: AuthedRequest, res: Response) => {
       sender,
       body,
     });
+
+    // Disparar respuesta del bot en background (no bloquear respuesta HTTP)
+    if (sender === "SELLER") {
+      void botService.replyToVendorChat({ vendorChatId });
+    }
 
     res.status(201).json(message);
   } catch (error: any) {
