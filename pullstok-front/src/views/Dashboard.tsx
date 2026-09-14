@@ -52,7 +52,6 @@ import {
   matchesProductFilter,
   isPurinaProduct,
 } from "@/lib/productFilter";
-import { VendorChatWidget } from "@/components/organisms/VendorChat";
 
 type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
 
@@ -555,8 +554,6 @@ export const Dashboard = () => {
       <GenericModal isOpen={isModalUploadOpen} onClose={closeModalUpload}>
         <ModalContentUploadCsv />
       </GenericModal>
-
-      <VendorChatWidget sellerId={currentUser?.id ?? ""} />
     </div>
   );
 };
