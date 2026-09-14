@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Loader } from "@/components/atoms/loader";
@@ -21,8 +22,12 @@ import {
   useListVendorChats,
   useSendVendorMessage,
   useCreateVendorChat,
-} from "@/components/hooks/useVendorChat";
-import { VendorChatPanel, VendorChatFAB } from "@/components/organisms/VendorChatPanel";
+} from "@/hooks/useVendorChat";
+import {
+  VendorChatPanel,
+  VendorChatFAB,
+  ChatListPanel,
+} from "@/components/organisms/VendorChatPanel";
 import {
   branchQty,
   VENDOR_FILTER_KEY,

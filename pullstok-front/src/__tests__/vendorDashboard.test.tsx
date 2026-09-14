@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("react-router-dom", () => ({
   useNavigate: () => vi.fn(),
@@ -23,7 +24,32 @@ vi.mock("@/components/hooks/useVendorKeyboard", () => ({
 vi.mock("@/components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
 }));
-
+vi.mock("@/hooks/useVendorChat", () => ({
+  useListVendorChats: vi.fn(() => ({ data: [] })),
+  useSendVendorMessage: vi.fn(() => ({
+    mutateAsync: vi.fn().mockResolvedValue({}),
+  })),
+  useCreateVendorChat: vi.fn(() => ({
+    mutateAsync: vi.fn().mockResolvedValue({
+      id: "chat-1",
+      organizationId: "org-1",
+      sellerId: "",
+      status: "ACTIVE",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [],
+    }),
+  })),
+  vendorChatKeys: {
+    conversations: ["vendorChat", "conversations"],
+    conversation: (id: string) => ["vendorChat", "conversation", id],
+    messages: (convId: string) => ["vendorChat", "messages", convId],
+  },
+  useGetMessages: vi.fn(() => ({ data: [] })),
+  useCloseVendorChat: vi.fn(() => ({
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
 vi.mock("@/components/molecules/VendorSearchBar", () => ({
   VendorSearchBar: () => <div data-testid="search-bar" />,
 }));
@@ -50,6 +76,8 @@ import { useVendorQuantityModal } from "@/components/hooks/useVendorQuantityModa
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useVendorKeyboard } from "@/components/hooks/useVendorKeyboard";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
+
+const queryClient = new QueryClient();
 
 const mockUseVendorCatalog = vi.mocked(useVendorCatalog);
 
@@ -121,7 +149,11 @@ function renderVendor(catalogOverrides: Record<string, unknown> = {}) {
     refetch: vi.fn(),
   } as never);
 
-  render(<VendorDashboard branchId="branch-1" />);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <VendorDashboard branchId="branch-1" />
+    </QueryClientProvider>,
+  );
   return catalog;
 }
 

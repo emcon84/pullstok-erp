@@ -10,7 +10,6 @@ import {
   useGetMessages,
   useSendVendorMessage,
   type VendorChat,
-  type VendorChatMessage,
 } from "@/hooks/useVendorChat";
 
 interface VendorChatPanelProps {
