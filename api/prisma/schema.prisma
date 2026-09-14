@@ -104,6 +104,8 @@ model Organization {
   invoices              Invoice[]
   conversations         Conversation[]
   botConfig             BotConfig?
+  vendorChats           VendorChat[]
+  vendorChatMessages    VendorChatMessage[]
   appBranding           AppBranding?
   arcaSetting           ArcaSetting?
   arcaSequences         ArcaSequence[]
@@ -140,6 +142,7 @@ model User {
   resetTokenExpiry   DateTime?
   branchAssignments  BranchAssignment[]
   cashSessions       CashSession[]
+  vendorChats        VendorChat[]
 
   @@index([organizationId])
   @@map("users")
@@ -1174,6 +1177,53 @@ model WhatsAppOrderDraft {
 
   @@index([organizationId, status, createdAt])
   @@map("whatsapp_order_drafts")
+}
+
+// ---------------------------------------------------------------------------
+// Asistente de ventas por vendedor (sdd/asistente-ventas-chat)
+// ---------------------------------------------------------------------------
+
+enum VendorChatStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum VendorMessageSender {
+  SELLER
+  ASSISTANT
+}
+
+model VendorChat {
+  id             String              @id @default(uuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  sellerId       String
+  seller         User                @relation(fields: [sellerId], references: [id])
+  status         VendorChatStatus    @default(ACTIVE)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  messages       VendorChatMessage[]
+
+  @@index([organizationId])
+  @@index([organizationId, sellerId])
+  @@map("vendor_chats")
+}
+
+model VendorChatMessage {
+  id             String          @id @default(uuid())
+  vendorChatId   String
+  vendorChat     VendorChat      @relation(fields: [vendorChatId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  sender         VendorMessageSender
+  isBot          Boolean           @default(false)
+  body           String
+  ragContext     String?
+  createdAt      DateTime          @default(now())
+
+  @@index([vendorChatId, createdAt])
+  @@index([organizationId])
+  @@map("vendor_chat_messages")
 }
 
 // Configuración de branding del ERP por organización, 1:1 con Organization.

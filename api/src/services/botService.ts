@@ -1,67 +1,30 @@
 import { BotConfig, Message, Organization } from "@prisma/client";
 import { prisma, basePrisma } from "../config/db";
 import { runWithTenant } from "../config/tenantContext";
-// Import UNIDIRECCIONAL (botService → chatService/realtime): estos módulos NO
-// importan botService → sin ciclo. persistMessage es el ÚNICO punto de escritura
-// de mensajes (emite chat:message al room); emitChatTyping muestra el
-// "escribiendo…" del lado OPERATOR mientras Groq genera.
 import { persistMessage, escalateConversation } from "./chatService";
 import { emitChatTyping } from "../realtime/socket";
 import getNextSequenceValue from "./secuenceService";
 
-/**
- * Bot de atención IA (FASE 1: motor Groq).
- *
- * El bot es un "operador" que responde con Groq en vez de un humano. Su respuesta
- * fluye por la MISMA infra de chat existente: se persiste con persistMessage
- * (sender=OPERATOR, senderUserId=null, isBot=true) → eso emite chat:message al
- * room de la conversación, igual que la respuesta de un humano.
- *
- * Se dispara FIRE-AND-FORGET después de que un GUEST manda un mensaje (ver
- * chatController.postGuestMessage): nunca bloquea el response REST del visitante.
- *
- * FASE 2 (fuera de alcance): handoff a humano (flipear Conversation.mode a HUMAN),
- * config del bot desde el ERP, BYO-key encriptada.
- */
-
-// Endpoint compatible con OpenAI que expone Groq. Usamos plain fetch (Node 20
-// trae fetch + AbortSignal.timeout globales) para no sumar una dependencia.
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-// Caps de contexto/costo. Truncamos SIEMPRE: nunca mandamos una conversación
-// infinita ni una base de conocimiento gigante a Groq.
-const HISTORY_LIMIT = 15; // últimos N mensajes que se mandan como historial
-const KB_CHAR_CAP = 6000; // máx. de caracteres de la base de conocimiento
-const MAX_TOKENS = 500; // tope de tokens de la respuesta del bot
-const TIMEOUT_MS = 15000; // timeout del fetch a Groq (red / rate limit colgado)
+const HISTORY_LIMIT = 15;
+const KB_CHAR_CAP = 6000;
+const MAX_TOKENS = 500;
+const TIMEOUT_MS = 15000;
 
-// El bot solo atiende a comercios PREMIUM (gating por plan). Mismo criterio que
-// checkStoreEnabled pero más restrictivo (STORE es PRO+; el bot es PREMIUM).
 const BOT_PLAN = "PREMIUM";
 
-// warn-once (mismo espíritu que mailService): si falta GROQ_API_KEY, avisamos una
-// sola vez y el bot queda en silencio (no rompe nada).
 let warnedNoKey = false;
 
-/**
- * Resuelve la key de Groq a usar. ENCHUFABLE: hoy SIEMPRE cae en la key de
- * plataforma (env GROQ_API_KEY). El `botConfig.apiKey` es un placeholder para el
- * futuro BYO-key (bring-your-own-key) del comercio; cuando se implemente habrá
- * que ENCRIPTAR esa columna. Devuelve null si no hay ninguna key configurada.
- */
 export const resolveGroqKey = (botConfig: BotConfig): string | null =>
   botConfig.apiKey ?? process.env.GROQ_API_KEY ?? null;
 
-// Nombre del contador diario de uso del bot, por org (reusa el modelo Counter,
-// mismo patrón que la numeración de comprobantes). Un contador por día (UTC).
 const botCounterName = (): string =>
   `bot:${new Date().toISOString().slice(0, 10)}`;
 
-/**
- * Uso del bot en el día de hoy para una org (0 si nunca respondió hoy). Counter
- * NO es tenant-model (se scopea a mano por organizationId + name), así que se lee
- * con basePrisma con el where explícito.
- */
+const vendorChatCounterName = (): string =>
+  `vendor-chat:${new Date().toISOString().slice(0, 10)}`;
+
 const getBotUsageToday = async (organizationId: string): Promise<number> => {
   const counter = await basePrisma.counter.findFirst({
     where: { organizationId, name: botCounterName() },
@@ -70,13 +33,23 @@ const getBotUsageToday = async (organizationId: string): Promise<number> => {
   return counter?.sequenceValue ?? 0;
 };
 
-// Suma 1 al contador diario del bot (upsert atómico, reusa secuenceService).
+export const getVendorChatUsageToday = async (
+  organizationId: string,
+): Promise<number> => {
+  const counter = await basePrisma.counter.findFirst({
+    where: { organizationId, name: vendorChatCounterName() },
+    select: { sequenceValue: true },
+  });
+  return counter?.sequenceValue ?? 0;
+};
+
 const incrementBotUsage = (organizationId: string): Promise<number> =>
   getNextSequenceValue(organizationId, botCounterName());
 
-// ---------------------------------------------------------------------------
-// Armado del prompt y llamada a Groq
-// ---------------------------------------------------------------------------
+export const incrementVendorChatUsage = (
+  organizationId: string,
+): Promise<number> =>
+  getNextSequenceValue(organizationId, vendorChatCounterName());
 
 type GroqRole = "system" | "user" | "assistant";
 interface GroqMessage {
@@ -84,9 +57,6 @@ interface GroqMessage {
   content: string;
 }
 
-// Tool (function calling, formato OpenAI que Groq acepta) para el handoff a
-// humano de FASE 2. Sin parámetros: es una señal ("derivá a un humano"), la
-// decisión de cuándo llamarlo la toma el modelo según el system prompt.
 const HANDOFF_TOOL = {
   type: "function",
   function: {
@@ -97,23 +67,13 @@ const HANDOFF_TOOL = {
   },
 } as const;
 
-// Resultado del bot: o una respuesta de texto normal, o la señal de handoff
-// (el modelo llamó a request_human_handoff → hay que escalar, no persistir texto).
-// null se reserva para "el bot no responde" (sin key, error, respuesta vacía).
 export type BotReply = { kind: "text"; content: string } | { kind: "handoff" };
 
-// Shape parcial del `message` que devuelve Groq en cada choice (solo lo que
-// consumimos: texto y/o tool_calls).
 interface GroqChoiceMessage {
   content?: string | null;
   tool_calls?: { function?: { name?: string } }[];
 }
 
-// Los modelos chicos (ej. llama-3.1-8b) a veces NO usan el canal `tool_calls` y
-// en su lugar escupen la llamada como TEXTO dentro del content, ej:
-//   "…texto… <function=request_human_handoff>{}</function>"
-// Este helper saca cualquier etiqueta <function ...> (con o sin cierre) para que
-// esa basura NUNCA se le muestre al cliente.
 const stripFunctionTags = (text: string): string =>
   text
     .replace(/<function[^>]*>[\s\S]*?<\/function>/gi, "")
@@ -122,10 +82,6 @@ const stripFunctionTags = (text: string): string =>
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-// System prompt: define al bot como asistente del comercio, en español
-// rioplatense, y lo ata a responder SOLO con la base de conocimiento (si no sabe,
-// lo dice y ofrece derivar a un humano). Dejado listo para extenderse en FASE 2
-// (p.ej. instrucciones de handoff explícito).
 const buildSystemPrompt = (org: Organization, botConfig: BotConfig): string => {
   const kb = botConfig.knowledgeBase.trim().slice(0, KB_CHAR_CAP);
   const knowledge =
@@ -147,28 +103,44 @@ const buildSystemPrompt = (org: Organization, botConfig: BotConfig): string => {
   ].join("\n");
 };
 
-// Mapea los últimos mensajes del historial a roles de Groq: GUEST → user,
-// OPERATOR (humano o bot) → assistant. Trunca a HISTORY_LIMIT.
+const buildVendorSystemPrompt = (
+  org: Organization,
+  ragContext?: string,
+): string => {
+  const parts = [
+    `Sos el asistente de ventas del vendedor en "${org.name}".`,
+    "Respondé SIEMPRE en español rioplatense, con tono profesional y orientado a cerrar ventas.",
+    "Tu tarea es AYUDAR AL VENDEDOR a responder consultas de productos del catálogo de la org. Enfocate en PRECIO, STOCK, CARACTERÍSTICAS y RECOMENDACIONES de venta.",
+    "Usá EXCLUSIVAMENTE la información de los PRODUCTOS inyectada abajo y la del catálogo de la org. NO inventes datos.",
+    "NO ofrezcas derivar a un humano: vos sos el asistente del vendedor, respondé con información de productos y sugerencias de venta.",
+    "Sé breve y directo: respuestas cortas, enfocadas en vender.",
+  ];
+
+  if (ragContext && ragContext.length > 0) {
+    parts.push("", "--- PRODUCTOS RELEVANTES ---", ragContext, "--- FIN PRODUCTOS ---");
+  }
+
+  return parts.join("\n");
+};
+
 const mapHistory = (messages: Message[]): GroqMessage[] =>
   messages.slice(-HISTORY_LIMIT).map((m) => ({
     role: m.sender === "GUEST" ? "user" : "assistant",
     content: m.body,
   }));
 
-/**
- * Llama a Groq y devuelve el texto de la respuesta del bot, o null si algo falla.
- * ROBUSTO: cualquier error (red, timeout, rate limit, key inválida, respuesta
- * rara) se loguea y devuelve null → el bot queda en silencio, nunca rompe el
- * flujo del chat.
- */
 export const generateBotReply = async ({
   botConfig,
   org,
   messages,
+  ragContext,
+  vendorMode,
 }: {
   botConfig: BotConfig;
   org: Organization;
   messages: Message[];
+  ragContext?: string;
+  vendorMode?: boolean;
 }): Promise<BotReply | null> => {
   const apiKey = resolveGroqKey(botConfig);
   if (!apiKey) {
@@ -182,13 +154,17 @@ export const generateBotReply = async ({
     return null;
   }
 
+  const systemPrompt = vendorMode
+    ? buildVendorSystemPrompt(org, ragContext)
+    : buildSystemPrompt(org, botConfig);
+
   const chatMessages = [
-    { role: "system", content: buildSystemPrompt(org, botConfig) },
+    { role: "system", content: systemPrompt },
     ...mapHistory(messages),
   ] as GroqMessage[];
 
-  // Un solo POST a Groq. `withTools` decide si mandamos el tool de handoff:
-  // permite reintentar SIN tools si el modelo elegido no los soporta.
+  const tools = vendorMode ? [] : [HANDOFF_TOOL];
+
   const callGroq = (withTools: boolean): Promise<Response> =>
     fetch(GROQ_URL, {
       method: "POST",
@@ -201,19 +177,16 @@ export const generateBotReply = async ({
         max_tokens: MAX_TOKENS,
         temperature: 0.4,
         messages: chatMessages,
-        ...(withTools
-          ? { tools: [HANDOFF_TOOL], tool_choice: "auto" }
+        ...(withTools && tools.length > 0
+          ? { tools, tool_choice: "auto" }
           : {}),
       }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
   try {
-    let res = await callGroq(true);
+    let res = await callGroq(tools.length > 0);
 
-    // Degradación con gracia: si el modelo no soporta tools (o Groq rechaza el
-    // request con tools por cualquier motivo), reintentamos UNA vez sin tools
-    // para al menos dar una respuesta de texto normal en vez de quedar mudos.
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
       console.error(
@@ -234,18 +207,16 @@ export const generateBotReply = async ({
     };
     const message = data.choices?.[0]?.message;
 
-    // Handoff tiene PRIORIDAD sobre el texto. Lo detectamos por DOS vías porque
-    // el modelo puede llamar al tool por el canal estructurado (tool_calls) O
-    // escupirlo como texto plano en el content ("<function=request_human_handoff>…").
     const rawContent = message?.content ?? "";
     const toolHandoff = (message?.tool_calls ?? []).some(
       (t) => t.function?.name === "request_human_handoff",
     );
     const inlineHandoff = /request_human_handoff/i.test(rawContent);
+    if (vendorMode && (toolHandoff || inlineHandoff)) {
+      return { kind: "text", content: stripFunctionTags(rawContent) };
+    }
     if (toolHandoff || inlineHandoff) return { kind: "handoff" };
 
-    // Red de seguridad: aunque no sea handoff, limpiamos cualquier etiqueta
-    // <function ...> filtrada al texto para no mostrarle basura al cliente.
     const content = stripFunctionTags(rawContent);
     return content.length > 0 ? { kind: "text", content } : null;
   } catch (err) {
@@ -254,34 +225,18 @@ export const generateBotReply = async ({
   }
 };
 
-// ---------------------------------------------------------------------------
-// Orquestador: disparo del bot tras un mensaje del GUEST
-// ---------------------------------------------------------------------------
-
-/**
- * Trabajo real del bot para una conversación. Corre DENTRO de runWithTenant (lo
- * abre maybeReplyToGuestMessage) → persistMessage y el `prisma` scopeado tienen
- * contexto de org aunque el request HTTP del guest ya haya terminado.
- */
 const handleBotReply = async (
   conversationId: string,
   organizationId: string,
 ): Promise<void> => {
-  // Config del bot (tenant-model → findFirst scopeado). Sin config o deshabilitado
-  // → el bot no existe para esta org.
   const botConfig = await prisma.botConfig.findFirst();
   if (!botConfig || !botConfig.enabled) return;
 
-  // Gating por plan: solo PREMIUM. Organization NO es tenant-model → basePrisma
-  // con where explícito.
   const org = await basePrisma.organization.findFirst({
     where: { id: organizationId },
   });
   if (!org || org.plan !== BOT_PLAN) return;
 
-  // La conversación debe existir, estar OPEN y en modo BOT (en FASE 2 el handoff
-  // la pasa a HUMAN → el bot se calla). Conversation es tenant-model → findFirst
-  // scopeado (ownership implícito por org).
   const conversation = await prisma.conversation.findFirst({
     where: { id: conversationId },
   });
@@ -293,21 +248,16 @@ const handleBotReply = async (
     return;
   }
 
-  // Historial (Message NO es tenant-model → no necesita scope; se acota por el
-  // conversationId ya validado como de la org).
   const history = await prisma.message.findMany({
     where: { conversationId },
     orderBy: { createdAt: "asc" },
-    take: HISTORY_LIMIT + 5, // pequeño margen antes del slice final
+    take: HISTORY_LIMIT + 5,
   });
   if (history.length === 0) return;
 
-  // Guarda anti-loop: el bot SOLO responde si el último mensaje es del GUEST.
-  // Sus propias respuestas nacen como OPERATOR → nunca se auto-responde.
   const last = history[history.length - 1];
   if (last.sender !== "GUEST") return;
 
-  // Freno de costo: si ya se alcanzó el tope diario, el bot queda en silencio.
   const usedToday = await getBotUsageToday(organizationId);
   if (usedToday >= botConfig.dailyLimit) {
     console.warn(
@@ -316,23 +266,16 @@ const handleBotReply = async (
     return;
   }
 
-  // "escribiendo…" del lado OPERATOR mientras Groq genera. Se corta SIEMPRE en el
-  // finally (haya respuesta o no).
   emitChatTyping(conversationId, "OPERATOR", true);
   try {
     const reply = await generateBotReply({ botConfig, org, messages: history });
-    if (!reply) return; // Groq falló o no hay key → nada que mandar
+    if (!reply) return;
 
-    // FASE 2 — HANDOFF: el modelo llamó a request_human_handoff. En vez de
-    // responder texto, escalamos la conversación a HUMAN (el bot se calla, se
-    // avisa a los operadores). No contamos uso: no hubo respuesta de conocimiento.
     if (reply.kind === "handoff") {
       await escalateConversation(conversationId, organizationId);
       return;
     }
 
-    // Persiste como respuesta del bot: sender=OPERATOR (fluye igual que un
-    // humano), senderUserId=null, isBot=true. persistMessage emite chat:message.
     await persistMessage({
       conversationId,
       sender: "OPERATOR",
@@ -341,23 +284,12 @@ const handleBotReply = async (
       body: reply.content,
     });
 
-    // Recién acá contamos el uso: el contador refleja respuestas REALMENTE
-    // generadas (no intentos que fallaron).
     await incrementBotUsage(organizationId);
   } finally {
     emitChatTyping(conversationId, "OPERATOR", false);
   }
 };
 
-/**
- * Punto de entrada FIRE-AND-FORGET del bot. Lo llama chatController.postGuestMessage
- * DESPUÉS de persistir el mensaje del guest y responder el HTTP. NUNCA se espera
- * (`void`): la respuesta del visitante no debe bloquearse por Groq.
- *
- * Abre su propio contexto de tenant (runWithTenant) con el organizationId de la
- * conversación → no depende de que sobreviva el AsyncLocalStorage del request.
- * Todo el trabajo va envuelto en try/catch: un fallo del bot jamás propaga.
- */
 export const maybeReplyToGuestMessage = ({
   conversationId,
   organizationId,
@@ -377,4 +309,10 @@ export const maybeReplyToGuestMessage = ({
   );
 };
 
-export default { maybeReplyToGuestMessage, generateBotReply, resolveGroqKey };
+export default {
+  maybeReplyToGuestMessage,
+  generateBotReply,
+  resolveGroqKey,
+  getVendorChatUsageToday,
+  incrementVendorChatUsage,
+};
