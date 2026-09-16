@@ -1,11 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type MouseEvent } from "react";
-import { MessageSquare, Send, Loader2, Plus, Trash2 } from "lucide-react";
+import { MessageSquare, Send, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import {
   useGetMessages,
 } from "@/hooks/useVendorChat";
@@ -13,11 +9,13 @@ import { useConfirm } from "@/components/hooks/useConfirm";
 import type { VendorChat } from "@/services/vendorChatService";
 
 interface VendorChatPanelProps {
-  conversation?: VendorChat | null;
+  conversation: VendorChat;
   onSendMessage: (body: string) => void;
   isTyping?: boolean;
 }
 
+// Solo el área de mensajes + composer: el header (título, volver, badge de
+// estado) vive en VendorChatWidget, compartido con la lista de conversaciones.
 export function VendorChatPanel({
   conversation,
   onSendMessage,
@@ -27,7 +25,7 @@ export function VendorChatPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const messagesQuery = useGetMessages(conversation?.id ?? null);
+  const messagesQuery = useGetMessages(conversation.id);
 
   const messages = messagesQuery.data ?? [];
   const isLoadingMessages = messagesQuery.isLoading;
@@ -38,11 +36,11 @@ export function VendorChatPanel({
 
   const handleSend = useCallback(() => {
     const body = draft.trim();
-    if (!body || !conversation) return;
+    if (!body) return;
     onSendMessage(body);
     setDraft("");
     inputRef.current?.focus();
-  }, [draft, conversation, onSendMessage]);
+  }, [draft, onSendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -51,36 +49,19 @@ export function VendorChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <SheetHeader className="px-0 pb-3 border-b">
-        <SheetTitle className="flex items-center justify-between text-base">
-          <span>Asistente de ventas</span>
-          {conversation && (
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full ${
-                conversation.status === "ACTIVE"
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {conversation.status === "ACTIVE" ? "Activa" : "Cerrada"}
-            </span>
-          )}
-        </SheetTitle>
-      </SheetHeader>
-
-      <div className="flex-1 overflow-y-auto space-y-2 py-3 min-h-0">
+    <div className="flex flex-1 flex-col min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
         {isLoadingMessages && (
           <div className="flex justify-center py-4">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         )}
 
-        {!conversation && !isLoadingMessages && (
+        {!isLoadingMessages && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
             <MessageSquare className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Iniciá una conversación con el asistente de ventas
+              Escribile al asistente para empezar
             </p>
           </div>
         )}
@@ -93,10 +74,10 @@ export function VendorChatPanel({
             }`}
           >
             <div
-              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
+              className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
                 msg.sender === "SELLER"
                   ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
+                  : "bg-muted text-foreground"
               }`}
             >
               {msg.body}
@@ -106,7 +87,7 @@ export function VendorChatPanel({
 
         {isTyping && (
           <div className="flex justify-start">
-            <div className="bg-muted rounded-lg px-3 py-2 flex items-center gap-1">
+            <div className="bg-muted rounded-2xl px-3.5 py-2.5 flex items-center gap-1">
               <span className="flex gap-1">
                 <span
                   className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce"
@@ -127,8 +108,8 @@ export function VendorChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
-      {conversation && conversation.status === "ACTIVE" && (
-        <div className="flex gap-2 pt-3 border-t">
+      {conversation.status === "ACTIVE" && (
+        <div className="flex shrink-0 items-center gap-2 border-t px-4 py-3">
           <Input
             ref={inputRef}
             value={draft}
@@ -138,7 +119,7 @@ export function VendorChatPanel({
             className="flex-1"
           />
           <Button
-            size="sm"
+            size="icon"
             onClick={handleSend}
             disabled={!draft.trim()}
           >
@@ -179,12 +160,15 @@ export function VendorChatFAB({
 
 interface ChatListPanelProps {
   chats: VendorChat[];
+  error?: string;
   onSelect: (chat: VendorChat) => void;
-  onCreate: () => void;
   onDelete: (id: string) => void;
 }
 
-export function ChatListPanel({ chats, onSelect, onCreate, onDelete }: ChatListPanelProps) {
+const formatChatDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "short" });
+
+export function ChatListPanel({ chats, error, onSelect, onDelete }: ChatListPanelProps) {
   const confirm = useConfirm();
 
   const handleDelete = async (e: MouseEvent, chatId: string) => {
@@ -199,25 +183,18 @@ export function ChatListPanel({ chats, onSelect, onCreate, onDelete }: ChatListP
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-1 pb-3 flex items-center justify-between border-b">
-        <span className="text-sm text-muted-foreground">
-          {chats.length} conversación{chats.length !== 1 ? "es" : ""}
-        </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onCreate}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="flex-1 overflow-y-auto space-y-1 py-2">
-        {chats.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+    <div className="flex flex-1 flex-col min-h-0">
+      {error && (
+        <p className="shrink-0 border-b bg-destructive/10 px-4 py-2 text-xs text-destructive">
+          No se pudieron cargar las conversaciones: {error}
+        </p>
+      )}
+      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 min-h-0">
+        {chats.length === 0 && !error && (
+          <div className="flex flex-col items-center justify-center py-16 text-center space-y-2 px-6">
             <MessageSquare className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Sin conversaciones. Creá una para empezar.
+              Sin conversaciones todavía. Creá una con el botón "+" de arriba.
             </p>
           </div>
         )}
@@ -233,33 +210,33 @@ export function ChatListPanel({ chats, onSelect, onCreate, onDelete }: ChatListP
                 onSelect(chat);
               }
             }}
-            className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted transition-colors group cursor-pointer"
+            className="group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
           >
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">
-                    {chat.status === "ACTIVE" ? "Activa" : "Cerrada"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(chat.updatedAt).toLocaleDateString("es-AR")}
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {chat._count?.messages ?? 0} mensajes
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                    chat.status === "ACTIVE" ? "bg-emerald-500" : "bg-muted-foreground/40"
+                  }`}
+                />
+                <span className="text-sm font-medium">
+                  {chat.status === "ACTIVE" ? "Conversación activa" : "Conversación cerrada"}
                 </span>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                title="Eliminar conversación"
-                onClick={(e) => handleDelete(e, chat.id)}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {chat._count?.messages ?? 0} mensaje{(chat._count?.messages ?? 0) !== 1 ? "s" : ""} · {formatChatDate(chat.updatedAt)}
+              </p>
             </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-muted-foreground opacity-100 transition-opacity hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+              title="Eliminar conversación"
+              onClick={(e) => handleDelete(e, chat.id)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           </div>
         ))}
       </div>

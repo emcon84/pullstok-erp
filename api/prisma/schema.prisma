@@ -1117,9 +1117,10 @@ model BotConfig {
   // envíos, políticas, catálogo, etc.). Se inyecta como contexto en el system
   // prompt (truncada a un cap de caracteres). Default vacío.
   knowledgeBase  String       @default("")
-  // Modelo Groq a usar (configurable por comercio). Default: modelo chico y
-  // barato de Groq. Ver generateBotReply en botService.
-  model          String       @default("llama-3.1-8b-instant")
+  // Modelo Groq a usar (configurable por comercio, sin selector en la UI hoy).
+  // "llama-3.1-8b-instant" fue discontinuado por Groq (404 model_not_found,
+  // ver migración 20260916190000): default actual verificado contra la API.
+  model          String       @default("openai/gpt-oss-20b")
   // Placeholder para BYO-key (bring-your-own-key): cuando se implemente, ENCRIPTAR
   // antes de guardar. HOY nadie la usa: resolveGroqKey siempre cae en la key de
   // plataforma (env GROQ_API_KEY). Nullable a propósito.

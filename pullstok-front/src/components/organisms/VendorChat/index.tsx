@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react";
 import { toast } from "react-toastify";
+import { ArrowLeft, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
-  SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
@@ -24,6 +24,14 @@ interface VendorChatWidgetProps {
   sellerId: string;
 }
 
+const formatChatMeta = (iso: string) =>
+  new Date(iso).toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
 export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
   const [chatOpen, setChatOpen] = useState(false);
   const [selectedChat, setSelectedChat] = useState<VendorChat | null>(null);
@@ -37,6 +45,15 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
   const openChat = useCallback(() => {
     setChatOpen(true);
   }, []);
+
+  const handleCreateChat = useCallback(async () => {
+    try {
+      const created = await createChat.mutateAsync({ sellerId });
+      setSelectedChat(created);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo crear la conversación");
+    }
+  }, [createChat, sellerId]);
 
   const handleDeleteChat = useCallback(
     async (id: string) => {
@@ -78,55 +95,73 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
 
       {/* ── Chat slide-over ── */}
       <Sheet open={chatOpen} onOpenChange={setChatOpen}>
-        <SheetContent className="w-full sm:max-w-md flex flex-col">
-          {selectedChat ? (
-            <>
-              <div className="flex items-center justify-between pb-3 border-b">
-                <SheetTitle className="text-sm">
-                  Chat #{selectedChat.id.slice(-6)}
-                </SheetTitle>
+        <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+          {/* Título accesible (visualmente oculto): el header real de abajo
+              ya muestra "Asistente de ventas" con el resto del contexto. */}
+          <SheetTitle className="sr-only">Asistente de ventas</SheetTitle>
+
+          {/* Header único y fijo — reemplaza al "Nuevo" ambiguo de antes:
+              adentro de un chat, la flecha vuelve a la lista de conversaciones
+              (antes no había forma clara de "salir" del chat sin cerrar todo). */}
+          <div className="flex shrink-0 items-center gap-2 border-b py-3 pl-4 pr-12">
+            {selectedChat ? (
+              <>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedChat(null);
-                  }}
+                  size="icon"
+                  className="-ml-2 h-8 w-8 shrink-0"
+                  title="Volver a conversaciones"
+                  onClick={() => setSelectedChat(null)}
                 >
-                  Nuevo
+                  <ArrowLeft className="h-4 w-4" />
                 </Button>
-              </div>
-              <VendorChatPanel
-                conversation={selectedChat}
-                onSendMessage={handleSendChatMessage}
-                isTyping={isTyping}
-              />
-            </>
-          ) : (
-            <>
-              <SheetHeader>
-                <SheetTitle>Asistente de ventas</SheetTitle>
-                {listError && (
-                  <p className="text-xs text-destructive">
-                    No se pudieron cargar las conversaciones: {listError.message}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold leading-tight">
+                    Asistente de ventas
                   </p>
-                )}
-              </SheetHeader>
-              <ChatListPanel
-                chats={vendorChatsData ?? []}
-                onSelect={(chat) => {
-                  setSelectedChat(chat);
-                }}
-                onCreate={async () => {
-                  try {
-                    const created = await createChat.mutateAsync({ sellerId });
-                    setSelectedChat(created);
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "No se pudo crear la conversación");
-                  }
-                }}
-                onDelete={handleDeleteChat}
-              />
-            </>
+                  <p className="text-xs text-muted-foreground">
+                    {formatChatMeta(selectedChat.createdAt)}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                    selectedChat.status === "ACTIVE"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {selectedChat.status === "ACTIVE" ? "Activa" : "Cerrada"}
+                </span>
+              </>
+            ) : (
+              <>
+                <p className="flex-1 text-sm font-semibold">Asistente de ventas</p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  title="Nueva conversación"
+                  onClick={handleCreateChat}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+          </div>
+
+          {selectedChat ? (
+            <VendorChatPanel
+              conversation={selectedChat}
+              onSendMessage={handleSendChatMessage}
+              isTyping={isTyping}
+            />
+          ) : (
+            <ChatListPanel
+              chats={vendorChatsData ?? []}
+              error={listError?.message}
+              onSelect={setSelectedChat}
+              onDelete={handleDeleteChat}
+            />
           )}
         </SheetContent>
       </Sheet>
