@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -28,7 +29,7 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
   const [selectedChat, setSelectedChat] = useState<VendorChat | null>(null);
   const [isTyping, setIsTyping] = useState(false);
 
-  const { data: vendorChatsData } = useListVendorChats();
+  const { data: vendorChatsData, error: listError } = useListVendorChats();
   const createChat = useCreateVendorChat();
   const deleteChat = useDeleteVendorChat();
   const sendChatMessage = useSendVendorMessage();
@@ -39,8 +40,12 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
 
   const handleDeleteChat = useCallback(
     async (id: string) => {
-      await deleteChat.mutateAsync(id);
-      setSelectedChat((prev) => (prev?.id === id ? null : prev));
+      try {
+        await deleteChat.mutateAsync(id);
+        setSelectedChat((prev) => (prev?.id === id ? null : prev));
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "No se pudo eliminar la conversación");
+      }
     },
     [deleteChat],
   );
@@ -55,6 +60,8 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
           sender: "SELLER",
           body,
         });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "No se pudo enviar el mensaje");
       } finally {
         setIsTyping(false);
       }
@@ -98,6 +105,11 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
             <>
               <SheetHeader>
                 <SheetTitle>Asistente de ventas</SheetTitle>
+                {listError && (
+                  <p className="text-xs text-destructive">
+                    No se pudieron cargar las conversaciones: {listError.message}
+                  </p>
+                )}
               </SheetHeader>
               <ChatListPanel
                 chats={vendorChatsData ?? []}
@@ -105,8 +117,12 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
                   setSelectedChat(chat);
                 }}
                 onCreate={async () => {
-                  const created = await createChat.mutateAsync({ sellerId });
-                  setSelectedChat(created);
+                  try {
+                    const created = await createChat.mutateAsync({ sellerId });
+                    setSelectedChat(created);
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "No se pudo crear la conversación");
+                  }
                 }}
                 onDelete={handleDeleteChat}
               />
