@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { ArrowLeft, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,15 +32,36 @@ const formatChatMeta = (iso: string) =>
     minute: "2-digit",
   });
 
+// El bot responde fire-and-forget en el backend (hasta 2 intentos de 15s c/u
+// contra Groq). Si no llega nada en este lapso, se apaga el "escribiendo…"
+// para no dejarlo tildado — el mensaje, si igual llega tarde, lo trae el
+// polling de todos modos.
+const TYPING_SAFETY_TIMEOUT_MS = 35000;
+
 export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
   const [chatOpen, setChatOpen] = useState(false);
   const [selectedChat, setSelectedChat] = useState<VendorChat | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: vendorChatsData, error: listError } = useListVendorChats();
   const createChat = useCreateVendorChat();
   const deleteChat = useDeleteVendorChat();
   const sendChatMessage = useSendVendorMessage();
+
+  const clearTypingTimeout = useCallback(() => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+  }, []);
+
+  const stopTyping = useCallback(() => {
+    clearTypingTimeout();
+    setIsTyping(false);
+  }, [clearTypingTimeout]);
+
+  useEffect(() => clearTypingTimeout, [clearTypingTimeout]);
 
   const openChat = useCallback(() => {
     setChatOpen(true);
@@ -71,6 +92,8 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
     async (body: string) => {
       if (!selectedChat) return;
       setIsTyping(true);
+      clearTypingTimeout();
+      typingTimeoutRef.current = setTimeout(stopTyping, TYPING_SAFETY_TIMEOUT_MS);
       try {
         await sendChatMessage.mutateAsync({
           conversationId: selectedChat.id,
@@ -78,12 +101,11 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
           body,
         });
       } catch (error) {
+        stopTyping();
         toast.error(error instanceof Error ? error.message : "No se pudo enviar el mensaje");
-      } finally {
-        setIsTyping(false);
       }
     },
-    [selectedChat, sendChatMessage],
+    [selectedChat, sendChatMessage, clearTypingTimeout, stopTyping],
   );
 
   return (
@@ -154,6 +176,7 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
               conversation={selectedChat}
               onSendMessage={handleSendChatMessage}
               isTyping={isTyping}
+              onAssistantReply={stopTyping}
             />
           ) : (
             <ChatListPanel

@@ -12,6 +12,8 @@ interface VendorChatPanelProps {
   conversation: VendorChat;
   onSendMessage: (body: string) => void;
   isTyping?: boolean;
+  /** Avisa al padre que ya llegó la respuesta del asistente (apaga el "escribiendo…"). */
+  onAssistantReply?: () => void;
 }
 
 // Solo el área de mensajes + composer: el header (título, volver, badge de
@@ -20,6 +22,7 @@ export function VendorChatPanel({
   conversation,
   onSendMessage,
   isTyping = false,
+  onAssistantReply,
 }: VendorChatPanelProps) {
   const [draft, setDraft] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -33,6 +36,18 @@ export function VendorChatPanel({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  // El bot responde fire-and-forget en el backend: recién sabemos que
+  // contestó cuando el polling (useGetMessages) trae un mensaje nuevo del
+  // ASSISTANT. Antes el "escribiendo…" se apagaba apenas se enviaba el
+  // mensaje del vendedor, sin esperar la respuesta real.
+  useEffect(() => {
+    if (!isTyping) return;
+    const last = messages[messages.length - 1];
+    if (last?.sender === "ASSISTANT") {
+      onAssistantReply?.();
+    }
+  }, [messages, isTyping, onAssistantReply]);
 
   const handleSend = useCallback(() => {
     const body = draft.trim();

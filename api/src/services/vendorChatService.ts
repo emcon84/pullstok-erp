@@ -1,9 +1,36 @@
 import { prisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
-import { buildProductSearchWhere } from "../controllers/productController";
 
 // Cap de caracteres para el contexto RAG inyectado al bot (spec R3).
 const RAG_CHAR_CAP = 5000;
+
+// Palabras de relleno de una pregunta en lenguaje natural ("¿qué tenemos de
+// royal canin para perro adulto?"). buildProductSearchWhere (usado por el
+// buscador real del catálogo) exige que TODAS las palabras matcheen (AND) en
+// un mismo producto — perfecto para "royal canin" tipeado a mano, pero
+// "que"/"tenemos"/"de"/"para" nunca van a estar en el nombre de un producto,
+// así que el AND siempre daba 0 resultados acá. Por eso el RAG usa su propio
+// filtro + búsqueda OR: relevancia amplia para inyectar contexto, no
+// precisión de buscador.
+const RAG_STOPWORDS = new Set([
+  "que", "tenemos", "tenes", "tienes", "tiene", "tienen", "de", "del", "la",
+  "el", "los", "las", "para", "por", "con", "sin", "hay", "algo", "alguna",
+  "alguno", "algun", "quiero", "necesito", "necesitas", "me", "mi", "dame",
+  "dar", "sirve", "sirven", "un", "una", "unos", "unas", "y", "o", "a", "en",
+  "es", "son", "como", "cual", "cuales", "cuanto", "cuanta", "cuestan",
+  "cuesta", "precio", "precios", "stock", "hola", "porfa", "porfavor",
+  "favor", "gracias", "buenas", "buen", "dia", "tarde", "noche",
+]);
+
+const normalizeRagToken = (value: string): string =>
+  value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+/** Extrae palabras con contenido (>=3 letras, sin stopwords) de una pregunta libre. */
+const extractRagKeywords = (message: string): string[] => {
+  const cleaned = normalizeRagToken(message).replace(/[^a-z0-9\s]/g, " ");
+  const tokens = cleaned.split(/\s+/).filter((w) => w.length >= 3 && !RAG_STOPWORDS.has(w));
+  return Array.from(new Set(tokens));
+};
 
 // --- Tipos ---
 
@@ -87,7 +114,8 @@ export const sendVendorMessage = async (input: SendMessageInput) => {
 
 /**
  * Construye contexto RAG buscando productos relevantes para el mensaje
- * del vendedor. Usa buildProductSearchWhere del productController.
+ * del vendedor. Extrae keywords (sin stopwords) de la pregunta libre y
+ * busca por OR — el vendedor tipea preguntas, no keywords de buscador.
  * Devuelve texto acotado a RAG_CHAR_CAP (5000 chars). Sin caché.
  */
 export const buildRAGContext = async (
@@ -96,7 +124,17 @@ export const buildRAGContext = async (
 ): Promise<string> => {
   if (!message || message.trim().length === 0) return "";
 
-  const where = buildProductSearchWhere(message);
+  const keywords = extractRagKeywords(message);
+  if (keywords.length === 0) return "";
+
+  const where = {
+    OR: keywords.flatMap((w) => [
+      { name: { contains: w, mode: "insensitive" as const } },
+      { code: { contains: w, mode: "insensitive" as const } },
+      { description: { contains: w, mode: "insensitive" as const } },
+      { category: { name: { contains: w, mode: "insensitive" as const } } },
+    ]),
+  };
 
   const products = await prisma.product.findMany({
     where,
