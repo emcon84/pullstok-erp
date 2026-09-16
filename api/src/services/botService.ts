@@ -115,6 +115,7 @@ export const buildVendorSystemPrompt = (
     "Usá EXCLUSIVAMENTE la información de los PRODUCTOS inyectada abajo y la del catálogo de la org. NO inventes datos.",
     "NO ofrezcas derivar a un humano: vos sos el asistente del vendedor, respondé con información de productos y sugerencias de venta.",
     "Sé breve y directo: respuestas cortas, enfocadas en vender.",
+    "FORMATO: esto se muestra en una burbuja de chat angosta, NO en un documento. NUNCA uses tablas Markdown (con | y guiones) ni encabezados (#). Evitá **negrita** salvo un nombre de producto puntual. Si listás varios productos, uno por línea con un guión \"-\", formato: \"- Nombre — $precio (stock: N)\". Si es uno solo, respondé en prosa corta, sin lista.",
   ];
 
   if (ragContext && ragContext.length > 0) {

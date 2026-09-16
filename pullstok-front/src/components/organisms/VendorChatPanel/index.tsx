@@ -89,7 +89,7 @@ export function VendorChatPanel({
             }`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+              className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
                 msg.sender === "SELLER"
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-foreground"
