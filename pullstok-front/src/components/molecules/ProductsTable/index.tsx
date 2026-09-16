@@ -427,8 +427,10 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
                     En desktop conserva la fila clásica. */}
                 <TableCell className="p-0 sm:table-cell sm:p-2">
                   <div className="flex items-center gap-2.5 px-3 py-2.5 sm:px-0 sm:py-0 w-full max-w-full overflow-hidden">
-                    {/* Imagen — fija en mobile y desktop */}
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted sm:h-10 sm:w-10">
+                    {/* Imagen — oculta en mobile (ahorra espacio y evita scroll
+                        horizontal que tapaba el precio); visible en desktop.
+                        El dato queda guardado igual para cuando se habilite la tienda. */}
+                    <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                       {src ? (
                         <img
                           src={src}
