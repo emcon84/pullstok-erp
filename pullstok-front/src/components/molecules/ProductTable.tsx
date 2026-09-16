@@ -197,10 +197,12 @@ export const ProductTable = memo(
                           <div className="max-h-10 overflow-y-auto break-words text-sm font-medium leading-tight sm:hidden scrollbar-none">
                             {p.name}
                           </div>
-                          <p className="text-[11px] text-muted-foreground font-mono leading-none mt-0.5">{p.code || "—"}</p>
+                          <p className="truncate text-[11px] text-muted-foreground font-mono leading-none mt-0.5">{p.code || "—"}</p>
 
-                          {/* Mobile: stock + acciones en la misma fila */}
-                          <div className="mt-1 flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none sm:hidden">
+                          {/* Mobile: stock + acciones en la misma fila (con wrap, no scroll:
+                              un código/SKU largo sin espacios podía forzar el ancho de la fila
+                              y tapar el precio en pantallas más angostas o con fuente más grande). */}
+                          <div className="mt-1 flex flex-wrap items-center justify-between gap-1.5 sm:hidden">
                             <Badge
                               variant="outline"
                               className={cn(
