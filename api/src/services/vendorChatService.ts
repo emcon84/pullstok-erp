@@ -63,6 +63,10 @@ export const closeVendorChat = async (id: string) => {
   });
 };
 
+export const deleteVendorChat = async (id: string) => {
+  return prisma.vendorChat.delete({ where: { id } });
+};
+
 // --- Mensajes ---
 
 export const sendVendorMessage = async (input: SendMessageInput) => {
@@ -125,6 +129,7 @@ export default {
   listVendorChats,
   getVendorChatById,
   closeVendorChat,
+  deleteVendorChat,
   sendVendorMessage,
   buildRAGContext,
 };

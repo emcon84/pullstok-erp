@@ -35,5 +35,11 @@ router.post(
   requireRole("VENDEDOR"),
   vendorChatController.closeConversation,
 );
+router.delete(
+  "/conversations/:id",
+  authenticateJWT,
+  requireRole("VENDEDOR"),
+  vendorChatController.deleteConversation,
+);
 
 export default router;

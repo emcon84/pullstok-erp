@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageSquare, Send, Loader2, Plus } from "lucide-react";
+import { useState, useRef, useEffect, useCallback, type MouseEvent } from "react";
+import { MessageSquare, Send, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,6 +9,7 @@ import {
 import {
   useGetMessages,
 } from "@/hooks/useVendorChat";
+import { useConfirm } from "@/components/hooks/useConfirm";
 import type { VendorChat } from "@/services/vendorChatService";
 
 interface VendorChatPanelProps {
@@ -180,9 +181,23 @@ interface ChatListPanelProps {
   chats: VendorChat[];
   onSelect: (chat: VendorChat) => void;
   onCreate: () => void;
+  onDelete: (id: string) => void;
 }
 
-export function ChatListPanel({ chats, onSelect, onCreate }: ChatListPanelProps) {
+export function ChatListPanel({ chats, onSelect, onCreate, onDelete }: ChatListPanelProps) {
+  const confirm = useConfirm();
+
+  const handleDelete = async (e: MouseEvent, chatId: string) => {
+    e.stopPropagation();
+    const ok = await confirm({
+      title: "¿Eliminar conversación?",
+      description: "Se borra la conversación y todos sus mensajes. Esta acción no se puede deshacer.",
+      confirmLabel: "Sí, eliminar",
+      danger: true,
+    });
+    if (ok) onDelete(chatId);
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-1 pb-3 flex items-center justify-between border-b">
@@ -193,7 +208,6 @@ export function ChatListPanel({ chats, onSelect, onCreate }: ChatListPanelProps)
           variant="ghost"
           size="sm"
           onClick={onCreate}
-          disabled={chats.length > 0}
         >
           <Plus className="h-4 w-4" />
         </Button>
@@ -208,23 +222,45 @@ export function ChatListPanel({ chats, onSelect, onCreate }: ChatListPanelProps)
           </div>
         )}
         {chats.map((chat) => (
-          <button
+          <div
             key={chat.id}
+            role="button"
+            tabIndex={0}
             onClick={() => onSelect(chat)}
-            className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(chat);
+              }
+            }}
+            className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted transition-colors group cursor-pointer"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">
-                {chat.status === "ACTIVE" ? "Activa" : "Cerrada"}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {new Date(chat.updatedAt).toLocaleDateString("es-AR")}
-              </span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    {chat.status === "ACTIVE" ? "Activa" : "Cerrada"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(chat.updatedAt).toLocaleDateString("es-AR")}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {chat._count?.messages ?? 0} mensajes
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                title="Eliminar conversación"
+                onClick={(e) => handleDelete(e, chat.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
             </div>
-            <span className="text-xs text-muted-foreground">
-              {chat._count?.messages ?? 0} mensajes
-            </span>
-          </button>
+          </div>
         ))}
       </div>
     </div>

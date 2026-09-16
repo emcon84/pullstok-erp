@@ -235,14 +235,25 @@ export const replyToVendorChat = async ({
     where: { id: vendorChatId },
     include: { messages: { orderBy: { createdAt: "asc" } } },
   });
-  if (!vendorChat || vendorChat.status !== "ACTIVE") return;
+  if (!vendorChat || vendorChat.status !== "ACTIVE") {
+    console.warn(
+      "[vendorChat] bot no respondió: conversación no encontrada o no ACTIVE",
+      { vendorChatId },
+    );
+    return;
+  }
 
   const messages = vendorChat.messages ?? [];
 
   const lastSellerMsg = [...messages]
     .reverse()
     .find((m) => m.sender === "SELLER");
-  if (!lastSellerMsg) return;
+  if (!lastSellerMsg) {
+    console.warn("[vendorChat] bot no respondió: sin mensaje de vendedor", {
+      vendorChatId,
+    });
+    return;
+  }
 
   const ragContext = await vendorChatService.buildRAGContext(
     lastSellerMsg.body,
@@ -250,15 +261,30 @@ export const replyToVendorChat = async ({
   );
 
   const botConfig = await prisma.botConfig.findFirst();
-  if (!botConfig || !botConfig.enabled) return;
+  if (!botConfig || !botConfig.enabled) {
+    console.warn("[vendorChat] bot no respondió: botConfig deshabilitado", {
+      vendorChatId,
+    });
+    return;
+  }
 
   const apiKey = resolveGroqKey(botConfig);
-  if (!apiKey) return;
+  if (!apiKey) {
+    console.warn("[vendorChat] bot no respondió: sin Groq API key", {
+      vendorChatId,
+    });
+    return;
+  }
 
   const org = await basePrisma.organization.findFirst({
     where: { id: vendorChat.organizationId },
   });
-  if (!org) return;
+  if (!org) {
+    console.warn("[vendorChat] bot no respondió: organización no encontrada", {
+      vendorChatId,
+    });
+    return;
+  }
 
   const history = messages.slice(-HISTORY_LIMIT).map((m) => ({
     role: (m.sender === "SELLER" ? "user" : "assistant") as "user" | "assistant",
@@ -302,14 +328,25 @@ export const replyToVendorChat = async ({
       }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      console.warn(
+        "[vendorChat] bot no respondió: Groq devolvió error tras reintento",
+        { vendorChatId, status: res.status },
+      );
+      return;
+    }
   }
 
   const data = (await res.json()) as {
     choices?: { message?: { content?: string | null } }[];
   };
   const content = data.choices?.[0]?.message?.content ?? "";
-  if (!content?.trim()) return;
+  if (!content?.trim()) {
+    console.warn("[vendorChat] bot no respondió: respuesta vacía de Groq", {
+      vendorChatId,
+    });
+    return;
+  }
 
   await vendorChatService.sendVendorMessage({
     vendorChatId,

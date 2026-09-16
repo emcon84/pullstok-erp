@@ -51,6 +51,10 @@ export const useGetMessages = (conversationId: string | null) => {
         (chat) => chat.messages,
       ),
     enabled: !!conversationId,
+    // La respuesta del bot llega en background (fire-and-forget en el
+    // backend), sin socket que avise al cliente: sin este polling, el
+    // mensaje del asistente queda en la base sin mostrarse hasta reabrir.
+    refetchInterval: 3000,
   });
 };
 
@@ -82,6 +86,19 @@ export const useCloseVendorChat = () => {
       });
       queryClient.invalidateQueries({
         queryKey: vendorChatKeys.conversation(id),
+      });
+    },
+  });
+};
+
+export const useDeleteVendorChat = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => vendorChatApiClient.deleteConversation(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: vendorChatKeys.conversations,
       });
     },
   });

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/sheet";
 import {
   useCreateVendorChat,
+  useDeleteVendorChat,
   useListVendorChats,
   useSendVendorMessage,
 } from "@/hooks/useVendorChat";
@@ -29,11 +30,20 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
 
   const { data: vendorChatsData } = useListVendorChats();
   const createChat = useCreateVendorChat();
+  const deleteChat = useDeleteVendorChat();
   const sendChatMessage = useSendVendorMessage();
 
   const openChat = useCallback(() => {
     setChatOpen(true);
   }, []);
+
+  const handleDeleteChat = useCallback(
+    async (id: string) => {
+      await deleteChat.mutateAsync(id);
+      setSelectedChat((prev) => (prev?.id === id ? null : prev));
+    },
+    [deleteChat],
+  );
 
   const handleSendChatMessage = useCallback(
     async (body: string) => {
@@ -98,6 +108,7 @@ export function VendorChatWidget({ sellerId }: VendorChatWidgetProps) {
                   const created = await createChat.mutateAsync({ sellerId });
                   setSelectedChat(created);
                 }}
+                onDelete={handleDeleteChat}
               />
             </>
           )}

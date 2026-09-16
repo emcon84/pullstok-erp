@@ -8,6 +8,7 @@ import {
   listVendorChats,
   getVendorChatById,
   closeVendorChat,
+  deleteVendorChat,
   sendVendorMessage,
 } from "../services/vendorChatService";
 
@@ -113,10 +114,29 @@ const closeConversation = async (req: AuthedRequest, res: Response) => {
   }
 };
 
+// DELETE /vendor-chat/conversations/:id — eliminar conversación (y sus mensajes, cascade)
+const deleteConversation = async (req: AuthedRequest, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const chat = await getVendorChatById(req.params.id);
+
+    if (!chat || chat.organizationId !== organizationId) {
+      return res.status(404).json({ message: "Conversación no encontrada" });
+    }
+
+    await deleteVendorChat(req.params.id);
+
+    res.status(200).json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export default {
   createConversation,
   listConversations,
   getConversation,
   postMessage,
   closeConversation,
+  deleteConversation,
 };

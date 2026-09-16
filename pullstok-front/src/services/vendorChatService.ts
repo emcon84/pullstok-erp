@@ -118,6 +118,22 @@ export const vendorChatApiClient = {
       throw new Error("An unknown error occurred");
     }
   },
+
+  deleteConversation: async (id: string): Promise<void> => {
+    try {
+      await axios.delete(
+        `${API_URL}/vendor-chat/conversations/${id}`,
+        { headers: { Authorization: `Bearer ${token()}` } },
+      );
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw new Error(
+          error.response?.data?.message || "delete conversation failed",
+        );
+      }
+      throw new Error("An unknown error occurred");
+    }
+  },
 };
 
 export default vendorChatApiClient;
