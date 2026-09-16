@@ -501,17 +501,19 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
               ))}
             </div>
           )}
+          </>
+          )}
+        </div>
 
-          {/* Acciones */}
-          <div className="flex gap-2 pt-2">
+        {/* Acciones — footer fijo, siempre visible sin necesidad de scroll */}
+        {!readOnly && (
+          <div className="flex shrink-0 gap-2 border-t px-6 py-4">
             <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
             <Button className="flex-1" onClick={handleSubmit} disabled={saving || loading}>
               {saving ? "Guardando..." : isEdit ? "Actualizar" : "Crear producto"}
             </Button>
           </div>
-          </>
-          )}
-        </div>
+        )}
       </SheetContent>
     </Sheet>
   );

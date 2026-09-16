@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Pencil,
   Trash2,
@@ -12,6 +13,7 @@ import {
   ChevronRight,
   ChevronsRight,
   BadgeDollarSign,
+  Barcode,
   Check,
   X,
 } from "lucide-react";
@@ -69,6 +71,7 @@ interface ProductsTableProps {
 }
 
 export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, branchMode }: ProductsTableProps) => {
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [sortBy, setSortBy] = useState<"name" | "code" | "quantity" | "price" | "peso">("name");
@@ -153,6 +156,11 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
   };
 
   const pid = (p: DataItem) => p._id || p.id || "";
+
+  const handleAssignBarcode = (id?: string) => {
+    if (!id) return;
+    navigate(`/scanner?assignTo=${id}`);
+  };
 
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => {
@@ -481,6 +489,15 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
+                            title="Asignar código de barras"
+                            onClick={(e) => { e.stopPropagation(); handleAssignBarcode(id); }}
+                          >
+                            <Barcode className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
                             onClick={(e) => { e.stopPropagation(); onEdit(p); }}
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -555,6 +572,15 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
                       onClick={(e) => { e.stopPropagation(); onDuplicate(p); }}
                     >
                       <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      title="Asignar código de barras"
+                      onClick={(e) => { e.stopPropagation(); handleAssignBarcode(id); }}
+                    >
+                      <Barcode className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
