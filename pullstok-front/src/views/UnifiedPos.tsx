@@ -175,14 +175,27 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         } else {
           // Bolsa cerrada: abrimos el modal de confirmación con producto+precio
           // en lugar de sumar directo. La balanza (isScale) NUNCA llega acá.
-          setScanQty(1);
-          setScanProduct(data.product);
+          // Si es EL MISMO producto que ya está en el modal (mismo id), el
+          // escaneo repetido suma como conteo en vez de resetear la cantidad
+          // — es el "chiche" de escanear 3 veces la misma bolsa y que quede
+          // cantidad 3, en vez de tener que tocar el stepper a mano.
+          const newProduct = data.product;
+          const prevId = scanProduct ? scanProduct._id || scanProduct.id : null;
+          const newId = newProduct._id || newProduct.id;
+          if (scanProduct && prevId && prevId === newId) {
+            const stock = Number(newProduct.quantity ?? 0);
+            const maxQty = stock > 0 ? stock : 999;
+            setScanQty((q) => Math.min(q + 1, maxQty));
+          } else {
+            setScanQty(1);
+            setScanProduct(newProduct);
+          }
         }
       } catch (e: any) {
         toast.error(e?.message || "Error al escanear");
       }
     },
-    [cart, branchId],
+    [cart, branchId, scanProduct],
   );
 
   // ── Modal de confirmación de bolsa cerrada escaneada ──

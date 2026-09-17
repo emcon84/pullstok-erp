@@ -313,6 +313,27 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
     expect(screen.getByLabelText("Cantidad")).toHaveValue("1");
   });
 
+  it("escanear el mismo producto de nuevo con el modal abierto suma como conteo (no resetea)", async () => {
+    mockFetchWith({
+      isScale: false,
+      product: { _id: "p1", id: "p1", name: "Royal 15kg", price: 18400, code: "7791234567890", quantity: 10 },
+    });
+    renderPos({ addToCart: vi.fn() });
+
+    scanCode("7791234567890");
+    await screen.findByText("Royal 15kg");
+    expect(screen.getByLabelText("Cantidad")).toHaveValue("1");
+
+    scanCode("7791234567890");
+    await waitFor(() => expect(screen.getByLabelText("Cantidad")).toHaveValue("2"));
+
+    scanCode("7791234567890");
+    await waitFor(() => expect(screen.getByLabelText("Cantidad")).toHaveValue("3"));
+
+    // Sigue siendo el mismo producto, no se re-abrió ni se duplicó el modal.
+    expect(screen.getAllByText("Royal 15kg")).toHaveLength(1);
+  });
+
   it("al cancelar el modal NO agrega la bolsa al pedido", async () => {
     mockFetchWith({
       isScale: false,
