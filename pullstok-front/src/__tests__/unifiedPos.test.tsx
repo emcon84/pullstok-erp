@@ -23,7 +23,7 @@ vi.mock("@/components/molecules/VendorOrderPanel", () => ({
   ),
 }));
 vi.mock("react-toastify", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
 import { UnifiedPos } from "@/views/UnifiedPos";
@@ -31,6 +31,7 @@ import { MemoryRouter } from "react-router-dom";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
+import { toast } from "react-toastify";
 
 function makeCart(overrides: Record<string, unknown> = {}) {
   return {
@@ -211,7 +212,7 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
     scanCode("7791234567890");
 
     const qtyInput = await screen.findByLabelText("Cantidad");
-    expect(qtyInput).toHaveValue(1);
+    expect(qtyInput).toHaveValue("1");
     expect(qtyInput).toHaveFocus();
   });
 
@@ -244,6 +245,55 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
     await waitFor(() =>
       expect(screen.queryByLabelText("Cantidad")).not.toBeInTheDocument(),
     );
+  });
+
+  it("si dígitos de otro código se filtran al campo, la cantidad queda topeada al stock (no explota el total)", async () => {
+    mockFetchWith({
+      isScale: false,
+      product: { _id: "p1", id: "p1", name: "Royal 15kg", price: 18400, code: "7791234567890", quantity: 10 },
+    });
+    const addToCart = vi.fn();
+    renderPos({ addToCart });
+
+    scanCode("7791234567890");
+    const qtyInput = await screen.findByLabelText("Cantidad");
+
+    // Simula el código de barras de un segundo producto filtrándose al campo.
+    fireEvent.change(qtyInput, { target: { value: "8445290988027" } });
+    expect(qtyInput).toHaveValue("10"); // clamp al stock (10), nunca el barcode
+
+    fireEvent.keyDown(qtyInput, { key: "Enter" });
+    expect(addToCart).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Royal 15kg" }),
+      10,
+      "branch-1",
+      10,
+      "BOLSA_CERRADA",
+      undefined,
+      undefined,
+      undefined,
+      false,
+    );
+  });
+
+  it("escanear un segundo producto sin cerrar el modal se ignora (no pisa el pendiente)", async () => {
+    mockFetchWith({
+      isScale: false,
+      product: { _id: "p1", id: "p1", name: "Royal 15kg", price: 18400, code: "7791234567890", quantity: 10 },
+    });
+    renderPos({ addToCart: vi.fn() });
+
+    scanCode("7791234567890");
+    await screen.findByText("Royal 15kg");
+    vi.mocked(fetch).mockClear();
+
+    scanCode("1112223334445");
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(toast.info).toHaveBeenCalledWith(
+      expect.stringContaining("Royal 15kg"),
+    );
+    expect(screen.getByText("Royal 15kg")).toBeInTheDocument();
   });
 
   it("al cancelar el modal NO agrega la bolsa al pedido", async () => {

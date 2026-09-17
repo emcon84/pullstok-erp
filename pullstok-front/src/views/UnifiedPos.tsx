@@ -133,6 +133,15 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   const handleScan = useCallback(
     async (barcode: string) => {
       if (!barcode || !/^\d+$/.test(barcode)) return;
+      // Con el modal de confirmación ya abierto, un segundo escaneo NO debe
+      // pisar el producto pendiente ni tocar su cantidad: se ignora y avisa.
+      // Confirmá o cancelá el primero antes de escanear el próximo.
+      if (scanProduct) {
+        toast.info(
+          `Confirmá o cancelá "${scanProduct.name}" antes de escanear otro producto`,
+        );
+        return;
+      }
       try {
         const token = localStorage.getItem("token") || "";
         const res = await fetch(
@@ -182,7 +191,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         toast.error(e?.message || "Error al escanear");
       }
     },
-    [cart, branchId],
+    [cart, branchId, scanProduct],
   );
 
   // ── Modal de confirmación de bolsa cerrada escaneada ──
@@ -438,25 +447,33 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         </div>
 
         {/* Cantidad: foco automático al abrir para permitir tipear el número
-            (ej. pouches/latas x3) y confirmar con Enter sin usar el mouse. */}
+            (ej. pouches/latas x3) y confirmar con Enter sin usar el mouse.
+            type="text" + maxLength (en vez de type="number") porque un
+            segundo escaneo con este campo enfocado puede filtrar sus dígitos
+            acá si la pistola tipea más lento que el umbral de "ráfaga" del
+            detector global (ver handleScan) — maxLength pone un techo duro
+            de caracteres a nivel DOM, y el clamp contra el stock hace de
+            segunda barrera aunque los dígitos lleguen a filtrarse. */}
         <div className="space-y-2">
           <Label htmlFor="scan-qty-input">Cantidad</Label>
           <Input
             id="scan-qty-input"
-            type="number"
+            type="text"
             inputMode="numeric"
-            min={1}
+            pattern="[0-9]*"
+            maxLength={4}
             autoFocus
             value={scanQty || ""}
             onFocus={(e) => e.target.select()}
             onChange={(e) => {
-              const raw = e.target.value;
-              if (raw === "") {
+              const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+              if (digits === "") {
                 setScanQty(0);
                 return;
               }
-              const v = parseInt(raw, 10);
-              if (!isNaN(v) && v >= 1) setScanQty(v);
+              const stock = Number(scanProduct?.quantity ?? 0);
+              const max = stock > 0 ? stock : 999;
+              setScanQty(Math.min(parseInt(digits, 10), max));
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
