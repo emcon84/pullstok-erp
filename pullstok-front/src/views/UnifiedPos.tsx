@@ -446,8 +446,10 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             un techo duro de caracteres a nivel DOM por si algo se filtra
             estando el campo enfocado, y el clamp contra el stock es la
             segunda barrera. */}
-        <div className="space-y-2">
-          <Label htmlFor="scan-qty-input">Cantidad</Label>
+        <div className="flex items-center justify-between gap-3">
+          <Label htmlFor="scan-qty-input" className="shrink-0">
+            Cantidad
+          </Label>
           <Input
             id="scan-qty-input"
             type="text"
@@ -472,7 +474,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
                 handleConfirmScan();
               }
             }}
-            className="text-lg font-bold tabular-nums"
+            className="w-20 text-center text-lg font-bold tabular-nums"
           />
         </div>
 
