@@ -334,6 +334,27 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
     expect(screen.getAllByText("Royal 15kg")).toHaveLength(1);
   });
 
+  it("las teclas +/- del teclado ajustan la cantidad del modal", async () => {
+    mockFetchWith({
+      isScale: false,
+      product: { _id: "p1", id: "p1", name: "Royal 15kg", price: 18400, code: "7791234567890", quantity: 10 },
+    });
+    renderPos({ addToCart: vi.fn() });
+
+    scanCode("7791234567890");
+    await screen.findByText("Royal 15kg");
+    expect(screen.getByLabelText("Cantidad")).toHaveValue("1");
+
+    fireEvent.keyDown(window, { key: "+" });
+    expect(screen.getByLabelText("Cantidad")).toHaveValue("2");
+
+    fireEvent.keyDown(window, { key: "+" });
+    expect(screen.getByLabelText("Cantidad")).toHaveValue("3");
+
+    fireEvent.keyDown(window, { key: "-" });
+    expect(screen.getByLabelText("Cantidad")).toHaveValue("2");
+  });
+
   it("al cancelar el modal NO agrega la bolsa al pedido", async () => {
     mockFetchWith({
       isScale: false,

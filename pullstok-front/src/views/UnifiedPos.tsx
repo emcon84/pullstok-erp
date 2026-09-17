@@ -278,6 +278,29 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [handleScan, openBagDialogOpen]);
 
+  // Teclas +/- del teclado para ajustar la cantidad del modal de escaneo sin
+  // mouse. Solo mientras el modal está abierto (scanProduct), y en captura
+  // para ganarle a cualquier otro listener; no interfiere con el detector de
+  // la pistola de arriba porque ese ignora "+"/"-" (solo mira dígitos/Enter).
+  useEffect(() => {
+    if (!scanProduct) return;
+    const stock = Number(scanProduct.quantity ?? 0);
+    const maxQty = stock > 0 ? stock : 999;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "+" || e.key === "=" || e.code === "NumpadAdd") {
+        e.preventDefault();
+        e.stopPropagation();
+        setScanQty((q) => Math.min(maxQty, q + 1));
+      } else if (e.key === "-" || e.code === "NumpadSubtract") {
+        e.preventDefault();
+        e.stopPropagation();
+        setScanQty((q) => Math.max(1, q - 1));
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [scanProduct]);
+
   const tabs: { id: Tab; label: string }[] = [
     { id: "unidad", label: "Por unidad" },
     { id: "suelto", label: "Suelto" },
@@ -464,10 +487,10 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
                   variant="outline"
                   size="icon"
                   className="h-9 w-9 shrink-0"
-                  disabled={scanQty >= maxQty}
-                  onClick={() => setScanQty((q) => Math.min(maxQty, q + 1))}
+                  disabled={scanQty <= 1}
+                  onClick={() => setScanQty((q) => Math.max(1, q - 1))}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Minus className="h-4 w-4" />
                 </Button>
                 <Label htmlFor="scan-qty-input" className="sr-only">
                   Cantidad
@@ -501,10 +524,10 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
                   variant="outline"
                   size="icon"
                   className="h-9 w-9 shrink-0"
-                  disabled={scanQty <= 1}
-                  onClick={() => setScanQty((q) => Math.max(1, q - 1))}
+                  disabled={scanQty >= maxQty}
+                  onClick={() => setScanQty((q) => Math.min(maxQty, q + 1))}
                 >
-                  <Minus className="h-4 w-4" />
+                  <Plus className="h-4 w-4" />
                 </Button>
               </div>
               <span className="text-2xl font-bold tabular-nums">
