@@ -13,7 +13,7 @@
  * their own lines. See api/tests/fixtures/pdfs/README.md for the fixture origin.
  */
 
-import { round2 } from "../utils/money";
+import { round2, roundBolsaPriceIfHigh } from "../utils/money";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -847,6 +847,23 @@ export function computeSuggestedPrice(
     return round2(round2(sinIva * 1.21) * 1.3334);
   }
   return null;
+}
+
+// ── Wholesale price (precio mayorista propio del negocio) ──────────────────
+
+/**
+ * wholesalePrice = sin IVA + 21% (IVA) + 15% de ganancia, mismo criterio de
+ * redondeo (roundBolsaPriceIfHigh) que ya usa PriceListDetail.tsx para el PDF
+ * impreso — el número que se persiste en Product.wholesalePrice debe
+ * coincidir con lo que se imprime. Fórmula fija por ahora; si en el futuro
+ * varía por proveedor, este es el único lugar a extender (ej. recibir el
+ * Provider y ramificar acá, no en los callers).
+ */
+export function computeWholesalePrice(
+  sinIva: number | null | undefined,
+): number | null {
+  if (sinIva === null || sinIva === undefined) return null;
+  return roundBolsaPriceIfHigh(round2(sinIva * 1.21 * 1.15));
 }
 
 // ── Parsers ────────────────────────────────────────────────────────────────

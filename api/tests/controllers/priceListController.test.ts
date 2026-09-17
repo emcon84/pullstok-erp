@@ -3,6 +3,7 @@ import {
   listPriceLists,
   getPriceList,
   adjustPriceList,
+  assignWholesalePrices,
 } from "../../src/controllers/providerPriceListController";
 import { prisma } from "../../src/config/db";
 
@@ -10,6 +11,7 @@ jest.mock("../../src/config/db", () => ({
   prisma: {
     priceList: { findMany: jest.fn(), findFirst: jest.fn() },
     priceListEntry: { findMany: jest.fn() },
+    product: { findMany: jest.fn() },
     $transaction: jest.fn(),
   },
   basePrisma: {},
@@ -22,6 +24,7 @@ jest.mock("../../src/config/tenantContext", () => ({
 const mockedPrisma = prisma as unknown as {
   priceList: { findMany: jest.Mock; findFirst: jest.Mock };
   priceListEntry: { findMany: jest.Mock };
+  product: { findMany: jest.Mock };
   $transaction: jest.Mock;
 };
 
@@ -308,6 +311,84 @@ describe("adjustPriceList — % server-side sobre el suggestedPrice ACTUAL (D7)"
     const res = fakeRes();
     await adjustPriceList(
       fakeReq({ params: { id: "pl-ajena" }, query: { dryRun: "true" }, body: { percentage: 10 } }),
+      res,
+    );
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+describe("assignWholesalePrices — fórmula fija computeWholesalePrice(priceSinIva)", () => {
+  const entry = (id: string, name: string, priceSinIva: number | null, productId: string | null = "p1") => ({
+    id,
+    productId,
+    name,
+    priceSinIva,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedPrisma.priceList.findFirst.mockResolvedValue({ id: "pl-1" });
+  });
+
+  it("computes the dryRun preview using computeWholesalePrice, only for linked entries with Sin IVA", async () => {
+    mockedPrisma.priceListEntry.findMany.mockResolvedValue([
+      entry("e1", "A x 1 Kg.", 8795, "p1"),
+      entry("e2", "B sin Sin IVA", null, "p2"),
+    ]);
+    mockedPrisma.product.findMany.mockResolvedValue([
+      { id: "p1", wholesalePrice: null },
+      { id: "p2", wholesalePrice: null },
+    ]);
+    const res = fakeRes();
+    await assignWholesalePrices(
+      fakeReq({ params: { id: "pl-1" }, query: { dryRun: "true" } }),
+      res,
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    const body = (res.json as jest.Mock).mock.calls[0][0];
+    // La entrada sin Sin IVA no tiene wholesalePrice derivable → queda afuera.
+    expect(body.affected).toBe(1);
+    expect(body.rows).toEqual([
+      { entryId: "e1", name: "A x 1 Kg.", productId: "p1", currentWholesalePrice: null, newWholesalePrice: 12200 },
+    ]);
+  });
+
+  it("reports the CURRENT wholesalePrice of the linked product in the preview", async () => {
+    mockedPrisma.priceListEntry.findMany.mockResolvedValue([entry("e1", "A x 1 Kg.", 8795, "p1")]);
+    mockedPrisma.product.findMany.mockResolvedValue([{ id: "p1", wholesalePrice: 9999 }]);
+    const res = fakeRes();
+    await assignWholesalePrices(
+      fakeReq({ params: { id: "pl-1" }, query: { dryRun: "true" } }),
+      res,
+    );
+    const body = (res.json as jest.Mock).mock.calls[0][0];
+    expect(body.rows[0].currentWholesalePrice).toBe(9999);
+  });
+
+  it("persists Product.wholesalePrice on apply (no dryRun) without touching suggestedPrice/price", async () => {
+    mockedPrisma.priceListEntry.findMany.mockResolvedValue([entry("e1", "A x 1 Kg.", 8795, "p1")]);
+    mockedPrisma.product.findMany.mockResolvedValue([{ id: "p1", wholesalePrice: null }]);
+    const tx = { product: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
+    mockedPrisma.$transaction.mockImplementation(async (fn: (t: unknown) => unknown) => fn(tx));
+
+    const res = fakeRes();
+    await assignWholesalePrices(fakeReq({ params: { id: "pl-1" }, query: {} }), res);
+
+    expect(tx.product.updateMany).toHaveBeenCalledWith({
+      where: { id: "p1" },
+      data: { wholesalePrice: 12200 },
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+    const body = (res.json as jest.Mock).mock.calls[0][0];
+    expect(body).toEqual({ affected: 1 });
+    expect(body.rows).toBeUndefined();
+  });
+
+  it("returns 404 when the plan is not found (cross-org or inexistent)", async () => {
+    mockedPrisma.priceList.findFirst.mockResolvedValue(null);
+    const res = fakeRes();
+    await assignWholesalePrices(
+      fakeReq({ params: { id: "pl-ajena" }, query: { dryRun: "true" } }),
       res,
     );
     expect(res.status).toHaveBeenCalledWith(404);

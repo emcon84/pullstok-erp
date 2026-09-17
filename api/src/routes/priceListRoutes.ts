@@ -16,5 +16,11 @@ router.post(
   validate(adjustPriceListSchema),
   priceListController.adjustPriceList,
 );
+router.post(
+  "/:id/assign-wholesale-prices",
+  authenticateJWT,
+  requireRole("ADMIN"),
+  priceListController.assignWholesalePrices,
+);
 
 export default router;

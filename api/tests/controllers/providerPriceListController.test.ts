@@ -340,8 +340,41 @@ describe("applyPriceList — transacción idempotente (precios del proveedor int
       omitted: 1,
       suggestedUpdated: 1,
       priceUpdated: 0,
+      wholesaleUpdated: 0,
       productsCreated: 0,
     });
+  });
+
+  it("applyWholesalePrices=true writes Product.wholesalePrice with computeWholesalePrice(priceSinIva)", async () => {
+    const tx = txMock();
+    tx.product.findMany.mockResolvedValue([{ id: uuid }]);
+    mockedPrisma.$transaction.mockImplementation(
+      async (fn: (t: unknown) => unknown) => fn(tx),
+    );
+    const res = fakeRes();
+    await applyPriceList(fakeReq({ body: { ...applyBody, applyWholesalePrices: true } }), res);
+
+    const updateCall = tx.product.updateMany.mock.calls[0][0];
+    // 8795 × 1.21 × 1.15 = 12238.24 → redondeado (>= 500) a 12200.
+    expect(updateCall).toEqual({
+      where: { id: uuid },
+      data: { suggestedPrice: 14190.04, wholesalePrice: 12200 },
+    });
+    expect((res.json as jest.Mock).mock.calls[0][0].wholesaleUpdated).toBe(1);
+  });
+
+  it("applyWholesalePrices ausente/false NO toca wholesalePrice (comportamiento original)", async () => {
+    const tx = txMock();
+    tx.product.findMany.mockResolvedValue([{ id: uuid }]);
+    mockedPrisma.$transaction.mockImplementation(
+      async (fn: (t: unknown) => unknown) => fn(tx),
+    );
+    const res = fakeRes();
+    await applyPriceList(fakeReq({ body: applyBody }), res);
+
+    const updateCall = tx.product.updateMany.mock.calls[0][0];
+    expect(updateCall.data.wholesalePrice).toBeUndefined();
+    expect((res.json as jest.Mock).mock.calls[0][0].wholesaleUpdated).toBe(0);
   });
 
   it("is idempotent: deletes the existing plan of the same (org, type, period) before recreating", async () => {
@@ -485,6 +518,7 @@ describe("applyPriceList — transacción idempotente (precios del proveedor int
       omitted: 0,
       suggestedUpdated: 0,
       priceUpdated: 0,
+      wholesaleUpdated: 0,
       productsCreated: 0,
     });
   });
@@ -668,6 +702,7 @@ describe("applyPriceList — aplicar precios al catálogo (applyPrices=true)", (
       omitted: 0,
       suggestedUpdated: 2,
       priceUpdated: 1,
+      wholesaleUpdated: 0,
       productsCreated: 1,
     });
   });
@@ -718,6 +753,7 @@ describe("applyPriceList — aplicar precios al catálogo (applyPrices=true)", (
       omitted: 0,
       suggestedUpdated: 0,
       priceUpdated: 0,
+      wholesaleUpdated: 0,
       productsCreated: 0,
     });
   });
@@ -755,6 +791,7 @@ describe("applyPriceList — aplicar precios al catálogo (applyPrices=true)", (
       omitted: 0,
       suggestedUpdated: 1,
       priceUpdated: 1,
+      wholesaleUpdated: 0,
       productsCreated: 0,
     });
   });

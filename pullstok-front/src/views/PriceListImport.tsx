@@ -192,6 +192,10 @@ export const PriceListImport = () => {
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
   const [importAll, setImportAll] = useState(true);
   const [applyPrices, setApplyPrices] = useState(true);
+  // Precio mayorista propio del negocio (distinto de applyPrices, que toca
+  // product.price). Default OFF: asignar precio mayorista es una decisión
+  // explícita, no viene tildado por defecto como "aplicar precios".
+  const [applyWholesalePrices, setApplyWholesalePrices] = useState(false);
   // Proveedor de la planilla (sdd/alican-wholesale-price-list/providers):
   // nombre seleccionado de los existentes o texto para crear uno nuevo.
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -255,6 +259,10 @@ export const PriceListImport = () => {
     if (preview) setDecisions(buildDefaults(preview.rows, next));
   };
 
+  const toggleApplyWholesalePrices = (checked: boolean | "indeterminate") => {
+    setApplyWholesalePrices(checked === true);
+  };
+
   const toggleApplyPrices = (checked: boolean | "indeterminate") => {
     setApplyPrices(checked === true);
   };
@@ -292,6 +300,24 @@ export const PriceListImport = () => {
     return { updates, creates };
   }, [preview, decisions]);
 
+  /**
+   * Plan del precio mayorista (espejo del server): usa Sin IVA (no Con IVA)
+   * como base — mismo criterio que computeWholesalePrice server-side. Solo
+   * cuenta filas vinculadas a un producto (las que se crean quedan cubiertas
+   * por applyPlan.creates, no duplicamos el conteo acá).
+   */
+  const wholesalePlan = useMemo(() => {
+    const rows = preview?.rows ?? [];
+    let updates = 0;
+    for (const row of rows) {
+      const decision = decisions[row.position] ?? { accion: "omit" };
+      if (decision.accion !== "import") continue;
+      if (row.precioSinIva == null) continue;
+      if (decision.productId ?? row.productId) updates++;
+    }
+    return { updates };
+  }, [preview, decisions]);
+
   const importar = async () => {
     if (!preview) return;
     setSubmitting(true);
@@ -302,6 +328,7 @@ export const PriceListImport = () => {
         period: preview.period,
         sourceFilename: preview.sourceFilename,
         applyPrices,
+        applyWholesalePrices,
         ...(providerName.trim() ? { providerName: providerName.trim() } : {}),
         rows: preview.rows.map((row) => ({
           position: row.position,
@@ -329,6 +356,9 @@ export const PriceListImport = () => {
           `${result.priceUpdated} precios actualizados`,
           `${result.productsCreated} productos creados`,
         );
+      }
+      if (applyWholesalePrices) {
+        detail.push(`${result.wholesaleUpdated} precios mayoristas asignados`);
       }
       toast.success(`Planilla importada: ${detail.join(" · ")}`);
       setDialogOpen(false);
@@ -441,6 +471,17 @@ export const PriceListImport = () => {
                   Aplicar precios al catálogo
                 </Label>
               </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="asignar-precio-mayorista"
+                  checked={applyWholesalePrices}
+                  onCheckedChange={toggleApplyWholesalePrices}
+                  aria-label="Asignar precio mayorista"
+                />
+                <Label htmlFor="asignar-precio-mayorista" className="text-sm font-normal text-muted-foreground">
+                  Asignar precio mayorista
+                </Label>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -525,6 +566,11 @@ export const PriceListImport = () => {
                 <strong>{applyPlan.creates.length}</strong> productos a crear
               </p>
             )}
+            {applyWholesalePrices && (
+              <p className="text-sm">
+                <strong>{wholesalePlan.updates}</strong> precios mayoristas a asignar
+              </p>
+            )}
             <Button
               onClick={() => setDialogOpen(true)}
               disabled={submitting || counts.importados === 0}
@@ -568,6 +614,12 @@ export const PriceListImport = () => {
                     </div>
                   )}
                 </div>
+              )}
+              {applyWholesalePrices && (
+                <p className="mt-2">
+                  Se asignará el precio mayorista de{" "}
+                  <strong>{wholesalePlan.updates}</strong> productos.
+                </p>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

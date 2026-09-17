@@ -63,6 +63,10 @@ export interface ApplyPriceListPayload {
    * precio Con IVA de cada fila va a product.price y las filas sin match se
    * crean automáticamente. */
   applyPrices?: boolean;
+  /** Check "Asignar precio mayorista": con true, Product.wholesalePrice de
+   * cada fila vinculada se setea a computeWholesalePrice(priceSinIva)
+   * (fórmula fija = mismo cálculo que ya se imprime en la planilla). */
+  applyWholesalePrices?: boolean;
   /** Proveedor de la planilla (opcional, back-compat): el server crea o
    * reutiliza el Provider de la org por nombre case-insensitive y asigna
    * providerId a todos los productos tocados (matcheados + creados). */
@@ -77,6 +81,8 @@ export interface ApplyResult {
   suggestedUpdated: number;
   /** Productos vinculados cuyo product.price se actualizó al Con IVA. */
   priceUpdated: number;
+  /** Productos cuyo product.wholesalePrice se asignó (applyWholesalePrices). */
+  wholesaleUpdated: number;
   /** Productos creados automáticamente (filas sin match con precio). */
   productsCreated: number;
 }
@@ -145,6 +151,19 @@ export interface AdjustResult {
   previousTotal: number;
   newTotal: number;
   rows?: AdjustRow[];
+}
+
+export interface WholesaleAssignRow {
+  entryId: string;
+  name: string;
+  productId: string | null;
+  currentWholesalePrice: number | null;
+  newWholesalePrice: number | null;
+}
+
+export interface WholesaleAssignResult {
+  affected: number;
+  rows?: WholesaleAssignRow[];
 }
 
 /** Error con status HTTP para distinguir 400/413/404 en la UI. */
@@ -248,6 +267,30 @@ export const adjustPriceList = async (
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw apiError(res, data.message || "Error al ajustar la planilla");
+  }
+  return res.json();
+};
+
+/**
+ * POST /price-lists/:id/assign-wholesale-prices — preview (dryRun) o apply de
+ * la asignación masiva de precio mayorista (fórmula fija, distinto de
+ * adjustPriceList que ajusta suggestedPrice por %/overrides).
+ */
+export const assignWholesalePrices = async (
+  id: string,
+  dryRun: boolean,
+): Promise<WholesaleAssignResult> => {
+  const res = await fetch(
+    `${API_URL}/price-lists/${id}/assign-wholesale-prices?dryRun=${dryRun}`,
+    {
+      method: "POST",
+      headers: authHeaders(true),
+      body: JSON.stringify({}),
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw apiError(res, data.message || "Error al asignar los precios mayoristas");
   }
   return res.json();
 };

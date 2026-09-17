@@ -29,10 +29,12 @@ import { savePlanilla, type SavedPlanillaRow } from "@/services/savedPlanillas";
 import { groupByPdfHierarchy } from "@/lib/printGrouping";
 import {
   adjustPriceList,
+  assignWholesalePrices,
   getPriceList,
   type AdjustPayload,
   type AdjustResult,
   type PriceListDetail as PlanDetail,
+  type WholesaleAssignResult,
 } from "@/services/priceLists";
 
 const formatPrice = (n: number | null | undefined) =>
@@ -88,6 +90,10 @@ export const PriceListDetail = () => {
   const [preview, setPreview] = useState<AdjustResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Asignación de precio mayorista (fórmula fija, distinta del ajuste de
+  // sugeridos de arriba): dialog propio para no pisar el preview de "Ajustar precios".
+  const [wholesalePreview, setWholesalePreview] = useState<WholesaleAssignResult | null>(null);
+  const [wholesaleDialogOpen, setWholesaleDialogOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -146,6 +152,35 @@ export const PriceListDetail = () => {
       await load(); // el server reescribe entries + products → recargar la planilla
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al aplicar el ajuste");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleWholesalePreview = async () => {
+    if (!id) return;
+    setSubmitting(true);
+    try {
+      const data = await assignWholesalePrices(id, true);
+      setWholesalePreview(data);
+      setWholesaleDialogOpen(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al obtener el preview");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleWholesaleApply = async () => {
+    if (!id) return;
+    setSubmitting(true);
+    try {
+      const result = await assignWholesalePrices(id, false);
+      toast.success(`${result.affected} precios mayoristas asignados`);
+      setWholesaleDialogOpen(false);
+      setWholesalePreview(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al asignar los precios mayoristas");
     } finally {
       setSubmitting(false);
     }
@@ -344,6 +379,71 @@ export const PriceListDetail = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Asignar precio mayorista propio (feature "precio mayorista para
+          usuario interno"): fórmula fija, sin %, solo confirma y persiste
+          Product.wholesalePrice para los productos vinculados de la planilla. */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Precio mayorista propio</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Asigna la columna "Precio mayorista" de esta planilla al catálogo
+            (Product.wholesalePrice) — se usa cuando un usuario interno con
+            "vende a precio mayorista" carga una venta.
+          </p>
+          <Button onClick={handleWholesalePreview} disabled={submitting}>
+            {submitting ? "Calculando…" : "Asignar precios mayoristas"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Diálogo de confirmación de la asignación de precio mayorista */}
+      <AlertDialog open={wholesaleDialogOpen} onOpenChange={setWholesaleDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar precios mayoristas</AlertDialogTitle>
+            <AlertDialogDescription>
+              {wholesalePreview
+                ? `Se asignará el precio mayorista de ${wholesalePreview.affected} productos.`
+                : "Calculando…"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {wholesalePreview && wholesalePreview.rows && wholesalePreview.rows.length > 0 && (
+            <div className="max-h-64 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Producto</TableHead>
+                    <TableHead className="text-right">Actual</TableHead>
+                    <TableHead className="text-right">Nuevo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {wholesalePreview.rows.map((row) => (
+                    <TableRow key={row.entryId}>
+                      <TableCell>{row.name}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatPrice(row.currentWholesalePrice)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatPrice(row.newWholesalePrice)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleWholesaleApply} disabled={submitting}>
+              Aplicar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Diálogo de confirmación con el preview del ajuste */}
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>

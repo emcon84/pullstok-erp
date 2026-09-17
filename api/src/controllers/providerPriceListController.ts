@@ -32,6 +32,7 @@ import { normalizeProductName } from "../utils/productName";
 import {
   buildCatalogIndex,
   computeSuggestedPrice,
+  computeWholesalePrice,
   detectLayout,
   detectProviderLayout,
   LayoutNotSupportedError,
@@ -299,6 +300,7 @@ export const applyPriceList = async (req: Request, res: Response) => {
       period: string | null;
       sourceFilename: string;
       applyPrices?: boolean;
+      applyWholesalePrices?: boolean;
       providerName?: string;
       rows: ApplyDecision[];
     };
@@ -385,6 +387,9 @@ async function applyPriceListCore(
     period: string | null;
     sourceFilename: string;
     applyPrices?: boolean;
+    // Precio mayorista propio del negocio (feature "precio mayorista para
+    // usuario interno"): distinto de applyPrices (que toca product.price).
+    applyWholesalePrices?: boolean;
     providerName?: string;
     rows: ApplyDecision[];
   },
@@ -394,9 +399,18 @@ async function applyPriceListCore(
   omitted: number;
   suggestedUpdated: number;
   priceUpdated: number;
+  wholesaleUpdated: number;
   productsCreated: number;
 }> {
-  const { layout, period, sourceFilename, applyPrices = false, providerName, rows } = body;
+  const {
+    layout,
+    period,
+    sourceFilename,
+    applyPrices = false,
+    applyWholesalePrices = false,
+    providerName,
+    rows,
+  } = body;
   const providerNameTrimmed = providerName?.trim();
   const imports = rows.filter((r) => r.accion === "import");
 
@@ -551,6 +565,9 @@ async function applyPriceListCore(
             categoryId: null,
             organizationId,
             suggestedPrice: computeSuggestedPrice(r.precioConIva, r.precioSinIva ?? null),
+            ...(applyWholesalePrices
+              ? { wholesalePrice: computeWholesalePrice(r.precioSinIva ?? null) }
+              : {}),
             ...(rowProviderId ? { providerId: rowProviderId } : {}),
           },
         });
@@ -605,18 +622,25 @@ async function applyPriceListCore(
       }
     }
 
-    // suggestedPrice (+ price con applyPrices) — UNA escritura por producto.
-    // Los productos RECIÉN creados ya llevan price y suggestedPrice en el
+    // suggestedPrice (+ price con applyPrices, + wholesalePrice con
+    // applyWholesalePrices) — UNA escritura por producto. Los productos
+    // RECIÉN creados ya llevan price/suggestedPrice/wholesalePrice en el
     // create → se omiten acá. product.price solo se toca con applyPrices ON y
     // precio Con IVA presente (decisión 5: fila sin Con IVA no aplica precio).
     const seenProducts = new Set<string>();
     let priceUpdated = 0;
+    let wholesaleUpdated = 0;
     for (const r of imports) {
       const productId = r.productId ?? resolveByPosition.get(r.position);
       if (!productId || seenProducts.has(productId)) continue;
-      if (createdIds.has(productId)) continue; // ya queda con price+sugerido
+      if (createdIds.has(productId)) continue; // ya queda con price+sugerido+mayorista
       seenProducts.add(productId);
-      const data: { suggestedPrice: number | null; price?: number; providerId?: string } = {
+      const data: {
+        suggestedPrice: number | null;
+        price?: number;
+        wholesalePrice?: number | null;
+        providerId?: string;
+      } = {
         suggestedPrice: resolveReimportSuggested(
           computeSuggestedPrice(r.precioConIva ?? null, r.precioSinIva ?? null),
           currentSuggestedById.get(productId),
@@ -625,6 +649,10 @@ async function applyPriceListCore(
       if (applyPrices && (r.precioSinIva != null || r.precioConIva != null)) {
         data.price = roundBolsaPriceIfHigh(resolveSalePrice(r.precioSinIva, r.precioConIva)!);
         priceUpdated++;
+      }
+      if (applyWholesalePrices && r.precioSinIva != null) {
+        data.wholesalePrice = computeWholesalePrice(r.precioSinIva);
+        wholesaleUpdated++;
       }
       if (rowTouchesProducts(r)) {
         const rowProviderId = await getProviderIdForRow(r.providerName);
@@ -642,6 +670,7 @@ async function applyPriceListCore(
       omitted: rows.length - imports.length,
       suggestedUpdated: seenProducts.size + createdIds.size,
       priceUpdated,
+      wholesaleUpdated: wholesaleUpdated + (applyWholesalePrices ? createdIds.size : 0),
       productsCreated: createdIds.size,
     };
   });
@@ -839,11 +868,92 @@ export const adjustPriceList = async (req: Request, res: Response) => {
   }
 };
 
+// ── Asignación masiva de precio mayorista sobre una planilla ya importada ──
+
+interface WholesaleAssignRow {
+  entryId: string;
+  name: string;
+  productId: string | null;
+  currentWholesalePrice: number | null;
+  newWholesalePrice: number | null;
+}
+
+/**
+ * POST /price-lists/:id/assign-wholesale-prices (?dryRun) — a diferencia de
+ * adjustPriceList (que ajusta suggestedPrice por %/overrides), esto asigna
+ * Product.wholesalePrice con la fórmula FIJA computeWholesalePrice(priceSinIva)
+ * a cada entrada de la planilla que tenga producto vinculado. No toca
+ * PriceListEntry ni Product.suggestedPrice/price. Mismo patrón dryRun que
+ * adjustPriceList: preview con rows en dryRun, solo el conteo en el apply real.
+ */
+export const assignWholesalePrices = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const { id } = req.params;
+    const dryRun = req.query.dryRun === "true";
+
+    const pl = await prisma.priceList.findFirst({
+      where: { id, organizationId },
+      select: { id: true },
+    });
+    if (!pl) {
+      return res.status(404).json({ message: "Planilla no encontrada" });
+    }
+
+    const entries = await prisma.priceListEntry.findMany({
+      where: { section: { priceListId: id }, productId: { not: null } },
+      select: { id: true, productId: true, name: true, priceSinIva: true },
+    });
+
+    const productIds = [
+      ...new Set(entries.map((e) => e.productId).filter((v): v is string => Boolean(v))),
+    ];
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, wholesalePrice: true },
+    });
+    const currentByProduct = new Map(
+      products.map((p) => [p.id, p.wholesalePrice === null ? null : Number(p.wholesalePrice)]),
+    );
+
+    const rows: WholesaleAssignRow[] = entries
+      .map((e) => ({
+        entryId: e.id,
+        name: e.name,
+        productId: e.productId,
+        currentWholesalePrice: e.productId ? currentByProduct.get(e.productId) ?? null : null,
+        newWholesalePrice: computeWholesalePrice(e.priceSinIva === null ? null : Number(e.priceSinIva)),
+      }))
+      .filter((r) => r.newWholesalePrice !== null); // sin Sin IVA no hay nada que asignar
+
+    const affected = rows.length;
+
+    if (!dryRun) {
+      await prisma.$transaction(async (tx) => {
+        for (const r of rows) {
+          if (!r.productId) continue;
+          await tx.product.updateMany({
+            where: { id: r.productId },
+            data: { wholesalePrice: r.newWholesalePrice },
+          });
+        }
+      });
+      return res.status(200).json({ affected });
+    }
+
+    return res.status(200).json({ affected, rows });
+  } catch (error: any) {
+    console.error("Error asignando precios mayoristas:", error);
+    return res.status(500).json({ message: "Error al asignar los precios mayoristas" });
+  }
+};
+
 const priceListController = {
   importPriceList,
   applyPriceList,
   listPriceLists,
   getPriceList,
   adjustPriceList,
+  assignWholesalePrices,
 };
 export default priceListController;

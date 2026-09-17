@@ -135,12 +135,15 @@ describe("PriceListImport — wizard de importación", () => {
 
     // Default con "Importar todas las filas" ON: matched → import,
     // error → omit, sin matchear → import. "Aplicar precios" default ON.
+    // "Asignar precio mayorista" default OFF (decisión explícita, no viene
+    // tildado como "aplicar precios").
     const checkboxes = screen.getAllByRole("checkbox");
     expect(checkboxes[0]).toBeChecked(); // importar todas (default ON)
     expect(checkboxes[1]).toBeChecked(); // aplicar precios al catálogo (default ON)
-    expect(checkboxes[2]).toBeChecked(); // matched → import
-    expect(checkboxes[3]).not.toBeChecked(); // error → omit
-    expect(checkboxes[4]).toBeChecked(); // sin matchear → import
+    expect(checkboxes[2]).not.toBeChecked(); // asignar precio mayorista (default OFF)
+    expect(checkboxes[3]).toBeChecked(); // matched → import
+    expect(checkboxes[4]).not.toBeChecked(); // error → omit
+    expect(checkboxes[5]).toBeChecked(); // sin matchear → import
   });
 
   it("toggle a una fila matched a omit y envía el payload correcto al aplicar", async () => {
@@ -148,7 +151,7 @@ describe("PriceListImport — wizard de importación", () => {
     await uploadPdf();
 
     const checkboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(checkboxes[2]); // desmarcar la fila matched
+    fireEvent.click(checkboxes[3]); // desmarcar la fila matched
     // la fila sin matchear ya viene import por default (importAll ON)
 
     await confirmImport();
@@ -206,7 +209,7 @@ describe("PriceListImport — wizard de importación", () => {
 
     const checkboxes = screen.getAllByRole("checkbox");
     expect(checkboxes[0]).not.toBeChecked(); // importar todas OFF
-    expect(checkboxes[4]).not.toBeChecked(); // sin matchear → omit (default anterior)
+    expect(checkboxes[5]).not.toBeChecked(); // sin matchear → omit (default anterior)
 
     await confirmImport();
 
