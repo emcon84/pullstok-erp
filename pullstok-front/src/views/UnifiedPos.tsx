@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Landmark, ShoppingCart, PackageOpen } from "lucide-react";
+import { Landmark, ShoppingCart, PackageOpen, Minus, Plus } from "lucide-react";
 import { toast } from "react-toastify";
 import { API_URL } from "@/constants";
 import { VendorCatalogTab } from "@/components/organisms/VendorCatalogTab";
@@ -424,59 +424,82 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           </div>
         )}
 
-        <div className="flex items-baseline justify-between rounded-lg bg-muted p-3">
-          <span className="text-sm text-muted-foreground">Precio por unidad</span>
-          <span className="text-2xl font-bold tabular-nums">
-            $
-            {scanProduct
-              ? effectivePrice(
-                  { name: scanProduct.name, price: scanProduct.price ?? 0, wholesalePrice: scanProduct.wholesalePrice ?? null, quantity: 0 },
-                  sellsWholesale,
-                ).toLocaleString("es-AR")
-              : 0}
-          </span>
-        </div>
-
-        {/* Cantidad: SIN autoFocus a propósito. El botón "Agregar al pedido"
+        {/* Stepper de cantidad + total (cantidad × precio) en una sola caja.
+            El input SIN autoFocus a propósito: el botón "Agregar al pedido"
             es el que queda enfocado (como antes), así seguir escaneando con
             el modal abierto sigue reemplazando el producto normalmente en
-            vez de filtrar dígitos acá. Si el operador toca el campo a
-            propósito para poner una cantidad (ej. pouches/latas x3), Enter
-            confirma igual. type="text" + maxLength (no type="number") pone
-            un techo duro de caracteres a nivel DOM por si algo se filtra
-            estando el campo enfocado, y el clamp contra el stock es la
-            segunda barrera. */}
-        <div className="flex items-center justify-between gap-3">
-          <Label htmlFor="scan-qty-input" className="shrink-0">
-            Cantidad
-          </Label>
-          <Input
-            id="scan-qty-input"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={4}
-            value={scanQty || ""}
-            onFocus={(e) => e.target.select()}
-            onChange={(e) => {
-              const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
-              if (digits === "") {
-                setScanQty(0);
-                return;
-              }
-              const stock = Number(scanProduct?.quantity ?? 0);
-              const max = stock > 0 ? stock : 999;
-              setScanQty(Math.min(parseInt(digits, 10), max));
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleConfirmScan();
-              }
-            }}
-            className="w-20 text-center text-lg font-bold tabular-nums"
-          />
-        </div>
+            vez de filtrar dígitos acá. Si el operador toca el campo o los
+            +/− a propósito para poner una cantidad (ej. pouches/latas x3),
+            Enter o el botón confirman igual. type="text" + maxLength (no
+            type="number") pone un techo duro de caracteres a nivel DOM por
+            si algo se filtra estando el campo enfocado, y el clamp contra
+            el stock es la segunda barrera. */}
+        {(() => {
+          const unitPrice = scanProduct
+            ? effectivePrice(
+                { name: scanProduct.name, price: scanProduct.price ?? 0, wholesalePrice: scanProduct.wholesalePrice ?? null, quantity: 0 },
+                sellsWholesale,
+              )
+            : 0;
+          const stock = Number(scanProduct?.quantity ?? 0);
+          const maxQty = stock > 0 ? stock : 999;
+          return (
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-muted p-3">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  disabled={scanQty >= maxQty}
+                  onClick={() => setScanQty((q) => Math.min(maxQty, q + 1))}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Label htmlFor="scan-qty-input" className="sr-only">
+                  Cantidad
+                </Label>
+                <Input
+                  id="scan-qty-input"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  value={scanQty || ""}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+                    if (digits === "") {
+                      setScanQty(0);
+                      return;
+                    }
+                    setScanQty(Math.min(parseInt(digits, 10), maxQty));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleConfirmScan();
+                    }
+                  }}
+                  className="h-9 w-14 shrink-0 text-center tabular-nums"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  disabled={scanQty <= 1}
+                  onClick={() => setScanQty((q) => Math.max(1, q - 1))}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+              </div>
+              <span className="text-2xl font-bold tabular-nums">
+                ${Math.round(unitPrice * scanQty).toLocaleString("es-AR")}
+              </span>
+            </div>
+          );
+        })()}
 
         <DialogFooter>
           <Button variant="outline" onClick={handleCancelScan}>
