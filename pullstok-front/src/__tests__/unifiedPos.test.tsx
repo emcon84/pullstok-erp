@@ -201,6 +201,51 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
     );
   });
 
+  it("el modal trae un campo de cantidad enfocado, en 1 por defecto", async () => {
+    mockFetchWith({
+      isScale: false,
+      product: { _id: "p1", id: "p1", name: "Royal 15kg", price: 18400, code: "7791234567890", quantity: 10 },
+    });
+    renderPos({ addToCart: vi.fn() });
+
+    scanCode("7791234567890");
+
+    const qtyInput = await screen.findByLabelText("Cantidad");
+    expect(qtyInput).toHaveValue(1);
+    expect(qtyInput).toHaveFocus();
+  });
+
+  it("edita la cantidad y confirma con Enter desde el campo (sin usar el mouse)", async () => {
+    mockFetchWith({
+      isScale: false,
+      product: { _id: "p1", id: "p1", name: "Royal 15kg", price: 18400, code: "7791234567890", quantity: 10 },
+    });
+    const addToCart = vi.fn();
+    renderPos({ addToCart });
+
+    scanCode("7791234567890");
+    const qtyInput = await screen.findByLabelText("Cantidad");
+
+    fireEvent.change(qtyInput, { target: { value: "3" } });
+    fireEvent.keyDown(qtyInput, { key: "Enter" });
+
+    expect(addToCart).toHaveBeenCalledTimes(1);
+    expect(addToCart).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Royal 15kg" }),
+      3,
+      "branch-1",
+      10,
+      "BOLSA_CERRADA",
+      undefined,
+      undefined,
+      undefined,
+      false,
+    );
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Cantidad")).not.toBeInTheDocument(),
+    );
+  });
+
   it("al cancelar el modal NO agrega la bolsa al pedido", async () => {
     mockFetchWith({
       isScale: false,

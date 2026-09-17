@@ -13,6 +13,8 @@ import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecul
 import { OpenBagDialog } from "@/components/molecules/OpenBagDialog";
 import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { imgSrc, effectivePrice } from "@/components/hooks/vendorCatalogHelpers";
 import { getMe } from "@/services/onboardingService";
 import {
@@ -64,6 +66,11 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // null = sin modal abierto. La rama balanza (isScale) NO pasa por acá: se
   // agrega directo al pedido (flujo suelto intacto).
   const [scanProduct, setScanProduct] = useState<ScannedProduct | null>(null);
+  // Cantidad a agregar del producto escaneado (bolsa cerrada). Arranca en 1 y
+  // se reinicia en cada escaneo nuevo — el input la recibe con foco para que
+  // el operador pueda tipear la cantidad (ej. pouches/latas x3) y confirmar
+  // con Enter, sin soltar el teclado.
+  const [scanQty, setScanQty] = useState(1);
 
   // Modal de "Abrir bolsa" - flujo para abrir bolsas y creditar kg a celda suelta
   const [openBagDialogOpen, setOpenBagDialogOpen] = useState(false);
@@ -168,6 +175,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         } else {
           // Bolsa cerrada: abrimos el modal de confirmación con producto+precio
           // en lugar de sumar directo. La balanza (isScale) NUNCA llega acá.
+          setScanQty(1);
           setScanProduct(data.product);
         }
       } catch (e: any) {
@@ -197,7 +205,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         code: p.code ?? "",
         unitsPerBox: p.unitsPerBox ?? null,
       },
-      1,
+      scanQty,
       branchId,
       Number(p.quantity ?? 0),
       "BOLSA_CERRADA",
@@ -208,7 +216,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     );
     toast.success(`${p.name} agregado`);
     setScanProduct(null);
-  }, [cart, branchId, scanProduct, sellsWholesale]);
+  }, [cart, branchId, scanProduct, scanQty, sellsWholesale]);
 
   // Capturador global (fase CAPTURE) del patrón de la pistola. Reset si hay
   // letras o pausas largas; solo un run de dígitos (≥6) + Enter se trata como
@@ -429,11 +437,42 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           </span>
         </div>
 
+        {/* Cantidad: foco automático al abrir para permitir tipear el número
+            (ej. pouches/latas x3) y confirmar con Enter sin usar el mouse. */}
+        <div className="space-y-2">
+          <Label htmlFor="scan-qty-input">Cantidad</Label>
+          <Input
+            id="scan-qty-input"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            autoFocus
+            value={scanQty || ""}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === "") {
+                setScanQty(0);
+                return;
+              }
+              const v = parseInt(raw, 10);
+              if (!isNaN(v) && v >= 1) setScanQty(v);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleConfirmScan();
+              }
+            }}
+            className="text-lg font-bold tabular-nums"
+          />
+        </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={handleCancelScan}>
             Cancelar
           </Button>
-          <Button autoFocus onClick={handleConfirmScan}>
+          <Button onClick={handleConfirmScan} disabled={scanQty <= 0}>
             <ShoppingCart className="h-4 w-4 mr-2" />
             Agregar al pedido
           </Button>
