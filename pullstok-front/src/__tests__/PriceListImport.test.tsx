@@ -105,6 +105,7 @@ describe("PriceListImport — wizard de importación", () => {
       omitted: 2,
       suggestedUpdated: 1,
       priceUpdated: 1,
+      wholesaleUpdated: 0,
       productsCreated: 1,
     });
     mockSearch.mockResolvedValue([
