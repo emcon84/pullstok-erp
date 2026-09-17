@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProductTable } from "@/components/molecules/ProductTable";
 import { VendorCatalogTab } from "@/components/organisms/VendorCatalogTab";
 import { useVendorCatalog } from "@/components/hooks/useVendorCatalog";
@@ -163,15 +164,23 @@ function renderCatalogTab(overrides: Record<string, unknown> = {}) {
     removeFromCart: vi.fn(),
     clearCart: vi.fn(),
   };
+  // VendorCatalogTab lee ["me"] (precio mayorista) vía react-query — necesita
+  // un QueryClientProvider en el árbol. retry:false para que el fetch fallido
+  // (sin backend en el test) no reintente y ralentice la suite.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   render(
-    <VendorCatalogTab
-      branchId="b1"
-      cart={cart as never}
-      onSaveOrder={vi.fn()}
-      onConfirmSale={vi.fn()}
-      onToggleTab={vi.fn()}
-      registerGridApi={vi.fn()}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <VendorCatalogTab
+        branchId="b1"
+        cart={cart as never}
+        onSaveOrder={vi.fn()}
+        onConfirmSale={vi.fn()}
+        onToggleTab={vi.fn()}
+        registerGridApi={vi.fn()}
+      />
+    </QueryClientProvider>,
   );
   return { catalog, cart };
 }

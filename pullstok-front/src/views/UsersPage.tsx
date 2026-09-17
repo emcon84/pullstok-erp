@@ -69,6 +69,7 @@ export const UsersPage = () => {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<string>("EMPLOYEE");
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [sellsWholesale, setSellsWholesale] = useState(false);
   const [creating, setCreating] = useState(false);
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
   // Edit form state
@@ -79,6 +80,7 @@ export const UsersPage = () => {
   const [editAddress, setEditAddress] = useState("");
   const [editRole, setEditRole] = useState("");
   const [editBranchIds, setEditBranchIds] = useState<string[]>([]);
+  const [editSellsWholesale, setEditSellsWholesale] = useState(false);
   const [saving, setSaving] = useState(false);
   const [resetPwd, setResetPwd] = useState("");
   const [resettingPwd, setResettingPwd] = useState(false);
@@ -122,6 +124,7 @@ export const UsersPage = () => {
         password,
         role,
         branchIds: selectedBranchIds.length > 0 ? selectedBranchIds : undefined,
+        sellsWholesale,
       });
       toast.success("Usuario creado");
       setEmail("");
@@ -132,6 +135,7 @@ export const UsersPage = () => {
       setPassword("");
       setRole("EMPLOYEE");
       setSelectedBranchIds([]);
+      setSellsWholesale(false);
       setDialogOpen(false);
       refetch();
     } catch (e: any) {
@@ -188,6 +192,7 @@ export const UsersPage = () => {
     setEditAddress((user as any).address || "");
     setEditRole(user.role);
     setEditBranchIds(user.branchIds || []);
+    setEditSellsWholesale(Boolean((user as any).sellsWholesale));
   };
 
   const handleUpdate = async () => {
@@ -201,6 +206,7 @@ export const UsersPage = () => {
     if (editPhone !== (orig.phone || "")) data.phone = editPhone || null;
     if (editAddress !== (orig.address || "")) data.address = editAddress || null;
     if (editRole !== orig.role) data.role = editRole;
+    if (editSellsWholesale !== Boolean(orig.sellsWholesale)) data.sellsWholesale = editSellsWholesale;
 
     // Always include branchIds in update (replace semantics)
     const currentIds = orig.branchIds || [];
@@ -373,6 +379,19 @@ export const UsersPage = () => {
                   </div>
                 </div>
               )}
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="u-wholesale">Vende a precio mayorista</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Al cargar una venta, usa el precio mayorista del producto en vez del precio de mostrador.
+                  </p>
+                </div>
+                <Switch
+                  id="u-wholesale"
+                  checked={sellsWholesale}
+                  onCheckedChange={setSellsWholesale}
+                />
+              </div>
               <Button
                 className="w-full"
                 onClick={handleCreate}
@@ -553,6 +572,19 @@ export const UsersPage = () => {
                 </div>
               </div>
             )}
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="u-edit-wholesale">Vende a precio mayorista</Label>
+                <p className="text-xs text-muted-foreground">
+                  Al cargar una venta, usa el precio mayorista del producto en vez del precio de mostrador.
+                </p>
+              </div>
+              <Switch
+                id="u-edit-wholesale"
+                checked={editSellsWholesale}
+                onCheckedChange={setEditSellsWholesale}
+              />
+            </div>
             {/* Reset password */}
             <div className="space-y-1.5 pt-2 border-t">
               <Label>Resetear contraseña</Label>

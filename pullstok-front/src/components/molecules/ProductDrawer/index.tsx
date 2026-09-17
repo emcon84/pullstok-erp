@@ -46,6 +46,9 @@ interface ProductPayload {
   code?: string;
   description?: string;
   price: number;
+  // Precio mayorista propio del negocio (feature "precio mayorista para
+  // usuario interno"). null = sin precio mayorista configurado.
+  wholesalePrice?: number | null;
   image?: string;
   variantOptionIds: string[];
   quantity?: number;
@@ -66,6 +69,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [price, setPrice] = useState("");
+  const [wholesalePrice, setWholesalePrice] = useState("");
   const [quantity, setQuantity] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
@@ -181,6 +185,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         setDescription(product.description || "");
         setCategoryId(product.categoryId || "");
         setPrice(product.price?.toString() || "");
+        setWholesalePrice(product.wholesalePrice != null ? String(product.wholesalePrice) : "");
         setQuantity(product.quantity?.toString() || "");
         setImageUrl(product.image || "");
         setImageFile(null);
@@ -203,6 +208,7 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         setDescription("");
         setCategoryId("");
         setPrice("");
+        setWholesalePrice("");
         setQuantity("");
         setImageUrl("");
         setImageFile(null);
@@ -245,6 +251,13 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         image: imgUrl,
         variantOptionIds,
       };
+      // Precio mayorista: vacío = sin configurar (null, cae a `price` para
+      // vendedores mayoristas).
+      const parsedWholesalePrice = parseFloat(wholesalePrice);
+      payload.wholesalePrice =
+        wholesalePrice.trim() !== "" && !Number.isNaN(parsedWholesalePrice)
+          ? parsedWholesalePrice
+          : null;
       // Only create mode sends the global quantity: the server syncs it to the
       // HQ ProductStock row (syncHqStock). In edit mode stock is edited per
       // branch via the stock endpoints, so Product.quantity must not change.
@@ -323,9 +336,20 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
 
           {/* Precio + Cantidad (Cantidad solo en alta; en edición el stock es por sucursal) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className={`space-y-1.5 ${isEdit ? "sm:col-span-2" : ""}`}>
+            <div className="space-y-1.5">
               <Label htmlFor="p-price">Precio</Label>
               <Input id="p-price" type="number" inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="p-wholesale-price">Precio mayorista</Label>
+              <Input
+                id="p-wholesale-price"
+                type="number"
+                inputMode="decimal"
+                value={wholesalePrice}
+                onChange={e => setWholesalePrice(e.target.value)}
+                placeholder="Sin configurar"
+              />
             </div>
             {!isEdit && (
               <div className="space-y-1.5">

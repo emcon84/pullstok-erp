@@ -131,6 +131,10 @@ model User {
   address            String?
   password           String
   role               Role          @default(EMPLOYEE)
+  // Flag independiente del Role: si es true, este usuario vende SIEMPRE a
+  // precio mayorista (product.wholesalePrice) al cargar una venta. No define
+  // permisos, solo qué precio de catálogo se usa.
+  sellsWholesale     Boolean       @default(false)
   mustChangePassword Boolean       @default(true)
   isActive           Boolean       @default(true)
   createdAt          DateTime      @default(now())
@@ -503,6 +507,12 @@ model Product {
   // Decimal nullable; product.price NUNCA se toca (el precio del proveedor es
   // solo informativo).
   suggestedPrice     Decimal?           @db.Decimal(12, 2)
+  // Precio mayorista PROPIO del negocio (distinto de suggestedPrice, que es
+  // el precio sugerido del proveedor al importar una planilla). Se aplica
+  // automáticamente en una venta cuando el vendedor logueado tiene
+  // User.sellsWholesale=true. null = producto sin precio mayorista propio →
+  // fallback a `price`.
+  wholesalePrice     Decimal?           @db.Decimal(12, 2)
   priceListEntries   PriceListEntry[]
   // Proveedor que abastece el producto (sdd/alican-wholesale-price-list/providers).
   // null = sin proveedor (productos legacy). onDelete SetNull: borrar un

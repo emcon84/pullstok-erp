@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,7 @@ import { ProductDrawer } from "@/components/molecules/ProductDrawer";
 import { FilterChips } from "@/components/molecules/FilterChips";
 import { VendorSearchBar } from "@/components/molecules/VendorSearchBar";
 import { ProductTable } from "@/components/molecules/ProductTable";
+import { getMe } from "@/services/onboardingService";
 import { useVendorCatalog } from "@/components/hooks/useVendorCatalog";
 import { useVendorRowsKeyboard } from "@/components/hooks/useVendorRowsKeyboard";
 import { useVendorCart, type SaleMode } from "@/components/hooks/useVendorCart";
@@ -57,6 +59,10 @@ export const VendorCatalogTab = ({
   const navigate = useNavigate();
   const catalog = useVendorCatalog(branchId);
   const rootRef = useRef<HTMLDivElement>(null);
+  // Precio mayorista: cache-hit de ["me"] (ProtectedLayout ya lo trajo), no
+  // dispara un request nuevo.
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const sellsWholesale = me?.sellsWholesale ?? false;
 
   // ── Cantidades inline (string por fila, sync desde el carrito) ──
   const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
@@ -200,11 +206,11 @@ export const VendorCatalogTab = ({
       if (existing) {
         cart.updateQuantity(key, qty, mode);
       } else {
-        cart.addToCart(p, qty, branchId, stock, mode);
+        cart.addToCart(p, qty, branchId, stock, mode, undefined, undefined, undefined, sellsWholesale);
       }
       toast.success(`"${p.name}" agregado al pedido`);
     },
-    [catalog.items, qtyByKey, keyOf, modeFor, itemFor, cart, branchId],
+    [catalog.items, qtyByKey, keyOf, modeFor, itemFor, cart, branchId, sellsWholesale],
   );
 
   const registerInput = useCallback((index: number, el: HTMLInputElement | null) => {
@@ -465,6 +471,7 @@ export const VendorCatalogTab = ({
             onAssignBarcode={handleAssignBarcode}
             inlineQty={inlineQty}
             unitMode={unitMode}
+            sellsWholesale={sellsWholesale}
           />
         )}
 

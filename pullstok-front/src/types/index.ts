@@ -33,6 +33,9 @@ export interface DataItem {
   // trabajo" del dashboard (admin + vendedor) oculta los desmarcados.
   carried?: boolean;
   price: number | string;
+  // Precio mayorista propio del negocio (distinto del sugerido de proveedor).
+  // null/undefined = sin precio mayorista configurado para este producto.
+  wholesalePrice?: number | string | null;
   quantity: number | string;
   // sdd/venta-por-unidad-multpack: un multi-pack puede venderse por unidad.
   // `unitsPerBox` = cantidad de unidades por caja (eligibilidad: > 1);

@@ -62,6 +62,12 @@ class AuthService {
         role: user.role,
         organizationId: user.organizationId,
         mustChangePassword: user.mustChangePassword,
+        // Precio mayorista (feature "precio mayorista para usuario interno"):
+        // solo informativo para el front (qué precio mostrar en el POS). NO
+        // se agrega al JWT firmado, mismo criterio que `plan` (ver comentario
+        // abajo): si el admin lo togglea, un token cacheado quedaría
+        // desincronizado. salesService SIEMPRE revalida con query propia.
+        sellsWholesale: user.sellsWholesale,
         // BranchIds del usuario como hint UX para el front (design D3):
         // el server re-lee BranchAssignment de la DB en cada PUT de stock,
         // este valor es SOLO informativo (scanner/selector de sucursal).
@@ -242,6 +248,7 @@ class AuthService {
       role: user.role,
       organizationId: user.organizationId,
       mustChangePassword: user.mustChangePassword,
+      sellsWholesale: user.sellsWholesale,
       branchIds,
       organization: user.organization,
     };
@@ -463,8 +470,9 @@ class AuthService {
     address?: string;
     password: string;
     role?: Role;
+    sellsWholesale?: boolean;
   }) {
-    const { organizationId, email, username, name, phone, address, password, role } = params;
+    const { organizationId, email, username, name, phone, address, password, role, sellsWholesale } = params;
 
     if (email) {
       const existing = await basePrisma.user.findFirst({
@@ -498,6 +506,7 @@ class AuthService {
         role: role ?? Role.EMPLOYEE,
         organizationId,
         mustChangePassword: false,
+        sellsWholesale: sellsWholesale ?? false,
       },
       select: {
         id: true,
@@ -506,6 +515,7 @@ class AuthService {
         name: true,
         role: true,
         organizationId: true,
+        sellsWholesale: true,
       },
     });
   }

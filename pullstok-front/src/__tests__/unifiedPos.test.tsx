@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("@/components/organisms/VendorCatalogTab", () => ({
   VendorCatalogTab: () => <div data-testid="catalog-tab" />,
@@ -58,10 +59,18 @@ function renderPos(cartOverrides: Record<string, unknown> = {}) {
     error: null,
     refetch: vi.fn(),
   } as never);
+  // UnifiedPos lee ["me"] (precio mayorista) vía react-query — necesita un
+  // QueryClientProvider en el árbol. retry:false para que el fetch fallido
+  // (sin backend en el test) no reintente y ralentice la suite.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   render(
-    <MemoryRouter>
-      <UnifiedPos branchId="branch-1" />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <UnifiedPos branchId="branch-1" />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -181,6 +190,11 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
       1,
       "branch-1",
       10,
+      "BOLSA_CERRADA",
+      undefined,
+      undefined,
+      undefined,
+      false, // sellsWholesale: sin sesión ["me"] en el test, default false
     );
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Agregar al pedido" })).not.toBeInTheDocument(),

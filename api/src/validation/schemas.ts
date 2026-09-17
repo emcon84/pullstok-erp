@@ -117,6 +117,9 @@ export const createUserSchema = z
       .min(8, "La contraseña debe tener al menos 8 caracteres"),
     role: z.enum(orgRoles).optional(),
     branchIds: z.array(z.string()).optional(),
+    // Flag independiente del role: si es true, este usuario vende siempre a
+    // precio mayorista (product.wholesalePrice) al cargar una venta.
+    sellsWholesale: z.boolean().optional(),
   })
   .refine((data) => data.email || data.username, {
     message: "Se requiere email o nombre de usuario",
@@ -144,6 +147,10 @@ export const superadminCreateUserSchema = createUserSchema;
 export const createProductSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   price: z.coerce.number().nonnegative("El precio no puede ser negativo"),
+  // Precio mayorista propio (distinto de suggestedPrice, que viene de la
+  // planilla del proveedor). Opcional/nullable: null = sin precio mayorista
+  // configurado, la venta cae a `price` para vendedores mayoristas.
+  wholesalePrice: z.coerce.number().nonnegative("El precio mayorista no puede ser negativo").nullable().optional(),
   code: z.string().optional(), // Código de barras / SKU
   barcode: z.string().nullable().optional(), // EAN-13 / UPC escaneado
   description: z.string().optional(),

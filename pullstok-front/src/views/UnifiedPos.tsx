@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Landmark, ShoppingCart, PackageOpen } from "lucide-react";
 import { toast } from "react-toastify";
 import { API_URL } from "@/constants";
@@ -12,7 +13,8 @@ import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecul
 import { OpenBagDialog } from "@/components/molecules/OpenBagDialog";
 import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
-import { imgSrc } from "@/components/hooks/vendorCatalogHelpers";
+import { imgSrc, effectivePrice } from "@/components/hooks/vendorCatalogHelpers";
+import { getMe } from "@/services/onboardingService";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +41,7 @@ interface ScannedProduct {
   quantity?: number | string;
   priceKgSuelto?: number | null;
   unitsPerBox?: number | null;
+  wholesalePrice?: number | string | null;
 }
 
 interface UnifiedPosProps {
@@ -68,6 +71,11 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // Modal de pago: lo abre la tecla V (listado y panel) y el botón Vender.
   const [paymentOpen, setPaymentOpen] = useState(false);
   const openPayment = useCallback(() => setPaymentOpen(true), []);
+
+  // Precio mayorista: cache-hit de ["me"] (ProtectedLayout ya lo trajo), no
+  // dispara un request nuevo.
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const sellsWholesale = me?.sellsWholesale ?? false;
 
   // Carrito ÚNICO de todo el POS (compartido entre ambas pestañas vía props).
   const cart = useVendorCart();
@@ -181,6 +189,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         id: p.id,
         name: p.name,
         price: p.price ?? 0,
+        wholesalePrice: p.wholesalePrice ?? null,
         priceKgSuelto: p.priceKgSuelto ?? null,
         quantity: 0,
         category: p.category?.name ?? "",
@@ -191,10 +200,15 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
       1,
       branchId,
       Number(p.quantity ?? 0),
+      "BOLSA_CERRADA",
+      undefined,
+      undefined,
+      undefined,
+      sellsWholesale,
     );
     toast.success(`${p.name} agregado`);
     setScanProduct(null);
-  }, [cart, branchId, scanProduct]);
+  }, [cart, branchId, scanProduct, sellsWholesale]);
 
   // Capturador global (fase CAPTURE) del patrón de la pistola. Reset si hay
   // letras o pausas largas; solo un run de dígitos (≥6) + Enter se trata como
@@ -405,7 +419,13 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         <div className="flex items-baseline justify-between rounded-lg bg-muted p-3">
           <span className="text-sm text-muted-foreground">Precio por unidad</span>
           <span className="text-2xl font-bold tabular-nums">
-            ${Number(scanProduct?.price ?? 0).toLocaleString("es-AR")}
+            $
+            {scanProduct
+              ? effectivePrice(
+                  { name: scanProduct.name, price: scanProduct.price ?? 0, wholesalePrice: scanProduct.wholesalePrice ?? null, quantity: 0 },
+                  sellsWholesale,
+                ).toLocaleString("es-AR")
+              : 0}
           </span>
         </div>
 

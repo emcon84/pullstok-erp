@@ -41,6 +41,11 @@ export interface Me {
   role: "SUPERADMIN" | "ADMIN" | "MANAGEMENT" | "VENDEDOR" | "CASHIER" | "EMPLOYEE";
   organizationId: string;
   mustChangePassword: boolean;
+  // Precio mayorista (feature "precio mayorista para usuario interno"):
+  // true = este usuario vende siempre a wholesalePrice cuando el producto
+  // lo tiene configurado. Informativo (igual que `plan`); el backend
+  // SIEMPRE revalida esto de forma autoritativa al cobrar.
+  sellsWholesale?: boolean;
   organization: Organization;
   branchIds: string[];
 }

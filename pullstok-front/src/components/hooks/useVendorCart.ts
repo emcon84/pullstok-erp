@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import type { DataItem } from "../../types";
-import { unitPrice } from "./vendorCatalogHelpers";
+import { unitPrice, effectivePrice } from "./vendorCatalogHelpers";
 
 export type SaleMode = "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD";
 
@@ -66,6 +66,10 @@ export function useVendorCart() {
       // distintas del mismo producto físico.
       loosePriceId?: string,
       looseName?: string,
+      // Precio mayorista (User.sellsWholesale): cuando true y el producto
+      // tiene wholesalePrice configurado, el carrito arma la línea con ese
+      // precio en vez de price. El backend SIEMPRE revalida esto al cobrar.
+      sellsWholesale?: boolean,
     ) => {
       setItems((prev) => {
         const pid = product._id || product.id;
@@ -95,10 +99,10 @@ export function useVendorCart() {
             price: mode === "POR_MONTO"
               ? 1 // amount IS the total; backend computes kg from priceKgSuelto
               : mode === "POR_UNIDAD"
-              ? unitPrice(product) ?? Number(product.price) // price per unit
+              ? unitPrice(product, sellsWholesale) ?? effectivePrice(product, sellsWholesale) // price per unit
               : mode !== "BOLSA_CERRADA"
               ? kgPrice
-              : Number(product.price),
+              : effectivePrice(product, sellsWholesale),
             stock,
             quantity,
             branchId,
@@ -107,7 +111,7 @@ export function useVendorCart() {
             loosePriceId: loosePriceId ?? undefined,
             looseName: looseName ?? undefined,
             unitsPerBox: product.unitsPerBox ?? null,
-            perUnitPrice: unitPrice(product),
+            perUnitPrice: unitPrice(product, sellsWholesale),
           },
         ];
       });

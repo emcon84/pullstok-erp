@@ -12,14 +12,31 @@ import type { SaleMode } from "./useVendorCart";
 export const isUnitSellable = (unitsPerBox?: number | null): boolean =>
   !!unitsPerBox && unitsPerBox > 1;
 
-/** Precio unitario de un multi-pack, o null si no es elegible. Usa el
- *  perUnitPrice que ya calculó el backend (redondeado hacia arriba al próximo
- *  $100, ej. 18.400/15=1.226,67 → 1.300); si no viene, lo deriva igual. */
-export const unitPrice = (p: DataItem): number | null => {
-  if (p.perUnitPrice != null) return Number(p.perUnitPrice);
+/** Precio de catálogo efectivo de un producto: mayorista (wholesalePrice) si
+ *  el usuario logueado vende mayorista (User.sellsWholesale) y el producto lo
+ *  tiene configurado; si no, el precio de mostrador (price). El backend
+ *  (salesService) SIEMPRE revalida esto de forma autoritativa al cobrar —
+ *  este helper es para mostrar/armar el carrito de forma consistente. */
+export const effectivePrice = (p: DataItem, sellsWholesale?: boolean): number =>
+  sellsWholesale && p.wholesalePrice != null
+    ? Number(p.wholesalePrice)
+    : Number(p.price);
+
+/** Precio unitario de un multi-pack, o null si no es elegible. Con
+ *  sellsWholesale + wholesalePrice configurado, se deriva de ese precio
+ *  (el perUnitPrice del backend es siempre sobre `price`, mostrador). Si no,
+ *  usa el perUnitPrice que ya calculó el backend (redondeado hacia arriba al
+ *  próximo $100, ej. 18.400/15=1.226,67 → 1.300); si no viene, lo deriva igual. */
+export const unitPrice = (p: DataItem, sellsWholesale?: boolean): number | null => {
   if (!isUnitSellable(p.unitsPerBox)) return null;
-  const price = Number(p.price);
   const ub = Number(p.unitsPerBox);
+  if (sellsWholesale && p.wholesalePrice != null) {
+    const wPrice = Number(p.wholesalePrice);
+    if (!wPrice || !ub) return null;
+    return Math.ceil(wPrice / ub / 100) * 100;
+  }
+  if (p.perUnitPrice != null) return Number(p.perUnitPrice);
+  const price = Number(p.price);
   if (!price || !ub) return null;
   return Math.ceil(price / ub / 100) * 100;
 };

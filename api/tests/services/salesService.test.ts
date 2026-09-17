@@ -17,6 +17,7 @@ jest.mock("../../src/config/db", () => ({
     branchAssignment: { findMany: jest.fn() },
     organization: { findUnique: jest.fn() },
     storeSettings: { findUnique: jest.fn() },
+    user: { findFirst: jest.fn() },
   },
 }));
 
@@ -46,6 +47,7 @@ const mockedPrisma = prisma as unknown as {
 
 const mockedBase = basePrisma as unknown as {
   branchAssignment: { findMany: jest.Mock };
+  user: { findFirst: jest.Mock };
 };
 
 const makeTx = () => ({
@@ -561,6 +563,243 @@ describe("salesService.createSale — loose decimal flow", () => {
     );
     expect(tx.looseStock.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: { quantity: { decrement: 2.35 } } }),
+    );
+  });
+});
+
+// ── createSale: precio mayorista (feature "precio mayorista para usuario
+// interno") — User.sellsWholesale + Product.wholesalePrice. ──
+describe("salesService.createSale — precio mayorista", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const vendorArgs: [string, string] = ["u-1", "VENDEDOR"];
+
+  const withVendorBranch = () => {
+    mockedBase.branchAssignment.findMany.mockResolvedValue([{ branchId: "b-1" }]);
+    (prisma.branch.findFirst as unknown as jest.Mock).mockResolvedValue({
+      id: "b-1",
+      isActive: true,
+    });
+    mockedPrisma.cashSession.findFirst.mockResolvedValue({
+      id: "cs-1",
+      branchId: "b-1",
+      status: "OPEN",
+    });
+  };
+
+  it("BOLSA_CERRADA: vendedor mayorista + producto con wholesalePrice usa wholesalePrice server-authoritative, ignora el price del cliente", async () => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    withVendorBranch();
+    mockedBase.user.findFirst.mockResolvedValue({ sellsWholesale: true });
+    tx.product.findFirst.mockResolvedValue({
+      ...branchProduct,
+      priceKgSuelto: null,
+      wholesalePrice: 3800,
+    });
+    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 10 });
+    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+
+    await SaleService.createSale(
+      {
+        products: [
+          {
+            productId: "p-1",
+            name: "Alimento 15kg",
+            quantity: 2,
+            price: 4500, // el cliente manda el precio de mostrador; el server lo ignora
+            category: "Balanceados",
+            saleMode: "BOLSA_CERRADA",
+          },
+        ],
+      },
+      ...vendorArgs,
+    );
+
+    expect(mockedBase.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "u-1" } }),
+    );
+    expect(tx.sale.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalAmount: 7600, // 2 × 3800 (wholesalePrice), NO 2 × 4500
+          items: {
+            create: [expect.objectContaining({ price: 3800, quantity: 2 })],
+          },
+        }),
+      }),
+    );
+  });
+
+  it("BOLSA_CERRADA: vendedor NO mayorista sigue confiando en el price del cliente (sin regresión)", async () => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    withVendorBranch();
+    mockedBase.user.findFirst.mockResolvedValue({ sellsWholesale: false });
+    tx.product.findFirst.mockResolvedValue({
+      ...branchProduct,
+      priceKgSuelto: null,
+      wholesalePrice: 3800,
+    });
+    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 10 });
+    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+
+    await SaleService.createSale(
+      {
+        products: [
+          {
+            productId: "p-1",
+            name: "Alimento 15kg",
+            quantity: 2,
+            price: 4500,
+            category: "Balanceados",
+            saleMode: "BOLSA_CERRADA",
+          },
+        ],
+      },
+      ...vendorArgs,
+    );
+
+    expect(tx.sale.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ totalAmount: 9000 }), // 2 × 4500, comportamiento legacy intacto
+      }),
+    );
+  });
+
+  it("BOLSA_CERRADA: vendedor mayorista pero producto SIN wholesalePrice → fallback a price (comportamiento legacy)", async () => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    withVendorBranch();
+    mockedBase.user.findFirst.mockResolvedValue({ sellsWholesale: true });
+    tx.product.findFirst.mockResolvedValue({
+      ...branchProduct,
+      priceKgSuelto: null,
+      wholesalePrice: null,
+    });
+    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 10 });
+    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+
+    await SaleService.createSale(
+      {
+        products: [
+          {
+            productId: "p-1",
+            name: "Alimento 15kg",
+            quantity: 2,
+            price: 4500,
+            category: "Balanceados",
+            saleMode: "BOLSA_CERRADA",
+          },
+        ],
+      },
+      ...vendorArgs,
+    );
+
+    expect(tx.sale.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ totalAmount: 9000 }),
+      }),
+    );
+  });
+
+  it("POR_UNIDAD: vendedor mayorista + wholesalePrice → perUnitPrice se deriva de wholesalePrice, no de price", async () => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    withVendorBranch();
+    mockedBase.user.findFirst.mockResolvedValue({ sellsWholesale: true });
+    tx.product.findFirst.mockResolvedValue({
+      ...branchProduct,
+      priceKgSuelto: null,
+      price: 15000,
+      wholesalePrice: 6000,
+      unitsPerBox: 15,
+    });
+    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 100 });
+    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+
+    await SaleService.createSale(
+      {
+        products: [
+          {
+            productId: "p-1",
+            name: "Alimento 15kg",
+            quantity: 3,
+            price: 999, // ignorado: POR_UNIDAD siempre es server-authoritative
+            category: "Balanceados",
+            saleMode: "POR_UNIDAD",
+          },
+        ],
+      },
+      ...vendorArgs,
+    );
+
+    // wholesalePrice=6000 ÷ unitsPerBox=15 = 400 exacto → ceil a 400.
+    expect(tx.sale.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalAmount: 1200, // 3 × 400
+          items: {
+            create: [expect.objectContaining({ price: 400 })],
+          },
+        }),
+      }),
+    );
+  });
+
+  it("POR_UNIDAD: vendedor NO mayorista sigue derivando el precio de price (sin regresión)", async () => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    withVendorBranch();
+    mockedBase.user.findFirst.mockResolvedValue({ sellsWholesale: false });
+    tx.product.findFirst.mockResolvedValue({
+      ...branchProduct,
+      priceKgSuelto: null,
+      price: 15000,
+      wholesalePrice: 6000,
+      unitsPerBox: 15,
+    });
+    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 100 });
+    tx.productStock.updateMany.mockResolvedValue({ count: 1 });
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+
+    await SaleService.createSale(
+      {
+        products: [
+          {
+            productId: "p-1",
+            name: "Alimento 15kg",
+            quantity: 3,
+            price: 999,
+            category: "Balanceados",
+            saleMode: "POR_UNIDAD",
+          },
+        ],
+      },
+      ...vendorArgs,
+    );
+
+    // price=15000 ÷ unitsPerBox=15 = 1000 exacto → ceil a 1000.
+    expect(tx.sale.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalAmount: 3000, // 3 × 1000
+          items: {
+            create: [expect.objectContaining({ price: 1000 })],
+          },
+        }),
+      }),
     );
   });
 });

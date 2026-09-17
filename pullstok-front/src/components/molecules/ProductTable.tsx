@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { imgSrc, branchQty, stockLabel, isUnitSellable, unitPrice } from "@/components/hooks/vendorCatalogHelpers";
+import { imgSrc, branchQty, stockLabel, isUnitSellable, unitPrice, effectivePrice } from "@/components/hooks/vendorCatalogHelpers";
 import type { DataItem } from "@/types";
 import type { VendorCartItem } from "@/components/hooks/useVendorCart";
 
@@ -45,6 +45,9 @@ interface ProductTableProps {
    *  si está OFF, muestra precio de CAJA y stock convertido a cajas. Default
    *  OFF (BOLSA_CERRADA). Solo usado por el POS unificado (inlineQty presente). */
   unitMode?: boolean;
+  /** Precio mayorista (User.sellsWholesale): si true, la fila muestra
+   *  wholesalePrice en vez de price cuando el producto lo tiene configurado. */
+  sellsWholesale?: boolean;
 }
 
 // Presentacional: sólo renderiza la tabla. Memoizada para no re-renderizar en
@@ -63,18 +66,21 @@ export const ProductTable = memo(
     onOpenQty,
     inlineQty,
     unitMode = false,
+    sellsWholesale = false,
   }: ProductTableProps) => {
     const hasInline = !!inlineQty;
 
     // Precio POR UNIDAD mostrado cuando el switch "Pouch por unidad" está ON.
     // multi-pack → unitPrice (caja÷N, redondeado hacia arriba); producto de a uno
-    // (no multi-pack) → su propio precio (ya es por unidad).
+    // (no multi-pack) → su propio precio (ya es por unidad). sellsWholesale
+    // hace que unitPrice/effectivePrice deriven de wholesalePrice cuando el
+    // producto lo tiene configurado.
     const displayedPrice = (p: DataItem): number => {
       if (isUnitSellable(p.unitsPerBox)) {
-        const u = unitPrice(p);
+        const u = unitPrice(p, sellsWholesale);
         if (u != null) return u;
       }
-      return Number(p.price ?? 0);
+      return effectivePrice(p, sellsWholesale);
     };
 
     const qtyCell = (index: number, p: DataItem, compact: boolean) => {
@@ -257,7 +263,7 @@ export const ProductTable = memo(
                             </>
                           ) : (
                             <p className="text-sm font-semibold tabular-nums leading-tight">
-                              ${Number(p.price ?? 0).toLocaleString("es-AR")}
+                              ${effectivePrice(p, sellsWholesale).toLocaleString("es-AR")}
                             </p>
                           )}
                         </div>
@@ -315,7 +321,7 @@ export const ProductTable = memo(
                           </span>
                         </>
                       ) : (
-                        <>${Number(p.price ?? 0).toLocaleString("es-AR")}</>
+                        <>${effectivePrice(p, sellsWholesale).toLocaleString("es-AR")}</>
                       )}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Mock dependencies
 vi.mock("@/components/organisms/VendorCatalogTab", () => ({
@@ -67,10 +68,18 @@ function renderPos(cartOverrides: Record<string, unknown> = {}) {
     error: null,
     refetch: vi.fn(),
   } as never);
+  // UnifiedPos lee ["me"] (precio mayorista) vía react-query — necesita un
+  // QueryClientProvider en el árbol. retry:false para que el fetch fallido
+  // (sin backend en el test) no reintente y ralentice la suite.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   render(
-    <MemoryRouter>
-      <UnifiedPos branchId={branchId} />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <UnifiedPos branchId={branchId} />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

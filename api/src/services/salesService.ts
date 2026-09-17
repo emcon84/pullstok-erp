@@ -52,6 +52,22 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
 
   const orderId = saleRequest.orderId;
 
+  // ── Precio mayorista (feature "precio mayorista para usuario interno") ──
+  // sellsWholesale es un flag de User, independiente del role. Si el
+  // vendedor de esta venta lo tiene activo, las líneas con precio de
+  // catálogo autoritativo (BOLSA_CERRADA, POR_UNIDAD) usan
+  // product.wholesalePrice en vez de product.price cuando el producto lo
+  // tiene configurado. userId sale del JWT (nunca del body), así que este
+  // lookup es seguro.
+  let sellerSellsWholesale = false;
+  if (userId) {
+    const seller = await basePrisma.user.findFirst({
+      where: { id: userId },
+      select: { sellsWholesale: true },
+    });
+    sellerSellsWholesale = seller?.sellsWholesale ?? false;
+  }
+
   // ── Resolve seller's branch for VENDEDOR / CASHIER ──
   // Only branch-assigned roles are scoped. ADMIN/MANAGEMENT keep the legacy
   // product.quantity flow (HQ global stock). SUPERADMIN and other roles also
@@ -195,6 +211,22 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       // exactamente.
       let lineQuantity = quantity;
       let linePrice = price;
+      // Precio mayorista en BOLSA_CERRADA: si el vendedor es mayorista y el
+      // producto tiene wholesalePrice configurado, el precio de catálogo
+      // pasa a ser SERVER-AUTHORITATIVE (mismo criterio de seguridad que
+      // POR_UNIDAD) e ignora el price que mande el cliente. Sin
+      // wholesalePrice configurado o vendedor no mayorista, sigue el
+      // comportamiento legacy (confía en item.price). POR_PESO/POR_MONTO
+      // (venta suelta) quedan fuera: su precio viene de PriceKgPrice, no de
+      // product.price/wholesalePrice.
+      if (
+        saleMode === "BOLSA_CERRADA" &&
+        product &&
+        sellerSellsWholesale &&
+        product.wholesalePrice != null
+      ) {
+        linePrice = Number(product.wholesalePrice);
+      }
       if (saleMode === "POR_MONTO") {
         // C-05: el precio unitario es el de la CELDA de la planilla (viene en
         // el payload como price). Fallback al priceKgSuelto almacenado o al
@@ -228,7 +260,13 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
           );
         }
         const unitsPerBox = product.unitsPerBox as number | null | undefined;
-        const perUnitPrice = computePerUnitPrice(Number(product.price), unitsPerBox);
+        // Precio mayorista: misma resolución que en BOLSA_CERRADA (wholesalePrice
+        // si el vendedor es mayorista y el producto lo tiene configurado).
+        const catalogPrice =
+          sellerSellsWholesale && product.wholesalePrice != null
+            ? Number(product.wholesalePrice)
+            : Number(product.price);
+        const perUnitPrice = computePerUnitPrice(catalogPrice, unitsPerBox);
         if (unitsPerBox === null || unitsPerBox === undefined || unitsPerBox <= 1 || perUnitPrice === null) {
           throw new Error(
             `El producto "${product.name}" no se puede vender por unidad (unitsPerBox debe ser mayor a 1)`,

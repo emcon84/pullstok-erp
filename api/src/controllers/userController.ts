@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 
 /** ADMIN o MANAGEMENT: crea un usuario dentro de SU organización. */
 export const createUser = async (req: AuthedRequest, res: Response) => {
-  const { email, username, name, phone, address, password, role, branchIds } = req.body;
+  const { email, username, name, phone, address, password, role, branchIds, sellsWholesale } = req.body;
   if ((!email && !username) || !password) {
     return res
       .status(400)
@@ -24,6 +24,7 @@ export const createUser = async (req: AuthedRequest, res: Response) => {
       address,
       password,
       role,
+      sellsWholesale,
     });
 
     // Assign branches if provided
@@ -65,6 +66,7 @@ export const listUsers = async (_req: AuthedRequest, res: Response) => {
         role: true,
         isActive: true,
         createdAt: true,
+        sellsWholesale: true,
         branchAssignments: {
           select: { branchId: true },
         },
@@ -79,6 +81,7 @@ export const listUsers = async (_req: AuthedRequest, res: Response) => {
       role: u.role,
       isActive: u.isActive,
       createdAt: u.createdAt,
+      sellsWholesale: u.sellsWholesale,
       branchIds: u.branchAssignments.map((a) => a.branchId),
     }));
 
@@ -160,7 +163,7 @@ export const deleteUser = async (req: AuthedRequest, res: Response) => {
 
 /** ADMIN o MANAGEMENT: edita un usuario de SU organización. */
 export const updateUser = async (req: AuthedRequest, res: Response) => {
-  const { name, email, username, phone, address, role, branchIds } = req.body;
+  const { name, email, username, phone, address, role, branchIds, sellsWholesale } = req.body;
   try {
     const organizationId = requireOrganizationId();
 
@@ -195,6 +198,7 @@ export const updateUser = async (req: AuthedRequest, res: Response) => {
         phone: phone !== undefined ? (phone || null) : undefined,
         address: address !== undefined ? (address || null) : undefined,
         role: role !== undefined ? (role || existing.role) : undefined,
+        sellsWholesale: sellsWholesale !== undefined ? Boolean(sellsWholesale) : undefined,
       },
       select: {
         id: true,
@@ -206,6 +210,7 @@ export const updateUser = async (req: AuthedRequest, res: Response) => {
         role: true,
         isActive: true,
         organizationId: true,
+        sellsWholesale: true,
       },
     });
 

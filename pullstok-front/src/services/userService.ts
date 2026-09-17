@@ -10,6 +10,9 @@ export interface UserData {
   isActive: boolean;
   createdAt: string;
   branchIds?: string[];
+  // Flag independiente del role: si es true, este usuario vende siempre a
+  // precio mayorista al cargar una venta.
+  sellsWholesale?: boolean;
 }
 
 export interface UpdateUserPayload {
@@ -20,6 +23,7 @@ export interface UpdateUserPayload {
   address?: string;
   role?: string;
   branchIds?: string[];
+  sellsWholesale?: boolean;
 }
 
 export interface CreateUserPayload {
@@ -31,6 +35,7 @@ export interface CreateUserPayload {
   password: string;
   role?: string;
   branchIds?: string[];
+  sellsWholesale?: boolean;
 }
 
 const authHeaders = () => ({

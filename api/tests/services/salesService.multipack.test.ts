@@ -19,7 +19,10 @@ jest.mock("../../src/config/db", () => ({
     sale: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn(), deleteMany: jest.fn() },
     $transaction: jest.fn(),
   },
-  basePrisma: { branchAssignment: { findMany: jest.fn() } },
+  basePrisma: {
+    branchAssignment: { findMany: jest.fn() },
+    user: { findFirst: jest.fn() },
+  },
 }));
 
 jest.mock("../../src/config/tenantContext", () => ({
