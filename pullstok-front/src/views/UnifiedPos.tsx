@@ -133,15 +133,6 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   const handleScan = useCallback(
     async (barcode: string) => {
       if (!barcode || !/^\d+$/.test(barcode)) return;
-      // Con el modal de confirmación ya abierto, un segundo escaneo NO debe
-      // pisar el producto pendiente ni tocar su cantidad: se ignora y avisa.
-      // Confirmá o cancelá el primero antes de escanear el próximo.
-      if (scanProduct) {
-        toast.info(
-          `Confirmá o cancelá "${scanProduct.name}" antes de escanear otro producto`,
-        );
-        return;
-      }
       try {
         const token = localStorage.getItem("token") || "";
         const res = await fetch(
@@ -191,7 +182,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         toast.error(e?.message || "Error al escanear");
       }
     },
-    [cart, branchId, scanProduct],
+    [cart, branchId],
   );
 
   // ── Modal de confirmación de bolsa cerrada escaneada ──
@@ -446,14 +437,15 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           </span>
         </div>
 
-        {/* Cantidad: foco automático al abrir para permitir tipear el número
-            (ej. pouches/latas x3) y confirmar con Enter sin usar el mouse.
-            type="text" + maxLength (en vez de type="number") porque un
-            segundo escaneo con este campo enfocado puede filtrar sus dígitos
-            acá si la pistola tipea más lento que el umbral de "ráfaga" del
-            detector global (ver handleScan) — maxLength pone un techo duro
-            de caracteres a nivel DOM, y el clamp contra el stock hace de
-            segunda barrera aunque los dígitos lleguen a filtrarse. */}
+        {/* Cantidad: SIN autoFocus a propósito. El botón "Agregar al pedido"
+            es el que queda enfocado (como antes), así seguir escaneando con
+            el modal abierto sigue reemplazando el producto normalmente en
+            vez de filtrar dígitos acá. Si el operador toca el campo a
+            propósito para poner una cantidad (ej. pouches/latas x3), Enter
+            confirma igual. type="text" + maxLength (no type="number") pone
+            un techo duro de caracteres a nivel DOM por si algo se filtra
+            estando el campo enfocado, y el clamp contra el stock es la
+            segunda barrera. */}
         <div className="space-y-2">
           <Label htmlFor="scan-qty-input">Cantidad</Label>
           <Input
@@ -462,7 +454,6 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             inputMode="numeric"
             pattern="[0-9]*"
             maxLength={4}
-            autoFocus
             value={scanQty || ""}
             onFocus={(e) => e.target.select()}
             onChange={(e) => {
@@ -489,7 +480,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           <Button variant="outline" onClick={handleCancelScan}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirmScan} disabled={scanQty <= 0}>
+          <Button autoFocus onClick={handleConfirmScan} disabled={scanQty <= 0}>
             <ShoppingCart className="h-4 w-4 mr-2" />
             Agregar al pedido
           </Button>

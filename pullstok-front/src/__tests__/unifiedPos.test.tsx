@@ -23,7 +23,7 @@ vi.mock("@/components/molecules/VendorOrderPanel", () => ({
   ),
 }));
 vi.mock("react-toastify", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
 import { UnifiedPos } from "@/views/UnifiedPos";
@@ -31,7 +31,6 @@ import { MemoryRouter } from "react-router-dom";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
-import { toast } from "react-toastify";
 
 function makeCart(overrides: Record<string, unknown> = {}) {
   return {
@@ -202,7 +201,7 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
     );
   });
 
-  it("el modal trae un campo de cantidad enfocado, en 1 por defecto", async () => {
+  it("el modal trae la cantidad en 1 y el botón de confirmar enfocado (no el campo)", async () => {
     mockFetchWith({
       isScale: false,
       product: { _id: "p1", id: "p1", name: "Royal 15kg", price: 18400, code: "7791234567890", quantity: 10 },
@@ -211,9 +210,12 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
 
     scanCode("7791234567890");
 
-    const qtyInput = await screen.findByLabelText("Cantidad");
-    expect(qtyInput).toHaveValue("1");
-    expect(qtyInput).toHaveFocus();
+    // El botón queda enfocado (no el input de cantidad): así seguir
+    // escaneando con el modal abierto reemplaza el producto en vez de
+    // filtrar los dígitos del código en el campo de cantidad.
+    const confirmButton = await screen.findByRole("button", { name: "Agregar al pedido" });
+    expect(confirmButton).toHaveFocus();
+    expect(screen.getByLabelText("Cantidad")).toHaveValue("1");
   });
 
   it("edita la cantidad y confirma con Enter desde el campo (sin usar el mouse)", async () => {
@@ -276,24 +278,39 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
     );
   });
 
-  it("escanear un segundo producto sin cerrar el modal se ignora (no pisa el pendiente)", async () => {
-    mockFetchWith({
-      isScale: false,
-      product: { _id: "p1", id: "p1", name: "Royal 15kg", price: 18400, code: "7791234567890", quantity: 10 },
-    });
+  it("escanear un segundo producto sin cerrar el modal reemplaza el contenido (comportamiento original)", async () => {
+    // Ojo: UnifiedPos también dispara un fetch propio para ["me"] (precio
+    // mayorista) — el stub tiene que responder por URL, no por orden de
+    // llamada, para no confundir esa respuesta con la del escaneo.
+    const byScanResponses: Record<string, unknown> = {
+      "7791234567890": {
+        isScale: false,
+        product: { _id: "p1", id: "p1", name: "Royal 15kg", price: 18400, code: "7791234567890", quantity: 10 },
+      },
+      "1112223334445": {
+        isScale: false,
+        product: { _id: "p2", id: "p2", name: "Dog Chow 15kg", price: 15900, code: "1112223334445", quantity: 5 },
+      },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        const code = Object.keys(byScanResponses).find((c) => url.includes(c));
+        const payload = code ? byScanResponses[code] : {};
+        return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(payload) });
+      }),
+    );
     renderPos({ addToCart: vi.fn() });
 
     scanCode("7791234567890");
     await screen.findByText("Royal 15kg");
-    vi.mocked(fetch).mockClear();
 
     scanCode("1112223334445");
 
-    expect(fetch).not.toHaveBeenCalled();
-    expect(toast.info).toHaveBeenCalledWith(
-      expect.stringContaining("Royal 15kg"),
-    );
-    expect(screen.getByText("Royal 15kg")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Dog Chow 15kg")).toBeInTheDocument());
+    expect(screen.queryByText("Royal 15kg")).not.toBeInTheDocument();
+    // La cantidad se resetea a 1 con el producto nuevo, no arrastra nada del anterior.
+    expect(screen.getByLabelText("Cantidad")).toHaveValue("1");
   });
 
   it("al cancelar el modal NO agrega la bolsa al pedido", async () => {
