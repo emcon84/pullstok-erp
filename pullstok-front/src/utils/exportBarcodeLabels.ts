@@ -45,19 +45,55 @@ export interface BarcodeLabel {
   barcode: string;
 }
 
-const MAX_NAME_CHARS = 26;
-const truncateName = (name: string): string =>
-  name.length > MAX_NAME_CHARS ? `${name.slice(0, MAX_NAME_CHARS - 1)}…` : name;
+const NAME_MAX_LINES = 2;
 
-const PAGE_MARGIN = 10;
-const COLS = 3;
-const CELL_HEIGHT = 25;
-const BARCODE_WIDTH = 45;
-const BARCODE_HEIGHT = 15;
+/** Envuelve `text` en hasta `maxLines` líneas que entran en `maxWidth` (según
+ * `measure`, con la fuente/tamaño ya seteados en el doc); si sobran palabras
+ * después de la última línea, la trunca con "…" en vez de cortar el resto. */
+const wrapToLines = (
+  measure: (s: string) => number,
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+): string[] => {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const allLines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (!current || measure(candidate) <= maxWidth) {
+      current = candidate;
+    } else {
+      allLines.push(current);
+      current = word;
+    }
+  }
+  if (current) allLines.push(current);
+
+  if (allLines.length <= maxLines) return allLines;
+
+  const kept = allLines.slice(0, maxLines - 1);
+  let rest = allLines.slice(maxLines - 1).join(" ");
+  while (rest.length > 0 && measure(`${rest}…`) > maxWidth) {
+    rest = rest.slice(0, -1);
+  }
+  kept.push(`${rest.trimEnd()}…`);
+  return kept;
+};
+
+const PAGE_MARGIN = 8;
+const COLS = 4;
+const CELL_HEIGHT = 23;
+const BARCODE_WIDTH = 32;
+const BARCODE_HEIGHT = 8;
+const NAME_FONT_SIZE = 6.5;
+const NAME_LINE_HEIGHT = 2.8;
+const CODE_FONT_SIZE = 6.5;
 
 /**
- * Genera y descarga un PDF A4 con una grilla de etiquetas (nombre + código
- * Code128 real + texto legible) para pegar en el producto físico.
+ * Genera y descarga un PDF A4 con una grilla de etiquetas chicas (nombre
+ * completo en hasta 2 líneas + código Code128 + texto legible) para pegar en
+ * el producto físico.
  */
 export const exportBarcodeLabels = (labels: BarcodeLabel[]): void => {
   if (labels.length === 0) return;
@@ -67,6 +103,7 @@ export const exportBarcodeLabels = (labels: BarcodeLabel[]): void => {
   const pageHeight = doc.internal.pageSize.getHeight();
   const usableWidth = pageWidth - PAGE_MARGIN * 2;
   const colWidth = usableWidth / COLS;
+  const nameMaxWidth = colWidth - 3;
   const rowsPerPage = Math.floor((pageHeight - PAGE_MARGIN * 2) / CELL_HEIGHT);
 
   labels.forEach((label, index) => {
@@ -80,20 +117,27 @@ export const exportBarcodeLabels = (labels: BarcodeLabel[]): void => {
 
     const cellX = PAGE_MARGIN + col * colWidth;
     const cellY = PAGE_MARGIN + row * CELL_HEIGHT;
+    const centerX = cellX + colWidth / 2;
     const barcodeX = cellX + (colWidth - BARCODE_WIDTH) / 2;
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text(truncateName(label.name), cellX + colWidth / 2, cellY + 4, {
-      align: "center",
+    doc.setFontSize(NAME_FONT_SIZE);
+    const nameLines = wrapToLines(
+      (s) => doc.getTextWidth(s),
+      label.name,
+      nameMaxWidth,
+      NAME_MAX_LINES,
+    );
+    nameLines.forEach((line, i) => {
+      doc.text(line, centerX, cellY + 3 + i * NAME_LINE_HEIGHT, { align: "center" });
     });
 
-    const barcodeY = cellY + 6;
+    const barcodeY = cellY + 3 + NAME_MAX_LINES * NAME_LINE_HEIGHT + 1.2;
     drawBarcodeBars(doc, label.barcode, barcodeX, barcodeY, BARCODE_WIDTH, BARCODE_HEIGHT);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text(label.barcode, cellX + colWidth / 2, barcodeY + BARCODE_HEIGHT + 4, {
+    doc.setFontSize(CODE_FONT_SIZE);
+    doc.text(label.barcode, centerX, barcodeY + BARCODE_HEIGHT + 3, {
       align: "center",
     });
   });

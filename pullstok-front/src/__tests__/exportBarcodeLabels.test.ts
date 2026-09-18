@@ -104,7 +104,7 @@ describe("exportBarcodeLabels", () => {
   });
 
   it("agrega una página nueva cuando se supera la grilla de la primera", () => {
-    const labels = Array.from({ length: 40 }, (_, i) => ({
+    const labels = Array.from({ length: 60 }, (_, i) => ({
       name: `Producto ${i}`,
       barcode: `INT${String(i).padStart(5, "0")}`,
     }));

@@ -27,11 +27,47 @@ const orgIdArg = args.find((a, i) => !a.startsWith("--") && i !== outIdx + 1);
 const TARGET_ORG = orgIdArg || DEFAULT_ORG;
 
 const MM = 2.834645669;
-const BARCODE_WIDTH = 45 * MM;
-const BARCODE_HEIGHT = 15 * MM;
-const COLS = 3;
-const MARGIN = 30;
-const CELL_PADDING = 10;
+const BARCODE_WIDTH = 32 * MM;
+const BARCODE_HEIGHT = 8 * MM;
+const COLS = 4;
+const MARGIN = 24;
+const CELL_PADDING = 8;
+const NAME_MAX_LINES = 2;
+const NAME_FONT_SIZE = 6.5;
+
+/** Envuelve `text` en hasta `maxLines` líneas que entran en `maxWidth` (según
+ * `measure`); si sobran palabras después de la última línea, la trunca con
+ * "…" en vez de cortarla sin avisar. */
+function wrapToLines(
+  measure: (s: string) => number,
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const allLines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (!current || measure(candidate) <= maxWidth) {
+      current = candidate;
+    } else {
+      allLines.push(current);
+      current = word;
+    }
+  }
+  if (current) allLines.push(current);
+
+  if (allLines.length <= maxLines) return allLines;
+
+  const kept = allLines.slice(0, maxLines - 1);
+  let rest = allLines.slice(maxLines - 1).join(" ");
+  while (rest.length > 0 && measure(`${rest}…`) > maxWidth) {
+    rest = rest.slice(0, -1);
+  }
+  kept.push(`${rest.trimEnd()}…`);
+  return kept;
+}
 
 function drawBarcode(
   doc: PDFKit.PDFDocument,
@@ -82,10 +118,18 @@ async function main() {
   const usableWidth = doc.page.width - MARGIN * 2;
   const colWidth = usableWidth / COLS;
   const cellWidth = colWidth - CELL_PADDING;
-  const cellHeight = BARCODE_HEIGHT + 55;
+
+  const NAME_LINE_HEIGHT = 8;
+  const nameBlockHeight = NAME_MAX_LINES * NAME_LINE_HEIGHT;
+  const barcodeGap = 3;
+  const codeTextHeight = 10;
+  const cellHeight = nameBlockHeight + barcodeGap + BARCODE_HEIGHT + barcodeGap + codeTextHeight;
 
   let col = 0;
   let y = MARGIN;
+
+  doc.font("Helvetica-Bold").fontSize(NAME_FONT_SIZE);
+  const measure = (s: string) => doc.widthOfString(s);
 
   for (const label of labels) {
     if (col === 0 && y + cellHeight > doc.page.height - MARGIN) {
@@ -95,20 +139,20 @@ async function main() {
 
     const x = MARGIN + col * colWidth;
 
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(7)
-      .fillColor("black")
-      .text(label.name, x, y, { width: cellWidth, height: 22, ellipsis: true });
+    doc.font("Helvetica-Bold").fontSize(NAME_FONT_SIZE).fillColor("black");
+    const nameLines = wrapToLines(measure, label.name, cellWidth, NAME_MAX_LINES);
+    nameLines.forEach((line, i) => {
+      doc.text(line, x, y + i * NAME_LINE_HEIGHT, { width: cellWidth, align: "center" });
+    });
 
-    const barcodeY = y + 24;
+    const barcodeY = y + nameBlockHeight + barcodeGap;
     drawBarcode(doc, label.barcode as string, x, barcodeY, BARCODE_WIDTH, BARCODE_HEIGHT);
 
     doc
       .font("Helvetica")
-      .fontSize(8)
+      .fontSize(NAME_FONT_SIZE)
       .fillColor("black")
-      .text(label.barcode as string, x, barcodeY + BARCODE_HEIGHT + 3, { width: cellWidth, align: "center" });
+      .text(label.barcode as string, x, barcodeY + BARCODE_HEIGHT + barcodeGap, { width: cellWidth, align: "center" });
 
     col++;
     if (col >= COLS) {
