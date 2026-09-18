@@ -21,10 +21,10 @@ const prisma = new PrismaClient({ adapter });
 const DEFAULT_ORG = "1bc3a6c5-1d06-4e40-93ba-12d51a2a2a1b";
 
 const args = process.argv.slice(2);
-const orgIdArg = args.find((a) => !a.startsWith("--"));
-const TARGET_ORG = orgIdArg || DEFAULT_ORG;
 const outIdx = args.indexOf("--out");
 const OUT_PATH = outIdx !== -1 && args[outIdx + 1] ? args[outIdx + 1] : "./blister-labels.pdf";
+const orgIdArg = args.find((a, i) => !a.startsWith("--") && i !== outIdx + 1);
+const TARGET_ORG = orgIdArg || DEFAULT_ORG;
 
 const MM = 2.834645669;
 const BARCODE_WIDTH = 45 * MM;
