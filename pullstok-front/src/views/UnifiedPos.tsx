@@ -271,6 +271,14 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           e.stopPropagation();
         }
         buffer += e.key;
+      } else if (e.key.length > 1) {
+        // Teclas con nombre largo (Shift, Control, CapsLock, Alt, Meta...) no
+        // son caracteres: para tipear/escanear una MAYÚSCULA (los códigos
+        // internos BLST#####/INT##### empiezan con letras) el teclado manda un
+        // keydown de Shift ANTES de la letra. Si tratábamos eso como "carácter
+        // inválido" el buffer se reseteaba justo antes de cada letra mayúscula
+        // y el código nunca se armaba completo — ni con la pistola ni tipeando
+        // a mano. Se ignoran (no tocan el buffer), no se tratan como reset.
       } else {
         buffer = "";
       }

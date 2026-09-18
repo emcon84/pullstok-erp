@@ -86,10 +86,17 @@ function mockFetchWith(payload: unknown, status = 200) {
   );
 }
 
-// Simula el patrón de la pistola USB HID: un run de dígitos + Enter.
+// Simula el patrón de teclado (pistola USB HID o tipeo a mano): un run de
+// caracteres + Enter. Antes de cada MAYÚSCULA dispara un keydown de "Shift"
+// primero — así manda el teclado/la pistola una letra en mayúscula de
+// verdad, y es justo lo que rompía el capturador (trataba Shift como
+// "carácter inválido" y reseteaba el buffer antes de cada letra).
 function scanCode(code: string) {
-  for (const d of code.split("")) {
-    fireEvent.keyDown(window, { key: d });
+  for (const ch of code.split("")) {
+    if (/[A-Z]/.test(ch)) {
+      fireEvent.keyDown(window, { key: "Shift" });
+    }
+    fireEvent.keyDown(window, { key: ch });
   }
   fireEvent.keyDown(window, { key: "Enter" });
 }
