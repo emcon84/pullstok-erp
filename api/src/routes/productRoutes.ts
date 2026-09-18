@@ -104,6 +104,15 @@ router.get(
   productController.getSecoBarcodesReport,
 );
 
+// Reporte de códigos de barra de TODO el catálogo (odd/tasks/codigos-barra-generados.md).
+// Debe registrarse ANTES de "/:id" (un id literal "barcodes-report" la matchearía).
+router.get(
+  "/barcodes-report",
+  authenticateJWT,
+  checkBusinessHours,
+  productController.getBarcodesReport,
+);
+
 router.get("/:id", authenticateJWT, checkBusinessHours, productController.getProductById);
 router.put(
   "/:id",
@@ -125,6 +134,12 @@ router.delete("/:id", authenticateJWT, checkBusinessHours, requireRole("ADMIN", 
 // Stock por sucursal (branch-stock, PR 2b): consulta autocontenida para
 // cualquier rol autenticado y edición con autorización server-side (A1/A2).
 router.get("/:id/stock", authenticateJWT, checkBusinessHours, productController.getProductStock);
+router.post(
+  "/:id/generate-barcode",
+  authenticateJWT,
+  checkBusinessHours,
+  productController.generateProductBarcode,
+);
 router.put(
   "/:id/stock/:branchId",
   authenticateJWT,

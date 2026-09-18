@@ -15,7 +15,7 @@ import jsPDF from "jspdf";
  * calcula con peso 1..N sobre los símbolos de datos (sin el start).
  */
 
-const CODE128_PATTERNS = [
+export const CODE128_PATTERNS = [
   "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213",
   "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132",
   "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211",
@@ -29,10 +29,10 @@ const CODE128_PATTERNS = [
   "114131", "311141", "411131", "211412", "211214", "211232", "2331112",
 ];
 
-const START_B = 104;
-const STOP = 106;
-const SYMBOL_MODULES = 11;
-const STOP_MODULES = 13;
+export const START_B = 104;
+export const STOP = 106;
+export const SYMBOL_MODULES = 11;
+export const STOP_MODULES = 13;
 
 /** Secuencia de símbolos Code128B (incluye start, checksum y stop) para un
  * texto. Lanza si el texto no es encodable (vacío o fuera de ASCII 32-127). */

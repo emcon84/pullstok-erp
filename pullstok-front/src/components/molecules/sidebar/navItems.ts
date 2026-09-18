@@ -13,6 +13,7 @@ import {
   UserPlus,
   Building,
   ScanLine,
+  Barcode,
   DollarSign,
   Package,
   Settings,
@@ -100,6 +101,7 @@ export const navGroups: NavGroup[] = [
     icon: Wrench,
     items: [
       { to: "/scanner", label: "Scanner", icon: ScanLine },
+      { to: "/codigos-barra", label: "Códigos de barra", icon: Barcode },
       { to: "/asistente-ia", label: "Asistente IA", icon: Bot, moduleKey: "bot", visibleRoles: ["ADMIN", "MANAGEMENT"] },
     ],
   },

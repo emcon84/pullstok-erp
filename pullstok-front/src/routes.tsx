@@ -158,6 +158,10 @@ const SavedPlanillas = lazy(() =>
   import("./views/SavedPlanillas").then((m) => ({ default: m.SavedPlanillas })),
 );
 
+const GeneratedBarcodes = lazy(() =>
+  import("./views/GeneratedBarcodes").then((m) => ({ default: m.GeneratedBarcodes })),
+);
+
 const AppRoutes = () => (
   <Router>
     <Routes>
@@ -312,6 +316,7 @@ const AppRoutes = () => (
         <Route path="/planilla-mayorista/importar" element={<PriceListImport />} />
         <Route path="/planilla-mayorista/:id" element={<PriceListDetail />} />
         <Route path="/saved-planillas" element={<SavedPlanillas />} />
+        <Route path="/codigos-barra" element={<GeneratedBarcodes />} />
         <Route path="/ajustes" element={<BrandingSettings />} />
         <Route path="/ajustes/modulos" element={<ModulesSettings />} />
         <Route path="/ajustes/horarios" element={<BusinessHoursSettings />} />

@@ -567,3 +567,69 @@ export const getSecoBarcodesReport = async (): Promise<SecoBarcodesReport> => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Reporte de códigos de barra de TODO el catálogo + generador de códigos
+// inventados (odd/tasks/codigos-barra-generados.md)
+// ---------------------------------------------------------------------------
+
+export interface BarcodeReportItem {
+  id: string;
+  name: string;
+  category: string;
+  code: string;
+  barcode: string;
+  hasBarcode: boolean;
+}
+
+export interface BarcodesReport {
+  total: number;
+  conBarcode: number;
+  sinBarcode: number;
+  items: BarcodeReportItem[];
+}
+
+/** GET /products/barcodes-report — listado de TODO el catálogo con/sin barras. */
+export const getBarcodesReport = async (): Promise<BarcodesReport> => {
+  try {
+    const token = localStorage.getItem("token");
+    const response = await axios.get<BarcodesReport>(
+      `${API_URL}/products/barcodes-report`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "get barcodes report failed");
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+
+export interface GeneratedBarcodeResult {
+  id: string;
+  name: string;
+  barcode: string;
+}
+
+/** POST /products/:id/generate-barcode — asigna un código inventado (INT#####). */
+export const generateProductBarcode = async (
+  productId: string,
+): Promise<GeneratedBarcodeResult> => {
+  try {
+    const token = localStorage.getItem("token");
+    const response = await axios.post<GeneratedBarcodeResult>(
+      `${API_URL}/products/${productId}/generate-barcode`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "generate product barcode failed");
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+

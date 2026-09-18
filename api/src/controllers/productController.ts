@@ -15,6 +15,7 @@ import { findCellForProduct, normalizeName } from "../services/priceMatchingServ
 import { roundBolsaPriceIfHigh } from "../utils/money";
 import { isUnitSellable, computePerUnitPrice } from "../utils/unitsPerBox";
 import { parseScaleBarcode } from "../utils/scaleBarcode";
+import { formatInternalBarcode, nextInternalBarcodeSeq } from "../utils/internalBarcode";
 import { requireOrganizationId } from "../config/tenantContext";
 import { PLAN_LIMITS } from "../config/planLimits";
 import { AuthedRequest } from "../middlewares/authMiddleware";
@@ -2064,12 +2065,97 @@ export const getSecoBarcodesReport = async (req: Request, res: Response) => {
   }
 };
 
+const GENERATED_BARCODE_PREFIX = "INT";
+
+/**
+ * GET /products/barcodes-report — reporte de códigos de barra de TODO el
+ * catálogo (no solo Alimento Seco, ver getSecoBarcodesReport arriba). Usado
+ * por la sección "Códigos de barra generados" (odd/tasks/codigos-barra-generados.md).
+ */
+export const getBarcodesReport = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+
+    const [products, categories] = await Promise.all([
+      prisma.product.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, code: true, barcode: true, categoryId: true },
+        orderBy: { name: "asc" },
+      }),
+      prisma.category.findMany({
+        where: { organizationId },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+    const items = products.map((p) => {
+      const barcode = (p.barcode ?? "").trim();
+      return {
+        id: p.id,
+        name: p.name,
+        category: (p.categoryId && categoryNameById.get(p.categoryId)) || "Sin categoría",
+        code: p.code ?? "",
+        barcode,
+        hasBarcode: barcode.length > 0,
+      };
+    });
+
+    const conBarcode = items.filter((i) => i.hasBarcode).length;
+    const sinBarcode = items.length - conBarcode;
+
+    res.json({ total: items.length, conBarcode, sinBarcode, items });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /products/:id/generate-barcode — inventa y asigna un código INT#####
+ * (ver api/src/utils/internalBarcode.ts) a un producto SIN barcode. No
+ * sobrescribe uno existente (409).
+ */
+export const generateProductBarcode = async (req: AuthedRequest, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const { id } = req.params;
+
+    const product = await prisma.product.findFirst({
+      where: { id },
+      select: { id: true, name: true, barcode: true },
+    });
+    if (!product) {
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
+    if (product.barcode && product.barcode.trim().length > 0) {
+      return res
+        .status(409)
+        .json({ message: "El producto ya tiene un código de barras asignado." });
+    }
+
+    const allBarcodes = await prisma.product.findMany({
+      where: { organizationId },
+      select: { barcode: true },
+    });
+    const seq = nextInternalBarcodeSeq(GENERATED_BARCODE_PREFIX, allBarcodes.map((p) => p.barcode));
+    const newBarcode = formatInternalBarcode(GENERATED_BARCODE_PREFIX, seq);
+
+    await prisma.product.update({ where: { id: product.id }, data: { barcode: newBarcode } });
+
+    res.status(200).json({ id: product.id, name: product.name, barcode: newBarcode });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export default {
   createProduct,
   bulkUploadProducts,
   getProducts,
   getProductFilterFacets,
   getSecoBarcodesReport,
+  getBarcodesReport,
+  generateProductBarcode,
   getProductById,
   updateProduct,
   publishProduct,
