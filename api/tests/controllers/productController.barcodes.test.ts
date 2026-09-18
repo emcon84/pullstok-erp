@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../../src/config/db";
-import productController from "../../src/controllers/productController";
+import productController, { getProductByScan } from "../../src/controllers/productController";
 
 // Mocks: config/db (prisma) y tenantContext (org fija) — mismo patrón que
 // branchStockController.test.ts.
@@ -8,6 +8,7 @@ jest.mock("../../src/config/db", () => ({
   prisma: {
     product: { findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     category: { findMany: jest.fn() },
+    priceKgPrice: { findFirst: jest.fn() },
   },
 }));
 
@@ -18,6 +19,7 @@ jest.mock("../../src/config/tenantContext", () => ({
 const mockedPrisma = prisma as unknown as {
   product: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
   category: { findMany: jest.Mock };
+  priceKgPrice: { findFirst: jest.Mock };
 };
 
 const mockRequest = (params: any, user?: any, body?: any) =>
@@ -177,5 +179,85 @@ describe("productController.getBarcodesReport", () => {
     await productController.getBarcodesReport(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
+  });
+});
+
+describe("getProductByScan", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("un código interno alfanumérico (BLST#####) NO es 13 dígitos numéricos: cae al lookup normal, no 400", async () => {
+    mockedPrisma.product.findFirst.mockResolvedValue({
+      id: "prod-1",
+      name: "AMOXICILINA 250 MG (BLISTER)",
+      barcode: "BLST00008",
+      code: null,
+      category: { id: "cat-1", name: "Farmacia" },
+      variantAssignments: [],
+    });
+
+    const req = mockRequest({ barcode: "BLST00008" });
+    const res = mockResponse();
+
+    await getProductByScan(req as any, res);
+
+    expect(res.status).not.toHaveBeenCalledWith(400);
+    expect(mockedPrisma.product.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-1", OR: [{ code: "BLST00008" }, { barcode: "BLST00008" }] },
+      }),
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(mockedPrisma.priceKgPrice.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("404 si el código alfanumérico no matchea ningún producto", async () => {
+    mockedPrisma.product.findFirst.mockResolvedValue(null);
+
+    const req = mockRequest({ barcode: "INT00099" });
+    const res = mockResponse();
+
+    await getProductByScan(req as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it("un EAN-13 de balanza (prefijo 20) sigue yendo a la rama de PriceKgPrice (no regresión)", async () => {
+    mockedPrisma.priceKgPrice.findFirst.mockResolvedValue({
+      id: "cell-1",
+      priceKg: 5000,
+      species: "PERRO",
+      brand: { name: "Cordobesa" },
+      type: { name: "Seco" },
+    });
+
+    const req = mockRequest({ barcode: "2000030001808" });
+    const res = mockResponse();
+
+    await getProductByScan(req as any, res);
+
+    expect(mockedPrisma.priceKgPrice.findFirst).toHaveBeenCalled();
+    expect(mockedPrisma.product.findFirst).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("un EAN-13 normal (no balanza, 13 dígitos) sigue cayendo al lookup normal (no regresión)", async () => {
+    mockedPrisma.product.findFirst.mockResolvedValue({
+      id: "prod-2",
+      name: "Royal 15kg",
+      barcode: "7791234567890",
+      code: "7791234567890",
+      category: null,
+      variantAssignments: [],
+    });
+
+    const req = mockRequest({ barcode: "7791234567890" });
+    const res = mockResponse();
+
+    await getProductByScan(req as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(mockedPrisma.priceKgPrice.findFirst).not.toHaveBeenCalled();
   });
 });

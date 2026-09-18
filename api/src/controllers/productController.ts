@@ -1188,13 +1188,17 @@ export const getOfflineSnapshot = async (req: Request, res: Response) => {
 export const getProductByScan = async (req: Request, res: Response) => {
   try {
     const { barcode } = req.params;
-    const organizationId = requireOrganizationId();
-    const parsed = parseScaleBarcode(barcode);
-    if (parsed === null) {
+    if (!barcode) {
       return res.status(400).json({ message: "Código de barras inválido" });
     }
+    const organizationId = requireOrganizationId();
+    // parseScaleBarcode devuelve null para cualquier código que no sea un
+    // EAN-13 numérico de 13 dígitos (ej. nuestros códigos internos BLST#####/
+    // INT#####, alfanuméricos) — NO significa "inválido", significa "no es
+    // etiqueta de balanza": cae al lookup normal por code/barcode más abajo.
+    const parsed = parseScaleBarcode(barcode);
 
-    if (parsed.isScale) {
+    if (parsed?.isScale) {
       const cell = await prisma.priceKgPrice.findFirst({
         where: { organizationId, scaleCode: parsed.code },
         include: {

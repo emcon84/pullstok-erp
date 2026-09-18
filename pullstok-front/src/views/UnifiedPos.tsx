@@ -132,7 +132,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   //    como BOLSA_CERRADA (qty 1).
   const handleScan = useCallback(
     async (barcode: string) => {
-      if (!barcode || !/^\d+$/.test(barcode)) return;
+      if (!barcode || !/^[0-9A-Za-z]+$/.test(barcode)) return;
       try {
         const token = localStorage.getItem("token") || "";
         const res = await fetch(
@@ -231,9 +231,10 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     setScanProduct(null);
   }, [cart, branchId, scanProduct, scanQty, sellsWholesale]);
 
-  // Capturador global (fase CAPTURE) del patrón de la pistola. Reset si hay
-  // letras o pausas largas; solo un run de dígitos (≥6) + Enter se trata como
-  // escaneo. Números cortos y texto no se interceptan.
+  // Capturador global (fase CAPTURE) del patrón de la pistola. Acepta dígitos
+  // Y letras (nuestros códigos internos BLST#####/INT##### son alfanuméricos,
+  // no solo EAN-13/balanza numéricos) + Enter, run de al menos 6 caracteres.
+  // Reset si hay pausas largas. Texto corto tipeado a mano no se intercepta.
   // IMPORTANTE: Si el diálogo "Abrir bolsa" está abierto, NO interceptamos
   // el escaneo para que el input del diálogo reciba el código de barras.
   useEffect(() => {
@@ -249,22 +250,22 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
       if (e.key === "Enter") {
         const code = buffer;
         buffer = "";
-        if (code.length >= 6 && /^\d+$/.test(code)) {
+        if (code.length >= 6 && /^[0-9A-Za-z]+$/.test(code)) {
           e.preventDefault();
           e.stopPropagation();
-          // El primer dígito de la ráfaga puede haberse escrito en el input
+          // El primer caracter de la ráfaga puede haberse escrito en el input
           // enfocado (buscador). Limpiamos el buscador para que no quede mezclado.
           gridApiRef.current?.clearSearch?.();
           void handleScan(code);
         }
         return;
       }
-      if (/^\d$/.test(e.key)) {
-        // La pistola manda los dígitos en ráfaga muy rápida (<60ms). Si ya hay
-        // buffer (escaneo en curso) y el dígito llega en ráfaga, lo prevenimos
-        // para que NO se escriba en el input enfocado (buscador) y no se mezcle
-        // con lo que el operador tipea. El tipeo humano (más lento, >100ms) no
-        // se intercepta.
+      if (/^[0-9A-Za-z]$/.test(e.key)) {
+        // La pistola manda los caracteres en ráfaga muy rápida (<60ms). Si ya
+        // hay buffer (escaneo en curso) y el caracter llega en ráfaga, lo
+        // prevenimos para que NO se escriba en el input enfocado (buscador) y
+        // no se mezcle con lo que el operador tipea. El tipeo humano (más
+        // lento, >100ms) no se intercepta.
         if (buffer.length > 0 && gap < 60) {
           e.preventDefault();
           e.stopPropagation();

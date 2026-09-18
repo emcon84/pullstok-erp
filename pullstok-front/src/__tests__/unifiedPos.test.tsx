@@ -172,6 +172,29 @@ describe("UnifiedPos — POS unificado del vendedor", () => {
     expect(addToCart).not.toHaveBeenCalled();
   });
 
+  it("escanea un código interno alfanumérico (BLST#####) y abre el modal igual que un EAN-13", async () => {
+    mockFetchWith({
+      isScale: false,
+      product: {
+        _id: "p2",
+        id: "p2",
+        name: "AMOXICILINA 250 MG (BLISTER)",
+        price: 3200,
+        code: "",
+        barcode: "BLST00008",
+        quantity: 50,
+        category: { name: "Farmacia" },
+      },
+    });
+    const addToCart = vi.fn();
+    renderPos({ addToCart });
+
+    scanCode("BLST00008");
+
+    expect(await screen.findByText("AMOXICILINA 250 MG (BLISTER)")).toBeInTheDocument();
+    expect(addToCart).not.toHaveBeenCalled();
+  });
+
   it("al confirmar en el modal agrega la bolsa cerrada (BOLSA_CERRADA qty 1) y lo cierra", async () => {
     mockFetchWith({
       isScale: false,
