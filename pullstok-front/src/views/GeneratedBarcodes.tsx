@@ -104,6 +104,25 @@ export const GeneratedBarcodes = () => {
     });
   };
 
+  const selectableItems = useMemo(
+    () => filteredItems.filter((i) => i.hasBarcode),
+    [filteredItems],
+  );
+  const allSelectableChecked =
+    selectableItems.length > 0 &&
+    selectableItems.every((i) => selectedIds.has(i.id));
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const item of selectableItems) {
+        if (checked) next.add(item.id);
+        else next.delete(item.id);
+      }
+      return next;
+    });
+  };
+
   const handlePrint = () => {
     const selected = filteredItems.filter(
       (i) => i.hasBarcode && selectedIds.has(i.id),
@@ -162,11 +181,18 @@ export const GeneratedBarcodes = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="sticky left-0 z-10 bg-background">
+                        <Checkbox
+                          aria-label="Seleccionar todos los filtrados"
+                          checked={allSelectableChecked}
+                          disabled={selectableItems.length === 0}
+                          onCheckedChange={(checked) => toggleSelectAll(checked === true)}
+                        />
+                      </TableHead>
                       <TableHead>Producto</TableHead>
                       <TableHead>Categoría</TableHead>
                       <TableHead>Código de barra</TableHead>
                       <TableHead>Estado</TableHead>
-                      <TableHead>Acción</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -179,15 +205,7 @@ export const GeneratedBarcodes = () => {
                     ) : (
                       filteredItems.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.name}</TableCell>
-                          <TableCell>{item.category}</TableCell>
-                          <TableCell>{item.barcode || "—"}</TableCell>
-                          <TableCell>
-                            <Badge variant={item.hasBarcode ? "default" : "destructive"}>
-                              {item.hasBarcode ? "Con código" : "Sin código"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
+                          <TableCell className="sticky left-0 z-10 bg-background">
                             {item.hasBarcode ? (
                               <Checkbox
                                 aria-label={`Seleccionar ${item.name} para imprimir`}
@@ -206,6 +224,14 @@ export const GeneratedBarcodes = () => {
                                 {generatingId === item.id ? "Generando…" : "Generar código"}
                               </Button>
                             )}
+                          </TableCell>
+                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell>{item.category}</TableCell>
+                          <TableCell>{item.barcode || "—"}</TableCell>
+                          <TableCell>
+                            <Badge variant={item.hasBarcode ? "default" : "destructive"}>
+                              {item.hasBarcode ? "Con código" : "Sin código"}
+                            </Badge>
                           </TableCell>
                         </TableRow>
                       ))
