@@ -36,12 +36,9 @@ import { useOrders } from "../components/hooks/useOrder";
 import { CartItem } from "../models/salesModel";
 import type { PaymentInput } from "../models/cashSessionModel";
 import { toast } from "react-toastify";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
 import { UnifiedPos } from "./UnifiedPos";
@@ -135,11 +132,8 @@ export const Dashboard = () => {
   const { budgets, loading: loadingBudgets } = useGetBudgets(resolvedBranchId);
   const { orders, loading: loadingOrders } = useOrders(resolvedBranchId);
   const { createSale } = useCreateSale();
-  const {
-    summary: stockSummary,
-    loading: stockSummaryLoading,
-    error: stockSummaryError,
-  } = useStockSummary();
+  const { summary: stockSummary, error: stockSummaryError } =
+    useStockSummary();
 
   // Resolve branch name for the active drill-down filter.
   const selectedBranchName = useMemo(() => {
@@ -370,60 +364,6 @@ export const Dashboard = () => {
           icon={<FaReceipt />}
           color="info"
         />
-      </div>
-
-      {/* Stock por sucursal */}
-      <div className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground">
-          Stock por sucursal
-        </h2>
-        {stockSummaryLoading ? (
-          <div className="flex flex-wrap gap-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Card key={i} className="min-w-[180px] flex-1 basis-40 p-5">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="mt-2 h-8 w-16" />
-              </Card>
-            ))}
-          </div>
-        ) : stockSummary?.branches.length ? (
-          <div className="flex flex-wrap gap-4">
-            {stockSummary.branches.map((branch) => (
-              <Card
-                key={branch.branchId}
-                onClick={
-                  userRole === "ADMIN" || userRole === "MANAGEMENT"
-                    ? () => setSearchParams({ branch: branch.branchId })
-                    : undefined
-                }
-                className={cn(
-                  "min-w-[180px] flex-1 basis-40 p-5 transition-all",
-                  (userRole === "ADMIN" || userRole === "MANAGEMENT") &&
-                    "cursor-pointer hover:-translate-y-0.5 hover:shadow-md",
-                  branch.isHeadquarters &&
-                    "border-primary/50 ring-1 ring-primary/20",
-                  branchFilter === branch.branchId &&
-                    "ring-2 ring-primary border-primary/60 bg-primary/5",
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {branch.branchName}
-                    </p>
-                    <p className="mt-1 text-3xl font-bold tracking-tight">
-                      {branch.quantity}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Sin sucursales activas para mostrar stock.
-          </p>
-        )}
       </div>
 
       {/* Indicador de sucursal seleccionada */}
