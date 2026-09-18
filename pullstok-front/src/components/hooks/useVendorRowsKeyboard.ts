@@ -57,8 +57,23 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
     optionsRef.current = options;
   });
 
+  const lastKeyAtRef = useRef(0);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const now = Date.now();
+      const gap = now - lastKeyAtRef.current;
+      lastKeyAtRef.current = now;
+      // Este listener se registra ANTES que el capturador de escaneo de
+      // UnifiedPos (los hijos montan sus efectos antes que el padre) — sin
+      // este chequeo, una letra del código escaneado que coincida con un
+      // atajo (ej. la "T" de BLST00018) dispara la acción del atajo (cambiar
+      // de tab) en vez de dejar que se arme el código completo. Un gap <60ms
+      // con la tecla anterior indica ráfaga de pistola, no una tecla suelta
+      // tipeada a propósito — en ese caso los atajos de letra se ignoran acá
+      // y el evento sigue su curso hacia el capturador de escaneo.
+      const isBurst = gap < 60;
+
       const o = optionsRef.current;
       const key = e.key;
       const active = document.activeElement;
@@ -88,7 +103,7 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
       if (!inGrid) return;
 
       // ── Tecla L: salta al listado (selecciona la primera fila) ──
-      if ((key === "l" || key === "L") && !isSearchFocused) {
+      if ((key === "l" || key === "L") && !isSearchFocused && !isBurst) {
         e.preventDefault();
         e.stopPropagation();
         o.searchInputRef.current?.blur();
@@ -97,7 +112,7 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
       }
 
       // ── Tecla T: cambiar de tab (Por unidad ↔ Suelto) ──
-      if ((key === "t" || key === "T") && !isSearchFocused && o.onToggleTab) {
+      if ((key === "t" || key === "T") && !isSearchFocused && !isBurst && o.onToggleTab) {
         e.preventDefault();
         e.stopPropagation();
         o.onToggleTab();
@@ -105,7 +120,7 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
       }
 
       // ── Tecla M: alternar modo de venta suelta (por kilo / por monto) ──
-      if ((key === "m" || key === "M") && !isSearchFocused && o.onToggleMode) {
+      if ((key === "m" || key === "M") && !isSearchFocused && !isBurst && o.onToggleMode) {
         e.preventDefault();
         e.stopPropagation();
         o.onToggleMode();
@@ -164,9 +179,12 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
 
       // ── Enter: confirma la fila activa al pedido ──
       // Gateado por !isSearchFocused: mientras tipeás en el buscador, Enter lo
-      // maneja el propio VendorSearchBar (commit del activo).
+      // maneja el propio VendorSearchBar (commit del activo). Gateado también
+      // por !isBurst: el Enter que cierra un escaneo de pistola no debe
+      // confirmar la fila activa del listado, tiene que llegar intacto al
+      // capturador de escaneo.
       if (key === "Enter") {
-        if (!isSearchFocused && hasActiveRow) {
+        if (!isSearchFocused && !isBurst && hasActiveRow) {
           e.preventDefault();
           e.stopPropagation();
           o.onCommitRow();
@@ -175,7 +193,7 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
       }
 
       // ── Tecla P: guardar pedido ──
-      if ((key === "p" || key === "P") && !isSearchFocused) {
+      if ((key === "p" || key === "P") && !isSearchFocused && !isBurst) {
         e.preventDefault();
         e.stopPropagation();
         if (o.cartItems.length > 0) {
@@ -187,7 +205,7 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
       }
 
       // ── Tecla V: vender el carrito ──
-      if ((key === "v" || key === "V") && !isSearchFocused) {
+      if ((key === "v" || key === "V") && !isSearchFocused && !isBurst) {
         e.preventDefault();
         e.stopPropagation();
         if (o.cartItems.length > 0) {
