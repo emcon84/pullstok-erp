@@ -11,6 +11,8 @@ import type { ArcaAuthContext } from "../../src/integrations/arca/types";
 
 // Fase 3 — cliente WSAA (LoginCms + cache de TicketAcceso 12 h en memoria).
 // Transporte SOAP y firma mockeados; parseo REAL del fixture loginCms_ok.xml.
+// T4 (sdd/arca-certificados-self-service): el cert/key ahora se leen de
+// ArcaCertificate (basePrisma) + certEncryption, no de fs.readFile.
 
 jest.mock("../../src/integrations/arca/soapClient", () => {
   const actual = jest.requireActual("../../src/integrations/arca/soapClient");
@@ -20,17 +22,21 @@ jest.mock("../../src/integrations/arca/traSigner", () => ({
   buildTra: jest.fn().mockReturnValue("<loginTicketRequest version=\"1.0\"/>"),
   signTra: jest.fn().mockReturnValue("b64-cms-firmado"),
 }));
-jest.mock("node:fs", () => {
-  const actual = jest.requireActual("node:fs");
-  return { ...actual, promises: { ...actual.promises, readFile: jest.fn() } };
-});
+jest.mock("../../src/config/db", () => ({
+  basePrisma: { arcaCertificate: { findUnique: jest.fn() } },
+}));
+jest.mock("../../src/utils/certEncryption", () => ({
+  decryptPrivateKeyPem: jest.fn(),
+}));
 
 import { soapRequest } from "../../src/integrations/arca/soapClient";
 import { signTra } from "../../src/integrations/arca/traSigner";
-import { promises as fsPromises } from "node:fs";
+import { basePrisma } from "../../src/config/db";
+import { decryptPrivateKeyPem } from "../../src/utils/certEncryption";
 
 const soapRequestMock = soapRequest as jest.Mock;
-const readFileMock = fsPromises.readFile as jest.Mock;
+const findCertMock = basePrisma.arcaCertificate.findUnique as jest.Mock;
+const decryptMock = decryptPrivateKeyPem as jest.Mock;
 const signTraMock = signTra as jest.Mock;
 
 const FIXTURES = path.join(__dirname, "..", "fixtures", "arca");
@@ -44,10 +50,19 @@ const CONTEXT: ArcaAuthContext = {
   keyPath: "/certs/org-1/wswfev1-homo.key",
 };
 
+const CERT_ROW = {
+  certPem: "pem-cert",
+  keyCiphertext: Buffer.from("ciphertext"),
+  keyIv: Buffer.from("iv"),
+  keyAuthTag: Buffer.from("authtag"),
+};
+
 beforeEach(() => {
   clearTaCache();
   soapRequestMock.mockReset();
-  readFileMock.mockReset();
+  findCertMock.mockReset();
+  decryptMock.mockReset();
+  decryptMock.mockReturnValue("pem-key");
   signTraMock.mockClear();
   delete process.env.ARCA_WSAA_HOMO_URL;
   delete process.env.ARCA_WSAA_PROD_URL;
@@ -162,16 +177,27 @@ describe("parseLoginCmsResponse", () => {
 });
 
 describe("authenticateWsaa", () => {
-  it("lee certificado+clave, firma el TRA y devuelve el TA parseado", async () => {
-    readFileMock.mockResolvedValue("pem-cert");
+  it("lee certificado+clave de ArcaCertificate, desencripta, firma el TRA y devuelve el TA parseado", async () => {
+    findCertMock.mockResolvedValue(CERT_ROW);
     soapRequestMock.mockResolvedValue(
       fs.readFileSync(path.join(FIXTURES, "loginCms_ok.xml"), "utf8"),
     );
 
     const ta = await authenticateWsaa(CONTEXT);
 
-    expect(readFileMock).toHaveBeenCalledWith(CONTEXT.certPath, "utf8");
-    expect(readFileMock).toHaveBeenCalledWith(CONTEXT.keyPath, "utf8");
+    expect(findCertMock).toHaveBeenCalledWith({
+      where: {
+        organizationId_environment: {
+          organizationId: CONTEXT.organizationId,
+          environment: CONTEXT.environment,
+        },
+      },
+    });
+    expect(decryptMock).toHaveBeenCalledWith({
+      ciphertext: CERT_ROW.keyCiphertext,
+      iv: CERT_ROW.keyIv,
+      authTag: CERT_ROW.keyAuthTag,
+    });
     expect(signTraMock).toHaveBeenCalledTimes(1);
     expect(soapRequestMock).toHaveBeenCalledTimes(1);
     const call = soapRequestMock.mock.calls[0][0];
@@ -181,7 +207,7 @@ describe("authenticateWsaa", () => {
   });
 
   it("cachea el TA 12 h por organización: segunda llamada no re-firma ni re-consulta", async () => {
-    readFileMock.mockResolvedValue("pem-cert");
+    findCertMock.mockResolvedValue(CERT_ROW);
     soapRequestMock.mockResolvedValue(
       fs.readFileSync(path.join(FIXTURES, "loginCms_ok.xml"), "utf8"),
     );
@@ -202,7 +228,7 @@ describe("authenticateWsaa", () => {
   });
 
   it("la cache es por organización (orgs distintas no comparten TA)", async () => {
-    readFileMock.mockResolvedValue("pem-cert");
+    findCertMock.mockResolvedValue(CERT_ROW);
     soapRequestMock.mockResolvedValue(
       fs.readFileSync(path.join(FIXTURES, "loginCms_ok.xml"), "utf8"),
     );
@@ -214,7 +240,7 @@ describe("authenticateWsaa", () => {
   });
 
   it("TA vencido → renueva (consulta de nuevo)", async () => {
-    readFileMock.mockResolvedValue("pem-cert");
+    findCertMock.mockResolvedValue(CERT_ROW);
     // loginCms_ok.xml expira 2026-08-19 — los reales vencen en el futuro; con
     // fake timers avanzamos más allá de la expiración para forzar el renew.
     soapRequestMock.mockResolvedValue(
@@ -235,7 +261,7 @@ describe("authenticateWsaa", () => {
   });
 
   it("error de red en LoginCms → ArcaError ARCA_AUTH_ERROR (502) y NO cachea", async () => {
-    readFileMock.mockResolvedValue("pem-cert");
+    findCertMock.mockResolvedValue(CERT_ROW);
     soapRequestMock.mockRejectedValueOnce(
       new ArcaError(ARCA_ERROR_CODES.ARCA_NETWORK_ERROR, "timeout", 503),
     );
@@ -253,8 +279,20 @@ describe("authenticateWsaa", () => {
     expect(soapRequestMock).toHaveBeenCalledTimes(2);
   });
 
-  it("error de lectura de cert/key → ArcaError ARCA_AUTH_ERROR (502)", async () => {
-    readFileMock.mockRejectedValue(new Error("ENOENT: no such file"));
+  it("sin ArcaCertificate cargado para el ambiente → ArcaError ARCA_AUTH_ERROR (502)", async () => {
+    findCertMock.mockResolvedValue(null);
+
+    const error: unknown = await authenticateWsaa(CONTEXT).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ArcaError);
+    expect((error as ArcaError).code).toBe(ARCA_ERROR_CODES.ARCA_AUTH_ERROR);
+    expect((error as ArcaError).message).toContain("No hay certificado cargado");
+  });
+
+  it("error al desencriptar la clave privada → ArcaError ARCA_AUTH_ERROR (502)", async () => {
+    findCertMock.mockResolvedValue(CERT_ROW);
+    decryptMock.mockImplementation(() => {
+      throw new Error("Unsupported state or unable to authenticate data");
+    });
 
     const error: unknown = await authenticateWsaa(CONTEXT).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ArcaError);

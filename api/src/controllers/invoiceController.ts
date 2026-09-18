@@ -10,6 +10,7 @@ import {
 import { createArcaClientHomo } from "../integrations/arca/arcaClient";
 import { ArcaError } from "../integrations/arca/types";
 import type { ArcaAuthContext } from "../integrations/arca/types";
+import { hasArcaCertificate } from "../integrations/arca/certificateGate";
 
 const invoiceInclude = {
   items: true,
@@ -40,18 +41,21 @@ const buildArcaContext = (setting: any, organizationId: string): ArcaAuthContext
   cuitEmisor: setting.cuitEmisor,
   puntoVenta: setting.puntoVenta,
   environment: setting.environment,
-  certPath: setting.certPath,
-  keyPath: setting.keyPath,
+  certPath: setting.certPath ?? "",
+  keyPath: setting.keyPath ?? "",
 });
 
-/** ¿El gate ARCA está habilitado para la org? (fila + enabled + campos completos). */
-const isArcaEnabled = (setting: any): boolean =>
+/** ¿El gate ARCA está habilitado para la org? (fila + enabled + campos completos
+ * + cert cargado para el ambiente activo). certPath/keyPath quedaron
+ * @deprecated (sdd/arca-certificados-self-service) — null en cualquier org
+ * que solo pasó por el flujo nuevo, así que el cert real se valida contra
+ * ArcaCertificate, no contra esas rutas. */
+const isArcaEnabled = async (setting: any, organizationId: string): Promise<boolean> =>
   !!setting &&
   setting.enabled === true &&
   !!setting.cuitEmisor &&
   setting.puntoVenta != null &&
-  !!setting.certPath &&
-  !!setting.keyPath;
+  (await hasArcaCertificate(organizationId, setting.environment));
 
 // Crear una factura en DRAFT (sin number; conceptos libres de servicios).
 const createInvoice = async (req: Request, res: Response) => {
@@ -267,7 +271,7 @@ const issueInvoice = async (req: Request, res: Response) => {
     const arcaSetting = await basePrisma.arcaSetting.findUnique({
       where: { organizationId },
     });
-    if (isArcaEnabled(arcaSetting)) {
+    if (await isArcaEnabled(arcaSetting, organizationId)) {
       const ctx = buildArcaContext(arcaSetting, organizationId);
       try {
         const fiscal = await emitirFiscalmente(

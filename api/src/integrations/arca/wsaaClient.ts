@@ -4,7 +4,8 @@
 // disco — solo vive en el Map de proceso. Error de WSAA => ArcaError
 // ARCA_AUTH_ERROR (502) con mensaje claro, sin cachear.
 
-import { promises as fs } from "node:fs";
+import { basePrisma } from "../../config/db";
+import { decryptPrivateKeyPem } from "../../utils/certEncryption";
 import { buildTra, signTra } from "./traSigner";
 import { buildSoapEnvelope, parseXml, soapRequest, WSAA_SOAP_ACTION } from "./soapClient";
 import { ArcaError, ARCA_ERROR_CODES } from "./types";
@@ -137,10 +138,29 @@ export const authenticateWsaa = async (
   }
 
   try {
-    const [certPem, keyPem] = await Promise.all([
-      fs.readFile(context.certPath, "utf8"),
-      fs.readFile(context.keyPath, "utf8"),
-    ]);
+    const certRow = await basePrisma.arcaCertificate.findUnique({
+      where: {
+        organizationId_environment: {
+          organizationId: context.organizationId,
+          environment: context.environment,
+        },
+      },
+    });
+    if (!certRow) {
+      throw new ArcaError(
+        ARCA_ERROR_CODES.ARCA_AUTH_ERROR,
+        `No hay certificado cargado para el ambiente ${context.environment}`,
+        502,
+      );
+    }
+
+    const certPem = certRow.certPem;
+    const keyPem = decryptPrivateKeyPem({
+      // Prisma 7 tipa Bytes como Uint8Array, no Buffer — normalizar acá.
+      ciphertext: Buffer.from(certRow.keyCiphertext),
+      iv: Buffer.from(certRow.keyIv),
+      authTag: Buffer.from(certRow.keyAuthTag),
+    });
 
     const tra = buildTra(context.cuitEmisor, service);
     const cms = signTra(tra, certPem, keyPem);

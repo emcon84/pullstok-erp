@@ -1,9 +1,16 @@
 import { Router } from "express";
 import arcaSettingsController from "../controllers/arcaSettingsController";
 import padronController from "../controllers/padronController";
+import {
+  uploadArcaCertificateFiles,
+  uploadArcaCertificate,
+  getArcaCertificates,
+  verifyArcaService,
+} from "../controllers/arcaCertificatesController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
+import { handleUploadError } from "../middlewares/uploadMiddleware";
 import { validate } from "../middlewares/validate";
-import { arcaSettingsSchema } from "../validation/schemas";
+import { arcaSettingsSchema, verifyArcaServiceSchema } from "../validation/schemas";
 
 const router = Router();
 
@@ -22,6 +29,32 @@ router.put(
   requireRole("ADMIN"),
   validate(arcaSettingsSchema),
   arcaSettingsController.updateArcaSettings,
+);
+
+// Certificados ARCA self-service (sdd/arca-certificados-self-service):
+// ADMIN only, mismo guard que el CRUD de arriba. Upload multipart (cert+key)
+// con multer memoryStorage; nunca se devuelven bytes de cert/key, solo
+// metadata parseada.
+router.post(
+  "/arca-settings/certificates/:environment",
+  authenticateJWT,
+  requireRole("ADMIN"),
+  uploadArcaCertificateFiles,
+  handleUploadError,
+  uploadArcaCertificate,
+);
+router.get(
+  "/arca-settings/certificates",
+  authenticateJWT,
+  requireRole("ADMIN"),
+  getArcaCertificates,
+);
+router.post(
+  "/arca-settings/verify-service",
+  authenticateJWT,
+  requireRole("ADMIN"),
+  validate(verifyArcaServiceSchema),
+  verifyArcaService,
 );
 
 // Gate por org: cualquier rol autenticado pregunta si ARCA está habilitado

@@ -108,6 +108,7 @@ model Organization {
   vendorChatMessages    VendorChatMessage[]
   appBranding           AppBranding?
   arcaSetting           ArcaSetting?
+  arcaCertificates      ArcaCertificate[]
   arcaSequences         ArcaSequence[]
   branches              Branch[]
   productStocks         ProductStock[]
@@ -938,15 +939,53 @@ model ArcaSetting {
   // Punto de venta fiscal del comercio (1..9999).
   puntoVenta     Int
   environment    ArcaEnvironment @default(HOMOLOGACION)
-  // VPS: /var/www/pullstok/certs/{org}/wswfev1-{env}.crt
-  certPath       String
-  // VPS: /var/www/pullstok/certs/{org}/wswfev1-{env}.key
-  keyPath        String
+  // @deprecated reemplazado por ArcaCertificate; nullable a partir de
+  // sdd/arca-certificados-self-service — una org nueva ya no pasa por acá,
+  // sube el cert directo a ArcaCertificate. Se mantiene por compatibilidad
+  // con las orgs migradas por el backfill (T5).
+  // VPS legacy: /var/www/pullstok/certs/{org}/wswfev1-{env}.crt
+  certPath       String?
+  // @deprecated ídem certPath.
+  // VPS legacy: /var/www/pullstok/certs/{org}/wswfev1-{env}.key
+  keyPath        String?
   enabled        Boolean         @default(false)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
   @@map("arca_settings")
+}
+
+// Certificado ARCA (homologación o producción) cargado por el ADMIN desde la
+// UI (self-service, sdd/arca-certificados-self-service). A PROPÓSITO fuera de
+// TENANT_MODELS (mismo patrón que ArcaSetting): se accede siempre por
+// (organizationId, environment) vía basePrisma, NUNCA por id propio — no debe
+// existir forma de leer/escribir la fila de otra organización aunque alguien
+// adivine un id. Es el tipo de credencial más sensible del sistema: firma
+// comprobantes fiscales ante AFIP a nombre del comercio.
+model ArcaCertificate {
+  id             String          @id @default(uuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  environment    ArcaEnvironment
+  // Certificado público (PEM) — no es secreto, se guarda en claro.
+  certPem        String
+  // Clave privada cifrada (AES-256-GCM, ver utils/certEncryption.ts). Nunca se
+  // guarda en claro, nunca se devuelve por API.
+  keyCiphertext  Bytes
+  keyIv          Bytes
+  keyAuthTag     Bytes
+  // Metadata parseada del cert (para mostrar en la UI sin desencriptar nada).
+  subjectCn        String?
+  subjectCuit      String?
+  issuer           String?
+  validFrom        DateTime
+  validTo          DateTime
+  uploadedAt       DateTime      @default(now())
+  uploadedByUserId String
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([organizationId, environment])
+  @@map("arca_certificates")
 }
 
 // Cache/contador local de la numeración fiscal por (org, puntoVenta,

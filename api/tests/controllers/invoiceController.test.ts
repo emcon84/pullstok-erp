@@ -12,6 +12,7 @@ jest.mock("../../src/config/db", () => ({
   },
   basePrisma: {
     arcaSetting: { findUnique: jest.fn() },
+    arcaCertificate: { findUnique: jest.fn() },
   },
 }));
 
@@ -195,6 +196,7 @@ describe("invoiceController.createInvoice + branchId (sdd/sucursales-pv-facturac
 describe("invoiceController.issueInvoice + fallo fiscal → 202 (deuda técnica item 8)", () => {
   const mockedBase = basePrisma as unknown as {
     arcaSetting: { findUnique: jest.Mock };
+    arcaCertificate: { findUnique: jest.Mock };
   };
   const { emitirFiscalmente } =
     jest.requireMock("../../src/services/fiscalInvoiceService") as {
@@ -223,6 +225,7 @@ describe("invoiceController.issueInvoice + fallo fiscal → 202 (deuda técnica 
   beforeEach(() => {
     jest.clearAllMocks();
     mockedBase.arcaSetting.findUnique.mockResolvedValue(ARCA_ENABLED);
+    mockedBase.arcaCertificate.findUnique.mockResolvedValue({ id: "cert-1" });
   });
 
   it("devuelve 202 (no 200) cuando la factura se emitió pero la fiscal falló", async () => {

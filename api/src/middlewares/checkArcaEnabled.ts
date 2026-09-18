@@ -2,6 +2,7 @@ import { Response, NextFunction } from "express";
 import { Request } from "express";
 import { basePrisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
+import { hasArcaCertificate } from "../integrations/arca/certificateGate";
 import type { ArcaAuthContext } from "../integrations/arca/types";
 
 // Gate de emisión fiscal ARCA por organización (design D6, patrón
@@ -22,13 +23,19 @@ export const checkArcaEnabled = async (
       where: { organizationId },
     });
 
-    const enabled =
+    // certPath/keyPath quedaron @deprecated (sdd/arca-certificados-self-service)
+    // — el cert real ahora vive en ArcaCertificate, cifrado. El chequeo del
+    // cert es async (hit a DB): se evalúa último, después de descartar por los
+    // campos sync más baratos, para no pegarle a la DB en el caso común de
+    // "gate apagado".
+    const basicsOk =
       !!setting &&
       setting.enabled === true &&
       !!setting.cuitEmisor &&
-      setting.puntoVenta != null &&
-      !!setting.certPath &&
-      !!setting.keyPath;
+      setting.puntoVenta != null;
+
+    const enabled =
+      basicsOk && (await hasArcaCertificate(organizationId, setting!.environment));
 
     if (!enabled) {
       return res.status(403).json({ error: "ARCA_NOT_AVAILABLE" });
@@ -39,8 +46,8 @@ export const checkArcaEnabled = async (
       cuitEmisor: setting.cuitEmisor,
       puntoVenta: setting.puntoVenta,
       environment: setting.environment,
-      certPath: setting.certPath,
-      keyPath: setting.keyPath,
+      certPath: setting.certPath ?? "",
+      keyPath: setting.keyPath ?? "",
     };
 
     next();

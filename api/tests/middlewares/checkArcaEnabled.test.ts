@@ -5,6 +5,7 @@ import { checkArcaEnabled } from "../../src/middlewares/checkArcaEnabled";
 jest.mock("../../src/config/db", () => ({
   basePrisma: {
     arcaSetting: { findUnique: jest.fn() },
+    arcaCertificate: { findUnique: jest.fn() },
   },
 }));
 
@@ -14,6 +15,7 @@ jest.mock("../../src/config/tenantContext", () => ({
 
 const mockedBase = basePrisma as unknown as {
   arcaSetting: { findUnique: jest.Mock };
+  arcaCertificate: { findUnique: jest.Mock };
 };
 
 const mockRequest = () => ({} as unknown as Request);
@@ -63,22 +65,28 @@ describe("checkArcaEnabled", () => {
     expect(mockNext).not.toHaveBeenCalled();
   });
 
-  it("fila incompleta (sin rutas de cert) → 403 ARCA_NOT_AVAILABLE", async () => {
+  it("fila enabled pero sin ArcaCertificate cargado para el ambiente → 403 ARCA_NOT_AVAILABLE", async () => {
     mockedBase.arcaSetting.findUnique.mockResolvedValue({
       ...COMPLETE_SETTING,
-      certPath: "",
-      keyPath: "",
+      certPath: null,
+      keyPath: null,
     });
+    mockedBase.arcaCertificate.findUnique.mockResolvedValue(null);
 
     const res = mockResponse();
     await checkArcaEnabled(mockRequest(), res, mockNext);
 
+    expect(mockedBase.arcaCertificate.findUnique).toHaveBeenCalledWith({
+      where: { organizationId_environment: { organizationId: "org-1", environment: "HOMOLOGACION" } },
+      select: { id: true },
+    });
     expect(res.status).toHaveBeenCalledWith(403);
     expect(mockNext).not.toHaveBeenCalled();
   });
 
-  it("fila completa + enabled → next() y adjunta el contexto ARCA al request", async () => {
+  it("fila completa + enabled + ArcaCertificate cargado → next() y adjunta el contexto ARCA al request", async () => {
     mockedBase.arcaSetting.findUnique.mockResolvedValue(COMPLETE_SETTING);
+    mockedBase.arcaCertificate.findUnique.mockResolvedValue({ id: "cert-1" });
 
     const req = mockRequest() as Request & { arcaContext?: any };
     const res = mockResponse();

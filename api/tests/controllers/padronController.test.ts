@@ -12,6 +12,7 @@ import type { PadronPersona } from "../../src/integrations/arca/types";
 jest.mock("../../src/config/db", () => ({
   basePrisma: {
     arcaSetting: { findUnique: jest.fn() },
+    arcaCertificate: { findUnique: jest.fn() },
   },
 }));
 jest.mock("../../src/config/tenantContext", () => ({
@@ -23,6 +24,7 @@ jest.mock("../../src/integrations/arca/padronClient", () => ({
 
 const mockedBase = basePrisma as unknown as {
   arcaSetting: { findUnique: jest.Mock };
+  arcaCertificate: { findUnique: jest.Mock };
 };
 const getPersonaMock = getPersona as jest.Mock;
 
@@ -61,7 +63,10 @@ const mockResponse = () => {
 };
 
 describe("padronController.getPadronByCuit", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedBase.arcaCertificate.findUnique.mockResolvedValue({ id: "cert-1" });
+  });
 
   it("CUIT inválido → 400 CUIT_INVALIDO (sin tocar DB ni cliente)", async () => {
     const res = mockResponse();

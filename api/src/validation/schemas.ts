@@ -1200,7 +1200,11 @@ export const listLooseStocksQuerySchema = z
 //  - cuitEmisor: 11 dígitos con DV mod 11 (isValidCuit normaliza guiones).
 //  - puntoVenta: entero 1..9999.
 //  - environment: HOMOLOGACION | PRODUCCION.
-//  - certPath/keyPath: rutas no vacías (los certificados NUNCA van en la DB).
+//  - certPath/keyPath: @deprecated (sdd/arca-certificados-self-service) — el
+//    certificado real vive cifrado en ArcaCertificate, cargado por separado
+//    vía POST /arca-settings/certificates/:environment. Ya no son requeridos
+//    acá: si vienen (compatibilidad con un caller viejo) se aceptan, si no
+//    vienen no bloquean el guardado.
 export const arcaSettingsSchema = z
   .object({
     cuitEmisor: z
@@ -1219,9 +1223,17 @@ export const arcaSettingsSchema = z
       .min(1, "El punto de venta debe estar entre 1 y 9999")
       .max(9999, "El punto de venta debe estar entre 1 y 9999"),
     environment: z.enum(["HOMOLOGACION", "PRODUCCION"]),
-    certPath: z.string().min(1, "La ruta del certificado no puede estar vacía"),
-    keyPath: z.string().min(1, "La ruta de la clave no puede estar vacía"),
+    certPath: z.string().optional(),
+    keyPath: z.string().optional(),
     enabled: z.boolean().default(false),
+  })
+  .strip();
+
+// Body de POST /arca-settings/verify-service (sdd/arca-certificados-self-service).
+// Solo dos services soportados hoy: facturación (wsfe) y padrón A4.
+export const verifyArcaServiceSchema = z
+  .object({
+    service: z.enum(["wsfe", "ws_sr_padron_a4"]),
   })
   .strip();
 

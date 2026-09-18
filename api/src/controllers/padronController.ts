@@ -5,22 +5,24 @@ import { requireOrganizationId } from "../config/tenantContext";
 import { getPersona } from "../integrations/arca/padronClient";
 import { ArcaError } from "../integrations/arca/types";
 import { normalizeCuit, isValidCuit } from "../services/arcaCalc";
+import { hasArcaCertificate } from "../integrations/arca/certificateGate";
 
 // Consulta al padrón A4 (ws_sr_padron_a4) para autocompletar la carga de
 // clientes. Mismo gate que el CRUD de clientes (cualquier rol autenticado).
 // Lee la ArcaSetting de la org (patrón basePrisma, igual que getArcaEnabled)
-// para obtener certPath/keyPath/environment/cuitEmisor. El front NO bloquea la
-// carga manual si esto falla: los errores se devuelven con código/mensaje
-// claros pero el usuario puede seguir cargando a mano.
+// para obtener environment/cuitEmisor; el certificado real se valida contra
+// ArcaCertificate (sdd/arca-certificados-self-service) — certPath/keyPath acá
+// quedaron @deprecated. El front NO bloquea la carga manual si esto falla:
+// los errores se devuelven con código/mensaje claros pero el usuario puede
+// seguir cargando a mano.
 
 /** Build ArcaAuthContext desde la ArcaSetting de la org (o null si no apta). */
-const buildContextFromSetting = (setting: any) => {
+const buildContextFromSetting = async (setting: any) => {
   if (
     !setting ||
     setting.enabled !== true ||
     !setting.cuitEmisor ||
-    !setting.certPath ||
-    !setting.keyPath
+    !(await hasArcaCertificate(setting.organizationId, setting.environment ?? "HOMOLOGACION"))
   ) {
     return null;
   }
@@ -33,8 +35,8 @@ const buildContextFromSetting = (setting: any) => {
     padronCuit: setting.padronCuit ?? undefined,
     puntoVenta: setting.puntoVenta ?? 0,
     environment: setting.environment ?? "HOMOLOGACION",
-    certPath: setting.certPath,
-    keyPath: setting.keyPath,
+    certPath: setting.certPath ?? "",
+    keyPath: setting.keyPath ?? "",
   };
 };
 
@@ -55,7 +57,7 @@ export const getPadronByCuit = async (req: AuthedRequest, res: Response) => {
       where: { organizationId },
     });
 
-    const context = buildContextFromSetting(setting);
+    const context = await buildContextFromSetting(setting);
     if (!context) {
       return res.status(403).json({
         error: "ARCA_NOT_CONFIGURED",

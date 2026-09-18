@@ -2,12 +2,14 @@ import { Response } from "express";
 import { basePrisma } from "../config/db";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 import { requireOrganizationId } from "../config/tenantContext";
+import { hasArcaCertificate } from "../integrations/arca/certificateGate";
 
 // ArcaSetting es 1:1 con Organization y NO está en TENANT_MODELS (patrón
 // StoreSettings/AppBranding): se accede siempre por organizationId vía
 // basePrisma, nunca por id propio, para que no haya forma de leer/escribir la
 // fila de otra organización aunque alguien adivine un id. Los CERTIFICADOS
-// nunca viven acá: solo rutas crt/key en el VPS.
+// viven en ArcaCertificate (cifrados, sdd/arca-certificados-self-service) —
+// certPath/keyPath acá quedaron @deprecated, solo compatibilidad legacy.
 
 /** ADMIN: devuelve el ArcaSetting de SU organización. Create-on-read: si no
  * existe fila, se devuelven los defaults (enabled=false → gate off) sin crear
@@ -41,6 +43,25 @@ export const updateArcaSettings = async (req: AuthedRequest, res: Response) => {
     const organizationId = requireOrganizationId();
     const data = req.body;
 
+    // No dejar prender el gate para un ambiente sin certificado propio
+    // cargado (sdd/arca-certificados-self-service) — el certificado es lo
+    // que realmente firma ante AFIP, el switch environment no alcanza.
+    if (data.enabled === true) {
+      const cert = await basePrisma.arcaCertificate.findUnique({
+        where: {
+          organizationId_environment: {
+            organizationId,
+            environment: data.environment,
+          },
+        },
+      });
+      if (!cert) {
+        return res.status(400).json({
+          message: `Falta cargar el certificado de ${data.environment} antes de habilitar este ambiente.`,
+        });
+      }
+    }
+
     const settings = await basePrisma.arcaSetting.upsert({
       where: { organizationId },
       update: data,
@@ -68,8 +89,7 @@ export const getArcaEnabled = async (_req: AuthedRequest, res: Response) => {
       setting.enabled === true &&
       !!setting.cuitEmisor &&
       setting.puntoVenta != null &&
-      !!setting.certPath &&
-      !!setting.keyPath;
+      (await hasArcaCertificate(organizationId, setting.environment));
 
     res.status(200).json({
       enabled,

@@ -1346,16 +1346,23 @@ describe("arcaSettingsSchema (sdd/arca-facturacion-electronica)", () => {
     expect(arcaSettingsSchema.safeParse({ ...valid, puntoVenta: 10000 }).success).toBe(false);
   });
 
-  it("rechaza environment inválido y rutas vacías", () => {
+  it("rechaza environment inválido", () => {
     expect(
       arcaSettingsSchema.safeParse({ ...valid, environment: "LOCAL" }).success,
     ).toBe(false);
-    expect(
-      arcaSettingsSchema.safeParse({ ...valid, certPath: "" }).success,
-    ).toBe(false);
-    expect(
-      arcaSettingsSchema.safeParse({ ...valid, keyPath: "" }).success,
-    ).toBe(false);
+  });
+
+  // certPath/keyPath quedaron @deprecated (sdd/arca-certificados-self-service):
+  // el certificado real se valida contra ArcaCertificate, no acá. Ya no son
+  // requeridos — una org nueva nunca los manda.
+  it("acepta certPath/keyPath vacíos, ausentes, o presentes (compatibilidad legacy)", () => {
+    expect(arcaSettingsSchema.safeParse({ ...valid, certPath: "" }).success).toBe(true);
+    expect(arcaSettingsSchema.safeParse({ ...valid, keyPath: "" }).success).toBe(true);
+    const { certPath, keyPath, ...withoutPaths } = valid as typeof valid & {
+      certPath?: string;
+      keyPath?: string;
+    };
+    expect(arcaSettingsSchema.safeParse(withoutPaths).success).toBe(true);
   });
 
   it("enabled default false si se omite", () => {

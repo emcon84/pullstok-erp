@@ -7,6 +7,7 @@ import arcaSettingsController from "../../src/controllers/arcaSettingsController
 jest.mock("../../src/config/db", () => ({
   basePrisma: {
     arcaSetting: { findUnique: jest.fn(), upsert: jest.fn() },
+    arcaCertificate: { findUnique: jest.fn() },
   },
 }));
 
@@ -16,6 +17,7 @@ jest.mock("../../src/config/tenantContext", () => ({
 
 const mockedBase = basePrisma as unknown as {
   arcaSetting: { findUnique: jest.Mock; upsert: jest.Mock };
+  arcaCertificate: { findUnique: jest.Mock };
 };
 
 const mockRequest = (body?: any) => ({ body } as unknown as Request);
@@ -74,6 +76,7 @@ describe("arcaSettingsController.updateArcaSettings", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("upsert por organizationId (nunca por body) y devuelve la fila", async () => {
+    mockedBase.arcaCertificate.findUnique.mockResolvedValue({ id: "cert-1" });
     mockedBase.arcaSetting.upsert.mockResolvedValue({
       ...FULL_SETTING,
       puntoVenta: 4,
@@ -106,5 +109,57 @@ describe("arcaSettingsController.updateArcaSettings", () => {
     const payload = res.json.mock.calls[0][0];
     expect(payload.puntoVenta).toBe(4);
     expect(payload.enabled).toBe(true);
+  });
+
+  it("enabled=true sin ArcaCertificate para ese ambiente → 400, NO hace upsert (sdd/arca-certificados-self-service)", async () => {
+    mockedBase.arcaCertificate.findUnique.mockResolvedValue(null);
+
+    const res = mockResponse();
+    await arcaSettingsController.updateArcaSettings(
+      mockRequest({
+        cuitEmisor: "30709706701",
+        puntoVenta: 4,
+        environment: "PRODUCCION",
+        certPath: "/var/www/pullstok/certs/org-1/wswfev1-PRODUCCION.crt",
+        keyPath: "/var/www/pullstok/certs/org-1/wswfev1-PRODUCCION.key",
+        enabled: true,
+      }),
+      res,
+    );
+
+    expect(mockedBase.arcaCertificate.findUnique).toHaveBeenCalledWith({
+      where: {
+        organizationId_environment: {
+          organizationId: "org-1",
+          environment: "PRODUCCION",
+        },
+      },
+    });
+    expect(mockedBase.arcaSetting.upsert).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Falta cargar el certificado de PRODUCCION antes de habilitar este ambiente.",
+    });
+  });
+
+  it("enabled=false no exige ArcaCertificate (apagar el gate siempre debe poder guardarse)", async () => {
+    mockedBase.arcaSetting.upsert.mockResolvedValue({ ...FULL_SETTING, enabled: false });
+
+    const res = mockResponse();
+    await arcaSettingsController.updateArcaSettings(
+      mockRequest({
+        cuitEmisor: "30709706701",
+        puntoVenta: 4,
+        environment: "HOMOLOGACION",
+        certPath: "/var/www/pullstok/certs/org-1/wswfev1-HOMOLOGACION.crt",
+        keyPath: "/var/www/pullstok/certs/org-1/wswfev1-HOMOLOGACION.key",
+        enabled: false,
+      }),
+      res,
+    );
+
+    expect(mockedBase.arcaCertificate.findUnique).not.toHaveBeenCalled();
+    expect(mockedBase.arcaSetting.upsert).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });
