@@ -399,6 +399,30 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
     expect(tableCallbacks.onQuickPrice.size).toBe(1);
   });
 
+  it("'limpiar todo' vacía el buscador y muestra todo el catálogo", async () => {
+    renderDashboard();
+    const getInput = () =>
+      screen.getByPlaceholderText(
+        "Buscar por nombre, código o variante...",
+      ) as HTMLInputElement;
+    fireEvent.change(getInput(), { target: { value: "collar" } });
+    await waitFor(() =>
+      expect(screen.getByTestId("products-table").textContent).toBe(
+        "Collar Suelto",
+      ),
+    );
+
+    fireEvent.click(screen.getByText("limpiar todo"));
+
+    // El input se remonta (key) al cambiar el filtro desde afuera: re-consultar.
+    await waitFor(() => expect(getInput().value).toBe(""));
+    await waitFor(() =>
+      expect(screen.getByTestId("products-table").textContent).toBe(
+        "Puppy A | Perros 15kg | Collar Suelto",
+      ),
+    );
+  });
+
   describe("área de impresión (costosa: una fila por producto)", () => {
     const ALL = "Puppy A | Perros 15kg | Collar Suelto";
     const typeCollar = async () => {

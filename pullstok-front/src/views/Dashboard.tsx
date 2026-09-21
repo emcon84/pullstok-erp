@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState, useMemo, useDeferredValue } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { useSettledValue } from "../components/hooks/useSettledValue";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Upload, ShoppingCart, Search, X, Printer, Barcode } from "lucide-react";
+import { Plus, Upload, ShoppingCart, X, Printer, Barcode } from "lucide-react";
 import {
   FaShoppingCart,
   FaFileInvoice,
@@ -10,7 +10,6 @@ import {
   FaReceipt,
 } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -45,6 +44,7 @@ import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
 import { UnifiedPos } from "./UnifiedPos";
 import { FilterChips } from "../components/molecules/FilterChips";
+import { TransitionSearchInput } from "../components/molecules/TransitionSearchInput";
 import { planTitleKeyOf } from "@/lib/printGrouping";
 import { VendorChatWidget } from "@/components/organisms/VendorChat";
 import {
@@ -65,6 +65,13 @@ export const Dashboard = () => {
   const [isModalSalesOpen, setIsModalSalesOpen] = useState(false);
   const [isModalUploadOpen, setIsModalUploadOpen] = useState(false);
   const [filter, setFilter] = useState("");
+  // Sube cuando el filtro lo cambia algo que NO es el input (chips, limpiar):
+  // remonta TransitionSearchInput para que muestre el valor nuevo.
+  const [filterVersion, setFilterVersion] = useState(0);
+  const setFilterFromOutside = useCallback((value: string) => {
+    setFilter(value);
+    setFilterVersion((v) => v + 1);
+  }, []);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [providerFilter, setProviderFilter] = useState("");
   // Título de planilla SECO (sdd/alican-plan-titles): filtro client-side por
@@ -233,11 +240,9 @@ export const Dashboard = () => {
   // ── Products already filtered by branch filter ──
 
   // "Purina, Proplan" → OR entre marcas; espacios dentro de un término → AND.
-  // useDeferredValue: el input se actualiza al instante con `filter`; el
-  // filtrado + re-render de la tabla/print area corren con prioridad baja
-  // (interrumpibles) y no bloquean el tipeo.
-  const deferredFilter = useDeferredValue(filter);
-  const filterTerms = useMemo(() => parseFilterTerms(deferredFilter), [deferredFilter]);
+  // El input escribe `filter` dentro de una transición (TransitionSearchInput): el
+  // filtrado y el re-render de la tabla ya son de baja prioridad e interrumpibles.
+  const filterTerms = useMemo(() => parseFilterTerms(filter), [filter]);
   const filteredProducts = useMemo(() => {
     let list = products;
     if (categoryFilter) {
@@ -416,16 +421,14 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {/* Búsqueda */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          className="pl-9"
-          placeholder="Buscar por nombre, código o variante..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-      </div>
+      {/* Búsqueda: estado local + transición (ver TransitionSearchInput). El
+          key remonta el input cuando el filtro cambia desde afuera (chips / limpiar). */}
+      <TransitionSearchInput
+        key={filterVersion}
+        initialValue={filter}
+        placeholder="Buscar por nombre, código o variante..."
+        onValueChange={setFilter}
+      />
 
       {/* Filtro por proveedor */}
       {availableProviders.length > 0 && (
@@ -497,9 +500,9 @@ export const Dashboard = () => {
         titles={isAlican ? facetTitles : undefined}
         titleFilter={isAlican ? titleFilter : null}
         onTitleChange={setTitleFilter}
-        onFilterChange={setFilter}
+        onFilterChange={setFilterFromOutside}
         onCategoryChange={setCategoryFilter}
-        onClear={() => { setFilter(""); setCategoryFilter(""); setProviderFilter(""); setTitleFilter(null); }}
+        onClear={() => { setFilterFromOutside(""); setCategoryFilter(""); setProviderFilter(""); setTitleFilter(null); }}
       />
 
       {/* Tabla de productos / stock */}
