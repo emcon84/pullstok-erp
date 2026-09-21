@@ -194,3 +194,81 @@ export async function syncOfflineCatalog(): Promise<number> {
   await storeOfflineSnapshot(data);
   return data.length;
 }
+
+/**
+ * Upsert de UN SOLO producto (patch puntual, no resync completo): actualiza
+ * el array/Maps en MEMORIA de forma incondicional (para que quede buscable
+ * ya mismo, incluso si IndexedDB no está disponible en este entorno) y
+ * best-effort persiste ese registro en IndexedDB — sin tocar META/lastSync.
+ */
+export async function patchProduct(product: OfflineProduct): Promise<void> {
+  const idx = products.findIndex((p) => p.id === product.id);
+  const nextList =
+    idx >= 0
+      ? products.map((p, i) => (i === idx ? product : p))
+      : [...products, product];
+  rebuildIndexes(nextList);
+
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put(product);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    /* IDB no disponible o falló el write: la memoria ya quedó consistente. */
+  }
+}
+
+/**
+ * Saca un producto del catálogo local (borrado real, o ya no pertenece a
+ * esta org). Actualiza memoria incondicionalmente y borra best-effort de
+ * IndexedDB.
+ */
+export async function removeProductFromCatalog(id: string): Promise<void> {
+  rebuildIndexes(products.filter((p) => p.id !== id));
+
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    /* IDB no disponible o falló el delete: la memoria ya quedó consistente. */
+  }
+}
+
+/**
+ * Trae el snapshot individual de UN producto y lo patchea en el catálogo
+ * local. Pensado para reaccionar al evento socket `product:changed`
+ * (T4). 404 => el producto se borró (o dejó de ser de esta org): lo sacamos
+ * del catálogo local en vez de tratarlo como error. Cualquier otro error
+ * (HTTP o de red) se loguea y no rompe la UI — mismo espíritu defensivo que
+ * el resto del módulo.
+ */
+export async function fetchAndPatchProduct(id: string): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+  try {
+    const res = await fetch(`${API_URL}/products/${id}/offline-snapshot`, {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    });
+    if (res.status === 404) {
+      await removeProductFromCatalog(id);
+      return;
+    }
+    if (!res.ok) {
+      console.error(`fetchAndPatchProduct: offline-snapshot failed (${res.status}) for ${id}`);
+      return;
+    }
+    const data = (await res.json()) as OfflineProduct;
+    await patchProduct(data);
+  } catch (err) {
+    console.error(`fetchAndPatchProduct: error patcheando ${id}`, err);
+  }
+}

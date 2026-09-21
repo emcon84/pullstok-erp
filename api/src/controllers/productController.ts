@@ -12,6 +12,7 @@ import {
   recomputeForCsvImport,
 } from "../services/priceLooseService";
 import { findCellForProduct, normalizeName } from "../services/priceMatchingService";
+import { emitProductChanged } from "../realtime/socket";
 import { roundBolsaPriceIfHigh } from "../utils/money";
 import { isUnitSellable, computePerUnitPrice } from "../utils/unitsPerBox";
 import { parseScaleBarcode } from "../utils/scaleBarcode";
@@ -32,6 +33,27 @@ const readUserBranchIds = async (userId: string): Promise<string[]> => {
     select: { branchId: true },
   });
   return assignments.map((a) => a.branchId);
+};
+
+/**
+ * Notifica al front (catálogo offline, IndexedDB) que un producto cambió,
+ * DESPUÉS de que la mutación se confirmó en DB (T2 —
+ * odd/tasks/product-search-offline-realtime.md). Envuelto en try/catch: un
+ * fallo del socket NUNCA debe romper la operación HTTP (mismo patrón que
+ * notifyOrdersChanged en orderController).
+ */
+const notifyProductChanged = (
+  productId: string,
+  action: "created" | "updated" | "deleted",
+) => {
+  try {
+    emitProductChanged(requireOrganizationId(), productId, action);
+  } catch (err: any) {
+    console.error(
+      "[productController] emitProductChanged falló:",
+      err?.message ?? err,
+    );
+  }
 };
 
 // Create a new product (organizationId lo inyecta la extension de Prisma).
@@ -103,6 +125,7 @@ const createProduct = async (req: Request, res: Response) => {
       },
     });
 
+    notifyProductChanged(product.id, "created");
     res.status(201).json(created);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -930,6 +953,7 @@ const updateProduct = async (req: Request, res: Response) => {
         },
       },
     });
+    notifyProductChanged(req.params.id, "updated");
     res.status(200).json(product);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -993,6 +1017,7 @@ const deleteProduct = async (req: Request, res: Response) => {
     if (result.count === 0) {
       return res.status(404).json({ message: "Product not found" });
     }
+    notifyProductChanged(id, "deleted");
     res.status(200).json({ message: "Product deleted successfully" });
   } catch (error: any) {
     // FK constraint: el producto tiene dependencias sin onDelete Cascade
@@ -1089,6 +1114,96 @@ export const getProductByCode = async (req: Request, res: Response) => {
  * `priceKgLista` = precio por kg de la LISTA de suelto (PriceKgPrice, resuelto
  * con findCellForProduct), NO el priceKgSuelto derivado de la bolsa.
  */
+// Selección Prisma reusada por getOfflineSnapshot (bulk) y
+// getOfflineProductSnapshot (individual) — misma forma "liviana" de producto.
+const OFFLINE_SNAPSHOT_PRODUCT_SELECT = {
+  id: true,
+  name: true,
+  code: true,
+  barcode: true,
+  price: true,
+  description: true,
+  categoryId: true,
+  priceKgSuelto: true,
+  priceKgSueltoManual: true,
+  category: { select: { name: true } },
+  variantAssignments: {
+    select: {
+      option: {
+        select: {
+          id: true,
+          value: true,
+          variantId: true,
+          variant: { select: { id: true, name: true } },
+        },
+      },
+    },
+  },
+} as const;
+
+type OfflineSnapshotProduct = {
+  id: string;
+  name: string;
+  code: string | null;
+  barcode: string | null;
+  price: number;
+  description: string | null;
+  categoryId: string | null;
+  priceKgSuelto: number | null;
+  priceKgSueltoManual: boolean;
+  category: { name: string } | null;
+  variantAssignments: {
+    option: {
+      id: string;
+      value: string;
+      variantId: string;
+      variant: { id: string; name: string };
+    };
+  }[];
+};
+
+/**
+ * Mapea un producto (forma OFFLINE_SNAPSHOT_PRODUCT_SELECT) a la forma
+ * "offline" (OfflineProduct del front): resuelve `priceKgLista` con
+ * findCellForProduct contra la planilla de precios por kilo. Extraído de
+ * getOfflineSnapshot para reusarlo también en getOfflineProductSnapshot
+ * (T1 — odd/tasks/product-search-offline-realtime.md).
+ */
+const mapProductToOfflineSnapshot = (
+  product: OfflineSnapshotProduct,
+  brands: any,
+  types: any,
+  categoryById: Map<string, any>,
+  cells: any,
+) => {
+  const { cell } = findCellForProduct(
+    { id: product.id, name: product.name, categoryId: product.categoryId },
+    brands,
+    types,
+    categoryById,
+    cells,
+  );
+  return {
+    id: product.id,
+    name: product.name,
+    code: product.code,
+    barcode: product.barcode,
+    price: product.price,
+    priceKgLista: cell?.priceKg ?? null,
+    priceKgSuelto: product.priceKgSuelto,
+    priceKgSueltoManual: product.priceKgSueltoManual,
+    description: product.description,
+    categoryId: product.categoryId,
+    categoryName: product.category?.name ?? null,
+    variants: (product.variantAssignments || []).map((va) => ({
+      value: va.option.value,
+      variantName: va.option.variant.name,
+      variantId: va.option.variantId,
+      optionId: va.option.id,
+    })),
+  };
+};
+
 export const getOfflineSnapshot = async (req: Request, res: Response) => {
   try {
     const organizationId = requireOrganizationId();
@@ -1112,64 +1227,83 @@ export const getOfflineSnapshot = async (req: Request, res: Response) => {
       }),
       prisma.product.findMany({
         where: { organizationId },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          barcode: true,
-          price: true,
-          description: true,
-          categoryId: true,
-          priceKgSuelto: true,
-          priceKgSueltoManual: true,
-          category: { select: { name: true } },
-          variantAssignments: {
-            select: {
-              option: {
-                select: {
-                  id: true,
-                  value: true,
-                  variantId: true,
-                  variant: { select: { id: true, name: true } },
-                },
-              },
-            },
-          },
-        },
+        select: OFFLINE_SNAPSHOT_PRODUCT_SELECT,
       }),
     ]);
 
     const categoryById = new Map(categories.map((c) => [c.id, c]));
 
-    const snapshot = products.map((p) => {
-      const { cell } = findCellForProduct(
-        { id: p.id, name: p.name, categoryId: p.categoryId },
-        brands as any,
-        types as any,
-        categoryById as any,
-        cells as any,
-      );
-      return {
-        id: p.id,
-        name: p.name,
-        code: p.code,
-        barcode: p.barcode,
-        price: p.price,
-        priceKgLista: cell?.priceKg ?? null,
-        priceKgSuelto: p.priceKgSuelto,
-        priceKgSueltoManual: p.priceKgSueltoManual,
-        description: p.description,
-        categoryId: p.categoryId,
-        categoryName: p.category?.name ?? null,
-        variants: (p.variantAssignments || []).map((va) => ({
-          value: va.option.value,
-          variantName: va.option.variant.name,
-          variantId: va.option.variantId,
-          optionId: va.option.id,
-        })),
-      };
-    });
+    const snapshot = products.map((p) =>
+      mapProductToOfflineSnapshot(p as OfflineSnapshotProduct, brands, types, categoryById, cells),
+    );
 
+    res.status(200).json(snapshot);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * GET /products/:id/offline-snapshot
+ * Snapshot "offline" de UN producto puntual (misma forma que el bulk de
+ * arriba) para que el catálogo local (IndexedDB) se parchee sin refetchear
+ * todo el catálogo — lo dispara el evento product:changed por socket (T2).
+ * 404 si no existe o no pertenece a la organización actual: prisma.product
+ * ya viene scoped por organizationId vía la extensión anti-fuga (mismo
+ * patrón que getProductByCode/deleteProduct — no filtra datos entre
+ * tenants).
+ */
+export const getOfflineProductSnapshot = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const product = await prisma.product.findFirst({
+      where: { id },
+      select: OFFLINE_SNAPSHOT_PRODUCT_SELECT,
+    });
+    if (!product) {
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
+
+    // Igual que getProductByCode: solo se consulta la planilla de precios por
+    // kilo (brands/types/cells, org-scoped) si el producto tiene categoría —
+    // sin categoría no hay clasificación posible y priceKgLista queda null.
+    let categoryById = new Map<string, any>();
+    let brands: any[] = [];
+    let types: any[] = [];
+    let cells: any[] = [];
+    if (product.categoryId) {
+      const organizationId = requireOrganizationId();
+      const [categories, brandsRes, typesRes, cellsRes] = await Promise.all([
+        prisma.category.findMany({
+          where: { organizationId },
+          select: { id: true, name: true, parentId: true },
+        }),
+        prisma.priceKgBrand.findMany({
+          where: { organizationId },
+          select: { id: true, name: true, keywords: true },
+        }),
+        prisma.priceKgType.findMany({
+          where: { organizationId },
+          select: { id: true, name: true, synonyms: true },
+        }),
+        prisma.priceKgPrice.findMany({
+          where: { organizationId },
+          select: { id: true, brandId: true, typeId: true, species: true, priceKg: true },
+        }),
+      ]);
+      categoryById = new Map(categories.map((c) => [c.id, c]));
+      brands = brandsRes;
+      types = typesRes;
+      cells = cellsRes;
+    }
+
+    const snapshot = mapProductToOfflineSnapshot(
+      product as OfflineSnapshotProduct,
+      brands,
+      types,
+      categoryById,
+      cells,
+    );
     res.status(200).json(snapshot);
   } catch (error: any) {
     res.status(500).json({ message: error.message });

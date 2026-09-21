@@ -1,0 +1,153 @@
+# Buscador de productos del admin: catálogo offline + sync por socket
+
+## Objetivo
+El buscador de "abrir bolsa" en `LooseStockAdmin` (`/stock-suelto`) anda lento en
+mobile porque pide `pageSize=300` en un único request server-side por cada
+búsqueda. El scanner (`StockScannerPage`) ya resuelve esto con un snapshot
+completo del catálogo en IndexedDB + búsqueda 100% en memoria
+(`pullstok-front/src/lib/offlineCatalog.ts`), pero ese snapshot solo se
+refresca por TTL (3 min) al montar la vista o al reconectar — sin push.
+
+## Por qué
+Decisión del usuario (conversación 2026-09-21): llevar `LooseStockAdmin` al
+mismo patrón de catálogo offline que el scanner, y además cerrar el gap de
+staleness emitiendo un evento por socket.io cuando un producto se
+crea/actualiza/borra, para que el snapshot se actualice en vivo en vez de
+esperar el TTL.
+
+## Alcance
+- Backend: evento `product:changed` (señal `{ productId, action }`, mismo
+  patrón que `emitOrdersChanged`) emitido a `orgRoom(organizationId)` desde
+  create/update/delete de producto. Endpoint `GET /products/:id/offline-snapshot`
+  para que el cliente resuelva un producto individual en la forma `OfflineProduct`
+  (reusa el mapeo de `getOfflineSnapshot`, extraído a helper compartido).
+- Frontend: `offlineCatalog.ts` gana patch puntual (`patchProduct`,
+  `removeProductFromCatalog`, `fetchAndPatchProduct`) sin tocar el TTL de
+  resync completo. Hook `useProductCatalogRealtime` (patrón
+  `useChatConversationsRealtime`) montado a nivel de layout autenticado.
+  `LooseStockAdmin` deja de pegarle a `products()` con `pageSize=300` y pasa a
+  usar `ensureOfflineCatalog()` + `searchProducts()` local, igual que el
+  scanner.
+- Fuera de alcance: tocar `VendorCatalogTab`/`useVendorCatalog` (ya es
+  razonablemente rápido con infinite scroll) y cualquier otro buscador admin
+  no mencionado.
+- **Diferido (decisión 2026-09-21):** el fix de raíz del costo de
+  `findCellForProduct` en `getOfflineSnapshot` (~3.6s de los 3.9s totales,
+  ver memoria `offline-first/erp-mobile`) y en `getProductByCode` — cachear
+  `priceKgLista` por producto con invalidación multi-tenant. Requiere mapear
+  también dónde se edita la planilla de precio/kg (marcas/tipos/celdas) para
+  no dejar la cache stale. Usuario decidió posponerlo y avisó que amerita
+  Opus para el diseño de invalidación — se retoma después de T1-T5.
+
+## Restricciones / contexto
+- Multi-tenant: todo emit y query debe respetar `organizationId`
+  (`requireOrganizationId()` / extensión anti-fuga de Prisma).
+- El operador ya se une automáticamente a `orgRoom(organizationId)` al
+  conectar el socket (`api/src/realtime/socket.ts:375`) — no hace falta join
+  explícito desde el frontend.
+- Sin Docker/BD local: tests backend (jest) corren sin DB; e2e solo en VPS.
+- Preservar el fallback: `handleSearch` actual busca "el catálogo completo"
+  porque productos fuera del pageSize inicial deben encontrarse igual — el
+  catálogo offline YA cubre esto (snapshot completo local), no se pierde
+  funcionalidad.
+
+## TDD
+Modo: **estricto** (flag de sesión). Fuente: system-level "Strict TDD Mode:
+enabled". Runners: backend `jest` (`api/package.json` → `test`), frontend
+`vitest run` (`pullstok-front/package.json` → `test`). RED observado antes de
+implementar, luego GREEN, luego REFACTOR — por tarea.
+
+## Tareas
+
+- [x] **T1 — Backend: endpoint de snapshot individual**
+  - Extraer el mapeo por-producto de `getOfflineSnapshot`
+    (`api/src/controllers/productController.ts:1092`) a un helper reusable.
+  - Nuevo handler `getOfflineProductSnapshot` (`GET /products/:id/offline-snapshot`)
+    devolviendo un único producto en forma `OfflineProduct`.
+  - Ruta: `api/src/routes/productRoutes.ts` (verificar que no choque con la
+    ruta genérica `/products/:id` existente).
+  - Test jest primero (RED): 404 si no existe / no es de la org, shape
+    correcto si existe.
+  - Ruta: delegado (writer backend, toca controller + routes + test = 3 archivos).
+
+- [x] **T2 — Backend: emitir `product:changed` en create/update/delete**
+  - `emitProductChanged(organizationId, productId, action)` en
+    `api/src/realtime/socket.ts`, mismo patrón que `emitOrdersChanged` (línea 446).
+  - Wire-up en `createProduct` (línea 43), `updateProduct` (línea 834),
+    `deleteProduct` (línea 962) de `productController.ts`, después del commit
+    exitoso.
+  - Test jest primero (RED): mockear el emitter y verificar que se llama con
+    action correcta tras cada mutación exitosa (y que NO se llama si la
+    mutación falla).
+  - Ruta: delegado (mismo writer que T1, secuencial — T1 y T2 tocan los mismos
+    archivos backend).
+
+- [x] **T3 — Frontend: patch puntual del catálogo offline**
+  - `offlineCatalog.ts`: `patchProduct(product: OfflineProduct)`,
+    `removeProductFromCatalog(id: string)` (upsert/delete en IndexedDB +
+    reindexar Maps en memoria, sin tocar `lastSync`/TTL de resync completo).
+  - `fetchAndPatchProduct(id: string)`: pega a `GET /products/:id/offline-snapshot`
+    y llama `patchProduct`.
+  - Test vitest primero (RED) para cada función nueva.
+  - Ruta: delegado (writer frontend infra).
+
+- [x] **T4 — Frontend: hook de realtime + montaje global**
+  - `useProductCatalogRealtime` (patrón `useChatConversationsRealtime`,
+    `pullstok-front/src/components/hooks/useChatRealtime.ts:72`): suscribe a
+    `product:changed` vía `getSocket(token)`; `deleted` → `removeProductFromCatalog`,
+    si no → `fetchAndPatchProduct`.
+  - Montar el hook a nivel de layout autenticado (para que corra sin importar
+    qué vista esté abierta), no solo dentro de `StockScannerPage`.
+  - Test vitest primero (RED): evento simulado → función de catálogo llamada
+    con los argumentos correctos.
+  - Ruta: delegado (mismo writer que T3, secuencial).
+
+- [x] **T5 — Frontend: rewire de `LooseStockAdmin`**
+  - Reemplazar `handleSearch` (línea 168, hoy `products(undefined, term, undefined, 1, 300)`)
+    por `ensureOfflineCatalog()` (al abrir el diálogo) + `searchProducts()` local,
+    igual que `StockScannerPage`.
+  - Confirmar el campo id real en `ProductsProps` (`id` vs `_id`) antes de
+    mapear `OfflineProduct` → lo que usa el JSX (solo `id`/`_id` + `name`
+    según el mapeo previo).
+  - Actualizar/crear test vitest para `LooseStockAdmin` (RED primero): la
+    búsqueda ya no dispara request server-side por keystroke, usa el catálogo
+    local.
+  - Ruta: delegado (writer frontend, depende de T3 completo).
+
+## Progreso
+
+- **T1+T2 (2026-09-21)**: hecho. `GET /products/:id/offline-snapshot` +
+  `emitProductChanged` (socket) wireado en create/update/delete. TDD
+  estricto respetado (RED por compilación TS antes de implementar handler/
+  emitter, luego GREEN). Suite completa backend verificada dos veces (por el
+  writer y por mí antes de commitear): 97 suites, 1479 passed, 2 skipped, 0
+  failed (`tests/e2e/` excluido, corre solo en VPS). Commit:
+  `c25fabb feat(products): emitir product:changed por socket y exponer
+  snapshot offline individual` en `feature/admin-search-offline-realtime`.
+- **T3+T4 (2026-09-21)**: hecho. `patchProduct`/`removeProductFromCatalog`/
+  `fetchAndPatchProduct` en `offlineCatalog.ts`; hook `useProductCatalogRealtime`
+  montado globalmente en `ProtectedLayout.tsx` (mismo lugar que
+  `useOrdersRealtime`/`useChatConversationsRealtime`). TDD estricto (RED real
+  confirmado con stash/rename de la implementación). Suite frontend completa
+  verificada por mí: 656 passed, 8 failed — los 8 failing son 2 archivos
+  preexistentes (`productDrawer.test.tsx`, `priceKgUpdate.test.tsx`) sin
+  relación de import con nada tocado acá (confirmado con grep antes de
+  commitear).
+- **T5 (2026-09-21)**: hecho. `LooseStockAdmin.tsx` ya no pega al server por
+  búsqueda: `ensureOfflineCatalog()` al abrir el diálogo "abrir bolsa" +
+  `searchProducts()` síncrono local sobre el catálogo offline completo.
+  Estado migrado de `ProductsProps` a `OfflineProduct` (solo se usaban `id`/
+  `_id` + `name`, confirmado leyendo todos los usos); se eliminó el guard
+  anti-race `searchSeq` (ya no aplica, la búsqueda es síncrona en memoria).
+  TDD estricto (RED real contra la implementación vieja, luego GREEN). Suite
+  frontend completa verificada por mí: 659 passed, mismos 2 archivos
+  preexistentes fallando (8 tests, sin relación con este cambio) —
+  `tsc --noEmit` limpio.
+
+**Feature completa (T1-T5).** Objetivo cumplido: el buscador de
+`LooseStockAdmin` pasó de pedir 300 productos por request en cada tecleo a
+buscar instantáneo sobre un catálogo local (IndexedDB + memoria), igual que
+el scanner, y se mantiene sincronizado en vivo vía el evento `product:changed`
+por socket.io en vez de depender solo del TTL de 3 min. La cache de
+`priceKgLista` (causa de los ~3.6s del primer sync) quedó diferida — ver
+sección "Diferido" arriba, amerita Opus cuando se retome.
