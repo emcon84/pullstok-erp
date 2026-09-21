@@ -595,10 +595,19 @@ const getProducts = async (req: Request, res: Response) => {
     const include = {
       category: { select: { id: true, name: true } },
       provider: { select: { id: true, name: true } },
+      // Solo lo que lee el front de cada asignación (ProductDrawer, FilterChips,
+      // filtros, agrupado de impresión): option.{id,value,variantId,variant}.
+      // Antes se enviaban ids/organizationId de la asignación y sortOrder de la
+      // opción: la mayor parte de los ~5,7 MB de la lista completa.
       variantAssignments: {
-        include: {
+        select: {
           option: {
-            include: { variant: { select: { id: true, name: true } } },
+            select: {
+              id: true,
+              value: true,
+              variantId: true,
+              variant: { select: { id: true, name: true } },
+            },
           },
         },
       },
