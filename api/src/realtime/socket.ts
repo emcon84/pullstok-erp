@@ -449,6 +449,22 @@ export const emitOrdersChanged = (organizationId: string): void => {
 };
 
 /**
+ * Señal "un producto de esta org cambió" (create/update/delete), emitida tras
+ * confirmar la mutación en DB (odd/tasks/product-search-offline-realtime.md,
+ * T2). El front la usa para parchear el catálogo offline (IndexedDB) en vivo
+ * en vez de esperar el TTL de resync. Mismo patrón que emitOrdersChanged:
+ * no-op seguro si socket.io todavía no se inicializó.
+ */
+export const emitProductChanged = (
+  organizationId: string,
+  productId: string,
+  action: "created" | "updated" | "deleted",
+): void => {
+  if (!io) return;
+  io.to(orgRoom(organizationId)).emit("product:changed", { productId, action });
+};
+
+/**
  * Entrega un mensaje nuevo, EN VIVO y con datos, a la room de su conversación:
  * lo reciben el guest (siempre en su room) y el operador que la tenga abierta
  * (se unió con chat:join). No-op seguro si socket.io aún no se inicializó.

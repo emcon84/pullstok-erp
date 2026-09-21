@@ -5,6 +5,7 @@ import productController, {
   getProductByCode,
   getProductByScan,
   getOfflineSnapshot,
+  getOfflineProductSnapshot,
 } from "../controllers/productController";
 import providerPriceListController from "../controllers/providerPriceListController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
@@ -130,6 +131,17 @@ router.patch(
   productController.publishProduct,
 );
 router.delete("/:id", authenticateJWT, checkBusinessHours, requireRole("ADMIN", "MANAGEMENT"), productController.deleteProduct);
+
+// Snapshot "offline" de UN producto puntual (misma forma que /offline-snapshot
+// bulk de arriba) — lo usa el catálogo local del front para parchear un
+// producto sin refetchear todo tras el evento product:changed (T1/T2). Dos
+// segmentos de path, no choca con el "/:id" genérico de arriba.
+router.get(
+  "/:id/offline-snapshot",
+  authenticateJWT,
+  checkBusinessHours,
+  getOfflineProductSnapshot,
+);
 
 // Stock por sucursal (branch-stock, PR 2b): consulta autocontenida para
 // cualquier rol autenticado y edición con autorización server-side (A1/A2).
