@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { PackageOpen, Save, Scale, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,11 +31,11 @@ import {
   openBag,
   type LooseStockLine,
 } from "@/services/looseStock";
-import { products } from "@/services/productService";
 import { getPriceKgPlan } from "@/services/priceKgPlan";
 import { listPriceKgTypes } from "@/services/priceKgTypes";
 import { listPriceKgBrands } from "@/services/priceKgBrands";
-import type { ProductsProps } from "@/models/productsModel";
+import { ensureOfflineCatalog, searchProducts } from "@/lib/offlineCatalog";
+import type { OfflineProduct } from "@/lib/offlineCatalog";
 
 const SPECIES_LABELS: Record<string, string> = {
   PERRO: "Perro",
@@ -65,9 +65,12 @@ export const LooseStockAdmin = () => {
   // Diálogo "Abrir bolsa" (una bolsa a la vez, asignación EXPLÍCITA de la
   // celda de la planilla a la que se acreditan los kg).
   const [openBagDialogOpen, setOpenBagDialogOpen] = useState(false);
-  const [selectedBagProduct, setSelectedBagProduct] = useState<ProductsProps | null>(null);
+  const [selectedBagProduct, setSelectedBagProduct] = useState<OfflineProduct | null>(null);
   const [selectedCellId, setSelectedCellId] = useState("");
-  const [bagProducts, setBagProducts] = useState<ProductsProps[]>([]);
+  const [bagProducts, setBagProducts] = useState<OfflineProduct[]>([]);
+  // Ya no hay fetch por búsqueda: esto refleja el ensureOfflineCatalog() que
+  // corre al abrir el diálogo (puede resincronizar en background si el
+  // snapshot local está stale).
   const [loadingBagProducts, setLoadingBagProducts] = useState(false);
   const [openingBag, setOpeningBag] = useState(false);
   const [bagSearch, setBagSearch] = useState("");
@@ -75,8 +78,6 @@ export const LooseStockAdmin = () => {
   const [cellQuery, setCellQuery] = useState("");
   const [cellOptions, setCellOptions] = useState<NativeSelectOption[]>([]);
   const [loadingCells, setLoadingCells] = useState(false);
-  // Guard de búsquedas server-side: descarta respuestas que llegan desordenadas.
-  const searchSeq = useRef(0);
 
   // Preselecciona la única sucursal cuando la org tiene exactamente una.
   useEffect(() => {
@@ -162,28 +163,20 @@ export const LooseStockAdmin = () => {
     }
   }, []);
 
-  // Búsqueda server-side de la BOLSA: consulta el catálogo COMPLETO (no solo la
-  // primera página) por nombre, para que productos como "CAT CHOW" que quedan
-  // más allá del pageSize inicial se puedan encontrar.
-  const handleSearch = useCallback(async (term: string) => {
-    const seq = ++searchSeq.current;
-    setLoadingBagProducts(true);
-    try {
-      const data = await products(undefined, term, undefined, 1, 300);
-      if (seq !== searchSeq.current) return; // respuesta vieja → descartar
-      const items = Array.isArray(data) ? data : (data as any).items ?? [];
-      setBagProducts(items);
-    } catch (_err) {
-      if (seq !== searchSeq.current) return;
-      toast.error("No se pudieron cargar los productos para abrir la bolsa");
-      setBagProducts([]);
-    } finally {
-      if (seq === searchSeq.current) setLoadingBagProducts(false);
-    }
+  // Búsqueda de la BOLSA sobre el catálogo offline COMPLETO (IndexedDB +
+  // Maps en memoria, ver pullstok-front/src/lib/offlineCatalog.ts), igual
+  // que StockScannerPage. Antes esto pegaba al server con pageSize=300 para
+  // que productos como "CAT CHOW" que quedan más allá de la primera página
+  // se pudieran encontrar; el catálogo offline resuelve ese problema por
+  // diseño (no hay paginación: siempre tiene TODOS los productos de la org),
+  // y la búsqueda es síncrona en memoria, así que ya no hace falta el guard
+  // anti-race de respuestas desordenadas.
+  const handleSearch = useCallback((term: string) => {
+    setBagProducts(searchProducts(term));
   }, []);
 
-  // Debounce del término de búsqueda (300ms) para no disparar una request por
-  // tecla.
+  // Debounce del término de búsqueda (300ms) para no recalcular en cada
+  // tecla (el catálogo puede tener miles de productos).
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(bagSearch), 300);
     return () => clearTimeout(t);
@@ -199,8 +192,13 @@ export const LooseStockAdmin = () => {
     setBagSearch("");
     setDebouncedSearch("");
     setCellQuery("");
+    setBagProducts([]);
     setOpenBagDialogOpen(true);
     loadCellOptions();
+    // Asegura que el catálogo local esté cargado (o resincronizando en
+    // background si está stale) antes de que el usuario busque.
+    setLoadingBagProducts(true);
+    void ensureOfflineCatalog().finally(() => setLoadingBagProducts(false));
   };
 
   const handleOpenChangeDialog = (open: boolean) => {
@@ -226,7 +224,7 @@ export const LooseStockAdmin = () => {
       toast.error("Seleccioná la línea suelta de destino");
       return;
     }
-    const productId = selectedBagProduct._id ?? selectedBagProduct.id;
+    const productId = selectedBagProduct.id;
     if (!productId) return;
     const lineLabel =
       cellOptions.find((o) => o.value === selectedCellId)?.label ?? "";
@@ -422,7 +420,7 @@ export const LooseStockAdmin = () => {
               <div className="max-h-52 overflow-y-auto rounded-md border">
                 {loadingBagProducts ? (
                   <p className="p-4 text-center text-sm text-muted-foreground">
-                    Buscando...
+                    Cargando catálogo...
                   </p>
                 ) : bagProducts.length === 0 ? (
                   <p className="p-4 text-center text-sm text-muted-foreground">
@@ -430,9 +428,9 @@ export const LooseStockAdmin = () => {
                   </p>
                 ) : (
                   bagProducts.map((product) => {
-                    const id = product._id ?? product.id ?? "";
+                    const id = product.id;
                     const isSel = selectedBagProduct
-                      ? (selectedBagProduct._id ?? selectedBagProduct.id) === id
+                      ? selectedBagProduct.id === id
                       : false;
                     return (
                       <button

@@ -102,7 +102,7 @@ implementar, luego GREEN, luego REFACTOR — por tarea.
     con los argumentos correctos.
   - Ruta: delegado (mismo writer que T3, secuencial).
 
-- [ ] **T5 — Frontend: rewire de `LooseStockAdmin`**
+- [x] **T5 — Frontend: rewire de `LooseStockAdmin`**
   - Reemplazar `handleSearch` (línea 168, hoy `products(undefined, term, undefined, 1, 300)`)
     por `ensureOfflineCatalog()` (al abrir el diálogo) + `searchProducts()` local,
     igual que `StockScannerPage`.
@@ -133,4 +133,21 @@ implementar, luego GREEN, luego REFACTOR — por tarea.
   preexistentes (`productDrawer.test.tsx`, `priceKgUpdate.test.tsx`) sin
   relación de import con nada tocado acá (confirmado con grep antes de
   commitear).
-- Siguiente: T5 (rewire de `LooseStockAdmin.tsx` al catálogo offline).
+- **T5 (2026-09-21)**: hecho. `LooseStockAdmin.tsx` ya no pega al server por
+  búsqueda: `ensureOfflineCatalog()` al abrir el diálogo "abrir bolsa" +
+  `searchProducts()` síncrono local sobre el catálogo offline completo.
+  Estado migrado de `ProductsProps` a `OfflineProduct` (solo se usaban `id`/
+  `_id` + `name`, confirmado leyendo todos los usos); se eliminó el guard
+  anti-race `searchSeq` (ya no aplica, la búsqueda es síncrona en memoria).
+  TDD estricto (RED real contra la implementación vieja, luego GREEN). Suite
+  frontend completa verificada por mí: 659 passed, mismos 2 archivos
+  preexistentes fallando (8 tests, sin relación con este cambio) —
+  `tsc --noEmit` limpio.
+
+**Feature completa (T1-T5).** Objetivo cumplido: el buscador de
+`LooseStockAdmin` pasó de pedir 300 productos por request en cada tecleo a
+buscar instantáneo sobre un catálogo local (IndexedDB + memoria), igual que
+el scanner, y se mantiene sincronizado en vivo vía el evento `product:changed`
+por socket.io en vez de depender solo del TTL de 3 min. La cache de
+`priceKgLista` (causa de los ~3.6s del primer sync) quedó diferida — ver
+sección "Diferido" arriba, amerita Opus cuando se retome.
