@@ -58,6 +58,14 @@ export const usePorducts = () => {
   };
 }
 
+/**
+ * Ventana de frescura de la lista COMPLETA de productos (~5,7 MB decodificados,
+ * ~720 ms de servidor por request). Volver al Dashboard dentro de este lapso
+ * reutiliza la lista en memoria en vez de bajarla de nuevo. Las mutaciones
+ * siguen refrescándola: invalidateQueries(["products"]) ignora el staleTime.
+ */
+export const PRODUCTS_STALE_MS = 60_000;
+
 // Hook para obtener la lista de productos
 export const useProducts = (
   branchId?: string,
@@ -70,6 +78,7 @@ export const useProducts = (
       Boolean,
     ),
     queryFn: () => fetchProducts(branchId, search, category, priceListType),
+    staleTime: PRODUCTS_STALE_MS,
     placeholderData: (prev) => prev, // keep previous while fetching
   });
 
