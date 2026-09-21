@@ -3,7 +3,6 @@ import express from "express";
 import connectDB from "./config/db";
 import apiRoutes from "./routes/index";
 import cors from "cors";
-import { responseCompression } from "./middlewares/responseCompression";
 
 dotenv.config();
 connectDB();
@@ -22,9 +21,6 @@ app.use(
     origin: allowedOrigins,
   }),
 );
-
-// Comprime las respuestas (gzip). Va antes de las rutas para cubrir /api/*.
-app.use(responseCompression());
 
 // JSON parser con captura del body crudo. Kapso firma el body EXACTO con un
 // HMAC (x-webhook-signature), y `JSON.stringify` del body ya parseado NO
