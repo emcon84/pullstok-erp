@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("react-toastify", () => ({
@@ -58,7 +58,9 @@ vi.mock("@/components/molecules/GenericModal/ModalContentUploadCsv", () => ({
   ModalContentUploadCsv: () => <div data-testid="upload-csv" />,
 }));
 vi.mock("@/components/molecules/PrintProductList", () => ({
-  PrintProductList: () => <div data-testid="print-list" />,
+  PrintProductList: ({ products }: { products: Array<{ name: string }> }) => (
+    <div data-testid="print-list">{products.map((p) => p.name).join(" | ")}</div>
+  ),
 }));
 vi.mock("@/components/atoms/loader", () => ({
   Loader: () => <div data-testid="loader" />,
@@ -350,5 +352,67 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
         "Collar Suelto",
       ),
     );
+  });
+
+  describe("área de impresión (costosa: una fila por producto)", () => {
+    const ALL = "Puppy A | Perros 15kg | Collar Suelto";
+    const typeCollar = async () => {
+      const input = screen.getByPlaceholderText(
+        "Buscar por nombre, código o variante...",
+      );
+      fireEvent.change(input, { target: { value: "collar" } });
+      await waitFor(() =>
+        expect(screen.getByTestId("products-table").textContent).toBe(
+          "Collar Suelto",
+        ),
+      );
+    };
+
+    it("no se re-renderiza en cada tecla: sigue con la lista anterior mientras se tipea", async () => {
+      renderDashboard();
+      await typeCollar();
+
+      expect(screen.getByTestId("print-list").textContent).toBe(ALL);
+    });
+
+    it("se actualiza cuando el usuario deja de tipear", async () => {
+      renderDashboard();
+      await typeCollar();
+
+      await waitFor(
+        () =>
+          expect(screen.getByTestId("print-list").textContent).toBe(
+            "Collar Suelto",
+          ),
+        { timeout: 2000 },
+      );
+    });
+
+    it("'Imprimir listado' fuerza la lista actual antes de abrir el diálogo", async () => {
+      let atPrintTime = "";
+      const printSpy = vi.spyOn(window, "print").mockImplementation(() => {
+        atPrintTime = screen.getByTestId("print-list").textContent ?? "";
+      });
+      renderDashboard();
+      await typeCollar();
+
+      fireEvent.click(screen.getByText("Imprimir listado"));
+
+      expect(printSpy).toHaveBeenCalledTimes(1);
+      expect(atPrintTime).toBe("Collar Suelto");
+      printSpy.mockRestore();
+    });
+
+    it("Ctrl+P (beforeprint) también fuerza la lista actual", async () => {
+      renderDashboard();
+      await typeCollar();
+      expect(screen.getByTestId("print-list").textContent).toBe(ALL);
+
+      act(() => {
+        window.dispatchEvent(new Event("beforeprint"));
+      });
+
+      expect(screen.getByTestId("print-list").textContent).toBe("Collar Suelto");
+    });
   });
 });

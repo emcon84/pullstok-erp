@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo, useDeferredValue } from "react";
+import { flushSync } from "react-dom";
+import { useSettledValue } from "../components/hooks/useSettledValue";
 import { useSearchParams } from "react-router-dom";
 import { Plus, Upload, ShoppingCart, Search, X, Printer, Barcode } from "lucide-react";
 import {
@@ -52,6 +54,9 @@ import {
 } from "@/lib/productFilter";
 
 type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
+
+// Pausa de tipeo tras la cual se actualiza el área de impresión.
+const PRINT_SETTLE_MS = 400;
 
 export const Dashboard = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -260,6 +265,25 @@ export const Dashboard = () => {
     return list.filter((product) => matchesProductFilter(product, filterTerms));
   }, [products, filterTerms, categoryFilter, providerFilter, titleFilter, onlyCarried]);
 
+  // El área de impresión (una fila oculta por producto, ~80% del costo de cada
+  // tecla) sigue SIEMPRE montada — montarla con estado + afterprint deja el
+  // botón muerto al cancelar el diálogo (ver PriceKgUpdate) — pero solo se
+  // actualiza cuando el usuario dejó de tipear. Al imprimir se fuerza la lista
+  // actual, tanto desde el botón como con Ctrl+P (beforeprint).
+  const [printProducts, flushPrintProducts] = useSettledValue(
+    filteredProducts,
+    PRINT_SETTLE_MS,
+  );
+  useEffect(() => {
+    const onBeforePrint = () => flushSync(flushPrintProducts);
+    window.addEventListener("beforeprint", onBeforePrint);
+    return () => window.removeEventListener("beforeprint", onBeforePrint);
+  }, [flushPrintProducts]);
+  const handlePrint = () => {
+    flushSync(flushPrintProducts);
+    window.print();
+  };
+
   // Proveedores disponibles en el catálogo cargado (para el select de filtro).
   const availableProviders = useMemo(() => {
     const seen = new Set<string>();
@@ -321,7 +345,7 @@ export const Dashboard = () => {
               Alimento seco · barras
             </Button>
           )}
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button variant="outline" onClick={handlePrint}>
             <Printer className="h-4 w-4" />
             Imprimir listado
           </Button>
@@ -479,7 +503,7 @@ export const Dashboard = () => {
       <ProductsTable products={filteredProducts} onEdit={openEditDrawer} onDuplicate={openDuplicateDrawer} onQuickPrice={openQuickPrice} branchMode={!!branchFilter} />
 
       {/* Print area: only visible when printing (see @media print in index.css) */}
-      <PrintProductList products={filteredProducts} />
+      <PrintProductList products={printProducts} />
 
       {/* Product Drawer (create/edit) */}
       <ProductDrawer open={drawerOpen} onClose={closeDrawer} product={drawerProduct} />
