@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Pencil,
@@ -77,7 +77,10 @@ interface ProductsTableProps {
   branchMode?: boolean;
 }
 
-export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, branchMode }: ProductsTableProps) => {
+// memo: el Dashboard se re-renderiza en cada tecla del buscador; con props estables
+// (lista memoizada + callbacks con useCallback) la tabla no se vuelve a renderizar
+// en el commit urgente que bloquea al input (clave en mobile).
+export const ProductsTable = memo(function ProductsTable({ products, onEdit, onDuplicate, onQuickPrice, branchMode }: ProductsTableProps) {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
@@ -688,4 +691,4 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
     </Card>
     </div>
   );
-};
+});

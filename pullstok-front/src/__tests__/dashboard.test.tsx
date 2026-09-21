@@ -32,12 +32,34 @@ vi.mock("@/components/hooks/useOrder", () => ({
   useOrders: vi.fn(),
 }));
 
+// Referencias de callbacks que recibió la tabla en cada render (para verificar
+// que son estables y ProductsTable (memo) no se re-renderiza al tipear).
+const tableCallbacks = vi.hoisted(() => ({
+  onEdit: new Set<unknown>(),
+  onDuplicate: new Set<unknown>(),
+  onQuickPrice: new Set<unknown>(),
+}));
 vi.mock("@/components/molecules/ProductsTable", () => ({
-  ProductsTable: ({ products }: { products: Array<{ name: string }> }) => (
-    <div data-testid="products-table">
-      {products.map((p) => p.name).join(" | ")}
-    </div>
-  ),
+  ProductsTable: ({
+    products,
+    onEdit,
+    onDuplicate,
+    onQuickPrice,
+  }: {
+    products: Array<{ name: string }>;
+    onEdit: unknown;
+    onDuplicate: unknown;
+    onQuickPrice: unknown;
+  }) => {
+    tableCallbacks.onEdit.add(onEdit);
+    tableCallbacks.onDuplicate.add(onDuplicate);
+    tableCallbacks.onQuickPrice.add(onQuickPrice);
+    return (
+      <div data-testid="products-table">
+        {products.map((p) => p.name).join(" | ")}
+      </div>
+    );
+  },
 }));
 vi.mock("@/components/molecules/ProductDrawer", () => ({
   ProductDrawer: () => <div data-testid="product-drawer" />,
@@ -352,6 +374,29 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
         "Collar Suelto",
       ),
     );
+  });
+
+  it("los callbacks que recibe la tabla son estables entre renders (habilita memo)", async () => {
+    tableCallbacks.onEdit.clear();
+    tableCallbacks.onDuplicate.clear();
+    tableCallbacks.onQuickPrice.clear();
+    renderDashboard();
+    const input = screen.getByPlaceholderText(
+      "Buscar por nombre, código o variante...",
+    );
+
+    fireEvent.change(input, { target: { value: "c" } });
+    fireEvent.change(input, { target: { value: "co" } });
+    fireEvent.change(input, { target: { value: "col" } });
+    await waitFor(() =>
+      expect(screen.getByTestId("products-table").textContent).toBe(
+        "Collar Suelto",
+      ),
+    );
+
+    expect(tableCallbacks.onEdit.size).toBe(1);
+    expect(tableCallbacks.onDuplicate.size).toBe(1);
+    expect(tableCallbacks.onQuickPrice.size).toBe(1);
   });
 
   describe("área de impresión (costosa: una fila por producto)", () => {

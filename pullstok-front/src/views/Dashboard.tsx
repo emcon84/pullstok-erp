@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useDeferredValue } from "react";
+import { useCallback, useEffect, useState, useMemo, useDeferredValue } from "react";
 import { flushSync } from "react-dom";
 import { useSettledValue } from "../components/hooks/useSettledValue";
 import { useSearchParams } from "react-router-dom";
@@ -181,11 +181,14 @@ export const Dashboard = () => {
     }
   };
 
-  const openEditDrawer = (data: DataItem) => {
+  // useCallback (identidad estable): ProductsTable es memo y el Dashboard se
+  // re-renderiza en cada tecla; con funciones nuevas la tabla se re-renderizaría
+  // en el commit urgente que bloquea al input.
+  const openEditDrawer = useCallback((data: DataItem) => {
     setDrawerProduct(data);
     setDrawerOpen(true);
-  };
-  const openDuplicateDrawer = (data: DataItem) => {
+  }, []);
+  const openDuplicateDrawer = useCallback((data: DataItem) => {
     setDrawerProduct({
       ...data,
       _id: undefined,
@@ -193,8 +196,8 @@ export const Dashboard = () => {
       code: "",
     });
     setDrawerOpen(true);
-  };
-  const openQuickPrice = (data: DataItem) => setQuickPriceProduct(data);
+  }, []);
+  const openQuickPrice = useCallback((data: DataItem) => setQuickPriceProduct(data), []);
   const closeQuickPrice = () => setQuickPriceProduct(null);
   const closeDrawer = () => {
     setDrawerOpen(false);

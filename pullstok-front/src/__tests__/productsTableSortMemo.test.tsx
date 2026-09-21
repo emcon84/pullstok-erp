@@ -14,6 +14,12 @@ vi.mock("@/components/hooks/useConfirm", () => ({
   useConfirm: () => vi.fn(),
 }));
 
+vi.mock("@/components/hooks/vendorCatalogHelpers", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/hooks/vendorCatalogHelpers")>();
+  return { ...actual, unitStock: vi.fn(actual.unitStock) };
+});
+
+import { unitStock } from "@/components/hooks/vendorCatalogHelpers";
 import { ProductsTable } from "@/components/molecules/ProductsTable";
 
 // Largo único para distinguir el sort de la tabla de cualquier otro .sort().
@@ -60,5 +66,30 @@ describe("ProductsTable — el orden no se recalcula en cada render", () => {
     fireEvent.click(rowCheckbox);
 
     expect(tableSorts()).toBe(afterMount);
+  });
+
+  it("re-render del padre con las MISMAS props no vuelve a renderizar la tabla", () => {
+    const onEdit = vi.fn();
+    const onDuplicate = vi.fn();
+    const onQuickPrice = vi.fn();
+    const tree = () => (
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <ProductsTable
+            products={products}
+            onEdit={onEdit}
+            onDuplicate={onDuplicate}
+            onQuickPrice={onQuickPrice}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const qc = new QueryClient();
+    const { rerender } = render(tree());
+    vi.mocked(unitStock).mockClear();
+
+    rerender(tree());
+
+    expect(unitStock).not.toHaveBeenCalled();
   });
 });
