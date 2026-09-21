@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("react-toastify", () => ({
@@ -334,5 +334,21 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
     // Encender el Switch → solo los marcados.
     fireEvent.click(screen.getByRole("switch"));
     expect(screen.getByTestId("products-table").textContent).toBe("Trabajado");
+  });
+
+  it("escribir en el buscador refleja el texto en el input y acota la lista", async () => {
+    renderDashboard();
+    const input = screen.getByPlaceholderText(
+      "Buscar por nombre, código o variante...",
+    ) as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: "collar" } });
+
+    expect(input.value).toBe("collar");
+    await waitFor(() =>
+      expect(screen.getByTestId("products-table").textContent).toBe(
+        "Collar Suelto",
+      ),
+    );
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useDeferredValue } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus, Upload, ShoppingCart, Search, X, Printer, Barcode } from "lucide-react";
 import {
@@ -225,7 +225,11 @@ export const Dashboard = () => {
   // ── Products already filtered by branch filter ──
 
   // "Purina, Proplan" → OR entre marcas; espacios dentro de un término → AND.
-  const filterTerms = useMemo(() => parseFilterTerms(filter), [filter]);
+  // useDeferredValue: el input se actualiza al instante con `filter`; el
+  // filtrado + re-render de la tabla/print area corren con prioridad baja
+  // (interrumpibles) y no bloquean el tipeo.
+  const deferredFilter = useDeferredValue(filter);
+  const filterTerms = useMemo(() => parseFilterTerms(deferredFilter), [deferredFilter]);
   const filteredProducts = useMemo(() => {
     let list = products;
     if (categoryFilter) {

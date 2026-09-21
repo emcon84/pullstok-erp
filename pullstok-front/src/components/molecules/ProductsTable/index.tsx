@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Pencil,
@@ -62,6 +62,13 @@ const imgSrc = (image?: string) => {
     : `${API_URL.replace("/api", "")}${image}`;
 };
 
+// branchMode (filtro por sucursal): stocks[0] es ESA sucursal (unidades); si no
+// hay fila se muestra 0 (es lo real de la sucursal, NO el legacy). En modo
+// global (sin branchId) la API NO adjunta stocks, así que se usa unitStock, que
+// convierte products.quantity (kg legacy) a bolsas.
+const stockQty = (p: DataItem, branchMode?: boolean) =>
+  branchMode ? Number(p.stocks?.[0]?.quantity ?? 0) : unitStock(p);
+
 interface ProductsTableProps {
   products: DataItem[];
   onEdit: (product: DataItem) => void;
@@ -84,44 +91,41 @@ export const ProductsTable = ({ products, onEdit, onDuplicate, onQuickPrice, bra
   const { deleteProduct, loading } = useDeleteProduct();
   const confirm = useConfirm();
 
-  // branchMode (filtro por sucursal): stocks[0] es ESA sucursal (unidades); si
-  // no hay fila se muestra 0 (es lo real de la sucursal, NO el legacy). En modo
-  // global (sin branchId) la API NO adjunta stocks, así que se usa unitStock,
-  // que convierte products.quantity (kg legacy) a bolsas.
-  const branchQty = (p: DataItem) =>
-    branchMode
-      ? Number(p.stocks?.[0]?.quantity ?? 0)
-      : unitStock(p);
+  // Memoizado: ordenar toda la lista filtrada en cada render (p. ej. al tildar
+  // una fila) es O(n log n) y solo se muestra una página.
+  const sorted = useMemo(() => {
+    return [...products].sort((a, b) => {
+      const aQty = stockQty(a, branchMode);
+      const bQty = stockQty(b, branchMode);
+      const aHasStock = aQty > 0 ? 1 : 0;
+      const bHasStock = bQty > 0 ? 1 : 0;
 
-  const sorted = [...products].sort((a, b) => {
-    const aQty = branchQty(a);
-    const bQty = branchQty(b);
-    const aHasStock = aQty > 0 ? 1 : 0;
-    const bHasStock = bQty > 0 ? 1 : 0;
+      // Regla principal: productos CON STOCK (>0) SIEMPRE primero que SIN STOCK (<=0)
+      if (aHasStock !== bHasStock) {
+        return bHasStock - aHasStock;
+      }
 
-    // Regla principal: productos CON STOCK (>0) SIEMPRE primero que SIN STOCK (<=0)
-    if (aHasStock !== bHasStock) {
-      return bHasStock - aHasStock;
-    }
+      // Orden por peso: ascendente (1, 3, 5, 8, 15...) por defecto. Los que no
+      // tienen peso detectable van al final.
+      if (sortBy === "peso") {
+        const aW = productWeight(a);
+        const bW = productWeight(b);
+        const aN = aW != null ? aW : Number.POSITIVE_INFINITY;
+        const bN = bW != null ? bW : Number.POSITIVE_INFINITY;
+        if (aN !== bN) return sortDir === "asc" ? aN - bN : bN - aN;
+        return (a.name || "").localeCompare(b.name || "", "es", { sensitivity: "base" });
+      }
 
-    // Orden por peso: ascendente (1, 3, 5, 8, 15...) por defecto. Los que no
-    // tienen peso detectable van al final.
-    if (sortBy === "peso") {
-      const aW = productWeight(a);
-      const bW = productWeight(b);
-      const aN = aW != null ? aW : Number.POSITIVE_INFINITY;
-      const bN = bW != null ? bW : Number.POSITIVE_INFINITY;
-      if (aN !== bN) return sortDir === "asc" ? aN - bN : bN - aN;
-      return (a.name || "").localeCompare(b.name || "", "es", { sensitivity: "base" });
-    }
+      // Regla secundaria: orden por la columna elegida dentro de cada grupo
+      const aVal = sortBy === "quantity" ? aQty : sortBy === "price" ? Number(a.price ?? 0) : (a[sortBy] || "").toString().toLowerCase();
+      const bVal = sortBy === "quantity" ? bQty : sortBy === "price" ? Number(b.price ?? 0) : (b[sortBy] || "").toString().toLowerCase();
+      if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [products, sortBy, sortDir, branchMode]);
 
-    // Regla secundaria: orden por la columna elegida dentro de cada grupo
-    const aVal = sortBy === "quantity" ? aQty : sortBy === "price" ? Number(a.price ?? 0) : (a[sortBy] || "").toString().toLowerCase();
-    const bVal = sortBy === "quantity" ? bQty : sortBy === "price" ? Number(b.price ?? 0) : (b[sortBy] || "").toString().toLowerCase();
-    if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
-    if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
-    return 0;
-  });
+  const branchQty = (p: DataItem) => stockQty(p, branchMode);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const current = Math.min(page, totalPages);

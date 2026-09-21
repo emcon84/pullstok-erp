@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   Table,
   TableBody,
@@ -14,7 +15,12 @@ interface PrintProductListProps {
   products: DataItem[];
 }
 
-export const PrintProductList = ({ products }: PrintProductListProps) => {
+// memo: el área vive SIEMPRE montada (oculta en pantalla) y es cara — un render
+// por producto. Solo se recalcula cuando cambia la lista, no en cada tecla del
+// buscador del Dashboard.
+export const PrintProductList = memo(function PrintProductList({
+  products,
+}: PrintProductListProps) {
   // Títulos ALICAN: los productos con planSection se agrupan por título en
   // orden del PDF; sin sección caen a su marca (productBrandOf) y los que no
   // tienen marca ni sección van al bucket final "Sin marca".
@@ -80,4 +86,4 @@ export const PrintProductList = ({ products }: PrintProductListProps) => {
       ))}
     </div>
   );
-};
+});
