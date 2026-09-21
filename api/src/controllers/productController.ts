@@ -18,6 +18,7 @@ import { isUnitSellable, computePerUnitPrice } from "../utils/unitsPerBox";
 import { parseScaleBarcode } from "../utils/scaleBarcode";
 import { formatInternalBarcode, nextInternalBarcodeSeq } from "../utils/internalBarcode";
 import { requireOrganizationId } from "../config/tenantContext";
+import { formatServerTiming } from "../utils/serverTiming";
 import { PLAN_LIMITS } from "../config/planLimits";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
@@ -684,6 +685,7 @@ const getProducts = async (req: Request, res: Response) => {
       const take = pageSize;
       const skip = (page - 1) * pageSize;
 
+      const dbStart = performance.now();
       let [items, total] = await Promise.all([
         prisma.product.findMany({ where, include, take, skip, orderBy: { name: "asc" } }),
         prisma.product.count({ where }),
@@ -696,8 +698,16 @@ const getProducts = async (req: Request, res: Response) => {
         ]);
       }
 
+      const dbMs = performance.now() - dbStart;
+
+      const mapStart = performance.now();
+      const mappedItems = items.map(mapProduct);
+      res.setHeader(
+        "Server-Timing",
+        formatServerTiming({ db: dbMs, map: performance.now() - mapStart }),
+      );
       res.status(200).json({
-        items: items.map(mapProduct),
+        items: mappedItems,
         total,
         page,
         pageSize,
@@ -706,12 +716,21 @@ const getProducts = async (req: Request, res: Response) => {
       return;
     }
 
+    const dbStart = performance.now();
     let products = await prisma.product.findMany({ where, include });
     if (products.length === 0 && nameFuzzy) {
       // Fallback fuzzy: reintenta tolerando typos comunes (solo si el estricto dio 0).
       products = await prisma.product.findMany({ where: whereFuzzy, include });
     }
-    res.status(200).json(products.map(mapProduct));
+    const dbMs = performance.now() - dbStart;
+
+    const mapStart = performance.now();
+    const mappedProducts = products.map(mapProduct);
+    res.setHeader(
+      "Server-Timing",
+      formatServerTiming({ db: dbMs, map: performance.now() - mapStart }),
+    );
+    res.status(200).json(mappedProducts);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

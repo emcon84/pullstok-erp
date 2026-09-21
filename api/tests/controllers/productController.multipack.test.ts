@@ -41,6 +41,8 @@ const mockResponse = () => {
   const res = {} as Response & { json: jest.Mock; status: jest.Mock };
   res.status = jest.fn().mockReturnValue(res);
   res.json = jest.fn().mockReturnValue(res);
+  // getProducts informa Server-Timing (db/map) con setHeader.
+  res.setHeader = jest.fn().mockReturnValue(res);
   return res;
 };
 

@@ -120,4 +120,31 @@ describe("productController.getProducts — payload de la lista", () => {
       },
     ]);
   });
+
+
+  describe("Server-Timing (medición de dónde se va el tiempo del servidor)", () => {
+    const timingHeader = (res: Response) =>
+      (res.setHeader as jest.Mock).mock.calls.find(
+        ([name]) => name === "Server-Timing",
+      )?.[1] as string | undefined;
+
+    it("la lista completa informa db y map", async () => {
+      const res = mockResponse();
+
+      await productController.getProducts(mockRequest(), res);
+
+      expect(timingHeader(res)).toMatch(/^db;dur=\d+\.\d, map;dur=\d+\.\d$/);
+    });
+
+    it("la lista paginada informa db y map", async () => {
+      const res = mockResponse();
+
+      await productController.getProducts(
+        mockRequest({ page: "1", pageSize: "30" }),
+        res,
+      );
+
+      expect(timingHeader(res)).toMatch(/^db;dur=\d+\.\d, map;dur=\d+\.\d$/);
+    });
+  });
 });
