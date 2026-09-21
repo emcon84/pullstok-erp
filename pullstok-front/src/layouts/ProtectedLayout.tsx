@@ -6,6 +6,7 @@ import { Loader } from "../components/atoms/loader";
 import { getMe } from "../services/onboardingService";
 import { useOrdersRealtime } from "../components/hooks/useOrdersRealtime";
 import { useChatConversationsRealtime } from "../components/hooks/useChatRealtime";
+import { useProductCatalogRealtime } from "../components/hooks/useProductCatalogRealtime";
 import { BrandingProvider } from "@/contexts/BrandingContext";
 import { OrgModulesProvider } from "@/contexts/OrgModulesContext";
 
@@ -36,8 +37,12 @@ const ProtectedLayout = () => {
   // - chat conversations: invalida ['chat','conversations'] ante
   //   chat:conversation-updated (bandeja + badge de no-leídos), incluso fuera
   //   de la vista de Mensajes.
+  // - product catalog: ante product:changed parchea/borra el catálogo
+  //   offline (IndexedDB + memoria) para que el scanner/stock suelto no
+  //   dependan del TTL de 3min del sync completo.
   useOrdersRealtime();
   useChatConversationsRealtime();
+  useProductCatalogRealtime();
 
   if (!isAuthenticated) {
     return <Navigate to="/" replace />;

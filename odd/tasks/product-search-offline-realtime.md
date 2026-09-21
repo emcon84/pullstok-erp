@@ -59,7 +59,7 @@ implementar, luego GREEN, luego REFACTOR — por tarea.
 
 ## Tareas
 
-- [ ] **T1 — Backend: endpoint de snapshot individual**
+- [x] **T1 — Backend: endpoint de snapshot individual**
   - Extraer el mapeo por-producto de `getOfflineSnapshot`
     (`api/src/controllers/productController.ts:1092`) a un helper reusable.
   - Nuevo handler `getOfflineProductSnapshot` (`GET /products/:id/offline-snapshot`)
@@ -70,7 +70,7 @@ implementar, luego GREEN, luego REFACTOR — por tarea.
     correcto si existe.
   - Ruta: delegado (writer backend, toca controller + routes + test = 3 archivos).
 
-- [ ] **T2 — Backend: emitir `product:changed` en create/update/delete**
+- [x] **T2 — Backend: emitir `product:changed` en create/update/delete**
   - `emitProductChanged(organizationId, productId, action)` en
     `api/src/realtime/socket.ts`, mismo patrón que `emitOrdersChanged` (línea 446).
   - Wire-up en `createProduct` (línea 43), `updateProduct` (línea 834),
@@ -82,7 +82,7 @@ implementar, luego GREEN, luego REFACTOR — por tarea.
   - Ruta: delegado (mismo writer que T1, secuencial — T1 y T2 tocan los mismos
     archivos backend).
 
-- [ ] **T3 — Frontend: patch puntual del catálogo offline**
+- [x] **T3 — Frontend: patch puntual del catálogo offline**
   - `offlineCatalog.ts`: `patchProduct(product: OfflineProduct)`,
     `removeProductFromCatalog(id: string)` (upsert/delete en IndexedDB +
     reindexar Maps en memoria, sin tocar `lastSync`/TTL de resync completo).
@@ -91,7 +91,7 @@ implementar, luego GREEN, luego REFACTOR — por tarea.
   - Test vitest primero (RED) para cada función nueva.
   - Ruta: delegado (writer frontend infra).
 
-- [ ] **T4 — Frontend: hook de realtime + montaje global**
+- [x] **T4 — Frontend: hook de realtime + montaje global**
   - `useProductCatalogRealtime` (patrón `useChatConversationsRealtime`,
     `pullstok-front/src/components/hooks/useChatRealtime.ts:72`): suscribe a
     `product:changed` vía `getSocket(token)`; `deleted` → `removeProductFromCatalog`,
@@ -115,4 +115,22 @@ implementar, luego GREEN, luego REFACTOR — por tarea.
   - Ruta: delegado (writer frontend, depende de T3 completo).
 
 ## Progreso
-(se completa a medida que cada tarea cierra, con evidencia de checks y commit)
+
+- **T1+T2 (2026-09-21)**: hecho. `GET /products/:id/offline-snapshot` +
+  `emitProductChanged` (socket) wireado en create/update/delete. TDD
+  estricto respetado (RED por compilación TS antes de implementar handler/
+  emitter, luego GREEN). Suite completa backend verificada dos veces (por el
+  writer y por mí antes de commitear): 97 suites, 1479 passed, 2 skipped, 0
+  failed (`tests/e2e/` excluido, corre solo en VPS). Commit:
+  `c25fabb feat(products): emitir product:changed por socket y exponer
+  snapshot offline individual` en `feature/admin-search-offline-realtime`.
+- **T3+T4 (2026-09-21)**: hecho. `patchProduct`/`removeProductFromCatalog`/
+  `fetchAndPatchProduct` en `offlineCatalog.ts`; hook `useProductCatalogRealtime`
+  montado globalmente en `ProtectedLayout.tsx` (mismo lugar que
+  `useOrdersRealtime`/`useChatConversationsRealtime`). TDD estricto (RED real
+  confirmado con stash/rename de la implementación). Suite frontend completa
+  verificada por mí: 656 passed, 8 failed — los 8 failing son 2 archivos
+  preexistentes (`productDrawer.test.tsx`, `priceKgUpdate.test.tsx`) sin
+  relación de import con nada tocado acá (confirmado con grep antes de
+  commitear).
+- Siguiente: T5 (rewire de `LooseStockAdmin.tsx` al catálogo offline).
