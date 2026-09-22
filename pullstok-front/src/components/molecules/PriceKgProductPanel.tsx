@@ -31,6 +31,7 @@ const LOOSE_MODE_LABELS: Record<SaleMode, string> = {
   POR_PESO: "Por kilo",
   POR_MONTO: "Por monto",
   POR_UNIDAD: "Por unidad",
+  POR_UNIDAD_BLISTER: "Pastillas sueltas",
 };
 
 export interface CellContext {

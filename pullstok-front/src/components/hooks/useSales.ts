@@ -27,6 +27,11 @@ export const useCreateSale = () => {
               price: item.product.price.toString(),
               category: item.product.category ?? "",
               saleMode,
+              // sdd/venta-pastillas-sueltas-blister: no aplica a líneas
+              // sueltas por celda, pero se reenvía igual por si el caller
+              // arma una línea mixta (harmless: undefined se descarta al
+              // serializar).
+              piecesPerBlister: item.piecesPerBlister ?? undefined,
             };
           }
           return {
@@ -37,6 +42,9 @@ export const useCreateSale = () => {
             description: item.product.description || "",
             category: item.product.category || "",
             saleMode,
+            // sdd/venta-pastillas-sueltas-blister: conteo ad-hoc de la línea
+            // POR_UNIDAD_BLISTER; el server lo exige (saleProductSchema, T1).
+            piecesPerBlister: item.piecesPerBlister ?? undefined,
           };
         }),
         payments,

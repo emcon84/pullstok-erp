@@ -72,6 +72,12 @@ export function useVendorCheckout({
           // Ventas sueltas: la celda de la planilla que identifica la línea.
           loosePriceId: i.loosePriceId,
           looseName: i.looseName,
+          // sdd/venta-pastillas-sueltas-blister: conteo ad-hoc, el server lo
+          // exige para recomputar el precio (T1/T2). i.price ya es el precio
+          // por pastilla resuelto en el carrito (useVendorCart), no hace
+          // falta un branch extra en el ternario de arriba.
+          piecesPerBlister:
+            i.saleMode === "POR_UNIDAD_BLISTER" ? i.piecesPerBlister ?? undefined : undefined,
         }));
         await createSale({ cart, payments, cashSessionId, discountPct });
         clearCart();
