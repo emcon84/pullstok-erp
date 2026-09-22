@@ -860,6 +860,56 @@ describe("createSaleSchema — saleMode-aware quantity validation (B-06/B-08)", 
   });
 });
 
+// ── Venta de pastillas sueltas de un blister (sdd/venta-pastillas-sueltas-blister) ──
+describe("createSaleSchema — POR_UNIDAD_BLISTER + piecesPerBlister (venta-pastillas-sueltas-blister)", () => {
+  const base = {
+    productId: "p-1",
+    quantity: 3,
+    price: 100,
+  };
+
+  it("accepts POR_UNIDAD_BLISTER with a valid piecesPerBlister (> 1)", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ ...base, saleMode: "POR_UNIDAD_BLISTER", piecesPerBlister: 10 }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.products[0].piecesPerBlister).toBe(10);
+    }
+  });
+
+  it("rejects POR_UNIDAD_BLISTER without piecesPerBlister", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ ...base, saleMode: "POR_UNIDAD_BLISTER" }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const flat = result.error.issues.map((i: any) => i.message).join(" | ");
+      expect(flat).toMatch(/piecesPerBlister/i);
+    }
+  });
+
+  it("rejects POR_UNIDAD_BLISTER with piecesPerBlister <= 1", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ ...base, saleMode: "POR_UNIDAD_BLISTER", piecesPerBlister: 1 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects POR_UNIDAD_BLISTER without productId (blister físico exige producto)", () => {
+    const result = createSaleSchema.safeParse({
+      products: [
+        { quantity: 3, price: 100, saleMode: "POR_UNIDAD_BLISTER", piecesPerBlister: 10 },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const flat = result.error.issues.map((i: any) => i.message).join(" | ");
+      expect(flat).toMatch(/requiere un producto/i);
+    }
+  });
+});
+
 // ── Ventas sueltas por celda de la planilla (sdd/loose-lines-stock) ──
 describe("createSaleSchema — loose line by loosePriceId (loose-lines-stock)", () => {
   it("POR_PESO without productId accepted when loosePriceId is present", () => {

@@ -1,7 +1,12 @@
 import { ProductsProps } from "./productsModel";
 import { PaymentMethod } from "./cashSessionModel";
 
-export type SaleMode = "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD";
+export type SaleMode =
+  | "BOLSA_CERRADA"
+  | "POR_PESO"
+  | "POR_MONTO"
+  | "POR_UNIDAD"
+  | "POR_UNIDAD_BLISTER";
 
 export interface CartItem {
   product: ProductsProps;
@@ -14,6 +19,10 @@ export interface CartItem {
   loosePriceId?: string;
   /** Nombre de la línea suelta ("MARCA · TIPO") usado en el payload. */
   looseName?: string;
+  /** sdd/venta-pastillas-sueltas-blister: cuántas pastillas trae ESE blister,
+   *  conteo AD-HOC cargado por el vendedor. Solo presente cuando saleMode ===
+   *  "POR_UNIDAD_BLISTER"; el backend lo exige para recomputar el precio. */
+  piecesPerBlister?: number | null;
 }
 
 export interface SaleRequest {
@@ -27,6 +36,7 @@ export interface SaleRequest {
     saleMode?: SaleMode;
     loosePriceId?: string;
     looseName?: string;
+    piecesPerBlister?: number;
   }[];
   orderId?: string;
   /** Desglose de medios de pago (R6/R7): la suma debe igualar el total. */

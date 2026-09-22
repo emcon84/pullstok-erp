@@ -41,6 +41,27 @@ export const unitPrice = (p: DataItem, sellsWholesale?: boolean): number | null 
   return Math.ceil(price / ub / 100) * 100;
 };
 
+// Paso de redondeo del precio por unidad (hacia ARRIBA), espejo de
+// UNIT_PRICE_ROUND_STEP en api/src/utils/unitsPerBox.ts.
+const UNIT_PRICE_ROUND_STEP = 100;
+
+/**
+ * sdd/venta-pastillas-sueltas-blister — espejo (front-only, solo esta
+ * función) de `computePerUnitPrice` en api/src/utils/unitsPerBox.ts: precio
+ * por unidad = round2(price ÷ units) redondeado HACIA ARRIBA al próximo
+ * $100. Se usa para el preview del modal ANTES de confirmar (el server
+ * siempre recomputa el precio real al cobrar — este cálculo es solo UX).
+ * `null` cuando no se puede derivar (units ausente o <= 0).
+ */
+export const computePerUnitPrice = (
+  price: number,
+  units: number | null | undefined,
+): number | null => {
+  if (units === null || units === undefined || units <= 0) return null;
+  const perUnit = price / units;
+  return Math.ceil(perUnit / UNIT_PRICE_ROUND_STEP) * UNIT_PRICE_ROUND_STEP;
+};
+
 /** Cantidad de cajas completas que hay en `units` unidades de stock
  *  (división entera; para mostrar stock de unidades convertido en cajas). */
 export const boxCountFromUnits = (units: number, unitsPerBox: number): number =>
