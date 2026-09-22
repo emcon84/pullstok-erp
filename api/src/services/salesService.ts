@@ -22,7 +22,13 @@ interface IProductSale {
   // legacy BOLSA_CERRADA (el schema lo normaliza con .default()).
   // POR_UNIDAD (sdd/venta-por-unidad-multpack): línea de un multi-pack vendida
   // por unidad; el precio lo recomputa el server (round2(price/unitsPerBox)).
-  saleMode?: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD";
+  // POR_UNIDAD_BLISTER (sdd/venta-pastillas-sueltas-blister): pastillas
+  // sueltas de un blister, conteo AD-HOC (piecesPerBlister), no persistido en
+  // Product; el precio lo recomputa el server con el mismo util.
+  saleMode?: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD" | "POR_UNIDAD_BLISTER";
+  // sdd/venta-pastillas-sueltas-blister: cuántas pastillas tenía ESE blister
+  // en ESA venta. Solo presente cuando saleMode === "POR_UNIDAD_BLISTER".
+  piecesPerBlister?: number;
 }
 
 interface ISaleRequest {
@@ -137,7 +143,8 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       quantity: number;
       category: string;
       price: number;
-      saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD";
+      saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD" | "POR_UNIDAD_BLISTER";
+      piecesPerBlister: number | null;
     }[] = [];
 
     for (const item of saleRequest.products) {
@@ -149,7 +156,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       // parseInt (que truncaba los kg sueltos): el schema ya validó la forma.
       const quantity = Number(String(item.quantity));
       const price = parseFloat(String(item.price));
-      const saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD" =
+      const saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD" | "POR_UNIDAD_BLISTER" =
         item.saleMode ?? "BOLSA_CERRADA";
       const isLoose = saleMode === "POR_PESO" || saleMode === "POR_MONTO";
 
@@ -275,6 +282,43 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         linePrice = perUnitPrice; // server-authoritative
       }
 
+      // POR_UNIDAD_BLISTER (sdd/venta-pastillas-sueltas-blister): pastillas
+      // sueltas de un blister ya escaneado (FARMACIA). A diferencia de
+      // POR_UNIDAD, el conteo (piecesPerBlister) NO está persistido en
+      // Product — lo carga el vendedor al momento de la venta, ad-hoc, por
+      // eso viene del request en vez de product.unitsPerBox. El precio
+      // sigue siendo server-authoritative: se recomputa con el mismo util
+      // (computePerUnitPrice) sobre el precio de catálogo, ignorando el
+      // price que mande el cliente.
+      if (saleMode === "POR_UNIDAD_BLISTER") {
+        if (!product) {
+          throw new Error(
+            "La venta de pastillas sueltas requiere un producto",
+          );
+        }
+        const piecesPerBlister = item.piecesPerBlister;
+        if (
+          piecesPerBlister === undefined ||
+          piecesPerBlister === null ||
+          piecesPerBlister <= 1
+        ) {
+          throw new Error(
+            "La venta de pastillas sueltas requiere piecesPerBlister (mayor a 1)",
+          );
+        }
+        const catalogPrice =
+          sellerSellsWholesale && product.wholesalePrice != null
+            ? Number(product.wholesalePrice)
+            : Number(product.price);
+        const perPiecePrice = computePerUnitPrice(catalogPrice, piecesPerBlister);
+        if (perPiecePrice === null) {
+          throw new Error(
+            `El producto "${product.name}" no se puede vender por pastilla suelta`,
+          );
+        }
+        linePrice = perPiecePrice; // server-authoritative
+      }
+
       const lineName = isLoose
         ? item.looseName ??
           looseLineName(cell?.brand?.name ?? "", cell?.type?.name ?? "")
@@ -285,10 +329,18 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       // (unitsPerBox > 1): la caja (BOLSA_CERRADA) descuenta qty × unitsPerBox;
       // la unidad (POR_UNIDAD) descuenta qty × 1. Para un producto legacy sin
       // unitsPerBox la caja sigue descontando 1 por bolsa (cajaMultiplier = 1).
+      // POR_UNIDAD_BLISTER (sdd/venta-pastillas-sueltas-blister) SIEMPRE
+      // descuenta 1 blister entero por línea, sin importar cuántas pastillas
+      // se vendieron (precisión de stock post-corte queda para conteo manual,
+      // mismo precedente aceptado con POUCH).
       const cajaMultiplier =
         product?.unitsPerBox && product.unitsPerBox > 1 ? product.unitsPerBox : 1;
       const stockUnits =
-        saleMode === "BOLSA_CERRADA" ? lineQuantity * cajaMultiplier : lineQuantity;
+        saleMode === "BOLSA_CERRADA"
+          ? lineQuantity * cajaMultiplier
+          : saleMode === "POR_UNIDAD_BLISTER"
+          ? 1
+          : lineQuantity;
       if (isLoose && cell) {
         // Ventas sueltas: descuentan kg del LooseStock de la celda (la bolsa
         // física ya se abrió con openBag y su peso quedó acreditado acá).
@@ -387,6 +439,8 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         category: product?.category?.name ?? "Sin categoría",
         price: linePrice,
         saleMode,
+        piecesPerBlister:
+          saleMode === "POR_UNIDAD_BLISTER" ? item.piecesPerBlister ?? null : null,
       });
       totalAmount += lineTotal;
     }
