@@ -763,6 +763,11 @@ model SaleItem {
   // POR_MONTO (monto → kg autoritativo en server). Default BOLSA_CERRADA:
   // las filas legacy/no-declaradas se comportan como bolsa cerrada (B-03).
   saleMode  SaleMode @default(BOLSA_CERRADA)
+  // sdd/venta-pastillas-sueltas-blister: cuántas pastillas tenía ESE blister
+  // en ESA venta. Conteo AD-HOC (no persistido en Product, a diferencia de
+  // unitsPerBox): el vendedor lo carga en el momento de la venta. Solo
+  // presente en renglones POR_UNIDAD_BLISTER; null en el resto (auditoría).
+  piecesPerBlister Int?
 
   @@map("sale_items")
 }
@@ -775,6 +780,12 @@ enum SaleMode {
   // línea usa el precio por unidad derivado (round2(price/unitsPerBox)) y
   // descuenta 1 unidad de stock por unidad vendida.
   POR_UNIDAD
+  // Venta de pastillas sueltas de un blister (sdd/venta-pastillas-sueltas-blister):
+  // conteo AD-HOC de piecesPerBlister (no persistido en Product, a diferencia
+  // de POR_UNIDAD/unitsPerBox). El precio usa el mismo computePerUnitPrice;
+  // el stock SIEMPRE descuenta 1 blister entero por línea, sin importar la
+  // cantidad de pastillas vendidas.
+  POR_UNIDAD_BLISTER
 }
 
 model Receipt {

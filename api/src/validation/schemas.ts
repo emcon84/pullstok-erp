@@ -254,13 +254,18 @@ const saleProductSchema = z.object({
   price: z.coerce.number().nonnegative(),
   category: z.string().optional(),
   saleMode: z
-    .enum(["BOLSA_CERRADA", "POR_PESO", "POR_MONTO", "POR_UNIDAD"], {
-      message: "saleMode inválido",
-    })
+    .enum(
+      ["BOLSA_CERRADA", "POR_PESO", "POR_MONTO", "POR_UNIDAD", "POR_UNIDAD_BLISTER"],
+      { message: "saleMode inválido" },
+    )
     .default("BOLSA_CERRADA"),
+  // sdd/venta-pastillas-sueltas-blister: cuántas pastillas trae ESE blister,
+  // cargado ad-hoc por el vendedor (no persistido en Product). Requerido y
+  // > 1 SOLO cuando saleMode === "POR_UNIDAD_BLISTER" (ver superRefine).
+  piecesPerBlister: z.coerce.number().int().optional(),
 }).superRefine((item, ctx) => {
   const mode = item.saleMode ?? "BOLSA_CERRADA";
-  if (mode === "BOLSA_CERRADA" || mode === "POR_UNIDAD") {
+  if (mode === "BOLSA_CERRADA" || mode === "POR_UNIDAD" || mode === "POR_UNIDAD_BLISTER") {
     if (!item.productId) {
       ctx.addIssue({
         code: "custom",
@@ -273,6 +278,13 @@ const saleProductSchema = z.object({
         code: "custom",
         path: ["quantity"],
         message: "La cantidad debe ser un número entero (bolsa cerrada / por unidad)",
+      });
+    }
+    if (mode === "POR_UNIDAD_BLISTER" && (item.piecesPerBlister === undefined || item.piecesPerBlister <= 1)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["piecesPerBlister"],
+        message: "La venta de pastillas sueltas requiere piecesPerBlister (entero mayor a 1)",
       });
     }
     return;
