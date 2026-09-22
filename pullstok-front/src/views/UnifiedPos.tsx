@@ -15,7 +15,8 @@ import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { imgSrc, effectivePrice } from "@/components/hooks/vendorCatalogHelpers";
+import { Switch } from "@/components/ui/switch";
+import { imgSrc, effectivePrice, computePerUnitPrice } from "@/components/hooks/vendorCatalogHelpers";
 import { getMe } from "@/services/onboardingService";
 import {
   Dialog,
@@ -71,6 +72,13 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // el operador pueda tipear la cantidad (ej. pouches/latas x3) y confirmar
   // con Enter, sin soltar el teclado.
   const [scanQty, setScanQty] = useState(1);
+
+  // sdd/venta-pastillas-sueltas-blister — switch "Vender pastillas sueltas"
+  // del modal de escaneo (SOLO categoría FARMACIA). `piecesPerBlister` es el
+  // conteo AD-HOC que carga el vendedor (no viene de catálogo); `scanQty`
+  // reusa el stepper existente como "cantidad de pastillas a vender".
+  const [sellLooseBlister, setSellLooseBlister] = useState(false);
+  const [piecesPerBlister, setPiecesPerBlister] = useState(0);
 
   // Modal de "Abrir bolsa" - flujo para abrir bolsas y creditar kg a celda suelta
   const [openBagDialogOpen, setOpenBagDialogOpen] = useState(false);
@@ -189,6 +197,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           } else {
             setScanQty(1);
             setScanProduct(newProduct);
+            setSellLooseBlister(false);
+            setPiecesPerBlister(0);
           }
         }
       } catch (e: any) {
@@ -199,10 +209,22 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   );
 
   // ── Modal de confirmación de bolsa cerrada escaneada ──
-  const handleCancelScan = useCallback(() => setScanProduct(null), []);
+  const handleCancelScan = useCallback(() => {
+    setScanProduct(null);
+    setSellLooseBlister(false);
+    setPiecesPerBlister(0);
+  }, []);
+
+  // sdd/venta-pastillas-sueltas-blister: switch activo (SOLO FARMACIA) → la
+  // línea se agrega POR_UNIDAD_BLISTER con el conteo ad-hoc de piecesPerBlister;
+  // requiere piecesPerBlister entero > 1 (mismo criterio que el server, T1).
+  const isFarmacia = scanProduct?.category?.name === "FARMACIA";
+  const isBlisterSale = isFarmacia && sellLooseBlister;
+  const piecesPerBlisterValid = Number.isInteger(piecesPerBlister) && piecesPerBlister > 1;
 
   const handleConfirmScan = useCallback(() => {
     if (!scanProduct) return;
+    if (isBlisterSale && !piecesPerBlisterValid) return;
     const p = scanProduct;
     cart.addToCart(
       {
@@ -221,15 +243,21 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
       scanQty,
       branchId,
       Number(p.quantity ?? 0),
-      "BOLSA_CERRADA",
+      isBlisterSale ? "POR_UNIDAD_BLISTER" : "BOLSA_CERRADA",
       undefined,
       undefined,
       undefined,
       sellsWholesale,
+      // Solo se manda el 10º argumento en la venta de blister: mantiene el
+      // call-site de BOLSA_CERRADA con la misma aridad de siempre (los tests
+      // existentes verifican la lista exacta de argumentos).
+      ...(isBlisterSale ? [piecesPerBlister] : []),
     );
     toast.success(`${p.name} agregado`);
     setScanProduct(null);
-  }, [cart, branchId, scanProduct, scanQty, sellsWholesale]);
+    setSellLooseBlister(false);
+    setPiecesPerBlister(0);
+  }, [cart, branchId, scanProduct, scanQty, sellsWholesale, isBlisterSale, piecesPerBlisterValid, piecesPerBlister]);
 
   // Capturador global (fase CAPTURE) del patrón de la pistola. Acepta dígitos
   // Y letras (nuestros códigos internos BLST#####/INT##### son alfanuméricos,
@@ -479,13 +507,57 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             type="number") pone un techo duro de caracteres a nivel DOM por
             si algo se filtra estando el campo enfocado, y el clamp contra
             el stock es la segunda barrera. */}
+        {/* sdd/venta-pastillas-sueltas-blister: switch SOLO para FARMACIA. Al
+            activarlo se pide "Pastillas por blister" y el stepper de cantidad
+            de arriba pasa a representar "cantidad de pastillas a vender". */}
+        {isFarmacia && (
+          <div className="flex items-center gap-2">
+            <Switch
+              id="sell-loose-blister"
+              checked={sellLooseBlister}
+              onCheckedChange={(v) => {
+                setSellLooseBlister(v);
+                if (!v) setPiecesPerBlister(0);
+              }}
+            />
+            <Label htmlFor="sell-loose-blister" className="cursor-pointer text-sm font-medium">
+              Vender pastillas sueltas
+            </Label>
+          </div>
+        )}
+
+        {isBlisterSale && (
+          <div className="space-y-1.5">
+            <Label htmlFor="pieces-per-blister-input">Pastillas por blister</Label>
+            <Input
+              id="pieces-per-blister-input"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={3}
+              value={piecesPerBlister || ""}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 3);
+                setPiecesPerBlister(digits === "" ? 0 : parseInt(digits, 10));
+              }}
+              className="h-9 w-20 text-center tabular-nums"
+            />
+          </div>
+        )}
+
         {(() => {
-          const unitPrice = scanProduct
+          const catalogPrice = scanProduct
             ? effectivePrice(
                 { name: scanProduct.name, price: scanProduct.price ?? 0, wholesalePrice: scanProduct.wholesalePrice ?? null, quantity: 0 },
                 sellsWholesale,
               )
             : 0;
+          // Preview (UX only — el server SIEMPRE recomputa el precio real al
+          // cobrar): con el switch activo, precio por pastilla derivado de
+          // piecesPerBlister; si no, el precio de catálogo de siempre.
+          const unitPrice = isBlisterSale
+            ? computePerUnitPrice(catalogPrice, piecesPerBlister || null) ?? 0
+            : catalogPrice;
           const stock = Number(scanProduct?.quantity ?? 0);
           const maxQty = stock > 0 ? stock : 999;
           return (
@@ -550,7 +622,11 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           <Button variant="outline" onClick={handleCancelScan}>
             Cancelar
           </Button>
-          <Button autoFocus onClick={handleConfirmScan} disabled={scanQty <= 0}>
+          <Button
+            autoFocus
+            onClick={handleConfirmScan}
+            disabled={scanQty <= 0 || (isBlisterSale && !piecesPerBlisterValid)}
+          >
             <ShoppingCart className="h-4 w-4 mr-2" />
             Agregar al pedido
           </Button>
