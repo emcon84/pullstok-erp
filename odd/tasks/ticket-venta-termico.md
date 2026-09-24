@@ -29,6 +29,12 @@ compraron.
       Ruta: delegada (writer). Commit: f423486
 - [x] T2 — Snapshot en checkout + diálogo Sí/No + wiring en UnifiedPos (con tests).
       Ruta: delegada (writer). Commit: e6807e4
+- [x] T3 — Fix: el diálogo "¿Imprimir ticket?" quedaba abierto al imprimir (window.print() bloquea el
+      hilo y la animación de salida no termina). Cerrar primero, imprimir ~300 ms después, sin que un
+      error de impresión pueda reabrir/dejar el diálogo. Ruta: delegada (writer). Commit: a9e27ff
+- [x] T4 — Fix: el logo claro/blanco (pensado para tema oscuro) no se veía en el ticket. Pre-procesar en
+      canvas (fetch → dataURL → composición sobre blanco, inversión de glifo claro, escala de grises);
+      si falla algo, se usa la URL original con el filtro CSS. Ruta: delegada (writer). Commit: 624cdcf
 
 ## Checks
 - TDD: strict (RED → GREEN → REFACTOR), runner `npx vitest run` en `pullstok-front/`.
@@ -56,4 +62,11 @@ Creado 2026-09-24.
   → 29/29 verdes (RED previo: 13 fallas + import faltante); suite completa del front 771 ok /
   8 fallas preexistentes (priceKgUpdate 6, productDrawer 2); `tsc --noEmit -p tsconfig.app.json`
   limpio.
+- T3 (a9e27ff): unifiedPos.printTicket 12/12 (RED previo: 2 fallas + error no atrapado; el diálogo se
+  cierra antes de imprimir y un throw no lo deja abierto); tsc limpio.
+- T4 (624cdcf): ticketLogo (12) + saleTicket (48) + unifiedPos.printTicket (12) verdes (RED previo: módulo
+  ticketLogo inexistente); suite completa 791 ok / 8 fallas preexistentes (priceKgUpdate 6,
+  productDrawer 2); tsc limpio. NO verificado: navegador/impresora reales ni que el bucket R2 envíe
+  CORS (sin CORS el fetch falla y se usa la URL original con el filtro CSS, o sea el logo claro sigue
+  sin verse).
 Próximo paso: revisión del usuario / push (decisión del usuario).
