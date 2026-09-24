@@ -216,17 +216,21 @@ const STYLES = `
 @page { size: 58mm auto; margin: 0 }
 * { box-sizing: border-box }
 html, body { margin: 0; padding: 0; background: #fff; color: #000 }
-body { width: 48mm; padding: 1.5mm 2mm; font: 10.5px/1.15 "Courier New", Courier, monospace }
+/* Medido en papel real (OCOM 58 mm por driver de Windows): el ticket sale ~17%
+   más ancho que en CSS y el borde derecho del papel corta el último carácter.
+   Contenido de 38mm (40.5mm - 2.5mm de margen izquierdo) centrado en la zona
+   imprimible; el margen derecho queda en 0 a propósito. */
+body { width: 40.5mm; padding: 1.5mm 0 1.5mm 2.5mm; font: 10px/1.15 "Courier New", Courier, monospace }
 header { text-align: center }
-header img { display: block; margin: 0 auto 1mm; max-width: 40mm; max-height: 16mm; object-fit: contain }
+header img { display: block; margin: 0 auto 1mm; max-width: 34mm; max-height: 16mm; object-fit: contain }
 header img.raw { filter: grayscale(1) contrast(1.2) }
 .biz { font-weight: bold }
 .info { font-size: 9.5px; overflow-wrap: anywhere }
 .sep { border-top: 1px dashed #000; margin: 1mm 0 }
 .item { margin: 0 }
 .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
-.row { display: flex; justify-content: space-between; gap: 2mm }
-.row > span:first-child { min-width: 0 }
+.row { display: flex; justify-content: space-between; gap: 1mm }
+.row > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .row > span:last-child { white-space: nowrap; text-align: right }
 .total { font-weight: bold; font-size: 12px }
 .pay { margin-top: 1mm }

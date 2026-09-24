@@ -168,6 +168,21 @@ describe("renderSaleTicketHtml", () => {
     expect(html).toContain("Gracias por su compra");
   });
 
+  it("el contenido cabe en el área imprimible: el driver ensancha ~17% y el papel corta el borde derecho", () => {
+    // Medido en papel real (OCOM 58 mm): con body de 48mm los importes perdían
+    // el último dígito ($18.100 → $18.10). Contenido máximo ~40mm de CSS.
+    const html = renderSaleTicketHtml(build([bolsa]));
+    const width = /body \{[^}]*?\bwidth: (\d+(?:\.\d+)?)mm/.exec(html);
+    expect(width).not.toBeNull();
+    expect(Number(width![1])).toBeLessThanOrEqual(41);
+  });
+
+  it("el detalle del renglón se recorta con elipsis en vez de empujar el total fuera del papel", () => {
+    const html = renderSaleTicketHtml(build([bolsa]));
+    expect(html).toMatch(/\.row > span:first-child \{[^}]*text-overflow: ellipsis/);
+    expect(html).toMatch(/\.row > span:last-child \{[^}]*white-space: nowrap/);
+  });
+
   it("incluye negocio, fecha/hora es-AR, líneas, total y pagos", () => {
     const html = renderSaleTicketHtml(
       build([bolsa], { payments: [{ method: "QR", amount: 16000 }] }),
@@ -254,7 +269,8 @@ describe("logo del ticket", () => {
     const img = doc.querySelector("header img")!;
     expect(img).not.toBeNull();
     expect(img.getAttribute("src")).toBe(LOGO);
-    expect(html).toContain("max-width: 40mm");
+    // 34mm: entra en el contenido de 38mm del ticket (ver STYLES).
+    expect(html).toContain("max-width: 34mm");
     expect(html).toContain("max-height: 16mm");
     expect(html).toContain("object-fit: contain");
     expect(html).toContain("grayscale(1)");
