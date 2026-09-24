@@ -57,7 +57,7 @@ const money = (n: number) =>
 
 /**
  * Tabla de la planilla "Suelto" del POS vendedor: celdas marca × tipo × especie
- * con precio por kg, stock suelto de la sucursal y un input inline de kg
+ * con precio por kg y un input inline de kg
  * (POR_PESO) con roving focus + Enter/click para agregar al pedido.
  * Presentacional y memoizada: la lógica de filas vive en LooseSellTab.
  */
@@ -82,7 +82,6 @@ export const LooseSellTable = memo(
             <TableHead>Especie</TableHead>
             <TableHead className="text-right">Código balanza</TableHead>
             <TableHead className="text-right">Precio/kg</TableHead>
-            <TableHead className="text-right">Stock</TableHead>
             <TableHead className="w-[150px] text-right">
               {mode === "POR_PESO" ? "Cantidad (kg)" : "Monto ($)"}
             </TableHead>
@@ -98,6 +97,7 @@ export const LooseSellTable = memo(
                 ref={(el) => registerRow(index, el)}
                 className={cn(
                   "cursor-pointer hover:bg-muted/50 transition-all",
+                  noStock && "opacity-50",
                   isSelected && "bg-primary/10 ring-2 ring-primary/60 dark:bg-primary/20",
                 )}
                 onClick={() => onRowClick(index, row)}
@@ -123,23 +123,6 @@ export const LooseSellTable = memo(
                   <span className="text-xs font-normal text-muted-foreground">
                     /kg
                   </span>
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {row.stockKg === null ? (
-                    "—"
-                  ) : (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "font-medium",
-                        noStock
-                          ? "border-destructive/30 bg-destructive/10 text-destructive"
-                          : "border-emerald-300 bg-emerald-50 text-emerald-700",
-                      )}
-                    >
-                      {row.stockKg.toFixed(2)} kg
-                    </Badge>
-                  )}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1.5">
