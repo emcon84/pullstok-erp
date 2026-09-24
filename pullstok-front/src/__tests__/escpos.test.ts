@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  encodeBaudProbeEscPos,
   encodeSaleTicketEscPos,
   encodeTestTicketEscPos,
   rasterFromImageData,
@@ -285,5 +286,26 @@ describe("encodeTestTicketEscPos", () => {
     expect(bytes[bytes.length - 3]).toBe(ESC);
     expect(bytes[bytes.length - 2]).toBe(0x64);
     expect(Array.from(bytes).every((b) => b <= 0x7f)).toBe(true);
+  });
+});
+
+describe("encodeBaudProbeEscPos", () => {
+  it("dice la velocidad en ASCII, en negrita y agrandada, con init y avance", () => {
+    const bytes = encodeBaudProbeEscPos(19200);
+    expect([bytes[0], bytes[1]]).toEqual([ESC, 0x40]);
+    expect(indexOfSeq(bytes, ascii("VELOCIDAD 19200"))).toBeGreaterThan(-1);
+    expect(indexOfSeq(bytes, [ESC, 0x45, 1])).toBeGreaterThan(-1); // negrita
+    expect(indexOfSeq(bytes, [GS, 0x21, 0x11])).toBeGreaterThan(-1); // doble ancho y alto
+    expect(indexOfSeq(bytes, [GS, 0x21, 0x00])).toBeGreaterThan(-1); // tamaño normal restaurado
+    expect(indexOfSeq(bytes, ascii("Si leiste esto, esta es la velocidad correcta"))).toBeGreaterThan(-1);
+    expect(bytes[bytes.length - 3]).toBe(ESC);
+    expect(bytes[bytes.length - 2]).toBe(0x64);
+    expect(Array.from(bytes).every((b) => b <= 0x7f)).toBe(true);
+  });
+
+  it("es diminuto (mucho menos de 512 bytes) para todas las velocidades", () => {
+    for (const baud of [9600, 19200, 38400, 57600, 115200]) {
+      expect(encodeBaudProbeEscPos(baud).length).toBeLessThan(512);
+    }
   });
 });

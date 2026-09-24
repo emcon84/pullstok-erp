@@ -163,6 +163,10 @@ class EscPosWriter {
   bold(on: boolean) {
     return this.raw(ESC, 0x45, on ? 1 : 0);
   }
+  /** `GS ! n`: tamaño de carácter. 0x11 = doble ancho y alto; 0x00 = normal. */
+  size(mode: "normal" | "double") {
+    return this.raw(GS, 0x21, mode === "double" ? 0x11 : 0x00);
+  }
   /** Una línea de texto (ya en ASCII) + salto de línea. */
   line(text: string) {
     for (let i = 0; i < text.length; i++) this.bytes.push(text.charCodeAt(i));
@@ -250,6 +254,26 @@ export function encodeTestTicketEscPos(): Uint8Array {
     .bold(true)
     .line("Impresora conectada - Pullstok")
     .bold(false)
+    .align("left")
+    .feed(FEED_LINES)
+    .done();
+}
+
+/**
+ * Ticket cortito para "probar velocidades": cada baud manda uno que dice a qué
+ * velocidad se envió. El usuario elige el que salió legible. Se mantiene tiny
+ * (~100 bytes) para que imprima rápido incluso a 9600.
+ */
+export function encodeBaudProbeEscPos(baud: number): Uint8Array {
+  return new EscPosWriter()
+    .init()
+    .align("center")
+    .bold(true)
+    .size("double")
+    .line(toPrinterText(`VELOCIDAD ${baud}`))
+    .size("normal")
+    .bold(false)
+    .line(toPrinterText("Si leíste esto, esta es la velocidad correcta"))
     .align("left")
     .feed(FEED_LINES)
     .done();

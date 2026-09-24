@@ -7,8 +7,12 @@ import {
   connectPrinter,
   disconnectPrinter,
   getConnectedPrinterPort,
+  getPrinterBaudRate,
   isSerialPrintingSupported,
   printBytes,
+  probePrinterBaudRates,
+  setPrinterBaudRate,
+  SUPPORTED_BAUD_RATES,
 } from "@/utils/serialPrinter";
 
 type Status = "unsupported" | "disconnected" | "connected";
@@ -19,7 +23,8 @@ const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e)
 
 /**
  * Conecta la térmica por Web Serial (una sola vez; Chrome recuerda el permiso).
- * Conectada: el botón abre un menú mínimo con "Imprimir prueba" y "Desconectar".
+ * Conectada: el botón abre un menú mínimo con "Imprimir prueba", la velocidad
+ * (baudios), "Probar velocidades" y "Desconectar".
  * Sin Web Serial queda deshabilitado con una explicación.
  *
  * El botón suelta el foco tras cada acción: con foco en un botón (y no en el
@@ -30,6 +35,8 @@ export const PrinterConnectButton = () => {
   const [status, setStatus] = useState<Status>(supported ? "disconnected" : "unsupported");
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [probing, setProbing] = useState(false);
+  const [baud, setBaud] = useState(() => getPrinterBaudRate());
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Puerto ya recordado por Chrome de una sesión anterior.
@@ -88,10 +95,42 @@ export const PrinterConnectButton = () => {
   const handleTest = async () => {
     release();
     setMenuOpen(false);
+    const current = getPrinterBaudRate();
     try {
       await printBytes(encodeTestTicketEscPos());
+      toast.success(`Prueba enviada a ${current} baudios`);
     } catch (e) {
-      toast.error(`No se pudo imprimir la prueba: ${errorMessage(e)}`);
+      toast.error(`No se pudo imprimir la prueba (${current} baudios): ${errorMessage(e)}`);
+    }
+  };
+
+  const handleBaudChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const next = Number(e.target.value);
+    setPrinterBaudRate(next);
+    setBaud(next);
+    toast.success(`Velocidad: ${next} baudios`);
+    release();
+  };
+
+  const handleProbe = async () => {
+    release();
+    setProbing(true);
+    try {
+      const results = await probePrinterBaudRates();
+      const printed = results.filter((r) => r.ok).length;
+      if (printed === 0) {
+        toast.error(
+          `No se pudo imprimir ninguna prueba: ${results.find((r) => r.message)?.message ?? "error desconocido"}`,
+        );
+      } else {
+        toast.info(
+          `Se imprimieron pruebas a ${printed} velocidades. Elegí la que salió legible en el menú Velocidad.`,
+        );
+      }
+    } catch (e) {
+      toast.error(`No se pudieron probar las velocidades: ${errorMessage(e)}`);
+    } finally {
+      setProbing(false);
     }
   };
 
@@ -124,7 +163,7 @@ export const PrinterConnectButton = () => {
         {menuOpen && (
           <div
             role="menu"
-            className="absolute left-0 top-full z-50 mt-1 w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            className="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
           >
             <button
               type="button"
@@ -133,6 +172,29 @@ export const PrinterConnectButton = () => {
               className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
             >
               Imprimir prueba
+            </button>
+            <label className="flex items-center justify-between gap-2 px-2 py-1.5 text-sm">
+              Velocidad
+              <select
+                value={baud}
+                onChange={handleBaudChange}
+                className="rounded-sm border bg-background px-1 py-0.5 text-sm"
+              >
+                {SUPPORTED_BAUD_RATES.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleProbe}
+              disabled={probing}
+              className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-50"
+            >
+              {probing ? "Probando…" : "Probar velocidades"}
             </button>
             <button
               type="button"

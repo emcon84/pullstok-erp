@@ -1,4 +1,4 @@
-import { encodeTestTicketEscPos } from "@/utils/escpos";
+import { encodeBaudProbeEscPos, encodeTestTicketEscPos } from "@/utils/escpos";
 
 /**
  * Transporte Web Serial (`navigator.serial`) para la térmica ESC/POS.
@@ -46,18 +46,32 @@ export type ConnectResult =
 
 /** Clave de localStorage con el vendor/product del puerto elegido. */
 export const PRINTER_STORAGE_KEY = "pullstok-thermal-printer";
+/** Clave de localStorage con el baud rate elegido por el usuario. */
+export const BAUD_STORAGE_KEY = "pullstok-thermal-printer-baud";
 /**
- * Baud rate al abrir el puerto. Bluetooth SPP lo ignora (el enlace no tiene
- * velocidad de línea); las térmicas USB-serie suelen usar 9600 o 115200. Se
- * elige 9600, el valor de fábrica más común en las 58 mm portátiles.
+ * Velocidades ofrecidas. Bluetooth SPP ignora el baud (el enlace no tiene
+ * velocidad de línea), pero un puente USB-serie interno SÍ necesita la velocidad
+ * real de la impresora: 9600 o 115200 son las más comunes, y no se puede saber
+ * desde acá, así que el usuario la elige (o la descubre con "Probar velocidades").
  */
-const BAUD_RATE = 9600;
+export const SUPPORTED_BAUD_RATES = [9600, 19200, 38400, 57600, 115200] as const;
+/** 9600: el valor de fábrica más común en las 58 mm portátiles. */
+export const DEFAULT_BAUD_RATE = 9600;
+/** Pausa entre velocidades de la sonda: que la impresora termine y se reponga. */
+const PROBE_PAUSE_MS = 1500;
 /** Bytes por escritura: un buffer Bluetooth chico se desborda con envíos enormes. */
 const CHUNK_SIZE = 512;
 /** Pausa entre chunks para que la impresora vacíe su buffer. */
 const CHUNK_DELAY_MS = 20;
-/** Tope de toda la impresión: el POS nunca queda colgado esperando el puerto. */
+/**
+ * Holgura de la impresión: el POS nunca queda colgado esperando el puerto. El
+ * tope real es esta holgura + el tiempo de drenaje estimado (ver `sendToPort`).
+ */
 export const PRINT_TIMEOUT_MS = 10_000;
+/** Colchón fijo del drenaje: latencia del puente USB-serie y del cabezal. */
+const DRAIN_SLACK_MS = 250;
+/** Tope del drenaje: un ticket enorme a 9600 no bloquea el POS más que esto. */
+const DRAIN_MAX_MS = 8000;
 /** Cuánto esperar el cierre del puerto tras un timeout antes de soltarlo. */
 const CLEANUP_GRACE_MS = 2000;
 
@@ -66,6 +80,19 @@ const CLEANUP_GRACE_MS = 2000;
 const errorName = (e: unknown) => (e as { name?: string } | null)?.name;
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Cuánto esperar (ms) a que los bytes salgan físicamente por el UART antes de
+ * cerrar el puerto: `close()` justo tras el último `write` puede truncar lo que
+ * todavía está viajando (a 9600 baudios ≈ 960 B/s: un logo de varios KB tarda
+ * segundos). 8N1 = 10 bits por byte, +15 % de margen, +250 ms de colchón, tope 8 s.
+ */
+export function estimateDrainMs(byteLength: number, baud: number): number {
+  const bytes = Number.isFinite(byteLength) && byteLength > 0 ? byteLength : 0;
+  const rate = Number.isFinite(baud) && baud > 0 ? baud : DEFAULT_BAUD_RATE;
+  const transmit = ((bytes * 10) / rate) * 1000 * 1.15;
+  return Math.min(DRAIN_MAX_MS, Math.ceil(transmit + DRAIN_SLACK_MS));
+}
 
 function getSerial(): ThermalSerial | null {
   if (typeof navigator === "undefined") return null;
@@ -110,6 +137,29 @@ function clearStoredInfo() {
   }
 }
 
+const isSupportedBaud = (n: unknown): n is number =>
+  typeof n === "number" && (SUPPORTED_BAUD_RATES as readonly number[]).includes(n);
+
+/** Baud rate guardado, o 9600. Nunca lanza (storage bloqueado o valor basura → default). */
+export function getPrinterBaudRate(): number {
+  try {
+    const raw = Number(localStorage.getItem(BAUD_STORAGE_KEY));
+    return isSupportedBaud(raw) ? raw : DEFAULT_BAUD_RATE;
+  } catch {
+    return DEFAULT_BAUD_RATE;
+  }
+}
+
+/** Guarda el baud rate. Valores fuera de la lista se ignoran; nunca lanza. */
+export function setPrinterBaudRate(baud: number): void {
+  if (!isSupportedBaud(baud)) return;
+  try {
+    localStorage.setItem(BAUD_STORAGE_KEY, String(baud));
+  } catch {
+    // Sin storage se usa el default; no es crítico.
+  }
+}
+
 /** Puerto recordado por Chrome (permiso ya otorgado), o null. Nunca lanza. */
 export async function getConnectedPrinterPort(): Promise<ThermalSerialPort | null> {
   const serial = getSerial();
@@ -143,16 +193,24 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
   return run;
 }
 
-/** Abre el puerto, escribe en chunks y siempre libera el lock y cierra. */
-async function sendToPort(port: ThermalSerialPort, bytes: Uint8Array): Promise<void> {
+/**
+ * Abre el puerto (a `baudRate`, por defecto el guardado), escribe en chunks,
+ * espera el drenaje del UART y siempre libera el lock y cierra.
+ */
+async function sendToPort(
+  port: ThermalSerialPort,
+  bytes: Uint8Array,
+  baudRate: number = getPrinterBaudRate(),
+): Promise<void> {
   let writer: ReturnType<NonNullable<ThermalSerialPort["writable"]>["getWriter"]> | null = null;
   let opened = false;
   let timedOut = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const drainMs = estimateDrainMs(bytes.length, baudRate);
 
   const work = (async () => {
     try {
-      await port.open({ baudRate: BAUD_RATE });
+      await port.open({ baudRate });
       opened = true;
     } catch (e) {
       // Ya abierto por una impresión anterior: se sigue usando (no lo cerramos).
@@ -164,6 +222,9 @@ async function sendToPort(port: ThermalSerialPort, bytes: Uint8Array): Promise<v
       await writer.write(bytes.subarray(offset, offset + CHUNK_SIZE));
       if (offset + CHUNK_SIZE < bytes.length) await sleep(CHUNK_DELAY_MS);
     }
+    // `write` resuelve al encolar en el buffer del SO, no al salir por el cable:
+    // se espera el drenaje antes de soltar el lock y cerrar (si no, se trunca).
+    await sleep(drainMs);
   })();
   work.catch(() => {}); // si gana el timeout, su rechazo tardío no queda sin manejar
 
@@ -177,7 +238,7 @@ async function sendToPort(port: ThermalSerialPort, bytes: Uint8Array): Promise<v
         // best-effort
       }
       reject(new Error("Tiempo de espera agotado: la impresora no respondió"));
-    }, PRINT_TIMEOUT_MS);
+    }, PRINT_TIMEOUT_MS + drainMs);
   });
 
   const cleanup = async () => {
@@ -206,12 +267,61 @@ async function sendToPort(port: ThermalSerialPort, bytes: Uint8Array): Promise<v
   }
 }
 
-/** Imprime bytes ESC/POS en la impresora conectada. Rechaza ante cualquier fallo. */
-export function printBytes(bytes: Uint8Array): Promise<void> {
+/**
+ * Imprime bytes ESC/POS en la impresora conectada. Rechaza ante cualquier fallo.
+ * `baudRate` pisa el guardado solo para esta impresión (lo usa la sonda).
+ */
+export function printBytes(bytes: Uint8Array, baudRate?: number): Promise<void> {
   return enqueue(async () => {
     const port = await getConnectedPrinterPort();
     if (!port) throw new Error("No hay una impresora conectada");
-    await sendToPort(port, bytes);
+    await sendToPort(port, bytes, baudRate);
+  });
+}
+
+export interface BaudProbeResult {
+  baud: number;
+  ok: boolean;
+  message?: string;
+}
+
+/**
+ * "Probar velocidades": por cada baud soportado, en orden, abre el puerto a esa
+ * velocidad, manda un ticket cortito que dice cuál es y lo cierra, con una pausa
+ * entre una y otra. El usuario mira cuál salió legible. NO cambia la velocidad
+ * guardada, nunca lanza (junta un resultado por baud) y va por la misma cola que
+ * las impresiones, así que no se pisa con ninguna; cada baud tiene el timeout de
+ * `sendToPort`, o sea que un puerto colgado no cuelga el POS.
+ */
+export function probePrinterBaudRates(
+  onProgress?: (baud: number, index: number, total: number) => void,
+): Promise<BaudProbeResult[]> {
+  return enqueue(async () => {
+    const results: BaudProbeResult[] = [];
+    const total = SUPPORTED_BAUD_RATES.length;
+    let port: ThermalSerialPort | null = null;
+    try {
+      port = await getConnectedPrinterPort();
+    } catch {
+      port = null;
+    }
+    for (let i = 0; i < total; i++) {
+      const baud = SUPPORTED_BAUD_RATES[i];
+      try {
+        onProgress?.(baud, i, total);
+      } catch {
+        // un callback roto no debe frenar la sonda
+      }
+      try {
+        if (!port) throw new Error("No hay una impresora conectada");
+        await sendToPort(port, encodeBaudProbeEscPos(baud), baud);
+        results.push({ baud, ok: true });
+      } catch (e) {
+        results.push({ baud, ok: false, message: errorMessage(e) });
+      }
+      if (port && i < total - 1) await sleep(PROBE_PAUSE_MS);
+    }
+    return results;
   });
 }
 
