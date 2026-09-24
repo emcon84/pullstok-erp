@@ -213,7 +213,9 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     await printed();
     const ticket = vi.mocked(printSaleTicketDirect).mock.calls[0][0];
     expect(ticket.businessName).toBe("Mi Pet Shop");
-    expect(ticket.logoUrl).toBe("https://cdn.test/logo.png");
+    // El ticket usa el logo negro empaquetado en la app (mismo origen, sin CORS),
+    // no el logo de branding (pensado para el tema oscuro).
+    expect(ticket.logoUrl).toContain("LogoConCirculoNegro");
     expect(ticket.taxId).toBe("30-12345678-9");
     expect(ticket.taxCondition).toBe("IVA Responsable Inscripto");
   });

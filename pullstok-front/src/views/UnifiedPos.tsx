@@ -17,6 +17,7 @@ import { useBranches } from "@/components/hooks/useBranches";
 import { useBrandingContext } from "@/contexts/BrandingContext";
 import { resolveTicketCompany } from "@/utils/saleTicket";
 import { printSaleTicketDirect } from "@/utils/printTicketDirect";
+import ticketLogoUrl from "@/assets/LogoConCirculoNegro.svg";
 import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,7 +111,10 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   const { branches } = useBranches(canListBranches);
   const ticketCompany = resolveTicketCompany({
     businessName: branding.displayName,
-    logoUrl: branding.logoUrl,
+    // Logo negro empaquetado en la app: mismo origen (sin CORS) y oscuro sobre
+    // transparente, que es lo que se ve en papel térmico. El logo de branding
+    // está pensado para el tema oscuro y no se imprime bien.
+    logoUrl: ticketLogoUrl,
     org: me?.organization,
     branch: branches.find((b) => b.id === branchId),
   });
