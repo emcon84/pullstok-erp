@@ -6,6 +6,7 @@ import type { VendorCartItem } from "./useVendorCart";
 import type { CartItem } from "../../models/salesModel";
 import type { CreateOrder } from "../../models/orderModel";
 import type { PaymentInput } from "../../models/cashSessionModel";
+import { buildSaleTicket, type SaleTicket, type TicketCompany } from "../../utils/saleTicket";
 
 interface UseVendorCheckoutParams {
   branchId: string;
@@ -17,6 +18,9 @@ interface UseVendorCheckoutParams {
   cartItems: VendorCartItem[];
   clearCart: () => void;
   totalAmount: number;
+  /** Encabezado del ticket térmico (nombre, logo, CUIT, dirección, teléfono).
+   *  Opcional: los views legacy no lo pasan y el ticket usa el nombre por defecto. */
+  ticketCompany?: TicketCompany;
 }
 
 /**
@@ -31,11 +35,16 @@ export function useVendorCheckout({
   cartItems,
   clearCart,
   totalAmount,
+  ticketCompany,
 }: UseVendorCheckoutParams) {
   const { createSale } = useCreateSale();
   const { submitOrder, loading: savingOrder } = useCreateOrder();
 
   const [confirming, setConfirming] = useState(false);
+  // Ticket de la última venta CONFIRMADA, pendiente de que el vendedor decida
+  // si lo imprime. Solo se setea tras un createSale exitoso.
+  const [pendingTicket, setPendingTicket] = useState<SaleTicket | null>(null);
+  const dismissTicket = useCallback(() => setPendingTicket(null), []);
 
   // ── Confirm sale ──
   const handleConfirmSale = useCallback(
@@ -43,6 +52,20 @@ export function useVendorCheckout({
       if (cartItems.length === 0) return;
       setConfirming(true);
       try {
+        // Snapshot del ticket ANTES de clearCart(): el carrito se vacía al
+        // confirmar. Si armarlo fallara, la venta igual sigue (solo no hay ticket).
+        let ticket: SaleTicket | null = null;
+        try {
+          ticket = buildSaleTicket({
+            ...ticketCompany,
+            issuedAt: new Date(),
+            items: cartItems,
+            payments,
+            discountPct,
+          });
+        } catch {
+          ticket = null;
+        }
         const cart: CartItem[] = cartItems.map((i) => ({
           product: {
             _id: i.productId,
@@ -81,6 +104,7 @@ export function useVendorCheckout({
         }));
         await createSale({ cart, payments, cashSessionId, discountPct });
         clearCart();
+        setPendingTicket(ticket);
         setCartOpen?.(false);
         toast.success("Pedido confirmado y vendido");
       } catch (err: any) {
@@ -89,7 +113,7 @@ export function useVendorCheckout({
         setConfirming(false);
       }
     },
-    [cartItems, createSale, clearCart],
+    [cartItems, createSale, clearCart, ticketCompany],
   );
 
   // ── Save cart as Pending Order ──
@@ -126,5 +150,7 @@ export function useVendorCheckout({
     savingOrder,
     handleConfirmSale,
     handleSaveOrder,
+    pendingTicket,
+    dismissTicket,
   };
 }
