@@ -42,6 +42,13 @@ compraron.
       bytes en chunks con timeout, desconectar) con `navigator.serial` mockeado. Ruta: writer único. Commit: 53b8924
 - [x] T7 — Wiring: `printSaleTicketDirect` (directo con respaldo al panel de Chrome), `handlePrintTicket`,
       botón `PrinterConnectButton` en el header del POS. Ruta: writer único. Commit: d140e5e
+- [x] T8 — Fix (rama `fix/ticket-serial-baud`): la prueba real por USB (puerto COM3, puente USB-serie) no
+      imprime ni da error → baud configurable (`SUPPORTED_BAUD_RATES` 9600…115200, persistido en
+      localStorage), `encodeBaudProbeEscPos`, `probePrinterBaudRates` ("Probar velocidades") y select
+      "Velocidad" en el menú de `PrinterConnectButton`. Ruta: writer único. Commit: 08dd8c6
+- [x] T9 — Fix: `close()` justo tras el último `write` puede truncar lo que aún sale por el UART →
+      `estimateDrainMs` (10 bits/byte x1,15 + 250 ms, tope 8 s) y espera del drenaje antes de cerrar;
+      timeout = 10 s + drenaje. Ruta: writer único. Commit: 5c2444f
 
 ## Seguimiento: impresión directa (2026-09-24, rama `feature/ticket-impresion-directa`)
 Objetivo: imprimir el ticket en la OCOM OCPP-M06 desde la PWA SIN panel de Chrome ni flags/impresora
@@ -99,3 +106,12 @@ Seguimiento impresión directa (rama feature/ticket-impresion-directa):
   códigos (todo sale transliterado a ASCII), ni el comportamiento en la PWA instalada. Riesgo: si el
   envío directo falla a mitad de ticket (o por timeout con papel ya impreso) el respaldo abre el panel y
   el ticket puede salir duplicado.
+
+Seguimiento baud/drenaje (rama fix/ticket-serial-baud):
+- T8 (08dd8c6): escpos 24, serialPrinter 43 y printerConnectButton 17 verdes (RED previo: 25 fallas por
+  exports inexistentes); tsc limpio; unifiedPos/printTicketDirect/saleTicket verdes.
+- T9 (5c2444f): serialPrinter 51/51 (RED previo: 22 fallas por `estimateDrainMs` inexistente; RED de
+  comportamiento confirmado quitando la espera: fallan los 3 tests de drenaje/timeout). Se actualizó el
+  test de timeout existente: avanza PRINT_TIMEOUT_MS + drenaje (el tope ahora es 10 s + drenaje).
+- NO verificado: impresora real, que el baud correcto haga salir papel por el puente USB, comportamiento
+  real de `port.close()` en Chrome/Windows ni el tiempo real de drenaje (es una estimación).
