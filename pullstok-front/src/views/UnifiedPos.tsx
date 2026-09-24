@@ -34,6 +34,9 @@ import { cn } from "@/lib/utils";
 
 type Tab = "unidad" | "suelto";
 
+/** Espera tras cerrar el diálogo de ticket antes de abrir el panel de impresión. */
+const PRINT_AFTER_CLOSE_MS = 300;
+
 // Producto devuelto por GET /products/by-scan (rama no-balanza) que se muestra
 // en el modal de confirmación antes de sumarlo como BOLSA_CERRADA al pedido.
 interface ScannedProduct {
@@ -139,10 +142,23 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
 
   // "¿Imprimir ticket?": Sí imprime y cierra; No solo cierra. La venta ya se
   // confirmó, así que nada de esto puede afectarla.
+  // window.print() bloquea el hilo mientras el navegador muestra su panel: si se
+  // llama con el diálogo todavía en pantalla, la animación de salida nunca
+  // termina y queda abierto. Por eso se cierra PRIMERO y se imprime cuando ya
+  // se fue (PRINT_AFTER_CLOSE_MS > duración de la animación de salida).
   const { pendingTicket, dismissTicket } = checkout;
   const handlePrintTicket = useCallback(() => {
-    if (pendingTicket) printSaleTicket(pendingTicket);
+    const ticket = pendingTicket;
     dismissTicket();
+    if (!ticket) return;
+    setTimeout(() => {
+      try {
+        // Puede ser síncrona o devolver una promesa: se atrapan ambas.
+        Promise.resolve(printSaleTicket(ticket)).catch(() => {});
+      } catch {
+        // La venta ya está confirmada: un fallo de impresión no la afecta.
+      }
+    }, PRINT_AFTER_CLOSE_MS);
   }, [pendingTicket, dismissTicket]);
 
   const registerGridApi = useCallback(
