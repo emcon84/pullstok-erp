@@ -35,12 +35,13 @@ compraron.
 - [x] T4 — Fix: el logo claro/blanco (pensado para tema oscuro) no se veía en el ticket. Pre-procesar en
       canvas (fetch → dataURL → composición sobre blanco, inversión de glifo claro, escala de grises);
       si falla algo, se usa la URL original con el filtro CSS. Ruta: delegada (writer). Commit: 624cdcf
-- [ ] T5 — Seguimiento "impresión directa": encoder ESC/POS puro (`utils/escpos.ts`: texto transliterado a
+- [x] T5 — Seguimiento "impresión directa": encoder ESC/POS puro (`utils/escpos.ts`: texto transliterado a
       ASCII, layout compacto 32 columnas, logo raster `GS v 0`, ticket de prueba). Ruta: writer único.
-- [ ] T6 — Transporte Web Serial (`utils/serialPrinter.ts`: soporte, puerto recordado, conectar, imprimir
-      bytes en chunks con timeout, desconectar) con `navigator.serial` mockeado. Ruta: writer único.
-- [ ] T7 — Wiring: `printSaleTicketDirect` (directo con respaldo al panel de Chrome), `handlePrintTicket`,
-      botón `PrinterConnectButton` en el header del POS. Ruta: writer único.
+      Commit: 80a7a71
+- [x] T6 — Transporte Web Serial (`utils/serialPrinter.ts`: soporte, puerto recordado, conectar, imprimir
+      bytes en chunks con timeout, desconectar) con `navigator.serial` mockeado. Ruta: writer único. Commit: 53b8924
+- [x] T7 — Wiring: `printSaleTicketDirect` (directo con respaldo al panel de Chrome), `handlePrintTicket`,
+      botón `PrinterConnectButton` en el header del POS. Ruta: writer único. Commit: d140e5e
 
 ## Seguimiento: impresión directa (2026-09-24, rama `feature/ticket-impresion-directa`)
 Objetivo: imprimir el ticket en la OCOM OCPP-M06 desde la PWA SIN panel de Chrome ni flags/impresora
@@ -84,3 +85,17 @@ Creado 2026-09-24.
   CORS (sin CORS el fetch falla y se usa la URL original con el filtro CSS, o sea el logo claro sigue
   sin verse).
 Próximo paso: revisión del usuario / push (decisión del usuario).
+
+Seguimiento impresión directa (rama feature/ticket-impresion-directa):
+- T5 (80a7a71): escpos.test.ts 22/22 (RED previo: módulo @/utils/escpos inexistente); saleTicket 48 y
+  tsc limpios (se exportaron money/qty/formatDateTime/clean de saleTicket.ts para reusar el formato).
+- T6 (53b8924): serialPrinter.test.ts 26/26 con navigator.serial mockeado (RED previo: módulo
+  inexistente); tsc limpio.
+- T7 (d140e5e): printTicketDirect (10), printerConnectButton (12), ticketLogo (16, +4 del bitmap) y
+  unifiedPos.printTicket (17) verdes (RED previo: módulos inexistentes / 12 fallas); suite completa 870 ok /
+  8 fallas preexistentes (priceKgUpdate 6, productDrawer 2); tsc limpio.
+- NO verificado: impresora real (OCOM OCPP-M06), prompt/persistencia real del permiso de Chrome, si
+  Windows expone la impresora como COM (Bluetooth SPP sí; USB depende del driver), baud/COM, página de
+  códigos (todo sale transliterado a ASCII), ni el comportamiento en la PWA instalada. Riesgo: si el
+  envío directo falla a mitad de ticket (o por timeout con papel ya impreso) el respaldo abre el panel y
+  el ticket puede salir duplicado.
