@@ -134,6 +134,9 @@ async function sell() {
   });
 }
 
+/** La impresión se difiere hasta que el diálogo ya se cerró. */
+const printed = (times = 1) => waitFor(() => expect(printSaleTicket).toHaveBeenCalledTimes(times));
+
 describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -170,7 +173,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     await sell();
     fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
 
-    expect(printSaleTicket).toHaveBeenCalledTimes(1);
+    await printed();
     const ticket = vi.mocked(printSaleTicket).mock.calls[0][0];
     // 16000 con 10% de descuento → 14400
     expect(ticket.total).toBe(14400);
@@ -187,7 +190,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     await sell();
     const yes = await screen.findByRole("button", { name: /sí, imprimir/i });
     fireEvent.keyDown(yes, { key: "s" });
-    expect(printSaleTicket).toHaveBeenCalledTimes(1);
+    await printed();
   });
 
   it("venta fallida: el diálogo NUNCA aparece", async () => {
@@ -206,6 +209,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     renderPos();
     await sell();
     fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+    await printed();
     const ticket = vi.mocked(printSaleTicket).mock.calls[0][0];
     expect(ticket.businessName).toBe("Mi Pet Shop");
     expect(ticket.logoUrl).toBe("https://cdn.test/logo.png");
@@ -217,6 +221,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     renderPos("VENDEDOR");
     await sell();
     fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+    await printed();
     const ticket = vi.mocked(printSaleTicket).mock.calls[0][0];
     expect(ticket.address).toBe("Dirección org");
     expect(ticket.phone).toBe("111-org");
@@ -228,8 +233,64 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     renderPos("ADMIN");
     await sell();
     fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+    await printed();
     const ticket = vi.mocked(printSaleTicket).mock.calls[0][0];
     expect(ticket.address).toBe("Dirección sucursal");
     expect(ticket.phone).toBe("222-suc");
+  });
+
+  it("'Sí': el diálogo ya está cerrado CUANDO se invoca la impresión (no antes)", async () => {
+    let dialogOpenAtPrint: boolean | null = null;
+    vi.mocked(printSaleTicket).mockImplementation(async () => {
+      dialogOpenAtPrint = !!screen.queryByText("¿Imprimir ticket?");
+    });
+    renderPos();
+    await sell();
+    const yes = await screen.findByRole("button", { name: /sí, imprimir/i });
+
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      fireEvent.click(yes);
+      // Todavía no se imprimió: primero tiene que terminar de irse el diálogo.
+      expect(printSaleTicket).not.toHaveBeenCalled();
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(printSaleTicket).toHaveBeenCalledTimes(1);
+    expect(dialogOpenAtPrint).toBe(false);
+    expect(screen.queryByText("¿Imprimir ticket?")).not.toBeInTheDocument();
+  });
+
+  it("'Sí' con impresión que falla: el diálogo se cierra igual y no revienta", async () => {
+    vi.mocked(printSaleTicket).mockImplementation(() => {
+      throw new Error("sin impresora");
+    });
+    renderPos();
+    await sell();
+    fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByText("¿Imprimir ticket?")).not.toBeInTheDocument(),
+    );
+    await printed();
+    // Damos un tick extra: un error no atrapado en el timer rompería el test.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  });
+
+  it("'Sí' con impresión asíncrona que rechaza: no genera rechazo sin manejar", async () => {
+    vi.mocked(printSaleTicket).mockRejectedValue(new Error("boom") as never);
+    renderPos();
+    await sell();
+    fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+    await printed();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
   });
 });
