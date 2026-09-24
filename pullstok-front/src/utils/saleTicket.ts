@@ -86,17 +86,17 @@ const num = (n: number, min: number, max: number) =>
   n.toLocaleString("es-AR", { minimumFractionDigits: min, maximumFractionDigits: max });
 
 /** Pesos es-AR sin decimales salvo que hagan falta ($8.000 / $1.226,67). */
-const money = (n: number) => {
+export const money = (n: number) => {
   const v = round2(n);
   return `$${num(v, Number.isInteger(v) ? 0 : 2, 2)}`;
 };
 
 /** Cantidades (unidades o kg): hasta 3 decimales, mínimo `min`. */
-const qty = (n: number, min = 0) => num(n, min, 3);
+export const qty = (n: number, min = 0) => num(n, min, 3);
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-const formatDateTime = (iso: string) => {
+export const formatDateTime = (iso: string) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -130,7 +130,7 @@ export function sanitizeLogoUrl(raw?: string | null): string | null {
   }
 }
 
-const clean = (v?: string | null) => v?.trim() || null;
+export const clean = (v?: string | null) => v?.trim() || null;
 
 /**
  * Arma los datos de empresa del encabezado: nombre/CUIT/condición de la
