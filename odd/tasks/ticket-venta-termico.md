@@ -115,3 +115,13 @@ Seguimiento baud/drenaje (rama fix/ticket-serial-baud):
   test de timeout existente: avanza PRINT_TIMEOUT_MS + drenaje (el tope ahora es 10 s + drenaje).
 - NO verificado: impresora real, que el baud correcto haga salir papel por el puente USB, comportamiento
   real de `port.close()` en Chrome/Windows ni el tiempo real de drenaje (es una estimación).
+
+Seguimiento: impresión directa desactivada (rama worktree-ticket-panel-only):
+- La sonda de velocidades mostró 5 baud "OK" sin que saliera papel. El único puerto serie era un FTDI
+  FT232R (vendor 0x0403 / product 0x6001); no se llegó a confirmar si era el puente de la impresora.
+  Decisión del usuario: configurar la impresora exige ir y venir a la PC de la impresora, así que el POS
+  vuelve a abrir SIEMPRE el panel de impresión de Chrome.
+- UnifiedPos llama a `printSaleTicket` y ya no muestra "Conectar impresora". Los módulos
+  serialPrinter / escpos / printTicketDirect / PrinterConnectButton siguen en el repo, sin uso desde la UI.
+- Tests: unifiedPos.printTicket 16/16 (RED previo: 2 fallas: botón visible y escritura al puerto con
+  una térmica serial conectada); suite completa 903 ok / 8 fallas preexistentes; tsc limpio.
