@@ -35,6 +35,20 @@ compraron.
 - [x] T4 — Fix: el logo claro/blanco (pensado para tema oscuro) no se veía en el ticket. Pre-procesar en
       canvas (fetch → dataURL → composición sobre blanco, inversión de glifo claro, escala de grises);
       si falla algo, se usa la URL original con el filtro CSS. Ruta: delegada (writer). Commit: 624cdcf
+- [ ] T5 — Seguimiento "impresión directa": encoder ESC/POS puro (`utils/escpos.ts`: texto transliterado a
+      ASCII, layout compacto 32 columnas, logo raster `GS v 0`, ticket de prueba). Ruta: writer único.
+- [ ] T6 — Transporte Web Serial (`utils/serialPrinter.ts`: soporte, puerto recordado, conectar, imprimir
+      bytes en chunks con timeout, desconectar) con `navigator.serial` mockeado. Ruta: writer único.
+- [ ] T7 — Wiring: `printSaleTicketDirect` (directo con respaldo al panel de Chrome), `handlePrintTicket`,
+      botón `PrinterConnectButton` en el header del POS. Ruta: writer único.
+
+## Seguimiento: impresión directa (2026-09-24, rama `feature/ticket-impresion-directa`)
+Objetivo: imprimir el ticket en la OCOM OCPP-M06 desde la PWA SIN panel de Chrome ni flags/impresora
+predeterminada, por Web Serial (`navigator.serial`) con bytes ESC/POS crudos. Flujo: una vez "Conectar
+impresora" (gesto de usuario → `requestPort()`), luego `getPorts()` devuelve el puerto recordado y se
+imprime en silencio. Solo sirve si Windows expone la impresora como puerto COM (seguro por Bluetooth/SPP;
+por USB depende del driver). Degrada siempre: sin puerto, sin soporte o ante cualquier error se usa
+`printSaleTicket` (panel de Chrome) como hoy. Nunca se pierde ni se bloquea una venta.
 
 ## Checks
 - TDD: strict (RED → GREEN → REFACTOR), runner `npx vitest run` en `pullstok-front/`.
