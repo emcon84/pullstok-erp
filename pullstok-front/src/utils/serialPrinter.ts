@@ -63,8 +63,15 @@ const PROBE_PAUSE_MS = 1500;
 const CHUNK_SIZE = 512;
 /** Pausa entre chunks para que la impresora vacíe su buffer. */
 const CHUNK_DELAY_MS = 20;
-/** Tope de toda la impresión: el POS nunca queda colgado esperando el puerto. */
+/**
+ * Holgura de la impresión: el POS nunca queda colgado esperando el puerto. El
+ * tope real es esta holgura + el tiempo de drenaje estimado (ver `sendToPort`).
+ */
 export const PRINT_TIMEOUT_MS = 10_000;
+/** Colchón fijo del drenaje: latencia del puente USB-serie y del cabezal. */
+const DRAIN_SLACK_MS = 250;
+/** Tope del drenaje: un ticket enorme a 9600 no bloquea el POS más que esto. */
+const DRAIN_MAX_MS = 8000;
 /** Cuánto esperar el cierre del puerto tras un timeout antes de soltarlo. */
 const CLEANUP_GRACE_MS = 2000;
 
@@ -73,6 +80,19 @@ const CLEANUP_GRACE_MS = 2000;
 const errorName = (e: unknown) => (e as { name?: string } | null)?.name;
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Cuánto esperar (ms) a que los bytes salgan físicamente por el UART antes de
+ * cerrar el puerto: `close()` justo tras el último `write` puede truncar lo que
+ * todavía está viajando (a 9600 baudios ≈ 960 B/s: un logo de varios KB tarda
+ * segundos). 8N1 = 10 bits por byte, +15 % de margen, +250 ms de colchón, tope 8 s.
+ */
+export function estimateDrainMs(byteLength: number, baud: number): number {
+  const bytes = Number.isFinite(byteLength) && byteLength > 0 ? byteLength : 0;
+  const rate = Number.isFinite(baud) && baud > 0 ? baud : DEFAULT_BAUD_RATE;
+  const transmit = ((bytes * 10) / rate) * 1000 * 1.15;
+  return Math.min(DRAIN_MAX_MS, Math.ceil(transmit + DRAIN_SLACK_MS));
+}
 
 function getSerial(): ThermalSerial | null {
   if (typeof navigator === "undefined") return null;
@@ -174,8 +194,8 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Abre el puerto (a `baudRate`, por defecto el guardado), escribe en chunks y
- * siempre libera el lock y cierra.
+ * Abre el puerto (a `baudRate`, por defecto el guardado), escribe en chunks,
+ * espera el drenaje del UART y siempre libera el lock y cierra.
  */
 async function sendToPort(
   port: ThermalSerialPort,
@@ -186,6 +206,7 @@ async function sendToPort(
   let opened = false;
   let timedOut = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const drainMs = estimateDrainMs(bytes.length, baudRate);
 
   const work = (async () => {
     try {
@@ -201,6 +222,9 @@ async function sendToPort(
       await writer.write(bytes.subarray(offset, offset + CHUNK_SIZE));
       if (offset + CHUNK_SIZE < bytes.length) await sleep(CHUNK_DELAY_MS);
     }
+    // `write` resuelve al encolar en el buffer del SO, no al salir por el cable:
+    // se espera el drenaje antes de soltar el lock y cerrar (si no, se trunca).
+    await sleep(drainMs);
   })();
   work.catch(() => {}); // si gana el timeout, su rechazo tardío no queda sin manejar
 
@@ -214,7 +238,7 @@ async function sendToPort(
         // best-effort
       }
       reject(new Error("Tiempo de espera agotado: la impresora no respondió"));
-    }, PRINT_TIMEOUT_MS);
+    }, PRINT_TIMEOUT_MS + drainMs);
   });
 
   const cleanup = async () => {

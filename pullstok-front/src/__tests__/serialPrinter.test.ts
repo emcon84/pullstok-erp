@@ -13,6 +13,7 @@ import {
   getPrinterBaudRate,
   setPrinterBaudRate,
   probePrinterBaudRates,
+  estimateDrainMs,
 } from "@/utils/serialPrinter";
 import { encodeBaudProbeEscPos, encodeTestTicketEscPos } from "@/utils/escpos";
 
@@ -215,7 +216,10 @@ describe("printBytes", () => {
     installSerial([p]);
     const bytes = Uint8Array.from({ length: 1300 }, (_, i) => i % 251);
 
-    await printBytes(bytes);
+    vi.useFakeTimers(); // el drenaje del buffer espera ~1,8 s a 9600
+    const printing = printBytes(bytes);
+    await vi.runAllTimersAsync();
+    await printing;
 
     expect(p.port.open).toHaveBeenCalledWith({ baudRate: 9600 });
     expect(p.written.map((c) => c.length)).toEqual([512, 512, 276]);
@@ -271,7 +275,7 @@ describe("printBytes", () => {
       () => "ok",
       (e: Error) => e.message,
     );
-    await vi.advanceTimersByTimeAsync(PRINT_TIMEOUT_MS + 50);
+    await vi.advanceTimersByTimeAsync(PRINT_TIMEOUT_MS + estimateDrainMs(3, 9600) + 50);
 
     expect(await result).toMatch(/tiempo/i);
     expect(p.writer.abort).toHaveBeenCalled();
@@ -410,19 +414,23 @@ describe("probePrinterBaudRates", () => {
     expect(getPrinterBaudRate()).toBe(19200);
   });
 
-  it("espera ~1,5 s entre velocidades (y no después de la última)", async () => {
+  it("espera ~1,5 s (tras el drenaje) entre velocidades", async () => {
     const p = makePort();
     installSerial([p]);
     vi.useFakeTimers();
+    const drain = estimateDrainMs(encodeBaudProbeEscPos(9600).length, 9600);
     const promise = probePrinterBaudRates();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(p.port.open).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(1400);
-    expect(p.port.open).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(300);
-    expect(p.port.open).toHaveBeenCalledTimes(2);
-    await vi.runAllTimersAsync();
-    await promise;
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(p.port.open).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(drain + 1400);
+      expect(p.port.open).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(300);
+      expect(p.port.open).toHaveBeenCalledTimes(2);
+    } finally {
+      await vi.runAllTimersAsync(); // que la cola (global) no quede colgada si falla un expect
+      await promise;
+    }
   });
 
   it("si una velocidad falla sigue con las demás y nunca lanza", async () => {
@@ -481,5 +489,92 @@ describe("probePrinterBaudRates", () => {
     expect(lastOpen).toEqual({ baudRate: 9600 });
     expect(p.written[p.written.length - 1]).toEqual(Uint8Array.from([9]));
     expect(p.port.open).toHaveBeenCalledTimes(6);
+  });
+});
+
+describe("estimateDrainMs", () => {
+  it("4000 bytes a 9600 baudios: ~4,8 s de transmisión + colchón (≈ 5 s)", () => {
+    const ms = estimateDrainMs(4000, 9600);
+    expect(ms).toBeGreaterThanOrEqual(4800);
+    expect(ms).toBeLessThan(5200);
+  });
+
+  it("pocos bytes a 115200: casi solo el colchón de 250 ms", () => {
+    const ms = estimateDrainMs(100, 115200);
+    expect(ms).toBeGreaterThanOrEqual(250);
+    expect(ms).toBeLessThanOrEqual(300);
+  });
+
+  it("tiene tope de 8 s", () => {
+    expect(estimateDrainMs(100_000, 9600)).toBe(8000);
+  });
+
+  it("crece con los bytes y baja con la velocidad", () => {
+    expect(estimateDrainMs(2000, 9600)).toBeGreaterThan(estimateDrainMs(1000, 9600));
+    expect(estimateDrainMs(2000, 115200)).toBeLessThan(estimateDrainMs(2000, 9600));
+  });
+
+  it("entradas raras no dan NaN ni negativos", () => {
+    for (const ms of [estimateDrainMs(0, 9600), estimateDrainMs(10, 0), estimateDrainMs(-5, Number.NaN)]) {
+      expect(Number.isFinite(ms)).toBe(true);
+      expect(ms).toBeGreaterThanOrEqual(250);
+      expect(ms).toBeLessThanOrEqual(8000);
+    }
+  });
+});
+
+describe("printBytes: espera el drenaje del buffer antes de cerrar", () => {
+  it("no cierra el puerto ni suelta el lock hasta que pasó el tiempo de drenaje", async () => {
+    vi.useFakeTimers();
+    const p = makePort();
+    installSerial([p]);
+    const bytes = new Uint8Array(100);
+    const drain = estimateDrainMs(bytes.length, 9600); // ≈ 370 ms
+
+    let done = false;
+    const printing = printBytes(bytes).then(() => {
+      done = true;
+    });
+    await vi.advanceTimersByTimeAsync(drain - 100);
+    expect(p.written).toHaveLength(1); // ya se escribió todo...
+    expect(p.port.close).not.toHaveBeenCalled(); // ...pero los bytes siguen saliendo por el UART
+    expect(p.writer.releaseLock).not.toHaveBeenCalled();
+    expect(done).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(200);
+    await printing;
+    expect(p.port.close).toHaveBeenCalledTimes(1);
+    expect(p.writer.releaseLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("el drenaje usa la velocidad efectiva (override): a 115200 cierra mucho antes", async () => {
+    vi.useFakeTimers();
+    const p = makePort();
+    installSerial([p]);
+    const bytes = new Uint8Array(1000);
+    const printing = printBytes(bytes, 115200);
+    await vi.advanceTimersByTimeAsync(estimateDrainMs(1000, 115200) + 60); // 2 chunks = 20 ms de pausa
+    await printing;
+    expect(p.port.close).toHaveBeenCalledTimes(1);
+    expect(estimateDrainMs(1000, 115200)).toBeLessThan(estimateDrainMs(1000, 9600) / 2);
+  });
+
+  it("el timeout suma el drenaje: un puerto colgado rechaza a los 10 s + drenaje, no antes", async () => {
+    vi.useFakeTimers();
+    const p = makePort({ writeImpl: () => new Promise<void>(() => {}) });
+    installSerial([p]);
+    const bytes = new Uint8Array(4000);
+    const limit = PRINT_TIMEOUT_MS + estimateDrainMs(bytes.length, 9600);
+
+    let msg = "";
+    const printing = printBytes(bytes).catch((e: Error) => {
+      msg = e.message;
+    });
+    await vi.advanceTimersByTimeAsync(limit - 100);
+    expect(msg).toBe("");
+    await vi.advanceTimersByTimeAsync(200);
+    await printing;
+    expect(msg).toMatch(/tiempo/i);
+    expect(p.writer.abort).toHaveBeenCalled();
   });
 });
