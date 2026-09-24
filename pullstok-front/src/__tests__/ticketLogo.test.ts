@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { processLogoPixels, prepareTicketLogo } from "@/utils/ticketLogo";
+import { processLogoPixels, prepareTicketLogo, prepareTicketLogoBitmap } from "@/utils/ticketLogo";
 
 // Logo del ticket térmico: las térmicas son de 1 bit sobre papel blanco, así que
 // un logo CLARO (pensado para tema oscuro) sobre fondo transparente hay que
@@ -169,5 +169,69 @@ describe("prepareTicketLogo", () => {
     const small = stubCanvas(new Uint8ClampedArray(4));
     await prepareTicketLogo(URL_);
     expect([small.canvas.width, small.canvas.height]).toEqual([100, 50]);
+  });
+});
+
+describe("prepareTicketLogoBitmap", () => {
+  const URL_ = "https://cdn.example.com/logo.png";
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function stubPipeline(naturalWidth: number, naturalHeight: number, data: Uint8ClampedArray) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(["x"], { type: "image/png" }) }),
+    );
+    class FakeImage {
+      naturalWidth = naturalWidth;
+      naturalHeight = naturalHeight;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_v: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+    vi.stubGlobal("Image", FakeImage);
+    const ctx = { drawImage: vi.fn(), getImageData: vi.fn(() => ({ data })), putImageData: vi.fn() };
+    const canvas = { width: 0, height: 0, getContext: vi.fn(() => ctx), toDataURL: vi.fn() };
+    const real = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tag: string) =>
+      tag === "canvas" ? canvas : real(tag)) as typeof document.createElement);
+    return canvas;
+  }
+
+  it("pipeline OK → bitmap RGBA procesado (glifo claro oscurecido) con el tamaño del canvas", async () => {
+    const data = new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    stubPipeline(100, 50, data);
+
+    const bmp = await prepareTicketLogoBitmap(URL_);
+
+    expect(bmp).not.toBeNull();
+    expect([bmp!.width, bmp!.height]).toEqual([100, 50]);
+    expect(bmp!.data[0]).toBeLessThan(60);
+    expect(bmp!.data[4]).toBe(255);
+  });
+
+  it("limita también el alto (160 px) manteniendo proporción", async () => {
+    const canvas = stubPipeline(320, 640, new Uint8ClampedArray(4));
+    await prepareTicketLogoBitmap(URL_);
+    expect([canvas.width, canvas.height]).toEqual([80, 160]);
+  });
+
+  it("fetch rechazado → null (nunca lanza)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("CORS")));
+    await expect(prepareTicketLogoBitmap(URL_)).resolves.toBeNull();
+  });
+
+  it("si tarda más de ~3 s → null sin bloquear", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    const p = prepareTicketLogoBitmap(URL_);
+    await vi.advanceTimersByTimeAsync(3100);
+    await expect(p).resolves.toBeNull();
   });
 });

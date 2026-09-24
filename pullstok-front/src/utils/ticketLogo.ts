@@ -80,14 +80,21 @@ const loadImage = (src: string) =>
     img.src = src;
   });
 
-/** Pipeline completo; null si algo no está disponible. */
-async function process(url: string): Promise<string | null> {
+/** Alto máx. del logo para el raster ESC/POS (puntos). */
+const MAX_BITMAP_HEIGHT_PX = 160;
+
+/**
+ * Pipeline compartido: URL → canvas escalado con los píxeles ya procesados
+ * (gris sobre blanco). null si algo no está disponible. `maxHeight` es
+ * opcional: el ticket HTML no lo necesita, el raster ESC/POS sí.
+ */
+async function renderLogo(url: string, maxHeight = Infinity) {
   const dataUrl = await fetchAsDataUrl(url);
   if (!dataUrl) return null;
   const img = await loadImage(dataUrl);
   if (!img.naturalWidth || !img.naturalHeight) return null;
 
-  const scale = Math.min(1, MAX_LOGO_WIDTH_PX / img.naturalWidth);
+  const scale = Math.min(1, MAX_LOGO_WIDTH_PX / img.naturalWidth, maxHeight / img.naturalHeight);
   const width = Math.max(1, Math.round(img.naturalWidth * scale));
   const height = Math.max(1, Math.round(img.naturalHeight * scale));
 
@@ -100,8 +107,15 @@ async function process(url: string): Promise<string | null> {
   ctx.drawImage(img, 0, 0, width, height);
   const imageData = ctx.getImageData(0, 0, width, height);
   processLogoPixels(imageData.data);
-  ctx.putImageData(imageData, 0, 0);
-  return canvas.toDataURL("image/png");
+  return { canvas, ctx, imageData, width, height };
+}
+
+/** Pipeline completo a data URL; null si algo no está disponible. */
+async function process(url: string): Promise<string | null> {
+  const r = await renderLogo(url);
+  if (!r) return null;
+  r.ctx.putImageData(r.imageData, 0, 0);
+  return r.canvas.toDataURL("image/png");
 }
 
 /**
@@ -114,6 +128,28 @@ export function prepareTicketLogo(url: string): Promise<string> {
     process(url)
       .then((result) => resolve(result ?? url))
       .catch(() => resolve(url))
+      .finally(() => clearTimeout(timer));
+  });
+}
+
+/** Logo ya procesado como píxeles RGBA (para rasterizar a ESC/POS). */
+export interface LogoBitmap {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+}
+
+/**
+ * Igual que prepareTicketLogo pero entrega los píxeles (RGBA, gris sobre
+ * blanco) en vez de un data URL. Nunca lanza ni bloquea más de ~3 s: ante
+ * cualquier problema resuelve null y el ticket se imprime sin logo.
+ */
+export function prepareTicketLogoBitmap(url: string): Promise<LogoBitmap | null> {
+  return new Promise<LogoBitmap | null>((resolve) => {
+    const timer = setTimeout(() => resolve(null), PREPARE_TIMEOUT_MS);
+    renderLogo(url, MAX_BITMAP_HEIGHT_PX)
+      .then((r) => resolve(r ? { width: r.width, height: r.height, data: r.imageData.data } : null))
+      .catch(() => resolve(null))
       .finally(() => clearTimeout(timer));
   });
 }
