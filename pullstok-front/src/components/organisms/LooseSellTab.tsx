@@ -428,7 +428,7 @@ export const LooseSellTab = ({
   });
 
   return (
-    <div ref={rootRef} className="mx-auto max-w-4xl space-y-6 min-h-0 lg:flex lg:w-full lg:flex-1 lg:flex-col lg:space-y-0">
+    <div ref={rootRef} className="mx-auto max-w-4xl space-y-6 min-h-0 lg:flex lg:w-full lg:flex-1 lg:flex-col lg:gap-4 lg:space-y-0 lg:pt-4">
       <div className="space-y-4 lg:shrink-0">
       {/* Buscador protagonista: input grande con lupa */}
       <div className="relative">

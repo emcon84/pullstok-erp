@@ -371,7 +371,17 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
 
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+      {/* En "Suelto" la planilla tiene ancho máximo (56rem = max-w-4xl): el
+          espacio sobrante (p. ej. al colapsar la sidebar) lo toma el panel de
+          pedido en vez de quedar como margen vacío entre ambos. */}
+      <div
+        className={cn(
+          "grid gap-6 lg:items-start",
+          tab === "suelto"
+            ? "lg:grid-cols-[minmax(0,56rem)_minmax(360px,1fr)]"
+            : "lg:grid-cols-[minmax(0,1fr)_360px]",
+        )}
+      >
       {/* ── Columna izquierda: header + tabs + contenido ── */}
       <div className="min-w-0 space-y-4 lg:flex lg:h-[calc(100vh_-_2rem)] lg:flex-col lg:space-y-0 lg:overflow-hidden">
         <div className="space-y-4 lg:shrink-0">
