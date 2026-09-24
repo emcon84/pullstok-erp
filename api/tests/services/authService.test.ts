@@ -230,6 +230,27 @@ describe('AuthService', () => {
       expect(result.branchIds).toEqual(['b-2', 'b-9']);
     });
 
+    it('selecciona los datos de contacto y fiscales del emisor de la organización (ticket/factura)', async () => {
+      mockedPrisma.user.findUnique.mockResolvedValue({
+        ...baseUser,
+        organization: { id: 'org-1', name: 'Org A' },
+      });
+      mockedPrisma.branchAssignment.findMany.mockResolvedValue([]);
+
+      await AuthService.me('u1');
+
+      const call = mockedPrisma.user.findUnique.mock.calls[0][0] as any;
+      expect(call.include.organization.select).toMatchObject({
+        name: true,
+        taxId: true,
+        taxCondition: true,
+        address: true,
+        phone: true,
+        ingresosBrutos: true,
+        inicioActividades: true,
+      });
+    });
+
     it('devuelve branchIds vacío cuando el usuario no tiene asignaciones', async () => {
       mockedPrisma.user.findUnique.mockResolvedValue({ ...baseUser, organization: null });
       mockedPrisma.branchAssignment.findMany.mockResolvedValue([]);
