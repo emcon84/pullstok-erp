@@ -1,4 +1,10 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+
+// El pre-proceso del logo (fetch + canvas) se prueba aparte en ticketLogo.test.ts;
+// acá se controla qué devuelve para no tocar la red.
+vi.mock("@/utils/ticketLogo", () => ({ prepareTicketLogo: vi.fn() }));
+
+import { prepareTicketLogo } from "@/utils/ticketLogo";
 import {
   buildSaleTicket,
   renderSaleTicketHtml,
@@ -252,6 +258,14 @@ describe("logo del ticket", () => {
     expect(html).toContain("max-height: 16mm");
     expect(html).toContain("object-fit: contain");
     expect(html).toContain("grayscale(1)");
+    // Sin procesar (URL cruda) usa el filtro CSS de respaldo vía la clase raw.
+    expect(img.classList.contains("raw")).toBe(true);
+    // Ya procesado (canvas) no se le aplica de nuevo.
+    const processed = renderSaleTicketHtml({ ...t, logoProcessed: true });
+    expect(
+      new DOMParser().parseFromString(processed, "text/html").querySelector("header img")!
+        .classList.contains("raw"),
+    ).toBe(false);
     // El nombre del negocio sigue como línea chica debajo del logo.
     expect(doc.querySelector("header")!.textContent).toContain("Mi Pet Shop");
   });
@@ -410,6 +424,11 @@ describe("datos de la empresa en el encabezado", () => {
 });
 
 describe("printSaleTicket", () => {
+  beforeEach(() => {
+    vi.mocked(prepareTicketLogo).mockReset();
+    // Por defecto el logo "no se pudo procesar": vuelve la URL original.
+    vi.mocked(prepareTicketLogo).mockImplementation(async (url) => url);
+  });
   afterEach(() => {
     vi.useRealTimers();
     document.body.innerHTML = "";
@@ -468,8 +487,8 @@ describe("printSaleTicket", () => {
   describe("con logo", () => {
     const LOGO = "https://cdn.example.com/logo.png";
 
-    function setup() {
-      printSaleTicket(build([bolsa], { logoUrl: LOGO }));
+    async function setup() {
+      await printSaleTicket(build([bolsa], { logoUrl: LOGO }));
       const iframe = getIframe()!;
       const win = iframe.contentWindow!;
       const print = vi.fn();
@@ -481,8 +500,8 @@ describe("printSaleTicket", () => {
       return { iframe, img, print };
     }
 
-    it("espera a que cargue el logo antes de imprimir", () => {
-      const { iframe, img, print } = setup();
+    it("espera a que cargue el logo antes de imprimir", async () => {
+      const { iframe, img, print } = await setup();
       iframe.dispatchEvent(new Event("load"));
       expect(print).not.toHaveBeenCalled();
 
@@ -491,17 +510,17 @@ describe("printSaleTicket", () => {
       expect(iframe.contentDocument!.querySelector("img")).not.toBeNull();
     });
 
-    it("si el logo falla, lo quita e imprime igual", () => {
-      const { iframe, img, print } = setup();
+    it("si el logo falla, lo quita e imprime igual", async () => {
+      const { iframe, img, print } = await setup();
       iframe.dispatchEvent(new Event("load"));
       img.dispatchEvent(new Event("error"));
       expect(print).toHaveBeenCalledTimes(1);
       expect(iframe.contentDocument!.querySelector("img")).toBeNull();
     });
 
-    it("si el logo tarda más de ~3 s, lo quita e imprime igual", () => {
+    it("si el logo tarda más de ~3 s, lo quita e imprime igual", async () => {
       vi.useFakeTimers();
-      const { iframe, print } = setup();
+      const { iframe, print } = await setup();
       iframe.dispatchEvent(new Event("load"));
       vi.advanceTimersByTime(2900);
       expect(print).not.toHaveBeenCalled();
@@ -510,8 +529,8 @@ describe("printSaleTicket", () => {
       expect(iframe.contentDocument!.querySelector("img")).toBeNull();
     });
 
-    it("si el logo ya estaba cargado imprime de inmediato", () => {
-      printSaleTicket(build([bolsa], { logoUrl: LOGO }));
+    it("si el logo ya estaba cargado imprime de inmediato", async () => {
+      await printSaleTicket(build([bolsa], { logoUrl: LOGO }));
       const iframe = getIframe()!;
       const print = vi.fn();
       iframe.contentWindow!.print = print;
@@ -521,14 +540,59 @@ describe("printSaleTicket", () => {
       iframe.dispatchEvent(new Event("load"));
       expect(print).toHaveBeenCalledTimes(1);
     });
+
+    it("usa el logo procesado (data URL) y ya no aplica el filtro CSS de respaldo", async () => {
+      const PROCESSED = "data:image/png;base64,QUJD";
+      vi.mocked(prepareTicketLogo).mockResolvedValue(PROCESSED);
+      await printSaleTicket(build([bolsa], { logoUrl: LOGO }));
+      const iframe = getIframe()!;
+      const img = iframe.contentDocument!.querySelector("img")!;
+
+      expect(prepareTicketLogo).toHaveBeenCalledWith(LOGO);
+      expect(img.getAttribute("src")).toBe(PROCESSED);
+      expect(img.classList.contains("raw")).toBe(false);
+    });
+
+    it("si no se pudo procesar, usa la URL original con el filtro CSS (clase raw)", async () => {
+      await printSaleTicket(build([bolsa], { logoUrl: LOGO })); // mock: devuelve la misma URL
+      const img = getIframe()!.contentDocument!.querySelector("img")!;
+      expect(img.getAttribute("src")).toBe(LOGO);
+      expect(img.classList.contains("raw")).toBe(true);
+    });
+
+    it("el logo procesado sobrevive a whenImagesReady (no se quita y se imprime)", async () => {
+      vi.mocked(prepareTicketLogo).mockResolvedValue("data:image/png;base64,QUJD");
+      await printSaleTicket(build([bolsa], { logoUrl: LOGO }));
+      const iframe = getIframe()!;
+      const print = vi.fn();
+      iframe.contentWindow!.print = print;
+      iframe.contentWindow!.focus = vi.fn();
+      const img = iframe.contentDocument!.querySelector("img")!;
+      Object.defineProperty(img, "complete", { value: false, configurable: true });
+      iframe.dispatchEvent(new Event("load"));
+      img.dispatchEvent(new Event("load"));
+      expect(print).toHaveBeenCalledTimes(1);
+      expect(iframe.contentDocument!.querySelector("img")).not.toBeNull();
+    });
+
+    it("sin logo no se invoca el pre-proceso", async () => {
+      await printSaleTicket(build([bolsa]));
+      expect(prepareTicketLogo).not.toHaveBeenCalled();
+    });
+
+    it("si el pre-proceso lanza igual imprime con la URL original", async () => {
+      vi.mocked(prepareTicketLogo).mockRejectedValue(new Error("boom"));
+      await expect(printSaleTicket(build([bolsa], { logoUrl: LOGO }))).resolves.toBeUndefined();
+      expect(getIframe()!.contentDocument!.querySelector("img")!.getAttribute("src")).toBe(LOGO);
+    });
   });
 
-  it("sin window (SSR) no falla", () => {
+  it("sin window (SSR) no falla", async () => {
     const win = globalThis.window;
     // @ts-expect-error simulamos entorno sin window
     delete globalThis.window;
     try {
-      expect(() => printSaleTicket(build([bolsa]))).not.toThrow();
+      await expect(printSaleTicket(build([bolsa]))).resolves.toBeUndefined();
     } finally {
       globalThis.window = win;
     }

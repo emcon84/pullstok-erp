@@ -1,6 +1,7 @@
 import { round2 } from "@/lib/money";
 import { PAYMENT_METHOD_LABELS, type PaymentInput } from "@/models/cashSessionModel";
 import type { VendorCartItem } from "@/components/hooks/useVendorCart";
+import { prepareTicketLogo } from "@/utils/ticketLogo";
 
 /**
  * Ticket de venta NO fiscal para impresora térmica de 58 mm.
@@ -35,6 +36,8 @@ export interface SaleTicketPayment {
 export interface SaleTicket {
   businessName: string;
   logoUrl?: string | null;
+  /** true si `logoUrl` ya pasó por el pre-proceso de canvas (gris, sobre blanco). */
+  logoProcessed?: boolean;
   /** Datos de la empresa para el encabezado (solo los que existen). */
   taxId?: string | null;
   taxCondition?: string | null;
@@ -215,7 +218,8 @@ const STYLES = `
 html, body { margin: 0; padding: 0; background: #fff; color: #000 }
 body { width: 48mm; padding: 1.5mm 2mm; font: 10.5px/1.15 "Courier New", Courier, monospace }
 header { text-align: center }
-header img { display: block; margin: 0 auto 1mm; max-width: 40mm; max-height: 16mm; object-fit: contain; filter: grayscale(1) contrast(1.2) }
+header img { display: block; margin: 0 auto 1mm; max-width: 40mm; max-height: 16mm; object-fit: contain }
+header img.raw { filter: grayscale(1) contrast(1.2) }
 .biz { font-weight: bold }
 .info { font-size: 9.5px; overflow-wrap: anywhere }
 .sep { border-top: 1px dashed #000; margin: 1mm 0 }
@@ -266,7 +270,7 @@ export function renderSaleTicketHtml(ticket: SaleTicket): string {
   return `<!DOCTYPE html>
 <html lang="es-AR"><head><meta charset="utf-8"><title>Ticket</title><style>${STYLES}</style></head>
 <body>
-<header>${logo ? `<img src="${escapeHtml(logo)}" alt="">` : ""}<div class="biz">${escapeHtml(ticket.businessName)}</div>${info}<div>${escapeHtml(formatDateTime(ticket.issuedAt))}</div></header>
+<header>${logo ? `<img${ticket.logoProcessed ? "" : ' class="raw"'} src="${escapeHtml(logo)}" alt="">` : ""}<div class="biz">${escapeHtml(ticket.businessName)}</div>${info}<div>${escapeHtml(formatDateTime(ticket.issuedAt))}</div></header>
 <div class="sep"></div>
 <section data-block="items">${items}</section>
 <div class="sep"></div>
@@ -323,10 +327,22 @@ function whenImagesReady(doc: Document, done: () => void) {
 /**
  * Imprime el ticket con el diálogo del navegador (driver de Windows) desde un
  * iframe oculto con su propio documento y @page. Sin window (SSR/tests sin DOM)
- * no hace nada.
+ * no hace nada. La promesa resuelve cuando el iframe quedó armado (no cuando
+ * termina la impresión). Sin logo no espera nada: el iframe se crea ya.
  */
-export function printSaleTicket(ticket: SaleTicket): void {
+export async function printSaleTicket(input: SaleTicket): Promise<void> {
   if (typeof window === "undefined" || typeof document === "undefined") return;
+
+  let ticket = input;
+  if (input.logoUrl) {
+    try {
+      // Logo claro → oscuro sobre blanco (nunca lanza; ante fallo vuelve la URL).
+      const logoUrl = await prepareTicketLogo(input.logoUrl);
+      ticket = { ...input, logoUrl, logoProcessed: logoUrl !== input.logoUrl };
+    } catch {
+      // Se imprime con la URL original y el filtro CSS de respaldo.
+    }
+  }
 
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");

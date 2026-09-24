@@ -241,7 +241,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
 
   it("'Sí': el diálogo ya está cerrado CUANDO se invoca la impresión (no antes)", async () => {
     let dialogOpenAtPrint: boolean | null = null;
-    vi.mocked(printSaleTicket).mockImplementation(() => {
+    vi.mocked(printSaleTicket).mockImplementation(async () => {
       dialogOpenAtPrint = !!screen.queryByText("¿Imprimir ticket?");
     });
     renderPos();
