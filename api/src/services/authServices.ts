@@ -227,6 +227,7 @@ class AuthService {
             taxId: true,
             taxCondition: true,
             address: true,
+            phone: true,
             ingresosBrutos: true,
             inicioActividades: true,
             enabledModules: true,

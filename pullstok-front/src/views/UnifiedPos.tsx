@@ -11,6 +11,10 @@ import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecules/VendorOrderPanel";
 import { OpenBagDialog } from "@/components/molecules/OpenBagDialog";
+import { PrintTicketDialog } from "@/components/molecules/PrintTicketDialog";
+import { useBranches } from "@/components/hooks/useBranches";
+import { useBrandingContext } from "@/contexts/BrandingContext";
+import { printSaleTicket, resolveTicketCompany } from "@/utils/saleTicket";
 import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,6 +96,20 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const sellsWholesale = me?.sellsWholesale ?? false;
 
+  // Encabezado del ticket térmico: logo/nombre del branding, CUIT/condición y
+  // dirección/teléfono de la organización (cache de ["me"]). La sucursal
+  // (dirección/teléfono propios) solo la puede listar ADMIN/MANAGEMENT
+  // (GET /branches); para el resto queda deshabilitada y rige la organización.
+  const { branding } = useBrandingContext();
+  const canListBranches = me?.role === "ADMIN" || me?.role === "MANAGEMENT";
+  const { branches } = useBranches(canListBranches);
+  const ticketCompany = resolveTicketCompany({
+    businessName: branding.displayName,
+    logoUrl: branding.logoUrl,
+    org: me?.organization,
+    branch: branches.find((b) => b.id === branchId),
+  });
+
   // Carrito ÚNICO de todo el POS (compartido entre ambas pestañas vía props).
   const cart = useVendorCart();
   const checkout = useVendorCheckout({
@@ -99,6 +117,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     cartItems: cart.items,
     clearCart: cart.clearCart,
     totalAmount: cart.totalAmount,
+    ticketCompany,
   });
   // Caja OPEN del vendedor (R8/R9): GATE — sin caja abierta no se puede vender
   // ni guardar pedido; también se propaga al confirmar la venta.
@@ -117,6 +136,14 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   const exitToGrid = useCallback(() => {
     gridApiRef.current?.focusSelectedRow();
   }, []);
+
+  // "¿Imprimir ticket?": Sí imprime y cierra; No solo cierra. La venta ya se
+  // confirmó, así que nada de esto puede afectarla.
+  const { pendingTicket, dismissTicket } = checkout;
+  const handlePrintTicket = useCallback(() => {
+    if (pendingTicket) printSaleTicket(pendingTicket);
+    dismissTicket();
+  }, [pendingTicket, dismissTicket]);
 
   const registerGridApi = useCallback(
     (api: { focusSelectedRow: () => void; clearSearch?: () => void }) => {
@@ -643,6 +670,16 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* ── ¿Imprimir ticket? (tras una venta confirmada) ──
+        Al cerrarse, el foco vuelve al listado: el botón que lo tenía (Vender)
+        ya no existe porque el carrito se vació. */}
+    <PrintTicketDialog
+      open={!!pendingTicket}
+      onPrint={handlePrintTicket}
+      onSkip={dismissTicket}
+      onClosed={exitToGrid}
+    />
 
     {/* ── Modal de Abrir bolsa ── */}
     <OpenBagDialog
