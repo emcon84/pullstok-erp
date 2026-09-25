@@ -5,11 +5,16 @@ import React from "react";
 
 // Vista admin "Carga manual": servicio (GET /products/manual, POST
 // /products/:id/promote) + hooks (query y mutation con invalidación).
-const { mockGet, mockPost } = vi.hoisted(() => ({ mockGet: vi.fn(), mockPost: vi.fn() }));
+const { mockGet, mockPost, mockDelete } = vi.hoisted(() => ({
+  mockGet: vi.fn(),
+  mockPost: vi.fn(),
+  mockDelete: vi.fn(),
+}));
 vi.mock("axios", () => ({
   default: {
     get: mockGet,
     post: mockPost,
+    delete: mockDelete,
     isAxiosError: (e: unknown) => !!(e as { isAxiosError?: boolean })?.isAxiosError,
   },
   isAxiosError: (e: unknown) => !!(e as { isAxiosError?: boolean })?.isAxiosError,
@@ -18,9 +23,11 @@ vi.mock("axios", () => ({
 import {
   getManualProducts,
   promoteManualProduct,
+  deleteManualProduct,
 } from "../services/productService";
 import { useManualProducts } from "../components/hooks/useManualProducts";
 import { usePromoteManualProduct } from "../components/hooks/usePromoteManualProduct";
+import { useDeleteManualProduct } from "../components/hooks/useDeleteManualProduct";
 
 describe("getManualProducts (service)", () => {
   beforeEach(() => {
@@ -95,6 +102,58 @@ describe("promoteManualProduct (service)", () => {
     await expect(promoteManualProduct("p1", "c9")).rejects.toThrow(
       "An unknown error occurred",
     );
+  });
+});
+
+describe("deleteManualProduct (service)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem("token", "test-token");
+    mockDelete.mockReset();
+  });
+
+  it("hace DELETE /products/manual/:id con el Bearer y devuelve la respuesta", async () => {
+    mockDelete.mockResolvedValue({ data: { message: "Producto eliminado" } });
+
+    const result = await deleteManualProduct("p1");
+
+    expect(result).toEqual({ message: "Producto eliminado" });
+    expect(mockDelete).toHaveBeenCalledWith(
+      expect.stringMatching(/\/products\/manual\/p1$/),
+      { headers: { Authorization: "Bearer test-token" } },
+    );
+  });
+
+  it("propaga el message del backend (409 en pedido/presupuesto)", async () => {
+    mockDelete.mockRejectedValue({
+      isAxiosError: true,
+      response: {
+        status: 409,
+        data: { message: "No se puede eliminar: el producto está en un pedido o presupuesto" },
+      },
+    });
+
+    await expect(deleteManualProduct("p1")).rejects.toThrow(
+      "No se puede eliminar: el producto está en un pedido o presupuesto",
+    );
+  });
+
+  it("el error conserva el status HTTP para que el llamador distinga el 404", async () => {
+    mockDelete.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 404, data: { message: "Producto manual no encontrado" } },
+    });
+
+    await expect(deleteManualProduct("p1")).rejects.toMatchObject({
+      message: "Producto manual no encontrado",
+      status: 404,
+    });
+  });
+
+  it("usa un mensaje genérico ante un error que no es de axios", async () => {
+    mockDelete.mockRejectedValue(new Error("boom"));
+
+    await expect(deleteManualProduct("p1")).rejects.toThrow("An unknown error occurred");
   });
 });
 
@@ -207,6 +266,80 @@ describe("usePromoteManualProduct (hook)", () => {
 
     await waitFor(() => expect(mockPost).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByTestId("promoting")).toHaveTextContent("false"));
+    expect(productsFetch).toHaveBeenCalledTimes(1);
+    expect(manualFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useDeleteManualProduct (hook)", () => {
+  const productsFetch = vi.fn();
+  const manualFetch = vi.fn();
+
+  function Probes() {
+    useQuery({ queryKey: ["products"], queryFn: productsFetch });
+    useQuery({ queryKey: ["manual-products"], queryFn: manualFetch });
+    return null;
+  }
+
+  function Harness() {
+    const { deleteProduct, deleting } = useDeleteManualProduct();
+    return (
+      <div>
+        <span data-testid="deleting">{String(deleting)}</span>
+        <button onClick={() => deleteProduct("p1").catch(() => {})}>eliminar</button>
+      </div>
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem("token", "test-token");
+    mockDelete.mockReset();
+    productsFetch.mockReset().mockResolvedValue([]);
+    manualFetch.mockReset().mockResolvedValue([]);
+  });
+
+  it("llama al servicio con el id y refresca ['products'] y la lista manual al éxito", async () => {
+    mockDelete.mockResolvedValue({ data: { message: "Producto eliminado" } });
+    renderWithClient(
+      <>
+        <Harness />
+        <Probes />
+      </>,
+    );
+    await waitFor(() => expect(productsFetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(manualFetch).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "eliminar" }));
+
+    await waitFor(() =>
+      expect(mockDelete).toHaveBeenCalledWith(
+        expect.stringMatching(/\/products\/manual\/p1$/),
+        expect.anything(),
+      ),
+    );
+    await waitFor(() => expect(productsFetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(manualFetch).toHaveBeenCalledTimes(2));
+  });
+
+  it("no invalida nada cuando la API falla", async () => {
+    mockDelete.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 409, data: { message: "x" } },
+    });
+    renderWithClient(
+      <>
+        <Harness />
+        <Probes />
+      </>,
+    );
+    await waitFor(() => expect(productsFetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(manualFetch).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "eliminar" }));
+
+    await waitFor(() => expect(mockDelete).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId("deleting")).toHaveTextContent("false"));
     expect(productsFetch).toHaveBeenCalledTimes(1);
     expect(manualFetch).toHaveBeenCalledTimes(1);
   });

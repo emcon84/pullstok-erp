@@ -4,6 +4,7 @@ import {
   createManualProduct as createManualProductService,
   listManualProducts as listManualProductsService,
   promoteManualProduct as promoteManualProductService,
+  deleteManualProduct as deleteManualProductService,
 } from "../services/manualProductService";
 import { emitProductChanged } from "../realtime/socket";
 import { requireOrganizationId } from "../config/tenantContext";
@@ -11,7 +12,7 @@ import { requireOrganizationId } from "../config/tenantContext";
 // Avisa al catálogo offline del front DESPUÉS de confirmada la mutación. Un
 // fallo del socket nunca rompe la operación HTTP (mismo patrón que
 // productController.notifyProductChanged).
-const notifyProductChanged = (productId: string, action: "created" | "updated") => {
+const notifyProductChanged = (productId: string, action: "created" | "updated" | "deleted") => {
   try {
     emitProductChanged(requireOrganizationId(), productId, action);
   } catch (err: any) {
@@ -62,4 +63,21 @@ const promoteManualProduct = async (req: Request, res: Response) => {
   }
 };
 
-export default { createManualProduct, listManualProducts, promoteManualProduct };
+// DELETE /products/manual/:id — solo productos manuales de la org. 404 si no
+// existe/no es manual, 409 si lo referencia un pedido o presupuesto.
+const deleteManualProduct = async (req: Request, res: Response) => {
+  try {
+    await deleteManualProductService(req.params.id as string);
+    notifyProductChanged(req.params.id as string, "deleted");
+    return res.status(200).json({ message: "Producto eliminado" });
+  } catch (error) {
+    return handleError(res, error, "Error al eliminar el producto manual");
+  }
+};
+
+export default {
+  createManualProduct,
+  listManualProducts,
+  promoteManualProduct,
+  deleteManualProduct,
+};

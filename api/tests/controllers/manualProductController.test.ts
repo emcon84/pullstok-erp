@@ -5,6 +5,7 @@ import {
   createManualProduct,
   listManualProducts,
   promoteManualProduct,
+  deleteManualProduct,
 } from "../../src/services/manualProductService";
 import { emitProductChanged } from "../../src/realtime/socket";
 
@@ -15,6 +16,7 @@ jest.mock("../../src/services/manualProductService", () => {
     createManualProduct: jest.fn(),
     listManualProducts: jest.fn(),
     promoteManualProduct: jest.fn(),
+    deleteManualProduct: jest.fn(),
   };
 });
 
@@ -29,6 +31,7 @@ jest.mock("../../src/realtime/socket", () => ({
 const mockedCreate = createManualProduct as jest.Mock;
 const mockedList = listManualProducts as jest.Mock;
 const mockedPromote = promoteManualProduct as jest.Mock;
+const mockedDelete = deleteManualProduct as jest.Mock;
 const mockedEmit = emitProductChanged as jest.Mock;
 
 const mockResponse = () => {
@@ -139,5 +142,78 @@ describe("manualProductController.promoteManualProduct", () => {
     await manualProductController.promoteManualProduct(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
+  });
+});
+
+describe("manualProductController.deleteManualProduct", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const req = { params: { id: "p1" } } as unknown as Request;
+
+  it("200 con mensaje y emite product:changed 'deleted'", async () => {
+    mockedDelete.mockResolvedValue(undefined);
+    const res = mockResponse();
+
+    await manualProductController.deleteManualProduct(req, res);
+
+    expect(mockedDelete).toHaveBeenCalledWith("p1");
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ message: "Producto eliminado" });
+    expect(mockedEmit).toHaveBeenCalledWith("org-1", "p1", "deleted");
+  });
+
+  it("un fallo del socket no rompe la respuesta", async () => {
+    mockedDelete.mockResolvedValue(undefined);
+    mockedEmit.mockImplementationOnce(() => {
+      throw new Error("socket caído");
+    });
+    const res = mockResponse();
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await manualProductController.deleteManualProduct(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("404 con { message } si no existe / no es manual, sin emitir", async () => {
+    mockedDelete.mockRejectedValue(
+      new ManualProductError(404, "Producto manual no encontrado"),
+    );
+    const res = mockResponse();
+
+    await manualProductController.deleteManualProduct(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ message: "Producto manual no encontrado" });
+    expect(mockedEmit).not.toHaveBeenCalled();
+  });
+
+  it("409 con { message } si está en un pedido/presupuesto, sin emitir", async () => {
+    mockedDelete.mockRejectedValue(
+      new ManualProductError(
+        409,
+        "No se puede eliminar: el producto está en un pedido o presupuesto",
+      ),
+    );
+    const res = mockResponse();
+
+    await manualProductController.deleteManualProduct(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "No se puede eliminar: el producto está en un pedido o presupuesto",
+    });
+    expect(mockedEmit).not.toHaveBeenCalled();
+  });
+
+  it("500 ante un error inesperado, sin emitir", async () => {
+    mockedDelete.mockRejectedValue(new Error("boom"));
+    const res = mockResponse();
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await manualProductController.deleteManualProduct(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(mockedEmit).not.toHaveBeenCalled();
   });
 });

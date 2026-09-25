@@ -388,6 +388,35 @@ export const promoteManualProduct = async (
   }
 };
 
+/** Error de API con el status HTTP, para que el llamador distinga p. ej. el 404. */
+export type ApiError = Error & { status?: number };
+
+/**
+ * DELETE /products/manual/:id — elimina un producto manual (ADMIN/MANAGEMENT).
+ * El server responde 409 si algún pedido/presupuesto lo referencia y 404 si ya
+ * no existe o dejó de ser manual; el error conserva el `status` y el `message`.
+ */
+export const deleteManualProduct = async (id: string): Promise<{ message: string }> => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const response = await axios.delete<{ message: string }>(
+      `${API_URL}/products/manual/${id}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw Object.assign(
+        new Error(error.response?.data?.message || "delete manual product failed"),
+        { status: error.response?.status },
+      );
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+
 export const updateProduct = async (product: DataItem) => {
   try {
     const token = localStorage.getItem("token");

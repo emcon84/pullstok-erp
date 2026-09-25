@@ -5,6 +5,7 @@ import {
   createManualProduct,
   listManualProducts,
   promoteManualProduct,
+  deleteManualProduct,
 } from "../../src/services/manualProductService";
 
 jest.mock("../../src/config/db", () => ({
@@ -15,7 +16,10 @@ jest.mock("../../src/config/db", () => ({
       findMany: jest.fn(),
       findFirst: jest.fn(),
       updateMany: jest.fn(),
+      deleteMany: jest.fn(),
     },
+    orderItem: { count: jest.fn() },
+    quotationItem: { count: jest.fn() },
   },
   basePrisma: {},
 }));
@@ -31,7 +35,10 @@ const mockedPrisma = prisma as unknown as {
     findMany: jest.Mock;
     findFirst: jest.Mock;
     updateMany: jest.Mock;
+    deleteMany: jest.Mock;
   };
+  orderItem: { count: jest.Mock };
+  quotationItem: { count: jest.Mock };
 };
 
 const manualCategory = { id: "cat-manual", name: MANUAL_CATEGORY_NAME, parentId: null };
@@ -166,5 +173,97 @@ describe("manualProductService.promoteManualProduct", () => {
       status: 404,
     });
     expect(mockedPrisma.product.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe("manualProductService.deleteManualProduct", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedPrisma.product.findFirst.mockResolvedValue({ id: "p1" });
+    mockedPrisma.orderItem.count.mockResolvedValue(0);
+    mockedPrisma.quotationItem.count.mockResolvedValue(0);
+    mockedPrisma.product.deleteMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("borra el producto manual (deleteMany con isManual:true en el where)", async () => {
+    await deleteManualProduct("p1");
+
+    expect(mockedPrisma.product.findFirst).toHaveBeenCalledWith({
+      where: { id: "p1", isManual: true },
+      select: { id: true },
+    });
+    expect(mockedPrisma.product.deleteMany).toHaveBeenCalledWith({
+      where: { id: "p1", isManual: true },
+    });
+  });
+
+  it("404 si no existe, es de otra org o no es manual (no borra nada)", async () => {
+    mockedPrisma.product.findFirst.mockResolvedValue(null);
+
+    const err = await deleteManualProduct("p-x").catch((e) => e);
+
+    expect(err).toBeInstanceOf(ManualProductError);
+    expect(err.status).toBe(404);
+    expect(err.message).toBe("Producto manual no encontrado");
+    expect(mockedPrisma.product.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("404 si el deleteMany borra 0 filas (carrera: lo borraron/promovieron en el medio)", async () => {
+    mockedPrisma.product.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(deleteManualProduct("p1")).rejects.toMatchObject({
+      status: 404,
+      message: "Producto manual no encontrado",
+    });
+  });
+
+  it("409 si algún pedido lo referencia (no borra)", async () => {
+    mockedPrisma.orderItem.count.mockResolvedValue(2);
+
+    const err = await deleteManualProduct("p1").catch((e) => e);
+
+    expect(err).toBeInstanceOf(ManualProductError);
+    expect(err.status).toBe(409);
+    expect(err.message).toBe(
+      "No se puede eliminar: el producto está en un pedido o presupuesto",
+    );
+    expect(mockedPrisma.orderItem.count).toHaveBeenCalledWith({
+      where: { productId: "p1" },
+    });
+    expect(mockedPrisma.product.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("409 si algún presupuesto lo referencia (no borra)", async () => {
+    mockedPrisma.quotationItem.count.mockResolvedValue(1);
+
+    await expect(deleteManualProduct("p1")).rejects.toMatchObject({ status: 409 });
+    expect(mockedPrisma.quotationItem.count).toHaveBeenCalledWith({
+      where: { productId: "p1" },
+    });
+    expect(mockedPrisma.product.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("traduce una violación de FK (P2003) del deleteMany a 409 (carrera)", async () => {
+    mockedPrisma.product.deleteMany.mockRejectedValue(
+      Object.assign(new Error("FK"), { code: "P2003" }),
+    );
+
+    await expect(deleteManualProduct("p1")).rejects.toMatchObject({
+      status: 409,
+      message: "No se puede eliminar: el producto está en un pedido o presupuesto",
+    });
+  });
+
+  it("un error inesperado del deleteMany se propaga tal cual", async () => {
+    const boom = new Error("boom");
+    mockedPrisma.product.deleteMany.mockRejectedValue(boom);
+
+    await expect(deleteManualProduct("p1")).rejects.toBe(boom);
+  });
+
+  it("un manual ya vendido se borra igual (SaleItem.productId es opcional/SetNull: no se consulta)", async () => {
+    // Solo pedidos y presupuestos bloquean; las ventas no.
+    await expect(deleteManualProduct("p1")).resolves.toBeUndefined();
+    expect(mockedPrisma.product.deleteMany).toHaveBeenCalledTimes(1);
   });
 });

@@ -93,3 +93,51 @@ export const promoteManualProduct = async (id: string, categoryId: string) => {
 
   return prisma.product.findFirst({ where: { id }, include: categorySelect });
 };
+
+const IN_USE_MESSAGE =
+  "No se puede eliminar: el producto está en un pedido o presupuesto";
+
+/**
+ * Elimina un producto manual de la org. Solo borra filas con isManual:true (el
+ * deleteMany lleva el flag en el where: un producto normal jamás se borra por
+ * acá) y queda scoped por org por la extensión anti-fuga.
+ *
+ * - 404 si no existe / no es manual / es de otra org.
+ * - 409 si lo referencia un OrderItem o QuotationItem (FK requerida sin cascada:
+ *   no se altera un pedido/presupuesto existente). OrderItem/QuotationItem no
+ *   son tenant-scoped, pero el productId ya quedó validado como de la org.
+ * - Un manual ya vendido SÍ se borra: SaleItem.productId es opcional (SetNull)
+ *   y la línea conserva su propio `name`.
+ * - Si una carrera crea la referencia entre el chequeo y el borrado, la FK
+ *   (P2003) se traduce al mismo 409.
+ */
+export const deleteManualProduct = async (id: string): Promise<void> => {
+  const product = await prisma.product.findFirst({
+    where: { id, isManual: true },
+    select: { id: true },
+  });
+  if (!product) {
+    throw new ManualProductError(404, "Producto manual no encontrado");
+  }
+
+  const [orderItems, quotationItems] = await Promise.all([
+    prisma.orderItem.count({ where: { productId: id } }),
+    prisma.quotationItem.count({ where: { productId: id } }),
+  ]);
+  if (orderItems > 0 || quotationItems > 0) {
+    throw new ManualProductError(409, IN_USE_MESSAGE);
+  }
+
+  let result: { count: number };
+  try {
+    result = await prisma.product.deleteMany({ where: { id, isManual: true } });
+  } catch (error: any) {
+    if (error?.code === "P2003") {
+      throw new ManualProductError(409, IN_USE_MESSAGE);
+    }
+    throw error;
+  }
+  if (result.count === 0) {
+    throw new ManualProductError(404, "Producto manual no encontrado");
+  }
+};
