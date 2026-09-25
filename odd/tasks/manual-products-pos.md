@@ -1,0 +1,76 @@
+# Carga manual de productos en el POS del vendedor
+
+## Objetivo
+Cuando el vendedor arma un pedido de venta y no encuentra el producto, puede
+cargarlo a mano (nombre + precio) y se agrega al pedido. Esos productos quedan
+guardados en una categoría especial ("Carga manual") y el admin los ve en una
+lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
+
+## Decisiones (confirmadas con el usuario)
+- El producto manual es un `Product` REAL (los `OrderItem`/`SaleItem` mantienen
+  su FK) con `isManual = true`, creado en la categoría "Carga manual" de la org.
+- Los productos manuales NO validan ni descuentan stock en `createSale`
+  (decisión del usuario, 2026-09-25). Al promoverlos se les carga stock normal.
+- Un solo flag (`isManual`): true = pendiente de revisión. Promover = `isManual=false`
+  + categoría real elegida. Sin segundo flag "review pending" (redundante).
+- Fuera de alcance (pedido aparte del usuario, "vamos de a una cosa"): que el
+  vendedor pueda crear productos reales/promover. Se decide después.
+
+## Hechos verificados
+- `Product.categoryId` es nullable; `Category` unique = `[organizationId, parentId, name]`
+  (parentId null → Postgres no lo deduplica: hacer findFirst + create, como los scripts).
+- Stock en `api/src/services/salesService.ts`: rama sucursal (`else if (sellerBranchId)`,
+  ~L374) y rama legacy/admin (~L405) validan y descuentan. La rama suelta (~L344)
+  no aplica (los manuales solo se venden BOLSA_CERRADA).
+- Precio BOLSA_CERRADA es server-authoritative desde `product.price` → el precio
+  tipeado se guarda en el Product.
+- El carrito (`CartItemRow`) topea el `+` con `item.stock` → los manuales no deben topearse.
+- Órdenes PENDING no validan stock; la conversión orden→venta pasa por `createSale`.
+- `publishedToStore` default false → no sale en la tienda pública; igual se filtra por `isManual`.
+
+## Contexto de checks
+- TDD: estricto (Strict TDD Mode habilitado en la config del usuario/sesión).
+- Runner backend: jest (`npm test` en `api/`, unit sin DB; e2e solo en VPS).
+- Runner frontend: vitest (`npm test` en `pullstok-front/`).
+- Migraciones: las aplica el pipeline (GitHub Actions) — NO correr manual.
+- Estimación: ~450 líneas autorales (heurística, no tope). Estrategia de entrega: ask-on-risk.
+
+## Tareas
+- [x] T1 — API: `Product.isManual` (schema + migración) y `createSale` saltea
+      validación/descuento de stock para productos manuales (ramas sucursal y
+      legacy). Auditar caminos que devuelven stock (anular venta, etc.). Tests primero.
+- [ ] T2 — API: servicio+endpoint `POST /products/manual` (roles ADMIN, MANAGEMENT,
+      VENDEDOR, CASHIER; crea/reusa categoría "Carga manual", `isManual=true`,
+      `quantity=0`, `publishedToStore=false`), `GET /products/manual` (lista
+      admin) y `POST /products/:id/promote` (categoría real + `isManual=false`).
+      Zod, multi-tenant, tests.
+- [ ] T3 — Front: dialog "Producto manual" en `UnifiedPos` (nombre + precio +
+      cantidad) → `POST /products/manual` → línea al carrito; el carrito no topea
+      líneas manuales por stock. Tests primero.
+- [ ] T4 — Front: vista admin "Carga manual" (lista + acción "Agregar al sistema"
+      con categoría, reusando el modal/drawer de edición), ruta + sidebar.
+
+## Ruteo por tarea
+(se completa al implementar: inline/delegado + evidencia del trigger)
+- T1: delegated writer (2+ non-trivial files)
+
+## Progreso / evidencia
+- Rama: `feat/manual-products-pos`.
+- T1 (RED→GREEN): tests nuevos en `api/tests/services/salesService.test.ts`. RED
+  observado: 4 fallaron (manual sucursal sin ProductStock, manual legacy qty 0,
+  deleteSale sucursal y legacy reponían stock de manuales); 2 de regresión
+  (no-manual sin stock sigue lanzando) pasaban. GREEN: `npx jest
+  tests/services/salesService.test.ts` 34/34; `npm test` → solo fallan suites
+  `tests/e2e/*` (requieren Postgres, solo VPS) y `botService.test.ts`, que pasa
+  12/12 aislada (flaky bajo carga); `npx tsc --noEmit` → 3 errores preexistentes,
+  todos en `tests/e2e/` (business-hours, loose-sale), ninguno en archivos de T1.
+- T1 auditoría de reposición de stock: único camino que repone stock por ítems de
+  venta = `salesService.deleteSale` (increment en LooseStock / ProductStock /
+  Product) → ahora saltea productos `isManual`. `looseSaleService.openBag` es
+  apertura de bolsa (no ligado a ventas); no hay cancelación de pedido con stock
+  (las órdenes PENDING no validan ni descuentan stock).
+- Migración `20260925120000_add_product_is_manual` escrita a mano, NO aplicada
+  (la aplica el pipeline).
+
+## Próximo paso
+T2 (API: `POST/GET /products/manual` y `POST /products/:id/promote`).

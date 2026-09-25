@@ -341,7 +341,10 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
           : saleMode === "POR_UNIDAD_BLISTER"
           ? 1
           : lineQuantity;
-      if (isLoose && cell) {
+      if (product?.isManual) {
+        // Producto cargado a mano (pendiente de pasar al sistema): no valida ni
+        // descuenta stock, ni de sucursal ni global.
+      } else if (isLoose && cell) {
         // Ventas sueltas: descuentan kg del LooseStock de la celda (la bolsa
         // física ya se abrió con openBag y su peso quedó acreditado acá).
         const kg = lineQuantity;
@@ -630,6 +633,19 @@ export const deleteSale = async (id: string) => {
     // Los items se borran en cascada (onDelete: Cascade en el schema).
     await tx.sale.deleteMany({ where: { id } });
 
+    // Los productos manuales nunca descontaron stock al vender → no se repone
+    // (evita inflar stock al anular la venta).
+    const productIds = sale.items
+      .map((item) => item.productId)
+      .filter((pid): pid is string => !!pid);
+    const manualRows = productIds.length
+      ? await tx.product.findMany({
+          where: { id: { in: productIds }, organizationId, isManual: true },
+          select: { id: true },
+        })
+      : [];
+    const manualIds = new Set(manualRows.map((p) => p.id));
+
     if (sale.branchId) {
       // Venta scoped a sucursal → reponer el pool correcto por renglón:
       // sueltos (loosePriceId) → LooseStock (kg de la celda); bolsas →
@@ -644,7 +660,7 @@ export const deleteSale = async (id: string) => {
             },
             data: { quantity: { increment: item.quantity } },
           });
-        } else if (item.productId) {
+        } else if (item.productId && !manualIds.has(item.productId)) {
           await tx.productStock.updateMany({
             where: {
               productId: item.productId,
@@ -658,7 +674,7 @@ export const deleteSale = async (id: string) => {
     } else {
       // Venta legacy / admin → reponer Product.quantity (stock global).
       for (const item of sale.items) {
-        if (item.productId) {
+        if (item.productId && !manualIds.has(item.productId)) {
           await tx.product.updateMany({
             where: {
               id: item.productId,

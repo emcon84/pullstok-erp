@@ -51,7 +51,11 @@ const mockedBase = basePrisma as unknown as {
 };
 
 const makeTx = () => ({
-  product: { findFirst: jest.fn(), updateMany: jest.fn() },
+  product: {
+    findFirst: jest.fn(),
+    findMany: jest.fn().mockResolvedValue([]),
+    updateMany: jest.fn(),
+  },
   productStock: { findFirst: jest.fn(), updateMany: jest.fn() },
   looseStock: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn() },
   priceKgPrice: { findFirst: jest.fn(), findMany: jest.fn() },
@@ -1054,5 +1058,173 @@ describe("salesService.createSale — cash session gate + sale payments", () => 
     expect(createCall.data.payments.create).toEqual([
       { method: "EFECTIVO", amount: 200, cashSessionId: undefined },
     ]);
+  });
+});
+
+// ── Productos manuales (feat/manual-products-pos): no validan ni descuentan stock ──
+describe("salesService — productos manuales (isManual)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const manualProduct = {
+    id: "pm-1",
+    name: "Producto manual",
+    price: 1500,
+    quantity: 0,
+    isManual: true,
+    category: { name: "Carga manual" },
+  };
+
+  const withVendorBranch = () => {
+    mockedBase.branchAssignment.findMany.mockResolvedValue([{ branchId: "b-1" }]);
+    (prisma.branch.findFirst as unknown as jest.Mock).mockResolvedValue({
+      id: "b-1",
+      isActive: true,
+    });
+    mockedPrisma.cashSession.findFirst.mockResolvedValue({
+      id: "cs-1",
+      branchId: "b-1",
+      status: "OPEN",
+    });
+  };
+
+  it("VENDEDOR (sucursal): manual product with NO ProductStock row sells without stock validation or deduction", async () => {
+    withVendorBranch();
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    tx.product.findFirst.mockResolvedValue(manualProduct);
+    tx.productStock.findFirst.mockResolvedValue(null); // sin fila de stock
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+
+    const sale = await SaleService.createSale(
+      {
+        products: [
+          { productId: "pm-1", name: "Producto manual", quantity: 2, price: 1500, category: "x" },
+        ],
+      },
+      "u-1",
+      "VENDEDOR",
+    );
+
+    expect((sale as any).id).toBe("s-1");
+    expect(tx.productStock.findFirst).not.toHaveBeenCalled();
+    expect(tx.productStock.updateMany).not.toHaveBeenCalled();
+    expect(tx.product.updateMany).not.toHaveBeenCalled();
+    // El renglón, el precio y el total se calculan igual que siempre.
+    const data = tx.sale.create.mock.calls[0][0].data;
+    expect(data.totalAmount).toBe(3000);
+    expect(data.items.create).toEqual([
+      expect.objectContaining({
+        productId: "pm-1",
+        name: "Producto manual",
+        quantity: 2,
+        price: 1500,
+        saleMode: "BOLSA_CERRADA",
+      }),
+    ]);
+  });
+
+  it("ADMIN (legacy): manual product with quantity 0 sells without validation or product.updateMany decrement", async () => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    tx.product.findFirst.mockResolvedValue(manualProduct);
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+
+    const sale = await SaleService.createSale(
+      {
+        products: [
+          { productId: "pm-1", name: "Producto manual", quantity: 3, price: 1500, category: "x" },
+        ],
+      },
+      "u-admin",
+      "ADMIN",
+    );
+
+    expect((sale as any).id).toBe("s-1");
+    expect(tx.product.updateMany).not.toHaveBeenCalled();
+    expect(tx.productStock.updateMany).not.toHaveBeenCalled();
+    expect(tx.sale.create.mock.calls[0][0].data.totalAmount).toBe(4500);
+  });
+
+  it("regression: NON-manual product with insufficient stock still throws (sucursal path)", async () => {
+    withVendorBranch();
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    tx.product.findFirst.mockResolvedValue({ ...manualProduct, id: "p-9", isManual: false });
+    tx.productStock.findFirst.mockResolvedValue(null);
+
+    await expect(
+      SaleService.createSale(
+        { products: [{ productId: "p-9", name: "Real", quantity: 1, price: 1500, category: "x" }] },
+        "u-1",
+        "VENDEDOR",
+      ),
+    ).rejects.toThrow(/Stock insuficiente/);
+    expect(tx.sale.create).not.toHaveBeenCalled();
+  });
+
+  it("regression: NON-manual product with insufficient stock still throws (legacy/admin path)", async () => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    tx.product.findFirst.mockResolvedValue({ ...manualProduct, id: "p-9", isManual: false });
+
+    await expect(
+      SaleService.createSale(
+        { products: [{ productId: "p-9", name: "Real", quantity: 1, price: 1500, category: "x" }] },
+        "u-admin",
+        "ADMIN",
+      ),
+    ).rejects.toThrow(/Stock insuficiente/);
+    expect(tx.sale.create).not.toHaveBeenCalled();
+  });
+
+  describe("deleteSale no repone stock de productos manuales", () => {
+    const baseSale = {
+      id: "s-1",
+      organizationId: "org-1",
+      orderId: null,
+      invoice: null,
+    };
+    const lines = [
+      { productId: "pm-1", loosePriceId: null, quantity: 2, saleMode: "BOLSA_CERRADA" },
+      { productId: "p-1", loosePriceId: null, quantity: 3, saleMode: "BOLSA_CERRADA" },
+    ];
+
+    it("branch sale: skips ProductStock increment for manual lines, still restores real ones", async () => {
+      mockedPrisma.sale.findFirst.mockResolvedValue({ ...baseSale, branchId: "b-1", items: lines });
+      const tx = makeTx();
+      tx.product.findMany.mockResolvedValue([{ id: "pm-1" }]);
+      mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+
+      await SaleService.deleteSale("s-1");
+
+      expect(tx.productStock.updateMany).toHaveBeenCalledTimes(1);
+      expect(tx.productStock.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ productId: "p-1" }),
+          data: { quantity: { increment: 3 } },
+        }),
+      );
+    });
+
+    it("legacy sale: skips Product.quantity increment for manual lines, still restores real ones", async () => {
+      mockedPrisma.sale.findFirst.mockResolvedValue({ ...baseSale, branchId: null, items: lines });
+      const tx = makeTx();
+      tx.product.findMany.mockResolvedValue([{ id: "pm-1" }]);
+      mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+
+      await SaleService.deleteSale("s-1");
+
+      expect(tx.product.updateMany).toHaveBeenCalledTimes(1);
+      expect(tx.product.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: "p-1" }),
+          data: { quantity: { increment: 3 } },
+        }),
+      );
+    });
   });
 });
