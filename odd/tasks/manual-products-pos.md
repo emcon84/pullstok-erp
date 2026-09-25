@@ -61,7 +61,7 @@ para no alterar pedidos existentes. Rama: `feat/manual-products-table-delete`.
 - [x] T5 — API: `DELETE /products/manual/:id` (ADMIN/MANAGEMENT, solo `isManual=true`
       de la org; 404 si no existe/no es manual; 409 si lo referencia un
       pedido/presupuesto; emite `product:changed` si corresponde). Tests primero.
-- [ ] T6 — Front: `ManualProducts` como TABLA (nombre, precio, categoría, acciones)
+- [x] T6 — Front: `ManualProducts` como TABLA (nombre, precio, categoría, acciones)
       + botón "Eliminar" con confirmación (AlertDialog/Dialog existente), toast,
       invalidar `["manual-products"]` y `["products"]`, mostrar el 409. Tests primero.
 
@@ -72,6 +72,7 @@ para no alterar pedidos existentes. Rama: `feat/manual-products-table-delete`.
 - T3: delegated writer (2+ non-trivial files)
 - T4: delegated writer (2+ non-trivial files)
 - T5: delegated writer (2+ non-trivial files)
+- T6: delegated writer (2+ non-trivial files)
 
 ## Progreso / evidencia
 - Rama: `feat/manual-products-pos`.
@@ -172,6 +173,24 @@ para no alterar pedidos existentes. Rama: `feat/manual-products-table-delete`.
   ReviewQueueEntry opcionales → SetNull) sin manejo especial. OrderItem/QuotationItem
   no están en TENANT_MODELS: el scope org lo da el findFirst previo del producto.
 
+- T6 (RED→GREEN, rama `feat/manual-products-table-delete`): tests nuevos/extendidos
+  en `manualProductsAdminService.test.tsx` (servicio `deleteManualProduct` x4 +
+  hook `useDeleteManualProduct` x2) y `manualProductsView.test.tsx` (tabla con
+  columnas/filas, flujo eliminar: abre confirm, cancelar, confirmar con el id,
+  toast éxito, toast 409, 404 → refetch, guard de doble envío, botones
+  deshabilitados). RED: la suite de servicio no cargaba (módulo/función
+  inexistentes) y 9 tests de la vista fallaban. GREEN: esas suites + `promoteManualProductDialog`
+  42/42; `npm test` (vitest) → 987 pasan / 8 fallan, todos preexistentes
+  (`priceKgUpdate.test.tsx` x6, `productDrawer.test.tsx` x2); `npx tsc -b` → 0
+  errores; eslint `--max-warnings 0` sobre archivos tocados → limpio.
+- T6 diseño: `ManualProducts` usa los primitivos `ui/table` dentro de un `Card`
+  (mismo patrón que `UsersPage`); columnas Nombre, Precio, Categoría, Acciones; en
+  mobile el primitivo scrollea en X dentro de su contenedor y las acciones
+  quedan solo con icono (label `hidden sm:inline`, `aria-label` con el nombre).
+  Confirmación con el `useConfirm` global (AlertDialog, `danger`). `deleteManualProduct`
+  adjunta `status` al Error para que la vista haga `refetch()` en 404; el 409 se
+  muestra con el `message` del server. Filas memoizadas (prop `busy` = mutation pendiente).
+
 ## Próximo paso
-T6 (tabla + eliminar en el front) → merge a main y push (el usuario pidió
-"mergealo a main y pushealo" en el ciclo anterior; confirmar alcance para este).
+Merge a main y push (el usuario pidió "mergealo a main y pushealo" en el ciclo
+anterior; confirmar alcance para este).
