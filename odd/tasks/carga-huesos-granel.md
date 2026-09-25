@@ -40,8 +40,8 @@ loader dry-run / `--apply`, idempotente, sin borrar ni pisar nada.
       sin-nombre / precio<=0 / duplicados por nombre, listado de omitidos.
 - [x] T2 — Loader `api/scripts/load-huesos-granel.ts` (dry-run por defecto, `--apply`,
       resuelve la categoría por id/nombre, `createMany`).
-- [ ] T3 — Dry-run en el VPS y revisión (conteos y omitidos).
-- [ ] T4 — Backup `pg_dump` + `--apply` en el VPS + verificación de conteos e
+- [x] T3 — Dry-run en el VPS y revisión (conteos y omitidos).
+- [x] T4 — Backup `pg_dump` + `--apply` en el VPS + verificación de conteos e
       idempotencia (dry-run posterior: 0 a crear).
 
 ## Autorización y checks
@@ -54,5 +54,15 @@ loader dry-run / `--apply`, idempotente, sin borrar ni pisar nada.
 - Rama: `feat/carga-huesos-granel`. Categorías de prod leídas (solo lectura).
 - T1+T2 hechos (writer, local): dataset `api/scripts/data/huesos-granel.ts` (49 filas extraídas por script; re-parse idéntico), `planLoad` puro, loader `api/scripts/load-huesos-granel.ts`. TDD: RED observado (módulo inexistente) -> GREEN `npm test -- huesos-granel` 14/14. `npx tsc --noEmit`: solo los 3 errores preexistentes en tests/e2e. Plan local con org vacía: 36 a crear, 13 omitidos (9 sin precio: 7 huesos corbata 16/17-18/19 y 20/21-23/24, Roll 9/10, Donuts 6,5; 4 sin nombre: filas 26/29/31/47).
 
+- T3 (2026-09-25, inline): loader + dataset copiados por scp a `/var/www/pullstok/api/scripts/`;
+  dry-run en el VPS: dataset 49 | a crear 36 | ya existen 0 | omitidos 13 (idéntico al plan local).
+- T4 (2026-09-25, inline): backup `/root/pre-huesos-granel_20260925_134538.sql.gz` (gzip -t OK,
+  1,1 MB). `--apply`: 36 productos creados. Dry-run posterior: a crear 0 | ya existen 36
+  (idempotente). Categoría PERROS > SNACKS, PREMIOS Y GOLOSINAS; quantity 0, carried=false,
+  publishedToStore=false.
+- Pendiente a mano (usuario): 9 filas sin precio (huesos corbata 16/17-18/19 y 20/21-23/24,
+  Roll 9/10, Donuts 6,5) y 4 filas sin nombre (Excel 26, 29, 31, 47).
+
 ## Próximo paso
-T3: dry-run en el VPS (lo corre el orquestador; copiar loader + dataset a `/var/www/pullstok/api/scripts/`).
+Definir con el usuario stock inicial / carried (como en accesorios T5/T6) y si se mergea
+la rama (loader + dataset versionados).
