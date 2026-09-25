@@ -43,6 +43,7 @@ loader dry-run / `--apply`, idempotente, sin borrar ni pisar nada.
 - [x] T3 — Dry-run en el VPS y revisión (conteos y omitidos).
 - [x] T4 — Backup `pg_dump` + `--apply` en el VPS + verificación de conteos e
       idempotencia (dry-run posterior: 0 a crear).
+- [x] T5 — Stock inicial (50 u Casa Central) + `carried=true` para los 36.
 
 ## Autorización y checks
 - Lectura del VPS autorizada. Escritura en prod: el usuario pidió cargar todo; el
@@ -63,6 +64,14 @@ loader dry-run / `--apply`, idempotente, sin borrar ni pisar nada.
 - Pendiente a mano (usuario): 9 filas sin precio (huesos corbata 16/17-18/19 y 20/21-23/24,
   Roll 9/10, Donuts 6,5) y 4 filas sin nombre (Excel 26, 29, 31, 47).
 
+- T5 (2026-09-25, inline, pedido del usuario "hacé lo mismo"): stock inicial 50 u en Casa
+  Central + `carried=true` para los 36, con `api/scripts/finish-huesos-granel.ts` (reusa
+  `planStock` de accesorios; test nuevo `HUESOS_NAMES`, RED->GREEN 15/15). Backup
+  `/root/pre-huesos-stock_20260925_134813.sql.gz`. Verificado por SQL de solo lectura:
+  36 con quantity=50, 36 carried, 36 con ProductStock HQ=50, 0 en otras sucursales, 0
+  publicados. Dry-run posterior: 0 a poner / 36 omitidos (ya tienen stock), 0 a marcar.
+  Nota: la corrida encadenada mostró un EPIPE de console.log por cerrar el pipe; el
+  `--apply` ya se había ejecutado y el estado quedó correcto.
+
 ## Próximo paso
-Definir con el usuario stock inicial / carried (como en accesorios T5/T6) y si se mergea
-la rama (loader + dataset versionados).
+Decidir si se mergea la rama `feat/carga-huesos-granel` (loader + dataset versionados).
