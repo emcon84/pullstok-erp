@@ -86,10 +86,15 @@ export function useVendorRowsKeyboard(options: VendorRowsKeyboardOptions) {
         : true;
       const hasActiveRow = o.selectedIndex >= 0 && o.hasRows;
 
+      // Un "/" tipeado dentro de un diálogo (ej. el nombre del producto manual:
+      // "cable 1/2") es texto, no el atajo del buscador: se deja pasar.
+      const inDialog = !!(active as HTMLElement | null)?.closest?.('[role="dialog"]');
+
       // ── Tecla / o Cmd+K / Ctrl+K: foco al buscador ──
-      // Sin guard: es la tecla de "volver al buscador" por diseño.
+      // Sin guard (salvo el "/" dentro de un diálogo): es la tecla de "volver
+      // al buscador" por diseño.
       if (
-        key === "/" ||
+        (key === "/" && !inDialog) ||
         ((e.metaKey || e.ctrlKey) && key.toLowerCase() === "k")
       ) {
         e.preventDefault();

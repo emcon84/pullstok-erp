@@ -187,3 +187,34 @@ describe("storeController.getProductById (S1)", () => {
     expect(mockedPrisma.product.findFirst).not.toHaveBeenCalled();
   });
 });
+
+// Los productos cargados a mano desde el POS (isManual=true) nunca deben salir
+// en la tienda pública, aunque alguien los marque publishedToStore.
+describe("storeController — excluye productos manuales (isManual)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedBasePrisma.storeSettings.findUnique.mockResolvedValue({
+      isPublished: true,
+    });
+    mockedBasePrisma.storeSettings.findFirst.mockResolvedValue(null);
+    mockedPrisma.branch.findFirst.mockResolvedValue(null);
+  });
+
+  it("getProducts filtra isManual: false junto a publishedToStore", async () => {
+    mockedPrisma.product.findMany.mockResolvedValue([]);
+
+    await storeController.getProducts(mockRequest(), mockResponse());
+
+    const where = mockedPrisma.product.findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ publishedToStore: true, isManual: false });
+  });
+
+  it("getProductById filtra isManual: false junto a publishedToStore", async () => {
+    mockedPrisma.product.findFirst.mockResolvedValue(null);
+
+    await storeController.getProductById(mockRequest({ id: "prod-1" }), mockResponse());
+
+    const where = mockedPrisma.product.findFirst.mock.calls[0][0].where;
+    expect(where).toEqual({ id: "prod-1", publishedToStore: true, isManual: false });
+  });
+});

@@ -6,6 +6,14 @@ export interface TreeNode extends Category {
 }
 
 /**
+ * Quita del árbol las RAÍCES cuyo nombre esté en `names` (con sus descendientes).
+ * Solo raíces: un hijo homónimo de otra rama se conserva (el server también
+ * distingue por parentId null).
+ */
+export const omitRootsByName = (tree: TreeNode[], names: string[]): TreeNode[] =>
+  names.length === 0 ? tree : tree.filter((root) => !names.includes(root.name));
+
+/**
  * Construye el árbol desde la lista plana de categorías (getCategories).
  * Los nodos cuyo parentId no existe en la lista caen como raíces (categorías
  * huérfanas se mantienen visibles). Compartido entre CategoryTreePicker

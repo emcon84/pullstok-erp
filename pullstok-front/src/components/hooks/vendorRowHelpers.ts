@@ -11,6 +11,23 @@ export const parseDecimal = (raw: string): number => {
   return Number.isFinite(v) ? v : NaN;
 };
 
+/**
+ * Parsea un precio tipeado en formato es-AR → number ó NaN. La coma es el
+ * decimal y el punto agrupa miles ("1.500" = 1500, "1.500,50" = 1500,5); un
+ * punto solo, sin patrón de miles, es decimal ("12.5" = 12,5).
+ */
+export const parseManualPrice = (raw: string): number => {
+  const s = raw.trim();
+  if (s === "") return NaN;
+  let normalized = s;
+  if (s.includes(",")) {
+    normalized = s.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    normalized = s.replace(/\./g, "");
+  }
+  return /^\d*\.?\d+$/.test(normalized) ? parseFloat(normalized) : NaN;
+};
+
 /** Clampa un porcentaje de descuento a 0..100. */
 export const clampPct = (n: number): number => Math.max(0, Math.min(100, n));
 

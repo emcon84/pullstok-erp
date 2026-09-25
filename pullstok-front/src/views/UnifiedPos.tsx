@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Landmark, ShoppingCart, PackageOpen, Minus, Plus } from "lucide-react";
+import { Landmark, ShoppingCart, PackageOpen, PackagePlus, Minus, Plus } from "lucide-react";
 import { toast } from "react-toastify";
 import { API_URL } from "@/constants";
 import { VendorCatalogTab } from "@/components/organisms/VendorCatalogTab";
@@ -11,6 +11,7 @@ import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecules/VendorOrderPanel";
 import { OpenBagDialog } from "@/components/molecules/OpenBagDialog";
+import { ManualProductDialog } from "@/components/molecules/ManualProductDialog";
 import { PrintTicketDialog } from "@/components/molecules/PrintTicketDialog";
 import { PrinterConnectButton } from "@/components/molecules/PrinterConnectButton";
 import { useBranches } from "@/components/hooks/useBranches";
@@ -34,6 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import type { DataItem } from "@/types";
 
 type Tab = "unidad" | "suelto";
 
@@ -92,6 +94,10 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
 
   // Modal de "Abrir bolsa" - flujo para abrir bolsas y creditar kg a celda suelta
   const [openBagDialogOpen, setOpenBagDialogOpen] = useState(false);
+
+  // Modal "Producto manual": el vendedor carga nombre + precio de algo que no
+  // encuentra; se crea en el server y se suma al pedido como BOLSA_CERRADA.
+  const [manualOpen, setManualOpen] = useState(false);
 
   // Modal de pago: lo abre la tecla V (listado y panel) y el botón Vender.
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -180,6 +186,24 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
       gridApiRef.current = api;
     },
     [],
+  );
+
+  // Producto manual ya creado en el server → línea BOLSA_CERRADA del pedido.
+  // stock 0: el server no valida stock de manuales (isManual) y el carrito no
+  // topea esa línea.
+  const { addToCart } = cart;
+  const handleManualCreated = useCallback(
+    (product: DataItem, quantity: number) => {
+      addToCart(
+        { ...product, _id: product._id ?? product.id, isManual: true, quantity: 0, category: "" },
+        quantity,
+        branchId,
+        0,
+        "BOLSA_CERRADA",
+      );
+      toast.success(`${product.name} agregado`);
+    },
+    [addToCart, branchId],
   );
 
   // Tecla T: alterna entre "Por unidad" y "Suelto".
@@ -321,9 +345,11 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // no solo EAN-13/balanza numéricos) + Enter, run de al menos 6 caracteres.
   // Reset si hay pausas largas. Texto corto tipeado a mano no se intercepta.
   // IMPORTANTE: Si el diálogo "Abrir bolsa" está abierto, NO interceptamos
-  // el escaneo para que el input del diálogo reciba el código de barras.
+  // el escaneo para que el input del diálogo reciba el código de barras. Lo
+  // mismo con "Producto manual": el nombre tipeado rápido + Enter (>= 6
+  // caracteres) se confundiría con un escaneo.
   useEffect(() => {
-    if (openBagDialogOpen) return; // El diálogo maneja su propio input
+    if (openBagDialogOpen || manualOpen) return; // El diálogo maneja su propio input
     let buffer = "";
     let lastKeyAt = 0;
     const onKey = (e: KeyboardEvent) => {
@@ -370,7 +396,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [handleScan, openBagDialogOpen]);
+  }, [handleScan, openBagDialogOpen, manualOpen]);
 
   // Teclas +/- del teclado para ajustar la cantidad del modal de escaneo sin
   // mouse. Solo mientras el modal está abierto (scanProduct), y en captura
@@ -479,6 +505,15 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
                 Abrir bolsa
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={() => setManualOpen(true)}
+              className="whitespace-nowrap"
+              aria-label="Producto manual"
+            >
+              <PackagePlus className="h-4 w-4 mr-2" />
+              Producto manual
+            </Button>
             <div className="ml-auto">
               <PrinterConnectButton />
             </div>
@@ -711,6 +746,14 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
       open={!!pendingTicket}
       onPrint={handlePrintTicket}
       onSkip={dismissTicket}
+      onClosed={exitToGrid}
+    />
+
+    {/* ── Modal de Producto manual (vuelve el foco al listado al cerrarse) ── */}
+    <ManualProductDialog
+      open={manualOpen}
+      onOpenChange={setManualOpen}
+      onCreated={handleManualCreated}
       onClosed={exitToGrid}
     />
 

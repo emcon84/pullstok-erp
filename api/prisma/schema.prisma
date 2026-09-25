@@ -496,6 +496,10 @@ model Product {
   // acota la búsqueda a los marcados SOLO cuando se enciende; apagado muestra
   // todo el catálogo.
   carried            Boolean           @default(false)
+  // Producto cargado a mano por el vendedor desde el POS, pendiente de que el
+  // admin lo pase al sistema. true = NO valida ni descuenta stock al vender.
+  // Al promoverlo pasa a false y se maneja con stock normal.
+  isManual           Boolean           @default(false)
   organizationId     String
   organization       Organization      @relation(fields: [organizationId], references: [id])
   orderItems         OrderItem[]

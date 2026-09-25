@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { ChevronRight, ChevronDown, ListTree } from "lucide-react";
 import { getCategories } from "@/services/onboardingService";
 import { Loader } from "@/components/atoms/loader";
-import { buildTree, TreeNode } from "@/components/molecules/CategoryTreePicker/tree";
+import { buildTree, omitRootsByName, TreeNode } from "@/components/molecules/CategoryTreePicker/tree";
 
 interface CategoryTreePickerProps {
   value: string | null; // selected categoryId
   onChange: (categoryId: string) => void;
+  /** Nombres de categorías RAÍZ a ocultar (ej. "Carga manual" al promover). */
+  excludeRootNames?: string[];
 }
 
 const TreePickerRow = ({
@@ -63,16 +65,23 @@ const TreePickerRow = ({
   );
 };
 
-export const CategoryTreePicker = ({ value, onChange }: CategoryTreePickerProps) => {
+export const CategoryTreePicker = ({
+  value,
+  onChange,
+  excludeRootNames,
+}: CategoryTreePickerProps) => {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
+  // Clave estable: evita refetchear si el llamador pasa un array nuevo por render.
+  const excludeKey = excludeRootNames?.join("\u0000") ?? "";
 
   useEffect(() => {
+    const excluded = excludeKey ? excludeKey.split("\u0000") : [];
     getCategories()
-      .then((data) => setTree(buildTree(data)))
+      .then((data) => setTree(omitRootsByName(buildTree(data), excluded)))
       .catch(() => setTree([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [excludeKey]);
 
   if (loading) return <Loader />;
 

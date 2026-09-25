@@ -162,6 +162,10 @@ const GeneratedBarcodes = lazy(() =>
   import("./views/GeneratedBarcodes").then((m) => ({ default: m.GeneratedBarcodes })),
 );
 
+const ManualProducts = lazy(() =>
+  import("./views/ManualProducts").then((m) => ({ default: m.ManualProducts })),
+);
+
 const AppRoutes = () => (
   <Router>
     <Routes>
@@ -296,6 +300,7 @@ const AppRoutes = () => (
         <Route path="/caja" element={<CashSessionPage />} />
         <Route path="/Clientes" element={<Customers />} />
         <Route path="/categorias" element={<Categories />} />
+        <Route path="/carga-manual" element={<ManualProducts />} />
         <Route path="/tienda" element={<Tienda />} />
         <Route path="/mensajes" element={<Messages />} />
         <Route path="/asistente-ia" element={<BotConfig />} />

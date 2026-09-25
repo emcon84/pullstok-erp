@@ -209,6 +209,20 @@ export const publishProductSchema = z.object({
   publishedToStore: z.boolean(),
 });
 
+// Alta rápida de producto "manual" desde el POS del vendedor: solo nombre +
+// precio. El resto (isManual, quantity, categoría "Carga manual", no publicado)
+// lo fija el server; z.object descarta cualquier otro campo del body.
+export const createManualProductSchema = z.object({
+  name: z.string().trim().min(1, "El nombre es requerido"),
+  price: z.coerce.number().positive("El precio debe ser mayor a 0"),
+});
+
+// Promover un producto manual a producto real: categoría real elegida por el
+// admin (el service valida que exista en la org y que no sea "Carga manual").
+export const promoteManualProductSchema = z.object({
+  categoryId: z.string().min(1, "La categoría es requerida"),
+});
+
 // Bulk JSON / CSV: sigue con `category` (nombre, texto libre) — find-or-create
 // vía resolveCategoryId en productsService.ts. No tiene UI de dropdown.
 const bulkProductSchema = z.object({

@@ -7,6 +7,7 @@ import productController, {
   getOfflineSnapshot,
   getOfflineProductSnapshot,
 } from "../controllers/productController";
+import manualProductController from "../controllers/manualProductController";
 import providerPriceListController from "../controllers/providerPriceListController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
 import { checkBusinessHours } from "../middlewares/checkBusinessHours";
@@ -26,6 +27,8 @@ import {
   applyPriceListSchema,
   bulkCarriedSchema,
   bulkPublishSchema,
+  createManualProductSchema,
+  promoteManualProductSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -112,6 +115,32 @@ router.get(
   authenticateJWT,
   checkBusinessHours,
   productController.getBarcodesReport,
+);
+
+// Productos "manuales" (carga a mano desde el POS). Deben registrarse ANTES de
+// "/:id" (un id literal "manual" matchearía GET /:id).
+// Alta: cualquier rol que vende (nombre + precio). Lista y promoción: admin.
+router.post(
+  "/manual",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"),
+  validate(createManualProductSchema),
+  manualProductController.createManualProduct,
+);
+router.get(
+  "/manual",
+  authenticateJWT,
+  requireRole("ADMIN", "MANAGEMENT"),
+  manualProductController.listManualProducts,
+);
+router.post(
+  "/:id/promote",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN", "MANAGEMENT"),
+  validate(promoteManualProductSchema),
+  manualProductController.promoteManualProduct,
 );
 
 router.get("/:id", authenticateJWT, checkBusinessHours, productController.getProductById);
