@@ -994,8 +994,10 @@ const updateProduct = async (req: Request, res: Response) => {
 const publishProduct = async (req: Request, res: Response) => {
   try {
     const { publishedToStore } = req.body as { publishedToStore: boolean };
+    // Un producto manual (carga a mano del POS) no se puede publicar en la
+    // tienda: al publicar se excluye (count 0 → 404). Despublicar siempre pasa.
     const result = await prisma.product.updateMany({
-      where: { id: req.params.id },
+      where: { id: req.params.id, ...(publishedToStore ? { isManual: false } : {}) },
       data: { publishedToStore },
     });
     if (result.count === 0) {
@@ -1991,6 +1993,8 @@ export const bulkPublish = async (req: Request, res: Response) => {
     };
     // Reutiliza el where por marca de bulkPriceUpdate (variante "Marca").
     const where = buildBulkPriceWhere(brandValues, [], [], [], [], [], organizationId);
+    // Al publicar se excluyen los productos manuales (nunca van a la tienda).
+    if (publishedToStore) where.isManual = false;
 
     if (publishedToStore) {
       const org = await basePrisma.organization.findUniqueOrThrow({

@@ -96,6 +96,8 @@ const getProducts = async (req: PublicStoreRequest, res: Response) => {
     const products = await prisma.product.findMany({
       where: {
         publishedToStore: true,
+        // Los productos manuales (carga a mano del POS) nunca salen en la tienda.
+        isManual: false,
         ...(q
           ? {
               OR: [
@@ -152,7 +154,7 @@ const getProductById = async (req: PublicStoreRequest, res: Response) => {
     }
 
     const product = await prisma.product.findFirst({
-      where: { id: req.params.id, publishedToStore: true },
+      where: { id: req.params.id, publishedToStore: true, isManual: false },
       select: {
         id: true,
         name: true,
@@ -248,7 +250,7 @@ const checkout = async (req: PublicStoreRequest, res: Response) => {
         // no debe poder comprarse (mismo criterio que getProductById).
         const productIds = items.map((i) => i.productId);
         const products = await tx.product.findMany({
-          where: { id: { in: productIds }, publishedToStore: true },
+          where: { id: { in: productIds }, publishedToStore: true, isManual: false },
         });
         const productsById = new Map(products.map((p) => [p.id, p]));
 

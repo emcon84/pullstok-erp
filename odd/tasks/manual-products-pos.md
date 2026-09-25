@@ -39,7 +39,7 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
 - [x] T1 — API: `Product.isManual` (schema + migración) y `createSale` saltea
       validación/descuento de stock para productos manuales (ramas sucursal y
       legacy). Auditar caminos que devuelven stock (anular venta, etc.). Tests primero.
-- [ ] T2 — API: servicio+endpoint `POST /products/manual` (roles ADMIN, MANAGEMENT,
+- [x] T2 — API: servicio+endpoint `POST /products/manual` (roles ADMIN, MANAGEMENT,
       VENDEDOR, CASHIER; crea/reusa categoría "Carga manual", `isManual=true`,
       `quantity=0`, `publishedToStore=false`), `GET /products/manual` (lista
       admin) y `POST /products/:id/promote` (categoría real + `isManual=false`).
@@ -53,6 +53,7 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
 ## Ruteo por tarea
 (se completa al implementar: inline/delegado + evidencia del trigger)
 - T1: delegated writer (2+ non-trivial files)
+- T2: delegated writer (2+ non-trivial files)
 
 ## Progreso / evidencia
 - Rama: `feat/manual-products-pos`.
@@ -72,5 +73,23 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
 - Migración `20260925120000_add_product_is_manual` escrita a mano, NO aplicada
   (la aplica el pipeline).
 
+- T2 (RED→GREEN): tests nuevos `tests/services/manualProductService.test.ts`,
+  `tests/controllers/manualProductController.test.ts`,
+  `tests/validation/manualProductSchemas.test.ts`,
+  `tests/controllers/productController.publishManual.test.ts`,
+  `tests/routes/manualProductRoutes.test.ts` + 2 casos en `storeController.test.ts`.
+  RED: 6 suites fallaban (módulos inexistentes + 5 asserts de `isManual`/rutas);
+  GREEN: esas 6 suites 37/37; `npm test` → solo fallan `tests/e2e/*` (Postgres, solo
+  VPS) y `botService.test.ts` (pasa 12/12 aislada); `npx tsc --noEmit` → los 3
+  errores preexistentes de `tests/e2e/` (business-hours L35/L38, loose-sale L186).
+- T2 diseño: `manualProductService` (crea/reusa categoría raíz "Carga manual" con
+  findFirst+create; nombre con `normalizeProductName` = MAYÚSCULAS, convención del
+  negocio) + `manualProductController` + rutas antes de `/:id`. Roles: POST /manual
+  ADMIN/MANAGEMENT/VENDEDOR/CASHIER; GET /manual y POST /:id/promote ADMIN/MANAGEMENT.
+  Tienda pública: `isManual: false` en getProducts, getProductById y checkout;
+  `publishProduct(true)` y `bulkPublish(true)` excluyen manuales. Sin test de rol
+  a nivel unit (los guards solo se prueban en e2e/VPS, no hay patrón unit).
+  Los checkout de tienda solo se cubren por e2e (tx SERIALIZABLE, no unit-testable).
+
 ## Próximo paso
-T2 (API: `POST/GET /products/manual` y `POST /products/:id/promote`).
+T3 (front: dialog "Producto manual" en `UnifiedPos`, consume `POST /products/manual`).
