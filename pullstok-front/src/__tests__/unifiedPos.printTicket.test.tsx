@@ -6,8 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Flujo completo POS → checkout REAL → diálogo "¿Imprimir ticket?".
 // Se mockean el carrito, la API de ventas y el panel (que expone un botón que
 // confirma la venta con pagos + descuento como haría PaymentModal).
-// La impresión (directa por Web Serial o panel de Chrome) se mockea en
-// printSaleTicketDirect; sus ramas se prueban en printTicketDirect.test.ts.
+// La impresión abre siempre el panel de Chrome: se mockea printSaleTicket.
 vi.mock("@/components/organisms/VendorCatalogTab", () => ({
   VendorCatalogTab: () => <div data-testid="catalog-tab" />,
 }));
@@ -21,7 +20,10 @@ vi.mock("@/components/hooks/useOrder", () => ({ useCreateOrder: vi.fn() }));
 vi.mock("@/components/hooks/useBranches", () => ({ useBranches: vi.fn() }));
 vi.mock("@/services/onboardingService", () => ({ getMe: vi.fn() }));
 vi.mock("@/contexts/BrandingContext", () => ({ useBrandingContext: vi.fn() }));
-vi.mock("@/utils/printTicketDirect", () => ({ printSaleTicketDirect: vi.fn() }));
+vi.mock("@/utils/saleTicket", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/saleTicket")>()),
+  printSaleTicket: vi.fn(),
+}));
 vi.mock("@/components/molecules/VendorOrderPanel", () => ({
   VendorOrderPanel: ({
     confirmSale,
@@ -49,7 +51,7 @@ import { useBranches } from "@/components/hooks/useBranches";
 import { getMe } from "@/services/onboardingService";
 import { useBrandingContext } from "@/contexts/BrandingContext";
 import { toast } from "react-toastify";
-import { printSaleTicketDirect } from "@/utils/printTicketDirect";
+import { printSaleTicket } from "@/utils/saleTicket";
 
 const items = [
   {
@@ -136,7 +138,7 @@ async function sell() {
 }
 
 /** La impresión se difiere hasta que el diálogo ya se cerró. */
-const printed = (times = 1) => waitFor(() => expect(printSaleTicketDirect).toHaveBeenCalledTimes(times));
+const printed = (times = 1) => waitFor(() => expect(printSaleTicket).toHaveBeenCalledTimes(times));
 
 describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
   beforeEach(() => {
@@ -166,7 +168,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     await waitFor(() =>
       expect(screen.queryByText("¿Imprimir ticket?")).not.toBeInTheDocument(),
     );
-    expect(printSaleTicketDirect).not.toHaveBeenCalled();
+    expect(printSaleTicket).not.toHaveBeenCalled();
   });
 
   it("'Sí': imprime UNA vez con el ticket de la venta y cierra el diálogo", async () => {
@@ -175,7 +177,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
 
     await printed();
-    const ticket = vi.mocked(printSaleTicketDirect).mock.calls[0][0];
+    const ticket = vi.mocked(printSaleTicket).mock.calls[0][0];
     // 16000 con 10% de descuento → 14400
     expect(ticket.total).toBe(14400);
     expect(ticket.discountAmount).toBe(1600);
@@ -203,7 +205,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
 
     await waitFor(() => expect(clearCart).not.toHaveBeenCalled());
     expect(screen.queryByText("¿Imprimir ticket?")).not.toBeInTheDocument();
-    expect(printSaleTicketDirect).not.toHaveBeenCalled();
+    expect(printSaleTicket).not.toHaveBeenCalled();
   });
 
   it("encabezado: logo, nombre, CUIT y condición de la organización", async () => {
@@ -211,7 +213,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     await sell();
     fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
     await printed();
-    const ticket = vi.mocked(printSaleTicketDirect).mock.calls[0][0];
+    const ticket = vi.mocked(printSaleTicket).mock.calls[0][0];
     expect(ticket.businessName).toBe("Mi Pet Shop");
     // El ticket usa el logo negro empaquetado en la app (mismo origen, sin CORS),
     // no el logo de branding (pensado para el tema oscuro).
@@ -225,7 +227,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     await sell();
     fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
     await printed();
-    const ticket = vi.mocked(printSaleTicketDirect).mock.calls[0][0];
+    const ticket = vi.mocked(printSaleTicket).mock.calls[0][0];
     expect(ticket.address).toBe("Dirección org");
     expect(ticket.phone).toBe("111-org");
     // Para un VENDEDOR la query de sucursales queda deshabilitada (403).
@@ -237,16 +239,15 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     await sell();
     fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
     await printed();
-    const ticket = vi.mocked(printSaleTicketDirect).mock.calls[0][0];
+    const ticket = vi.mocked(printSaleTicket).mock.calls[0][0];
     expect(ticket.address).toBe("Dirección sucursal");
     expect(ticket.phone).toBe("222-suc");
   });
 
   it("'Sí': el diálogo ya está cerrado CUANDO se invoca la impresión (no antes)", async () => {
     let dialogOpenAtPrint: boolean | null = null;
-    vi.mocked(printSaleTicketDirect).mockImplementation(async () => {
+    vi.mocked(printSaleTicket).mockImplementation(async () => {
       dialogOpenAtPrint = !!screen.queryByText("¿Imprimir ticket?");
-      return "direct";
     });
     renderPos();
     await sell();
@@ -256,7 +257,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     try {
       fireEvent.click(yes);
       // Todavía no se imprimió: primero tiene que terminar de irse el diálogo.
-      expect(printSaleTicketDirect).not.toHaveBeenCalled();
+      expect(printSaleTicket).not.toHaveBeenCalled();
       await act(async () => {
         vi.advanceTimersByTime(1000);
       });
@@ -264,13 +265,13 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
       vi.useRealTimers();
     }
 
-    expect(printSaleTicketDirect).toHaveBeenCalledTimes(1);
+    expect(printSaleTicket).toHaveBeenCalledTimes(1);
     expect(dialogOpenAtPrint).toBe(false);
     expect(screen.queryByText("¿Imprimir ticket?")).not.toBeInTheDocument();
   });
 
   it("'Sí' con impresión que falla: el diálogo se cierra igual y no revienta", async () => {
-    vi.mocked(printSaleTicketDirect).mockImplementation(() => {
+    vi.mocked(printSaleTicket).mockImplementation(() => {
       throw new Error("sin impresora");
     });
     renderPos();
@@ -288,7 +289,7 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
   });
 
   it("'Sí' con impresión asíncrona que rechaza: no genera rechazo sin manejar", async () => {
-    vi.mocked(printSaleTicketDirect).mockRejectedValue(new Error("boom") as never);
+    vi.mocked(printSaleTicket).mockRejectedValue(new Error("boom") as never);
     renderPos();
     await sell();
     fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
@@ -297,8 +298,8 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
   });
-  it("'Sí' con impresión directa OK: no muestra ningún aviso", async () => {
-    vi.mocked(printSaleTicketDirect).mockResolvedValue("direct");
+  it("'Sí': abre el panel de Chrome sin ningún aviso", async () => {
+    vi.mocked(printSaleTicket).mockResolvedValue(undefined);
     renderPos();
     await sell();
     fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
@@ -310,36 +311,30 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it("'Sí' sin impresora conectada (cae al panel sin error): sin aviso", async () => {
-    vi.mocked(printSaleTicketDirect).mockResolvedValue("panel");
-    renderPos();
-    await sell();
-    fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
-    await printed();
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 0));
+  it("'Sí' con una térmica serial ya conectada: abre el panel y no escribe al puerto", async () => {
+    const port = {
+      open: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      getInfo: () => ({ usbVendorId: 1027, usbProductId: 24577 }),
+      writable: { getWriter: vi.fn() },
+    };
+    Object.defineProperty(navigator, "serial", {
+      configurable: true,
+      value: { getPorts: vi.fn().mockResolvedValue([port]), requestPort: vi.fn() },
     });
-    expect(toast.info).not.toHaveBeenCalled();
-  });
-
-  it("'Sí' con fallo del envío directo: avisa con toast y el diálogo se cierra igual", async () => {
-    vi.mocked(printSaleTicketDirect).mockImplementation(async (_ticket, opts) => {
-      opts?.onDirectFailure?.(new Error("Bluetooth desconectado"));
-      return "panel";
-    });
-    renderPos();
-    await sell();
-    fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
-
-    await waitFor(() =>
-      expect(toast.info).toHaveBeenCalledWith(
-        "No se pudo imprimir directo; se abrió el panel de impresión",
-      ),
-    );
-    expect(toast.info).toHaveBeenCalledTimes(1);
-    await waitFor(() =>
-      expect(screen.queryByText("¿Imprimir ticket?")).not.toBeInTheDocument(),
-    );
+    try {
+      renderPos();
+      await sell();
+      fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+      await printed();
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 25));
+      });
+      expect(port.open).not.toHaveBeenCalled();
+      expect(port.writable.getWriter).not.toHaveBeenCalled();
+    } finally {
+      delete (navigator as unknown as { serial?: unknown }).serial;
+    }
   });
 
   it("'No' nunca imprime ni avisa", async () => {
@@ -349,13 +344,13 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     await waitFor(() =>
       expect(screen.queryByText("¿Imprimir ticket?")).not.toBeInTheDocument(),
     );
-    expect(printSaleTicketDirect).not.toHaveBeenCalled();
+    expect(printSaleTicket).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
   });
 
-  it("el header del POS muestra el botón para conectar la impresora", async () => {
+  it("el header del POS NO muestra el botón para conectar la impresora", async () => {
     renderPos();
-    // En jsdom no hay Web Serial: el botón existe pero deshabilitado.
-    expect(await screen.findByRole("button", { name: /conectar impresora/i })).toBeInTheDocument();
+    await screen.findByTestId("sell");
+    expect(screen.queryByRole("button", { name: /conectar impresora/i })).not.toBeInTheDocument();
   });
 });

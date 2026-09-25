@@ -13,11 +13,9 @@ import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecul
 import { OpenBagDialog } from "@/components/molecules/OpenBagDialog";
 import { ManualProductDialog } from "@/components/molecules/ManualProductDialog";
 import { PrintTicketDialog } from "@/components/molecules/PrintTicketDialog";
-import { PrinterConnectButton } from "@/components/molecules/PrinterConnectButton";
 import { useBranches } from "@/components/hooks/useBranches";
 import { useBrandingContext } from "@/contexts/BrandingContext";
-import { resolveTicketCompany } from "@/utils/saleTicket";
-import { printSaleTicketDirect } from "@/utils/printTicketDirect";
+import { printSaleTicket, resolveTicketCompany } from "@/utils/saleTicket";
 import ticketLogoUrl from "@/assets/LogoConCirculoNegro.svg";
 import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
@@ -158,9 +156,6 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // llama con el diálogo todavía en pantalla, la animación de salida nunca
   // termina y queda abierto. Por eso se cierra PRIMERO y se imprime cuando ya
   // se fue (PRINT_AFTER_CLOSE_MS > duración de la animación de salida).
-  // Con la térmica conectada por Web Serial imprime directo; si no hay impresora
-  // o falla, printSaleTicketDirect cae al panel de Chrome (y si fue por un error
-  // avisa con un toast, antes de que el panel bloquee el hilo).
   const { pendingTicket, dismissTicket } = checkout;
   const handlePrintTicket = useCallback(() => {
     const ticket = pendingTicket;
@@ -169,12 +164,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     setTimeout(() => {
       try {
         // Puede ser síncrona o devolver una promesa: se atrapan ambas.
-        Promise.resolve(
-          printSaleTicketDirect(ticket, {
-            onDirectFailure: () =>
-              toast.info("No se pudo imprimir directo; se abrió el panel de impresión"),
-          }),
-        ).catch(() => {});
+        Promise.resolve(printSaleTicket(ticket)).catch(() => {});
       } catch {
         // La venta ya está confirmada: un fallo de impresión no la afecta.
       }
@@ -514,9 +504,6 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
               <PackagePlus className="h-4 w-4 mr-2" />
               Producto manual
             </Button>
-            <div className="ml-auto">
-              <PrinterConnectButton />
-            </div>
           </div>
         </div>
 
