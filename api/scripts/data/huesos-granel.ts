@@ -128,3 +128,9 @@ export function planLoad(
   }
   return plan;
 }
+
+// Nombres normalizados de los productos que esta carga crea (org vacía). Los
+// scripts de stock inicial y de "carried" los usan para tocar SOLO estos.
+export const HUESOS_NAMES: readonly string[] = planLoad(HUESOS_ROWS, new Set()).toCreate.map(
+  (p) => p.name,
+);

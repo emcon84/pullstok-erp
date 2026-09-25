@@ -1,6 +1,7 @@
 import { normalizeProductName } from "../../src/utils/productName";
 import {
   DEFAULT_ORG,
+  HUESOS_NAMES,
   HUESOS_ROWS,
   TARGET_CATEGORY,
   planLoad,
@@ -136,5 +137,17 @@ describe("dataset invariants", () => {
     const plan = planLoad(HUESOS_ROWS, new Set());
     const names = plan.toCreate.map((p) => p.name);
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe("HUESOS_NAMES", () => {
+  // Nombres que la carga crea (36 al 2026-09-25): los usan los scripts de
+  // stock inicial y de "carried" para tocar SOLO estos productos.
+  it("lists exactly the products planLoad creates for an empty org", () => {
+    const expected = planLoad(HUESOS_ROWS, new Set()).toCreate.map((p) => p.name);
+    expect([...HUESOS_NAMES]).toEqual(expected);
+    expect(HUESOS_NAMES).toHaveLength(36);
+    expect(HUESOS_NAMES).toContain("HUESO CORBATA 3/4");
+    expect(HUESOS_NAMES).not.toContain("ROLL 9/10");
   });
 });
