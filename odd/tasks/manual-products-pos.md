@@ -50,12 +50,28 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
 - [x] T4 — Front: vista admin "Carga manual" (lista + acción "Agregar al sistema"
       con categoría, reusando el modal/drawer de edición), ruta + sidebar.
 
+### Seguimiento (2026-09-25, pedido del usuario): tabla + eliminar
+Motivo: durante las pruebas no quiere que queden productos manuales sucios.
+Decisiones: eliminar SOLO desde el admin (ADMIN/MANAGEMENT), una fila a la vez con
+confirmación. Reglas de borrado (verificadas en schema): `SaleItem.productId` es
+opcional (SetNull, el ítem guarda `name`) → un manual ya vendido se puede borrar y
+la venta conserva su historial; `OrderItem`/`QuotationItem` tienen FK requerida sin
+cascada → si un pedido/presupuesto lo referencia NO se borra (409 con mensaje claro),
+para no alterar pedidos existentes. Rama: `feat/manual-products-table-delete`.
+- [x] T5 — API: `DELETE /products/manual/:id` (ADMIN/MANAGEMENT, solo `isManual=true`
+      de la org; 404 si no existe/no es manual; 409 si lo referencia un
+      pedido/presupuesto; emite `product:changed` si corresponde). Tests primero.
+- [ ] T6 — Front: `ManualProducts` como TABLA (nombre, precio, categoría, acciones)
+      + botón "Eliminar" con confirmación (AlertDialog/Dialog existente), toast,
+      invalidar `["manual-products"]` y `["products"]`, mostrar el 409. Tests primero.
+
 ## Ruteo por tarea
 (se completa al implementar: inline/delegado + evidencia del trigger)
 - T1: delegated writer (2+ non-trivial files)
 - T2: delegated writer (2+ non-trivial files)
 - T3: delegated writer (2+ non-trivial files)
 - T4: delegated writer (2+ non-trivial files)
+- T5: delegated writer (2+ non-trivial files)
 
 ## Progreso / evidencia
 - Rama: `feat/manual-products-pos`.
@@ -138,5 +154,24 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
   nombre/precio antes de promover quedó fuera (el drawer completo trae variantes,
   stock por sucursal, etc.; no es trivialmente reutilizable) y no hay edición de stock.
 
+- T5 (RED→GREEN, rama `feat/manual-products-table-delete`): tests nuevos en
+  `tests/services/manualProductService.test.ts` (8), `tests/controllers/
+  manualProductController.test.ts` (5) y `tests/routes/manualProductRoutes.test.ts`
+  (2). RED: las 3 suites fallaban (`deleteManualProduct` inexistente, ruta
+  ausente). GREEN: esas 3 suites 32/32; `npm test` → solo fallan `tests/e2e/*`
+  (Postgres, solo VPS) y `botService.test.ts` (flaky bajo carga); `npx tsc
+  --noEmit` → los 3 errores preexistentes de `tests/e2e/`.
+- T5 contrato: `DELETE /products/manual/:id` (authenticateJWT + ADMIN/MANAGEMENT,
+  sin `checkBusinessHours`, igual que `GET /manual`; registrada antes de `/:id`).
+  200 `{ message: "Producto eliminado" }` + `product:changed` "deleted"; 404
+  `{ message: "Producto manual no encontrado" }`; 409 `{ message: "No se puede
+  eliminar: el producto está en un pedido o presupuesto" }` (count de
+  OrderItem/QuotationItem por productId, o P2003 en carrera). Borrado atómico con
+  `deleteMany({ where: { id, isManual: true } })`. Ventas no bloquean (SaleItem
+  SetNull). Otras FK (ProductStock/ProductVariant cascade; PriceListEntry/
+  ReviewQueueEntry opcionales → SetNull) sin manejo especial. OrderItem/QuotationItem
+  no están en TENANT_MODELS: el scope org lo da el findFirst previo del producto.
+
 ## Próximo paso
-Verificación final + merge a main y push (autorizado por el usuario).
+T6 (tabla + eliminar en el front) → merge a main y push (el usuario pidió
+"mergealo a main y pushealo" en el ciclo anterior; confirmar alcance para este).

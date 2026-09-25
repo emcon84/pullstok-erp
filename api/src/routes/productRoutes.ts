@@ -134,6 +134,13 @@ router.get(
   requireRole("ADMIN", "MANAGEMENT"),
   manualProductController.listManualProducts,
 );
+// Baja de un producto manual (solo isManual=true; 409 si está en pedido/presupuesto).
+router.delete(
+  "/manual/:id",
+  authenticateJWT,
+  requireRole("ADMIN", "MANAGEMENT"),
+  manualProductController.deleteManualProduct,
+);
 router.post(
   "/:id/promote",
   authenticateJWT,
