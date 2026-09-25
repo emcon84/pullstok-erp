@@ -37,6 +37,7 @@ export const ROLE_VISIBLE_PATHS: Record<string, Role[]> = {
   "/presupuestos": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/pedidos": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/categorias": ["ADMIN", "MANAGEMENT"],
+  "/carga-manual": ["ADMIN", "MANAGEMENT"], // productos cargados a mano desde el POS
   "/facturas": ["ADMIN", "MANAGEMENT", "CASHIER"], // Remitos
   "/tienda": ["ADMIN", "MANAGEMENT"],
   "/mensajes": ["ADMIN", "MANAGEMENT", "VENDEDOR"],

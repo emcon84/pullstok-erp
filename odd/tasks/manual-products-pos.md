@@ -47,7 +47,7 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
 - [x] T3 — Front: dialog "Producto manual" en `UnifiedPos` (nombre + precio +
       cantidad) → `POST /products/manual` → línea al carrito; el carrito no topea
       líneas manuales por stock. Tests primero.
-- [ ] T4 — Front: vista admin "Carga manual" (lista + acción "Agregar al sistema"
+- [x] T4 — Front: vista admin "Carga manual" (lista + acción "Agregar al sistema"
       con categoría, reusando el modal/drawer de edición), ruta + sidebar.
 
 ## Ruteo por tarea
@@ -55,6 +55,7 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
 - T1: delegated writer (2+ non-trivial files)
 - T2: delegated writer (2+ non-trivial files)
 - T3: delegated writer (2+ non-trivial files)
+- T4: delegated writer (2+ non-trivial files)
 
 ## Progreso / evidencia
 - Rama: `feat/manual-products-pos`.
@@ -118,5 +119,24 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
   sin stock habilitados). Fix de una línea: `disabled: (i) => !enabled(i)`; queda
   pendiente de decisión del usuario por su impacto en el foco del teclado.
 
+- T4 (RED→GREEN): tests nuevos `manualProductsAdminService.test.tsx` (servicio +
+  hooks), `promoteManualProductDialog.test.tsx` (diálogo + picker + helper),
+  `manualProductsView.test.tsx`, `manualProductsNav.test.ts`. RED: las 4 suites
+  fallaban (módulos inexistentes / entrada de nav y ruta ausentes). GREEN: esas 4
+  suites 30/30. `npm test` (vitest) → solo fallan los 8 preexistentes
+  (`priceKgUpdate.test.tsx` x6, `productDrawer.test.tsx` x2); `npx tsc -b` → 0
+  errores; eslint `--max-warnings 0` sobre archivos nuevos → limpio.
+- T4 diseño: ruta lazy `/carga-manual` (vista `ManualProducts`), entrada "Carga
+  manual" en el grupo Productos justo tras Categorías (`visibleRoles` ADMIN/MANAGEMENT
+  + `ROLE_VISIBLE_PATHS`); guard client-side en la vista (`getMe` + `roleAllows`,
+  redirige a /dashboard). Servicio `getManualProducts`/`promoteManualProduct` en
+  `productService.ts`; hooks `useManualProducts` (key `["manual-products"]`, sin
+  refetch al enfocar) y `usePromoteManualProduct` (invalida `["manual-products"]` y
+  `["products"]`). Diálogo `PromoteManualProductDialog` reusa `CategoryTreePicker`
+  con la nueva prop `excludeRootNames` (helper `omitRootsByName`, solo raíces) para
+  ocultar "Carga manual". Filas memoizadas. NO se reusó el ProductDrawer: editar
+  nombre/precio antes de promover quedó fuera (el drawer completo trae variantes,
+  stock por sucursal, etc.; no es trivialmente reutilizable) y no hay edición de stock.
+
 ## Próximo paso
-T4 (front: vista admin "Carga manual" con lista + "Agregar al sistema").
+Verificación final + merge a main y push (autorizado por el usuario).

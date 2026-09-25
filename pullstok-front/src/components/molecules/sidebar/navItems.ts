@@ -16,6 +16,7 @@ import {
   Barcode,
   DollarSign,
   Package,
+  PackagePlus,
   Settings,
   Wrench,
   Palette,
@@ -53,6 +54,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/categorias", label: "Categorías", icon: Tags, visibleRoles: ["ADMIN", "MANAGEMENT"] },
+      { to: "/carga-manual", label: "Carga manual", icon: PackagePlus, visibleRoles: ["ADMIN", "MANAGEMENT"] },
       { to: "/actualizar-precios", label: "Actualizar precios", icon: DollarSign, moduleKey: "suelto", visibleRoles: ["ADMIN", "SUPERADMIN"] },
       { to: "/precios-por-kilo", label: "Precios por kilo", icon: Scale, moduleKey: "suelto", visibleRoles: ["ADMIN", "SUPERADMIN"] },
       { to: "/consultar-precios", label: "Venta suelta", icon: Search, moduleKey: "suelto", visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"] },

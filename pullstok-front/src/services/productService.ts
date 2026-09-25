@@ -329,6 +329,65 @@ export const createManualProduct = async (
   }
 };
 
+/** Nombre de la categoría raíz especial que el server crea para los productos manuales. */
+export const MANUAL_CATEGORY_NAME = "Carga manual";
+
+/** Fila de GET /products/manual: producto manual pendiente de revisión. */
+export interface ManualProduct {
+  id: string;
+  name: string;
+  price: number | string;
+  quantity: number;
+  isManual: boolean;
+  categoryId: string | null;
+  category: { id: string; name: string } | null;
+}
+
+/** GET /products/manual — productos cargados a mano desde el POS (ADMIN/MANAGEMENT). */
+export const getManualProducts = async (): Promise<ManualProduct[]> => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const response = await axios.get<ManualProduct[]>(`${API_URL}/products/manual`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "get manual products failed");
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+
+/**
+ * POST /products/:id/promote — "Agregar al sistema": pasa un producto manual a
+ * real con una categoría real. El server rechaza (400) una categoría inexistente
+ * o la propia "Carga manual", y (404) un producto que ya no es manual.
+ */
+export const promoteManualProduct = async (
+  id: string,
+  categoryId: string,
+): Promise<ManualProduct> => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const response = await axios.post<ManualProduct>(
+      `${API_URL}/products/${id}/promote`,
+      { categoryId },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "promote manual product failed");
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+
 export const updateProduct = async (product: DataItem) => {
   try {
     const token = localStorage.getItem("token");
