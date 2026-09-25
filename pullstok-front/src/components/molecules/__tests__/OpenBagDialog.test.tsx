@@ -314,6 +314,21 @@ describe("OpenBagDialog", () => {
     });
   });
 
+  describe("layout", () => {
+    // DialogContent es un CSS grid: un hijo directo sin `min-w-0` toma como
+    // ancho mínimo el de su contenido más largo (la etiqueta de la celda, con
+    // nowrap) y ensancha la columna más allá del modal. jsdom no calcula
+    // layout, así que se verifica la clase que lo evita.
+    it("lets the form shrink inside the grid dialog so long cell labels don't overflow it", () => {
+      renderDialog();
+
+      const form = screen
+        .getByPlaceholderText("Escaneá o ingresá el código de barras")
+        .closest("form");
+      expect(form).toHaveClass("min-w-0");
+    });
+  });
+
   describe("accessibility", () => {
     it("has proper aria labels on inputs", () => {
       renderDialog();
