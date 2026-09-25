@@ -136,7 +136,10 @@ export const OpenBagDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleBarcodeSubmit} className="space-y-4">
+        {/* min-w-0: DialogContent es un grid; sin esto el form toma como ancho
+            mínimo el de la etiqueta más larga de la celda (nowrap) y sus
+            inputs se salen del modal. */}
+        <form onSubmit={handleBarcodeSubmit} className="min-w-0 space-y-4">
           {/* Barcode input */}
           <div className="space-y-2">
             <Label htmlFor="barcode-input" className="text-sm font-medium">
