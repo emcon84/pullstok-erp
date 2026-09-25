@@ -34,6 +34,9 @@ export interface VendorCartItem {
   // conteo AD-HOC cargado por el vendedor al momento de la venta (NO viene de
   // product.unitsPerBox). Solo presente cuando saleMode === "POR_UNIDAD_BLISTER".
   piecesPerBlister?: number | null;
+  /** Producto manual (cargado a mano en el POS): el server no valida stock, así
+   *  que la línea no se topea por `stock` (que viaja en 0). */
+  isManual?: boolean;
 }
 
 const STORAGE_KEY = "vendor-cart";
@@ -131,6 +134,8 @@ export function useVendorCart() {
             unitsPerBox: product.unitsPerBox ?? null,
             perUnitPrice: unitPrice(product, sellsWholesale),
             piecesPerBlister: mode === "POR_UNIDAD_BLISTER" ? piecesPerBlister ?? null : null,
+            // Solo se escribe la clave en líneas manuales: las demás quedan idénticas.
+            ...(product.isManual ? { isManual: true } : {}),
           },
         ];
       });

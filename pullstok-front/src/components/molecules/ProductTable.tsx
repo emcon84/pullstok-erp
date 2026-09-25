@@ -163,6 +163,20 @@ export const ProductTable = memo(
               {items.map((p, index) => {
                 const id = p._id || p.id;
                 const stock = branchQty(p);
+                // Manual: quantity 0 en la BD pero se vende igual (el server no
+                // valida su stock) → badge "Manual" en vez de "Sin stock".
+                const isManual = !!p.isManual;
+                const noStock = stock <= 0 && !isManual;
+                const stockText = isManual
+                  ? "Manual"
+                  : noStock
+                  ? "Sin stock"
+                  : stockLabel(p, unitMode);
+                const stockBadgeClass = isManual
+                  ? "border-amber-300 bg-amber-50 text-amber-700"
+                  : noStock
+                  ? "border-destructive/30 bg-destructive/10 text-destructive"
+                  : "border-emerald-300 bg-emerald-50 text-emerald-700";
                 const isSelected = index === selectedIndex;
                 return (
                   <TableRow
@@ -213,12 +227,10 @@ export const ProductTable = memo(
                               variant="outline"
                               className={cn(
                                 "shrink-0 font-medium text-[11px] px-1.5 py-0",
-                                stock <= 0
-                                  ? "border-destructive/30 bg-destructive/10 text-destructive"
-                                  : "border-emerald-300 bg-emerald-50 text-emerald-700",
+                                stockBadgeClass,
                               )}
                             >
-                              {stock <= 0 ? "Sin stock" : stockLabel(p, unitMode)}
+                              {stockText}
                             </Badge>
                             <div className="flex gap-0.5 shrink-0 items-center">
                               <Button
@@ -275,14 +287,9 @@ export const ProductTable = memo(
                       <div className="flex items-center justify-center gap-1.5">
                         <Badge
                           variant="outline"
-                          className={cn(
-                            "font-medium",
-                            stock <= 0
-                              ? "border-destructive/30 bg-destructive/10 text-destructive"
-                              : "border-emerald-300 bg-emerald-50 text-emerald-700",
-                          )}
+                          className={cn("font-medium", stockBadgeClass)}
                         >
-                          {stock <= 0 ? "Sin stock" : stockLabel(p, unitMode)}
+                          {stockText}
                         </Badge>
                         <Button
                           variant="ghost"

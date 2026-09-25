@@ -122,6 +122,8 @@ export const VendorCatalogTab = ({
   // stock total en unidades; una línea de CAJAS admite solo las cajas completas.
   const maxSellable = useCallback(
     (p: DataItem): number => {
+      // Producto manual: el server no valida su stock → sin tope.
+      if (p.isManual) return Infinity;
       const units = unitStock(p);
       if (modeFor(p) === "POR_UNIDAD") return units;
       const ub = Number(p.unitsPerBox);
@@ -192,7 +194,8 @@ export const VendorCatalogTab = ({
       const p = catalog.items[index];
       if (!p) return;
       const stock = branchQty(p);
-      if (stock <= 0) {
+      // Los manuales tienen quantity 0 pero se venden igual (sin stock en el server).
+      if (stock <= 0 && !p.isManual) {
         toast.error("Producto sin stock");
         return;
       }
@@ -234,7 +237,7 @@ export const VendorCatalogTab = ({
 
   const enabled = useCallback((index: number) => {
     const p = catalog.items[index];
-    return !!p && branchQty(p) > 0;
+    return !!p && (!!p.isManual || branchQty(p) > 0);
   }, [catalog.items]);
 
   // Memoizado para no perder el memo de ProductTable en cada tecla del

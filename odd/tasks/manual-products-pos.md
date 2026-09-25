@@ -44,7 +44,7 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
       `quantity=0`, `publishedToStore=false`), `GET /products/manual` (lista
       admin) y `POST /products/:id/promote` (categoría real + `isManual=false`).
       Zod, multi-tenant, tests.
-- [ ] T3 — Front: dialog "Producto manual" en `UnifiedPos` (nombre + precio +
+- [x] T3 — Front: dialog "Producto manual" en `UnifiedPos` (nombre + precio +
       cantidad) → `POST /products/manual` → línea al carrito; el carrito no topea
       líneas manuales por stock. Tests primero.
 - [ ] T4 — Front: vista admin "Carga manual" (lista + acción "Agregar al sistema"
@@ -54,6 +54,7 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
 (se completa al implementar: inline/delegado + evidencia del trigger)
 - T1: delegated writer (2+ non-trivial files)
 - T2: delegated writer (2+ non-trivial files)
+- T3: delegated writer (2+ non-trivial files)
 
 ## Progreso / evidencia
 - Rama: `feat/manual-products-pos`.
@@ -91,5 +92,31 @@ lista desde la UI para darles "Agregar al sistema" (pasarlos a producto real).
   a nivel unit (los guards solo se prueban en e2e/VPS, no hay patrón unit).
   Los checkout de tienda solo se cubren por e2e (tx SERIALIZABLE, no unit-testable).
 
+- T3 (RED→GREEN): tests nuevos `manualProductService.test.tsx` (servicio + hook),
+  `manualProductDialog.test.tsx`, `manualProductCart.test.tsx`,
+  `unifiedPos.manualProduct.test.tsx` + 2 casos en `useVendorRowsKeyboard.test.ts`.
+  RED: 13 tests fallaban + 2 suites sin módulo (`ManualProductDialog`,
+  `useCreateManualProduct`); GREEN: esas 5 suites 40/40. `npm test` (vitest) →
+  942 pasan / 8 fallan, TODOS preexistentes (`priceKgUpdate.test.tsx` x6,
+  `productDrawer.test.tsx` x2; fallan igual con los cambios stasheados).
+  `npx tsc -b` → 0 errores; eslint sobre archivos nuevos → limpio (los errores
+  de lint que quedan en archivos tocados son preexistentes: `any` en
+  `types/index.ts` y `UnifiedPos.tsx` catch, warnings de hooks en VendorCatalogTab).
+- T3 diseño: botón "Producto manual" (junto a "Abrir bolsa", ambas pestañas, sin
+  atajo de teclado) abre `ManualProductDialog` (Nombre, Precio es-AR, Cantidad);
+  `useCreateManualProduct` (mutation, invalida `["products"]`) → al éxito
+  `cart.addToCart(..., stock 0, "BOLSA_CERRADA")` con `isManual`. Guards: el
+  capturador de la pistola se apaga con el diálogo abierto; `/` dentro de un
+  diálogo ya no roba el foco al buscador (`useVendorRowsKeyboard`); al cerrar el
+  foco vuelve al listado (`onClosed=exitToGrid`).
+- T3 gates de stock salteados para `isManual`: `CartItemRow` (+), `VendorCatalogTab`
+  (`commit`, `maxSellable`, `enabled`), `ProductTable` (badge "Manual" en vez de
+  "Sin stock"). Sin tocar: `useVendorCheckout` (manda stock 0, el server saltea),
+  legacy `VendorDashboard`/`QuantityModal` (no ruteado).
+- Hallazgo preexistente (NO corregido): `VendorCatalogTab` pasa `disabled: enabled`
+  a `inlineQty` — semántica invertida (filas CON stock quedan con input/+ deshabilitados,
+  sin stock habilitados). Fix de una línea: `disabled: (i) => !enabled(i)`; queda
+  pendiente de decisión del usuario por su impacto en el foco del teclado.
+
 ## Próximo paso
-T3 (front: dialog "Producto manual" en `UnifiedPos`, consume `POST /products/manual`).
+T4 (front: vista admin "Carga manual" con lista + "Agregar al sistema").

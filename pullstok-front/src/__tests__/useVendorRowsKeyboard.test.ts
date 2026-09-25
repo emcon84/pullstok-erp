@@ -60,3 +60,40 @@ describe("useVendorRowsKeyboard — colisión de atajos con un código escaneado
     expect(selectFirst).not.toHaveBeenCalled();
   });
 });
+
+describe("useVendorRowsKeyboard — tecla / dentro de un diálogo", () => {
+  it("no roba el foco al buscador cuando se tipea '/' en un input de un diálogo (ej. nombre de producto manual)", () => {
+    const searchInput = document.createElement("input");
+    document.body.appendChild(searchInput);
+    const focusSpy = vi.spyOn(searchInput, "focus");
+    const { onToggleTab } = setup({ searchInputRef: { current: searchInput } });
+
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    const nameInput = document.createElement("input");
+    dialog.appendChild(nameInput);
+    document.body.appendChild(dialog);
+    nameInput.focus();
+
+    const notPrevented = fireEvent.keyDown(nameInput, { key: "/" });
+
+    expect(focusSpy).not.toHaveBeenCalled();
+    expect(notPrevented).toBe(true); // sin preventDefault: el '/' se escribe
+    expect(onToggleTab).not.toHaveBeenCalled();
+
+    dialog.remove();
+    searchInput.remove();
+  });
+
+  it("fuera de un diálogo, '/' sigue enfocando el buscador", () => {
+    const searchInput = document.createElement("input");
+    document.body.appendChild(searchInput);
+    const focusSpy = vi.spyOn(searchInput, "focus");
+    setup({ searchInputRef: { current: searchInput } });
+
+    fireEvent.keyDown(window, { key: "/" });
+
+    expect(focusSpy).toHaveBeenCalled();
+    searchInput.remove();
+  });
+});

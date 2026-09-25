@@ -32,6 +32,10 @@ export interface DataItem {
   // ¿El negocio trabaja este producto? Default true. El filtro "solo lo que
   // trabajo" del dashboard (admin + vendedor) oculta los desmarcados.
   carried?: boolean;
+  // Producto cargado a mano desde el POS (pendiente de revisión del admin).
+  // Tiene quantity 0 en la BD pero el server NO valida ni descuenta su stock:
+  // el POS no debe toparlo ni mostrarlo como "sin stock".
+  isManual?: boolean;
   price: number | string;
   // Precio mayorista propio del negocio (distinto del sugerido de proveedor).
   // null/undefined = sin precio mayorista configurado para este producto.

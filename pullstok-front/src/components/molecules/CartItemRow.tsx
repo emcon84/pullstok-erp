@@ -88,7 +88,7 @@ const LooseQtyInput = ({ item, onCommit }: LooseQtyInputProps) => {
  * c/u, precio total, cantidad y botón quitar. Compartida por el panel de pedido
  * (VendorOrderPanel) y el drawer legacy (VendorCartSheet).
  *
- * - Bolsa cerrada / unidades: stepper −/+ (tope = stock).
+ * - Bolsa cerrada / unidades: stepper −/+ (tope = stock, salvo productos manuales).
  * - Suelto por kilo: −/+ sin tope de stock (lo valida el backend contra
  *   LooseStock) + input editable de kg.
  * - Suelto por monto: solo input editable del total en $.
@@ -149,8 +149,9 @@ export const CartItemRow = ({ item, onUpdateQty, onRemove }: CartItemRowProps) =
             className="h-7 w-7"
             aria-label="Aumentar"
             // El stock del carrito para líneas sueltas es 0 (lo resuelve el
-            // backend contra LooseStock): no se topea en el cliente.
-            disabled={!isLoose && item.quantity >= item.stock}
+            // backend contra LooseStock): no se topea en el cliente. Los
+            // productos manuales tampoco (el server no valida su stock).
+            disabled={!isLoose && !item.isManual && item.quantity >= item.stock}
             onClick={() => onUpdateQty(stepQty(item, 1))}
           >
             <Plus className="h-3 w-3" />

@@ -297,6 +297,38 @@ export const createProduct = async (product: DataItem) => {
   }
 };
 
+/** Payload de POST /products/manual: producto cargado a mano desde el POS. */
+export interface ManualProductPayload {
+  name: string;
+  price: number;
+}
+
+/**
+ * POST /products/manual — crea un producto manual (categoría "Carga manual",
+ * `isManual = true`, quantity 0). Devuelve el Product real (nombre normalizado
+ * a MAYÚSCULAS por el server) para sumarlo al pedido.
+ */
+export const createManualProduct = async (
+  payload: ManualProductPayload,
+): Promise<DataItem> => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const response = await axios.post<DataItem>(
+      `${API_URL}/products/manual`,
+      payload,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "create manual product failed");
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+
 export const updateProduct = async (product: DataItem) => {
   try {
     const token = localStorage.getItem("token");
