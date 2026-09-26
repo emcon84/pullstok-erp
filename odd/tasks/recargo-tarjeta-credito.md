@@ -42,7 +42,7 @@
 - [x] T3 — Front: fila de recargo en ticket HTML y ESC/POS (`saleTicket.ts`, `escpos.ts`).
       Tests primero. Ruta: delegada (mismo writer que T2).
 
-- [ ] T4 — Front: recargo también en el flujo legacy `SalesDrawer` + `PaymentSection`
+- [x] T4 (a46bc6f) — Front: recargo también en el flujo legacy `SalesDrawer` + `PaymentSection`
       (Ventas, Pedidos, Dashboard; el usuario lo pidió el 2026-09-26). Reusar el helper
       compartido de T2. Un solo writer: arranca cuando T2+T3 cierren. Ruta: delegada.
 
@@ -60,5 +60,9 @@
 - Desvío: la fila "Subtotal" del ticket ahora sale también con recargo sin descuento.
 - Teclado: en el input de % de recargo, V/+/- siguen disparando vender/agregar/quitar (igual que los inputs de monto); dígitos no se secuestran.
 
+- T4: recargo en `SalesDrawer` (Ventas/Pedidos/Dashboard). RED 9/9 + 3/3; GREEN y spot-check propio 4 archivos / 12 tests. Suite completa 1031/1039: solo fallan los 2 archivos preexistentes. tsc limpio. eslint: errores preexistentes en Dashboard.tsx. La conversión pedido→venta ya maneja `surchargePct` en el API.
+- Decisión del usuario (2026-09-26): se deja el campo "Monto" en `SalesDrawer` (habilita pagos divididos, igual que el modal del POS). Sin él, el drawer solo admitía un medio de pago.
+- Nota: `Orders.tsx` y `Quotations.tsx` montan otro `SalesDrawer` cuyo `onConfirm` ignora los pagos: el campo aparece pero no se envía nada (igual que el descuento hoy).
+
 ## Próximo paso
-T4.
+Factura (`createInvoiceFromSale`): decidir si refleja descuento y recargo.
