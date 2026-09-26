@@ -195,6 +195,7 @@ export const SalesPage = () => {
     payments?: PaymentInput[],
     cashSessionId?: string,
     discountPct?: number,
+    surchargePct?: number,
   ) => {
     try {
       await createSale({
@@ -203,6 +204,7 @@ export const SalesPage = () => {
         payments,
         cashSessionId,
         discountPct,
+        surchargePct,
       });
       toast.success("Venta creada con éxito");
       setIsOpen(false);

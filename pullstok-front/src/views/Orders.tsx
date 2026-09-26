@@ -199,6 +199,7 @@ export const Orders: React.FC = () => {
     payments?: PaymentInput[],
     cashSessionId?: string,
     discountPct?: number,
+    surchargePct?: number,
   ) => {
     createSale(
       {
@@ -207,6 +208,7 @@ export const Orders: React.FC = () => {
         payments,
         cashSessionId,
         discountPct,
+        surchargePct,
       },
       {
         onSuccess: () => toast.success("Venta creada desde el pedido"),

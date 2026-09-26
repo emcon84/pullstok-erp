@@ -221,6 +221,7 @@ export const Dashboard = () => {
     payments?: PaymentInput[],
     cashSessionId?: string,
     discountPct?: number,
+    surchargePct?: number,
   ) => {
     try {
       await createSale({
@@ -229,6 +230,7 @@ export const Dashboard = () => {
         payments,
         cashSessionId,
         discountPct,
+        surchargePct,
       });
       toast.success("Venta creada con éxito");
     } catch (error) {
