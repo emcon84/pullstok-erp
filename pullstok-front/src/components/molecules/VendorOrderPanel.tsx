@@ -74,6 +74,14 @@ export const VendorOrderPanel = ({
   const [discountStr, setDiscountStr] = useState("0");
   const discountPct = clampPct(Number(discountStr) || 0);
 
+  // El panel queda montado entre ventas: al vaciarse el carrito (venta
+  // confirmada, pedido guardado o "Vaciar") el descuento no debe pasar a la
+  // siguiente venta.
+  const cartIsEmpty = cart.items.length === 0;
+  useEffect(() => {
+    if (cartIsEmpty) setDiscountStr("0");
+  }, [cartIsEmpty]);
+
   const subtotal = cart.totalAmount;
   const discountAmount = round2((subtotal * discountPct) / 100);
   const total = round2(subtotal - discountAmount);
