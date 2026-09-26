@@ -1,4 +1,9 @@
 import { round2 } from "@/lib/money";
+import {
+  applySurchargeToPayments,
+  clampSurchargePct,
+  computeSurcharge,
+} from "@/lib/surcharge";
 import { PAYMENT_METHOD_LABELS, type PaymentInput } from "@/models/cashSessionModel";
 import type { VendorCartItem } from "@/components/hooks/useVendorCart";
 import { prepareTicketLogo } from "@/utils/ticketLogo";
@@ -49,6 +54,10 @@ export interface SaleTicket {
   subtotal: number;
   discountPct: number;
   discountAmount: number;
+  /** Recargo de tarjeta de crédito (% y $): solo > 0 si hay fila de tarjeta. */
+  surchargePct: number;
+  surchargeAmount: number;
+  /** Total cobrado: subtotal − descuento + recargo. */
   total: number;
   payments: SaleTicketPayment[];
 }
@@ -68,6 +77,8 @@ export interface BuildSaleTicketInput extends TicketCompany {
   items: SaleTicketItem[];
   payments?: PaymentInput[];
   discountPct?: number;
+  /** Recargo % sobre las filas TARJETA_CREDITO de `payments` (montos BASE). */
+  surchargePct?: number;
 }
 
 const DEFAULT_BUSINESS_NAME = "Pullstok";
@@ -186,7 +197,12 @@ export function buildSaleTicket(input: BuildSaleTicketInput): SaleTicket {
   const discountPct = input.discountPct ?? 0;
   // Mismo cálculo que VendorOrderPanel: descuento a nivel venta.
   const discountAmount = round2((subtotal * discountPct) / 100);
-  const total = round2(subtotal - discountAmount);
+  const basePayments = input.payments ?? [];
+  // Recargo de tarjeta (helper compartido con el modal de pago): los montos de
+  // `payments` son BASE; el total del ticket incluye el recargo.
+  const surchargeAmount = computeSurcharge(basePayments, input.surchargePct);
+  const surchargePct = surchargeAmount > 0 ? clampSurchargePct(input.surchargePct) : 0;
+  const total = round2(subtotal - discountAmount + surchargeAmount);
   const issuedAt =
     input.issuedAt instanceof Date ? input.issuedAt.toISOString() : input.issuedAt;
 
@@ -202,8 +218,12 @@ export function buildSaleTicket(input: BuildSaleTicketInput): SaleTicket {
     subtotal,
     discountPct,
     discountAmount,
+    surchargePct,
+    surchargeAmount,
     total,
-    payments: (input.payments ?? []).map((p) => ({
+    // Cada fila de tarjeta muestra lo efectivamente cobrado (base + recargo),
+    // así Σ pagos == total.
+    payments: applySurchargeToPayments(basePayments, surchargePct).map((p) => ({
       methodLabel: PAYMENT_METHOD_LABELS[p.method] ?? p.method,
       amount: p.amount,
     })),
@@ -250,9 +270,14 @@ export function renderSaleTicketHtml(ticket: SaleTicket): string {
     .join("");
 
   const totals: string[] = [];
-  if (ticket.discountAmount > 0) {
+  if (ticket.discountAmount > 0 || ticket.surchargeAmount > 0) {
     totals.push(row("Subtotal", money(ticket.subtotal)));
+  }
+  if (ticket.discountAmount > 0) {
     totals.push(row(`Descuento ${qty(ticket.discountPct)}%`, `-${money(ticket.discountAmount)}`));
+  }
+  if (ticket.surchargeAmount > 0) {
+    totals.push(row(`Recargo tarjeta ${qty(ticket.surchargePct)}%`, `+${money(ticket.surchargeAmount)}`));
   }
   totals.push(row("TOTAL", money(ticket.total), "total"));
 

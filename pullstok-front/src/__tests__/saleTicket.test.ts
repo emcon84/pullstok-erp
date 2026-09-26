@@ -129,6 +129,52 @@ describe("buildSaleTicket — totales, descuento y pagos", () => {
     expect(t.total).toBe(14400);
   });
 
+  it("sin recargo: surchargePct/surchargeAmount en 0 y total sin cambios", () => {
+    const t = build([bolsa]);
+    expect(t.surchargePct).toBe(0);
+    expect(t.surchargeAmount).toBe(0);
+    expect(t.total).toBe(16000);
+  });
+
+  it("recargo de tarjeta: solo sobre la fila TARJETA_CREDITO y suma al total", () => {
+    const t = build([bolsa], {
+      payments: [
+        { method: "EFECTIVO", amount: 6000 },
+        { method: "TARJETA_CREDITO", amount: 10000 },
+      ],
+      surchargePct: 10,
+    });
+    expect(t.surchargePct).toBe(10);
+    expect(t.surchargeAmount).toBe(1000);
+    expect(t.total).toBe(17000);
+    // Σ pagos == total: la fila de tarjeta muestra lo efectivamente cobrado.
+    expect(t.payments).toEqual([
+      { methodLabel: "Efectivo", amount: 6000 },
+      { methodLabel: "Tarjeta de crédito", amount: 11000 },
+    ]);
+  });
+
+  it("recargo + descuento: total = subtotal − descuento + recargo", () => {
+    const t = build([bolsa], {
+      discountPct: 10,
+      payments: [{ method: "TARJETA_CREDITO", amount: 14400 }],
+      surchargePct: 5,
+    });
+    expect(t.discountAmount).toBe(1600);
+    expect(t.surchargeAmount).toBe(720);
+    expect(t.total).toBe(15120);
+  });
+
+  it("recargo sin fila de tarjeta: se ignora (0)", () => {
+    const t = build([bolsa], {
+      payments: [{ method: "EFECTIVO", amount: 16000 }],
+      surchargePct: 10,
+    });
+    expect(t.surchargePct).toBe(0);
+    expect(t.surchargeAmount).toBe(0);
+    expect(t.total).toBe(16000);
+  });
+
   it("lista los pagos con la etiqueta visible del método", () => {
     const t = build([bolsa], {
       payments: [
@@ -208,6 +254,26 @@ describe("renderSaleTicketHtml", () => {
     expect(html).toContain("Descuento 10%");
     expect(html).toContain("-$1.600");
     expect(html).toContain("$14.400");
+  });
+
+  it("recargo 0: no muestra la fila de recargo", () => {
+    const html = renderSaleTicketHtml(build([bolsa]));
+    expect(html).not.toContain("Recargo");
+  });
+
+  it("recargo > 0: fila de recargo después del descuento y TOTAL con recargo", () => {
+    const html = renderSaleTicketHtml(
+      build([bolsa], {
+        discountPct: 10,
+        payments: [{ method: "TARJETA_CREDITO", amount: 14400 }],
+        surchargePct: 5,
+      }),
+    );
+    expect(html).toContain("Recargo tarjeta 5%");
+    expect(html).toContain("+$720");
+    expect(html).toContain("$15.120");
+    expect(html.indexOf("Descuento 10%")).toBeLessThan(html.indexOf("Recargo tarjeta 5%"));
+    expect(html.indexOf("Recargo tarjeta 5%")).toBeLessThan(html.indexOf("TOTAL"));
   });
 
   it("escapa el texto interpolado (nombre de producto y del negocio)", () => {

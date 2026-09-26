@@ -230,9 +230,14 @@ export function encodeSaleTicketEscPos(ticket: SaleTicket, opts: EncodeOptions =
   w.line(sep);
 
   // Totales.
-  if (ticket.discountAmount > 0) {
+  if (ticket.discountAmount > 0 || ticket.surchargeAmount > 0) {
     w.line(row("Subtotal", money(ticket.subtotal), cols));
+  }
+  if (ticket.discountAmount > 0) {
     w.line(row(`Descuento ${qty(ticket.discountPct)}%`, `-${money(ticket.discountAmount)}`, cols));
+  }
+  if (ticket.surchargeAmount > 0) {
+    w.line(row(`Recargo tarjeta ${qty(ticket.surchargePct)}%`, `+${money(ticket.surchargeAmount)}`, cols));
   }
   w.bold(true).line(row("TOTAL", money(ticket.total), cols)).bold(false);
 

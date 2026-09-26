@@ -48,7 +48,12 @@ export function useVendorCheckout({
 
   // ── Confirm sale ──
   const handleConfirmSale = useCallback(
-    async (payments?: PaymentInput[], cashSessionId?: string, discountPct?: number) => {
+    async (
+      payments?: PaymentInput[],
+      cashSessionId?: string,
+      discountPct?: number,
+      surchargePct?: number,
+    ) => {
       if (cartItems.length === 0) return;
       setConfirming(true);
       try {
@@ -62,6 +67,7 @@ export function useVendorCheckout({
             items: cartItems,
             payments,
             discountPct,
+            surchargePct,
           });
         } catch {
           ticket = null;
@@ -102,7 +108,7 @@ export function useVendorCheckout({
           piecesPerBlister:
             i.saleMode === "POR_UNIDAD_BLISTER" ? i.piecesPerBlister ?? undefined : undefined,
         }));
-        await createSale({ cart, payments, cashSessionId, discountPct });
+        await createSale({ cart, payments, cashSessionId, discountPct, surchargePct });
         clearCart();
         setPendingTicket(ticket);
         setCartOpen?.(false);
