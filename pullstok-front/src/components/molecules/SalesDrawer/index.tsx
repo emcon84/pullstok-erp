@@ -31,6 +31,7 @@ import { Order } from "../../../models/orderModel";
 import { Budget } from "../../../models/budgetModel";
 import { type PaymentInput } from "../../../models/cashSessionModel";
 import { round2 } from "@/lib/money";
+import { clampSurchargePct, computeSurcharge } from "@/lib/surcharge";
 import { toast } from "react-toastify";
 
 const selectClass =
@@ -63,6 +64,8 @@ interface SalesDrawerProps {
     payments?: PaymentInput[],
     cashSessionId?: string,
     discountPct?: number,
+    /** Recargo de tarjeta de crédito en % (0 = sin recargo). */
+    surchargePct?: number,
   ) => void;
 }
 
@@ -105,6 +108,26 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
   const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = Number(e.target.value);
     setDiscountPct(Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0);
+  };
+
+  // ── Recargo de tarjeta de crédito (recargo-tarjeta-credito) ──
+  // Los montos declarados son BASE (suman el total descontado); el recargo se
+  // aplica solo sobre las filas TARJETA_CREDITO y el server es la autoridad. El
+  // campo existe solo mientras haya una fila de tarjeta de crédito: sin ella el
+  // % se limpia (nunca viaja un % viejo).
+  const [surchargeStr, setSurchargeStr] = useState("");
+  const hasCardRow = pay.payments.some((p) => p.method === "TARJETA_CREDITO");
+  useEffect(() => {
+    if (!hasCardRow) setSurchargeStr("");
+  }, [hasCardRow]);
+  const surchargePct = hasCardRow ? clampSurchargePct(Number(surchargeStr) || 0) : 0;
+  const surchargeAmount = computeSurcharge(pay.payments, surchargePct);
+  const totalToCharge = round2(totalAmount + surchargeAmount);
+
+  const handleSurchargeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const n = Number(raw);
+    setSurchargeStr(raw === "" ? "" : n > 100 ? "100" : n < 0 ? "0" : raw);
   };
 
   const tabs: { key: Mode; label: string }[] = [
@@ -182,6 +205,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
     setSelectedBudget("");
     setMode("products");
     pay.reset();
+    setSurchargeStr("");
   };
 
   const validate = () => {
@@ -217,6 +241,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
       pay.finalize(),
       cashSessionId,
       discountPct,
+      surchargePct,
     );
     resetState();
     setShowConfirm(false);
@@ -412,6 +437,8 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
               addPayment={pay.addPayment}
               clearPayments={pay.clearPayments}
               total={totalAmount}
+              amountInput={pay.amountInput}
+              setAmountInput={pay.setAmountInput}
               className="mb-4"
             />
 
@@ -439,6 +466,24 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
                 className="w-28"
               />
             </div>
+            {hasCardRow && (
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <Label htmlFor="sd-surcharge" className="shrink-0">
+                  Recargo tarjeta (%)
+                </Label>
+                <Input
+                  id="sd-surcharge"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="any"
+                  placeholder="0"
+                  value={surchargeStr}
+                  onChange={handleSurchargeChange}
+                  className="w-28"
+                />
+              </div>
+            )}
             <div className="mb-4 space-y-1 text-sm">
               <div className="flex items-center justify-between text-muted-foreground">
                 <span>Subtotal</span>
@@ -458,6 +503,22 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
                   ${totalAmount.toLocaleString("es-AR")}
                 </span>
               </div>
+              {surchargeAmount > 0 && (
+                <>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Recargo tarjeta</span>
+                    <span className="tabular-nums">
+                      +${surchargeAmount.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">total a cobrar</span>
+                    <span className="text-xl font-bold tabular-nums">
+                      ${totalToCharge.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
             <div className="flex gap-2">
               <Button
