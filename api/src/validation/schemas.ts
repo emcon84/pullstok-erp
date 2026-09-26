@@ -371,6 +371,15 @@ export const createSaleSchema = z.object({
     .min(0, "El descuento no puede ser menor a 0")
     .max(100, "El descuento no puede superar el 100%")
     .optional(),
+  // Recargo porcentual por tarjeta de crédito (recargo-tarjeta-credito): 0..100.
+  // Ausente = 0 = sin recargo (backward-compat). Se aplica SOLO sobre la parte
+  // pagada con TARJETA_CREDITO (los montos de payments son la BASE, antes del
+  // recargo); el server calcula el monto en $ y lo suma al total.
+  surchargePct: z.coerce
+    .number()
+    .min(0, "El recargo no puede ser menor a 0")
+    .max(100, "El recargo no puede superar el 100%")
+    .optional(),
 });
 
 // ---------- Caja (sdd/caja-apertura-cierre) ----------

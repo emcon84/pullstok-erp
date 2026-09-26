@@ -666,7 +666,12 @@ model Sale {
   // acá: discount = round2(subtotal * pct / 100) y totalAmount = subtotal −
   // discount (el monto FINAL). DEFAULT 0 → ventas sin descuento (backward-compat).
   discount       Float        @default(0)
-  saleDate       DateTime     @default(now())
+  // Recargo por tarjeta de crédito en $ (recargo-tarjeta-credito). El vendedor
+  // ingresa un % (surchargePct) que se aplica SOLO sobre lo pagado con
+  // TARJETA_CREDITO; totalAmount INCLUYE este recargo y cada SalePayment de
+  // tarjeta guarda base + su recargo (Σ payments == totalAmount). DEFAULT 0.
+  surcharge      Float        @default(0)
+  saleDate      DateTime     @default(now())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   invoice        Invoice?

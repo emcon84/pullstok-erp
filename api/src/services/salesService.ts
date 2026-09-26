@@ -47,6 +47,10 @@ interface ISaleRequest {
   // = 0 = sin descuento (backward-compat). El server materializa el monto en $
   // (discount) y repondera totalAmount = subtotal − discount.
   discountPct?: number;
+  // Recargo porcentual por tarjeta de crédito (recargo-tarjeta-credito):
+  // 0..100. Ausente = 0. Se aplica solo sobre los payments TARJETA_CREDITO
+  // (montos BASE, ya descontados) y se suma a totalAmount; ver Sale.surcharge.
+  surchargePct?: number;
 }
 
 const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: string) => {
@@ -473,6 +477,8 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
     // payments se compara contra el totalAmount calculado server-side con
     // round2 (tolerancia de centavos). Payments opcionales → backward-compat.
     const payments = saleRequest.payments ?? [];
+    // Los montos declarados son la BASE (antes del recargo): se comparan contra
+    // el total ya descontado, ANTES de sumar el recargo por tarjeta.
     if (payments.length > 0) {
       const declaredSum = round2(
         payments.reduce((acc, p) => acc + round2(p.amount), 0),
@@ -486,11 +492,30 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       }
     }
 
+    // ── Recargo por tarjeta de crédito (recargo-tarjeta-credito) ──
+    // Se aplica SOLO sobre las filas TARJETA_CREDITO (por fila, con round2) y
+    // después del descuento. Cada fila de tarjeta se persiste con base + su
+    // recargo, y totalAmount incluye el recargo → Σ payments == totalAmount.
+    // Sin filas de tarjeta (o pct 0/ausente) el recargo es 0 y nada cambia.
+    const surchargePct = Math.min(100, Math.max(0, saleRequest.surchargePct ?? 0));
+    const paymentsToPersist = payments.map((p) => {
+      if (surchargePct > 0 && p.method === "TARJETA_CREDITO") {
+        const rowSurcharge = round2((round2(p.amount) * surchargePct) / 100);
+        return { ...p, amount: round2(round2(p.amount) + rowSurcharge), rowSurcharge };
+      }
+      return { ...p, rowSurcharge: 0 };
+    });
+    const surchargeAmount = round2(
+      paymentsToPersist.reduce((acc, p) => acc + p.rowSurcharge, 0),
+    );
+    totalAmount = round2(totalAmount + surchargeAmount);
+
     const created = await tx.sale.create({
       data: {
         organizationId,
         totalAmount,
         discount: discountAmount,
+        surcharge: surchargeAmount,
         ...(sellerBranchId ? { branchId: sellerBranchId } : {}),
         ...(orderId ? { orderId } : {}),
         // Venta asociada a la caja abierta (R8); null en ventas legacy/admin.
@@ -501,7 +526,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         ...(payments.length > 0
           ? {
               payments: {
-                create: payments.map((p) => ({
+                create: paymentsToPersist.map((p) => ({
                   method: p.method as any,
                   amount: p.amount,
                   cashSessionId: resolvedCashSessionId ?? undefined,

@@ -1061,6 +1061,161 @@ describe("salesService.createSale — cash session gate + sale payments", () => 
   });
 });
 
+// ── createSale: recargo por tarjeta de crédito (recargo-tarjeta-credito) ──
+describe("salesService.createSale — credit card surcharge", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // ADMIN: sin gate de caja ni sucursal → foco en el cálculo del recargo.
+  const runSale = async (products: any[], extra: any = {}) => {
+    const tx = makeTx();
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    tx.product.findFirst.mockResolvedValue({ ...branchProduct, priceKgSuelto: null });
+    tx.product.updateMany.mockResolvedValue({ count: 1 });
+    tx.sale.create.mockResolvedValue({ id: "s-1", items: [] });
+    tx.order.findFirst.mockResolvedValue(null);
+    const sale = await SaleService.createSale(
+      { products, ...extra },
+      "u-admin",
+      "ADMIN",
+    ).catch((e: any) => e);
+    return { tx, sale };
+  };
+
+  const line = (quantity: number, price: number) => ({
+    productId: "p-1",
+    name: "Bolsa",
+    quantity,
+    price,
+    category: "x",
+  });
+
+  const sumPayments = (createCall: any) =>
+    createCall.data.payments.create.reduce((acc: number, p: any) => acc + p.amount, 0);
+
+  it("single card payment: surcharge on the whole card amount, persisted on the sale and the payment", async () => {
+    const { tx } = await runSale([line(1, 1000)], {
+      surchargePct: 10,
+      payments: [{ method: "TARJETA_CREDITO", amount: 1000 }],
+    });
+
+    const data = tx.sale.create.mock.calls[0][0].data;
+    expect(data.surcharge).toBe(100);
+    expect(data.totalAmount).toBe(1100);
+    expect(data.payments.create).toEqual([
+      { method: "TARJETA_CREDITO", amount: 1100, cashSessionId: undefined },
+    ]);
+  });
+
+  it("mixed cash + card: surcharge only on the card part", async () => {
+    const { tx } = await runSale([line(1, 1000)], {
+      surchargePct: 10,
+      payments: [
+        { method: "EFECTIVO", amount: 600 },
+        { method: "TARJETA_CREDITO", amount: 400 },
+      ],
+    });
+
+    const data = tx.sale.create.mock.calls[0][0].data;
+    expect(data.surcharge).toBe(40);
+    expect(data.totalAmount).toBe(1040);
+    expect(data.payments.create.map((p: any) => [p.method, p.amount])).toEqual([
+      ["EFECTIVO", 600],
+      ["TARJETA_CREDITO", 440],
+    ]);
+  });
+
+  it("two card rows: surcharge is rounded and applied per row", async () => {
+    const { tx } = await runSale([line(1, 100)], {
+      surchargePct: 3.5,
+      payments: [
+        { method: "TARJETA_CREDITO", amount: 33.33 },
+        { method: "TARJETA_CREDITO", amount: 66.67 },
+      ],
+    });
+
+    const data = tx.sale.create.mock.calls[0][0].data;
+    // round2(33.33*3.5/100)=1.17 ; round2(66.67*3.5/100)=2.33
+    expect(data.surcharge).toBe(3.5);
+    expect(data.payments.create.map((p: any) => p.amount)).toEqual([34.5, 69]);
+    expect(data.totalAmount).toBe(103.5);
+  });
+
+  it("applies the surcharge AFTER the discount (base = discounted total)", async () => {
+    const { tx } = await runSale([line(1, 1000)], {
+      discountPct: 10,
+      surchargePct: 10,
+      payments: [{ method: "TARJETA_CREDITO", amount: 900 }],
+    });
+
+    const data = tx.sale.create.mock.calls[0][0].data;
+    expect(data.discount).toBe(100);
+    expect(data.surcharge).toBe(90);
+    expect(data.totalAmount).toBe(990);
+  });
+
+  it("surchargePct without a card payment: surcharge is 0 and the total is unchanged", async () => {
+    const { tx } = await runSale([line(1, 1000)], {
+      surchargePct: 10,
+      payments: [{ method: "EFECTIVO", amount: 1000 }],
+    });
+
+    const data = tx.sale.create.mock.calls[0][0].data;
+    expect(data.surcharge).toBe(0);
+    expect(data.totalAmount).toBe(1000);
+    expect(data.payments.create[0].amount).toBe(1000);
+  });
+
+  it("no surchargePct: behaviour unchanged (surcharge 0, payments as declared)", async () => {
+    const { tx } = await runSale([line(1, 1000)], {
+      payments: [{ method: "TARJETA_CREDITO", amount: 1000 }],
+    });
+
+    const data = tx.sale.create.mock.calls[0][0].data;
+    expect(data.surcharge).toBe(0);
+    expect(data.totalAmount).toBe(1000);
+    expect(data.payments.create[0].amount).toBe(1000);
+  });
+
+  it("declared payments are BASE amounts: base != discounted total is still rejected", async () => {
+    const { tx, sale } = await runSale([line(1, 1000)], {
+      surchargePct: 10,
+      // Client already added the surcharge → does not match the base total.
+      payments: [{ method: "TARJETA_CREDITO", amount: 1100 }],
+    });
+
+    expect((sale as any).code).toBe("PAYMENTS_DO_NOT_MATCH_TOTAL");
+    expect(tx.sale.create).not.toHaveBeenCalled();
+  });
+
+  it("invariant: Σ persisted payments == persisted totalAmount", async () => {
+    const { tx } = await runSale([line(3, 333.33)], {
+      discountPct: 7,
+      surchargePct: 8.75,
+      payments: [
+        { method: "EFECTIVO", amount: 300.12 },
+        // subtotal 999.99 − discount 70 = 929.99 → 300.12 + 629.87
+        { method: "TARJETA_CREDITO", amount: 629.87 },
+      ],
+    });
+
+    const data = tx.sale.create.mock.calls[0][0].data;
+    expect(Math.round(sumPayments(tx.sale.create.mock.calls[0][0]) * 100) / 100).toBe(
+      data.totalAmount,
+    );
+  });
+
+  it("sale without payments and no surcharge keeps surcharge 0", async () => {
+    const { tx } = await runSale([line(1, 1000)], { surchargePct: 10 });
+
+    const data = tx.sale.create.mock.calls[0][0].data;
+    expect(data.surcharge).toBe(0);
+    expect(data.totalAmount).toBe(1000);
+    expect(data.payments).toBeUndefined();
+  });
+});
+
 // ── Productos manuales (feat/manual-products-pos): no validan ni descuentan stock ──
 describe("salesService — productos manuales (isManual)", () => {
   beforeEach(() => {
