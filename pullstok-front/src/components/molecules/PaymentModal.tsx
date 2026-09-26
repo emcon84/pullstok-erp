@@ -3,9 +3,11 @@ import { Plus, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { round2 } from "@/lib/money";
+import { clampSurchargePct, computeSurcharge } from "@/lib/surcharge";
 import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
@@ -20,10 +22,13 @@ interface PaymentModalProps {
   total: number;
   cashSessionId?: string;
   discountPct: number;
+  /** `surchargePct` es el recargo de tarjeta de crédito (0 = sin recargo);
+   *  `payments` viaja con montos BASE (Σ = total descontado). */
   confirmSale: (
     payments?: PaymentInput[],
     cashSessionId?: string,
     discountPct?: number,
+    surchargePct?: number,
   ) => void;
 }
 
@@ -42,6 +47,9 @@ const parseAmt = (v: string) => parseFloat(v.replace(",", ".")) || 0;
  *   elegir el método pasa al INPUT de esa fila para cargar el monto.
  * - Enter agrega una fila; "-" quita la última; 1..N saltan a editar una fila;
  *   ↑/↓ navegan; "V" (o VENDER) confirma (si el total encaja).
+ * - Los montos son BASE (antes del recargo). Con una fila TARJETA_CREDITO aparece
+ *   "Recargo tarjeta (%)": se aplica solo sobre esas filas (helper compartido con
+ *   el ticket) y el "total a cobrar" lo suma. El servidor recalcula y valida.
  */
 export const PaymentModal = ({
   open,
@@ -52,6 +60,8 @@ export const PaymentModal = ({
   confirmSale,
 }: PaymentModalProps) => {
   const [rows, setRows] = useState<PayRow[]>([{ method: "EFECTIVO", amount: "" }]);
+  // Recargo de tarjeta % como STRING (mismo patrón que el descuento del panel).
+  const [surchargeStr, setSurchargeStr] = useState("");
   const contentRef = useRef<HTMLDivElement>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const rowsRef = useRef(rows);
@@ -63,6 +73,7 @@ export const PaymentModal = ({
   useEffect(() => {
     if (!open) return;
     setRows([{ method: "EFECTIVO", amount: String(total) }]);
+    setSurchargeStr("");
   }, [open, total]);
 
   // Saldo de la primera fila: total − suma de los métodos adicionales.
@@ -70,6 +81,29 @@ export const PaymentModal = ({
     .slice(1)
     .reduce((s, r) => s + parseAmt(r.amount), 0);
   const balance = round2(total - extrasSum);
+
+  // Recargo de tarjeta: el campo existe solo mientras haya una fila de tarjeta
+  // de crédito; sin ella el % se limpia (nunca viaja un % viejo).
+  const hasCardRow = rows.some((r) => r.method === "TARJETA_CREDITO");
+  useEffect(() => {
+    if (!hasCardRow) setSurchargeStr("");
+  }, [hasCardRow]);
+  const surchargePct = hasCardRow ? clampSurchargePct(Number(surchargeStr) || 0) : 0;
+  const surchargeAmount = computeSurcharge(
+    rows.map((r, i) => ({
+      method: r.method,
+      amount: i === 0 ? Math.max(0, balance) : round2(parseAmt(r.amount)),
+    })),
+    surchargePct,
+  );
+  const totalToCharge = round2(total + surchargeAmount);
+
+  const handleSurchargeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.trim();
+    if (raw === "" || /^\d{0,3}$/.test(raw)) {
+      setSurchargeStr(Number(raw) > 100 ? "100" : raw);
+    }
+  };
 
   const addRow = useCallback(() => {
     const cur = rowsRef.current;
@@ -127,7 +161,10 @@ export const PaymentModal = ({
       );
       return;
     }
-    confirmSale(payments, cashSessionId, discountPct);
+    // Montos BASE al servidor; el % solo viaja si quedó una fila de tarjeta
+    // de crédito con monto (un % viejo sin tarjeta no debe enviarse).
+    const sendsCard = payments.some((p) => p.method === "TARJETA_CREDITO" && p.amount > 0);
+    confirmSale(payments, cashSessionId, discountPct, sendsCard ? surchargePct : 0);
     onOpenChange(false);
   };
 
@@ -274,10 +311,38 @@ export const PaymentModal = ({
             <Plus className="h-4 w-4" /> Agregar forma de pago
           </Button>
 
-          {/* ── Total a cobrar ── */}
+          {/* ── Recargo de tarjeta (solo con una fila de tarjeta de crédito) ── */}
+          {hasCardRow && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="payment-surcharge" className="shrink-0">
+                  Recargo tarjeta (%)
+                </Label>
+                <Input
+                  id="payment-surcharge"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={surchargeStr}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={handleSurchargeChange}
+                  className="w-24 text-right"
+                  placeholder="0"
+                />
+              </div>
+              {surchargeAmount > 0 && (
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Recargo tarjeta</span>
+                  <span className="tabular-nums">${money(surchargeAmount)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Total a cobrar (incluye el recargo de tarjeta) ── */}
           <div className="space-y-0.5">
             <p className="text-xs text-muted-foreground">total a cobrar</p>
-            <p className="text-3xl font-bold tabular-nums">${money(total)}</p>
+            <p className="text-3xl font-bold tabular-nums">${money(totalToCharge)}</p>
           </div>
 
           {/* ── Vender ── */}

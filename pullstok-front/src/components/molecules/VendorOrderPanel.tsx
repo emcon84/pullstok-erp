@@ -32,6 +32,7 @@ interface VendorOrderPanelProps {
     payments?: PaymentInput[],
     cashSessionId?: string,
     discountPct?: number,
+    surchargePct?: number,
   ) => void;
   /** Id de la caja OPEN del vendedor (R8/R9). */
   cashSessionId?: string;

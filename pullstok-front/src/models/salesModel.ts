@@ -47,6 +47,10 @@ export interface SaleRequest {
    *  (backward-compat). El backend materializa el monto en $ y repondera el
    *  total = subtotal − descuento. */
   discountPct?: number;
+  /** Recargo porcentual de tarjeta de crédito (0..100), aplicado solo a las
+   *  filas TARJETA_CREDITO de `payments` (montos BASE). Ausente = sin recargo:
+   *  solo se envía cuando es > 0. El servidor calcula el monto. */
+  surchargePct?: number;
 }
 
 export interface Sale {
@@ -77,6 +81,9 @@ export interface Sale {
   /** Descuento aplicado a la venta en $ (backend). Backward-compat: undefined
    *  en ventas legacy sin descuento. */
   discount?: number;
+  /** Recargo de tarjeta de crédito en $ (backend). `totalAmount` lo INCLUYE.
+   *  undefined en ventas legacy sin recargo. */
+  surcharge?: number;
   saleDate: string;
   createdAt?: string;
   __v?: number;

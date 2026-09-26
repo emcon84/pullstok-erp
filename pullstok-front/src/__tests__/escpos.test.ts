@@ -157,6 +157,26 @@ describe("encodeSaleTicketEscPos", () => {
     expect(con).toMatch(/TOTAL\s+\$14\.400/);
   });
 
+  it("recargo: fila solo si es > 0, después del descuento, y TOTAL con recargo", () => {
+    const sin = textLines(encodeSaleTicketEscPos(ticket())).join("\n");
+    expect(sin).not.toContain("Recargo");
+
+    const con = textLines(
+      encodeSaleTicketEscPos(
+        ticket([item()], {
+          discountPct: 10,
+          payments: [{ method: "TARJETA_CREDITO", amount: 14400 }],
+          surchargePct: 5,
+        }),
+      ),
+    ).join("\n");
+    expect(con).toMatch(/Recargo tarjeta 5%\s+\+\$720/);
+    expect(con).toMatch(/TOTAL\s+\$15\.120/);
+    expect(con.indexOf("Descuento 10%")).toBeLessThan(con.indexOf("Recargo tarjeta 5%"));
+    // La fila de tarjeta muestra lo cobrado (base + recargo).
+    expect(con).toMatch(/Tarjeta de credito\s+\$15\.120/);
+  });
+
   it("TOTAL va dentro de negrita: ESC E 1 ... ESC E 0", () => {
     const bytes = encodeSaleTicketEscPos(ticket());
     const on = indexOfSeq(bytes, [ESC, 0x45, 0x01, ...ascii("TOTAL")]);

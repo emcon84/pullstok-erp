@@ -9,9 +9,9 @@ export const useCreateSale = () => {
   const mutation = useMutation<
     void,
     Error,
-    { cart: CartItem[]; orderId?: string; payments?: PaymentInput[]; cashSessionId?: string; discountPct?: number }
+    { cart: CartItem[]; orderId?: string; payments?: PaymentInput[]; cashSessionId?: string; discountPct?: number; surchargePct?: number }
   >({
-    mutationFn: async ({ cart, orderId, payments, cashSessionId, discountPct }) => {
+    mutationFn: async ({ cart, orderId, payments, cashSessionId, discountPct, surchargePct }) => {
       const saleRequest = {
         products: cart.map((item) => {
           const saleMode: SaleMode = item.saleMode ?? "BOLSA_CERRADA";
@@ -50,6 +50,8 @@ export const useCreateSale = () => {
         payments,
         cashSessionId,
         discountPct,
+        // Solo viaja cuando hay recargo: el payload de las demás ventas no cambia.
+        ...(surchargePct && surchargePct > 0 ? { surchargePct } : {}),
       };
       await createSale(saleRequest, orderId);
     },
