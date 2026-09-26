@@ -190,4 +190,30 @@ describe("createSaleSchema payments + cashSessionId", () => {
     const result = createSaleSchema.safeParse({ products: validProducts });
     expect(result.success).toBe(true);
   });
+
+  it("accepts an optional surchargePct between 0 and 100 (recargo-tarjeta-credito)", () => {
+    for (const surchargePct of [0, 10, 12.5, 100]) {
+      expect(
+        createSaleSchema.safeParse({ products: validProducts, surchargePct }).success,
+      ).toBe(true);
+    }
+  });
+
+  it("rejects surchargePct out of range (recargo-tarjeta-credito)", () => {
+    expect(
+      createSaleSchema.safeParse({ products: validProducts, surchargePct: -1 }).success,
+    ).toBe(false);
+    expect(
+      createSaleSchema.safeParse({ products: validProducts, surchargePct: 101 }).success,
+    ).toBe(false);
+  });
+
+  it("keeps surchargePct in the parsed output", () => {
+    const result = createSaleSchema.safeParse({
+      products: validProducts,
+      surchargePct: "5",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.surchargePct).toBe(5);
+  });
 });
