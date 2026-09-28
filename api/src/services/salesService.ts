@@ -43,6 +43,10 @@ interface ISaleRequest {
   // Sesión de caja a la que se asocia la venta (R8). Para VENDEDOR/CASHIER el
   // server la resuelve de la sesión OPEN; para gestión se acepta del request.
   cashSessionId?: string;
+  // Cliente al que se asigna la deuda de un pago CUENTA_CORRIENTE
+  // (cuenta-corriente). Obligatorio si hay una fila CUENTA_CORRIENTE con monto
+  // > 0 (se valida contra la org); sin esa fila se ignora.
+  customerId?: string;
   // Descuento porcentual a nivel venta (sdd/venta-descuento): 0..100. Ausente
   // = 0 = sin descuento (backward-compat). El server materializa el monto en $
   // (discount) y repondera totalAmount = subtotal − discount.
@@ -61,6 +65,22 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
   }
 
   const orderId = saleRequest.orderId;
+
+  // ── Cuenta corriente (cuenta-corriente) ──
+  // Una fila CUENTA_CORRIENTE con monto > 0 deja esa parte a deuda de un
+  // cliente: el customerId es obligatorio (se valida contra la org dentro de la
+  // transacción). Sin esa fila, un customerId suelto se ignora.
+  const accountPaymentAmount = round2(
+    (saleRequest.payments ?? [])
+      .filter((p) => p.method === "CUENTA_CORRIENTE")
+      .reduce((acc, p) => acc + round2(p.amount), 0),
+  );
+  const isAccountSale = accountPaymentAmount > 0;
+  if (isAccountSale && !saleRequest.customerId) {
+    const err: any = new Error("Seleccioná un cliente para la venta en cuenta corriente");
+    err.code = "CUSTOMER_REQUIRED_FOR_ACCOUNT";
+    throw err;
+  }
 
   // ── Precio mayorista (feature "precio mayorista para usuario interno") ──
   // sellsWholesale es un flag de User, independiente del role. Si el
@@ -510,6 +530,20 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
     );
     totalAmount = round2(totalAmount + surchargeAmount);
 
+    // Cuenta corriente: el cliente debe pertenecer a la org (tx no tiene scope
+    // automático → organizationId explícito). Otra org / inexistente → 404.
+    if (isAccountSale) {
+      const customer = await tx.customer.findFirst({
+        where: { id: saleRequest.customerId!, organizationId },
+        select: { id: true },
+      });
+      if (!customer) {
+        const err: any = new Error("Cliente no encontrado");
+        err.code = "CUSTOMER_NOT_FOUND";
+        throw err;
+      }
+    }
+
     const created = await tx.sale.create({
       data: {
         organizationId,
@@ -537,6 +571,21 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       },
       include: { items: true },
     });
+
+    // Deuda del cliente: CHARGE en el libro, en la MISMA transacción que la
+    // venta (si algo falla, ni venta ni deuda). Monto = solo la parte CC.
+    if (isAccountSale) {
+      await tx.customerAccountMovement.create({
+        data: {
+          organizationId,
+          customerId: saleRequest.customerId!,
+          type: "CHARGE",
+          amount: accountPaymentAmount,
+          saleId: created.id,
+          createdById: userId,
+        },
+      });
+    }
 
     if (orderId) {
       await tx.order.updateMany({
@@ -655,6 +704,12 @@ export const deleteSale = async (id: string) => {
   }
 
   await prisma.$transaction(async (tx) => {
+    // Cuenta corriente: anular la venta revierte la deuda (borra su CHARGE del
+    // libro; sin esto quedaría huérfano con saleId null por el SetNull).
+    await tx.customerAccountMovement.deleteMany({
+      where: { saleId: id, type: "CHARGE", organizationId },
+    });
+
     // Los items se borran en cascada (onDelete: Cascade en el schema).
     await tx.sale.deleteMany({ where: { id } });
 

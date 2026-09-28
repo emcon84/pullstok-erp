@@ -216,6 +216,29 @@ describe("cashSessionService.closeCash", () => {
     );
   });
 
+  it("cuenta-corriente: a CUENTA_CORRIENTE sale payment is NOT cash and is excluded from expectedAmount", async () => {
+    mockedPrisma.cashSession.findFirst.mockResolvedValue({
+      ...openSession,
+      openingAmount: 5000,
+      status: "OPEN",
+    });
+    mockedPrisma.salePayment.groupBy.mockResolvedValue([
+      { method: "EFECTIVO", _sum: { amount: 1500 } },
+      { method: "CUENTA_CORRIENTE", _sum: { amount: 900 } },
+    ]);
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(mockedPrisma));
+    mockedPrisma.cashSession.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await cashSessionService.closeCash(
+      "cs-1",
+      { closingByMethod: { EFECTIVO: 6500 } },
+      "u-1",
+      "CASHIER",
+    );
+
+    expect(result.expectedAmount).toBe(6500); // 5000 + 1500, sin los 900 a cuenta
+  });
+
   it("R3: close by MANAGEMENT (not owner) is allowed (gestión scope)", async () => {
     mockedPrisma.cashSession.findFirst.mockResolvedValue({
       ...openSession,

@@ -217,3 +217,28 @@ describe("createSaleSchema payments + cashSessionId", () => {
     if (result.success) expect(result.data.surchargePct).toBe(5);
   });
 });
+
+describe("createSaleSchema — cuenta corriente (customerId)", () => {
+  const validProducts = [{ productId: "p-1", quantity: 1, price: 100, category: "x" }];
+
+  it("paymentSchema accepts CUENTA_CORRIENTE", () => {
+    expect(paymentSchema.safeParse({ method: "CUENTA_CORRIENTE", amount: 50 }).success).toBe(true);
+  });
+
+  it("accepts customerId together with a CUENTA_CORRIENTE payment", () => {
+    const result = createSaleSchema.safeParse({
+      products: validProducts,
+      payments: [{ method: "CUENTA_CORRIENTE", amount: 100 }],
+      customerId: "c-1",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.customerId).toBe("c-1");
+  });
+
+  it("customerId is optional and must be a non-empty string", () => {
+    expect(createSaleSchema.safeParse({ products: validProducts }).success).toBe(true);
+    expect(
+      createSaleSchema.safeParse({ products: validProducts, customerId: "" }).success,
+    ).toBe(false);
+  });
+});

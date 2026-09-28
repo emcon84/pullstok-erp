@@ -64,6 +64,8 @@ const makeTx = () => ({
   priceKgType: { findMany: jest.fn() },
   sale: { create: jest.fn(), deleteMany: jest.fn() },
   order: { findFirst: jest.fn(), updateMany: jest.fn() },
+  customer: { findFirst: jest.fn() },
+  customerAccountMovement: { create: jest.fn(), deleteMany: jest.fn() },
 });
 
 const branchProduct = {

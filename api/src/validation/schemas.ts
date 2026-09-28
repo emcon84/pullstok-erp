@@ -324,9 +324,18 @@ const saleProductSchema = z.object({
 // Medio de pago de una venta (sdd/caja-apertura-cierre). La suma de
 // payments[].amount DEBE ser igual al total calculado server-side (nunca se
 // confía en un total enviado por el cliente). Solo EFECTIVO suma al arqueo.
+// CUENTA_CORRIENTE deja la venta a deuda del cliente (requiere customerId en
+// createSaleSchema); nunca suma al arqueo.
 export const paymentSchema = z.object({
   method: z.enum(
-    ["EFECTIVO", "TARJETA_CREDITO", "TARJETA_DEBITO", "TRANSFERENCIA", "QR"],
+    [
+      "EFECTIVO",
+      "TARJETA_CREDITO",
+      "TARJETA_DEBITO",
+      "TRANSFERENCIA",
+      "QR",
+      "CUENTA_CORRIENTE",
+    ],
     { message: "Método de pago inválido" },
   ),
   amount: z.coerce
@@ -363,6 +372,10 @@ export const createSaleSchema = z.object({
     }),
   // CashSession a la que se asocia la venta (sdd/caja-apertura-cierre R8).
   cashSessionId: z.string().min(1).optional(),
+  // Cliente al que se asigna la deuda cuando hay un pago CUENTA_CORRIENTE
+  // (cuenta-corriente). Obligatorio en ese caso (lo valida el service contra la
+  // org); sin fila de cuenta corriente se ignora.
+  customerId: z.string().min(1).optional(),
   // Descuento porcentual a nivel venta (sdd/venta-descuento): 0..100. Ausente
   // = 0 = sin descuento (backward-compat). El server materializa el monto en $
   // y repondera totalAmount = subtotal − descuento.

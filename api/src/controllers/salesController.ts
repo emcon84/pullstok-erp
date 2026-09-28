@@ -15,8 +15,8 @@ const invoiceInclude = {
 // Create a new sale
 const createSale = async (req: AuthedRequest, res: Response) => {
     try {
-        const { products, orderId, payments, cashSessionId, discountPct, surchargePct } = req.body;
-        const sale = await SaleService.createSale({ products, orderId, payments, cashSessionId, discountPct, surchargePct }, req.user!.id, req.user!.role);
+        const { products, orderId, payments, cashSessionId, customerId, discountPct, surchargePct } = req.body;
+        const sale = await SaleService.createSale({ products, orderId, payments, cashSessionId, customerId, discountPct, surchargePct }, req.user!.id, req.user!.role);
         res.status(201).json(sale);
     } catch (error: any) {
         // 422 para errores de dominio del flujo suelto (B-06 amendment /
@@ -30,6 +30,14 @@ const createSale = async (req: AuthedRequest, res: Response) => {
         // caja OPEN en su sucursal → 422 (payload válido, operación bloqueada).
         if (error?.code === "CASH_SESSION_REQUIRED") {
             return res.status(422).json({ error: error.code, message: error.message });
+        }
+        // Cuenta corriente: el cliente no existe en la org → 404.
+        if (error?.code === "CUSTOMER_NOT_FOUND") {
+            return res.status(404).json({ error: error.code, message: error.message });
+        }
+        // Cuenta corriente sin cliente seleccionado → 400.
+        if (error?.code === "CUSTOMER_REQUIRED_FOR_ACCOUNT") {
+            return res.status(400).json({ error: error.code, message: error.message });
         }
         // Payments que no cuadran con el total (R7) → 400.
         if (error?.code === "PAYMENTS_DO_NOT_MATCH_TOTAL") {

@@ -79,6 +79,45 @@ describe("salesController.createSale", () => {
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
+  it("propagates customerId to the service (cuenta corriente)", async () => {
+    service.createSale.mockResolvedValue({ id: "s-1" });
+    const req = mockRequest({
+      products: [{ productId: "p-1", quantity: 1, price: 100, category: "x" }],
+      payments: [{ method: "CUENTA_CORRIENTE", amount: 100 }],
+      customerId: "c-1",
+    });
+    const res = mockResponse();
+    await salesController.createSale(req, res);
+
+    expect(service.createSale).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: "c-1" }),
+      "u-1",
+      "CASHIER",
+    );
+  });
+
+  it("maps CUSTOMER_NOT_FOUND to 404", async () => {
+    service.createSale.mockRejectedValue(mkErr("CUSTOMER_NOT_FOUND", "Cliente no encontrado"));
+    const res = mockResponse();
+    await salesController.createSale(mockRequest({ products: [] }), res);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: "CUSTOMER_NOT_FOUND", message: "Cliente no encontrado" }),
+    );
+  });
+
+  it("maps CUSTOMER_REQUIRED_FOR_ACCOUNT to 400", async () => {
+    service.createSale.mockRejectedValue(
+      mkErr("CUSTOMER_REQUIRED_FOR_ACCOUNT", "Seleccioná un cliente para la venta en cuenta corriente"),
+    );
+    const res = mockResponse();
+    await salesController.createSale(mockRequest({ products: [] }), res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: "CUSTOMER_REQUIRED_FOR_ACCOUNT" }),
+    );
+  });
+
   it("maps CASH_SESSION_REQUIRED to 422 (R9)", async () => {
     service.createSale.mockRejectedValue(
       mkErr("CASH_SESSION_REQUIRED", "Necesitás una caja abierta"),
