@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Phone, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Users, Wallet } from "lucide-react";
 import { toast } from "react-toastify";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import {
   useDeleteCustomer,
   useUpdateCustomer,
 } from "../components/hooks/useCustomer";
+import { useCustomerBalances } from "../components/hooks/useCustomerAccount";
+import { CustomerAccountDialog } from "../components/molecules/CustomerAccountDialog";
 import { Loader } from "../components/atoms/loader";
 import { fetchPadron } from "../services/customerService";
 import {
@@ -24,6 +26,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+const money = (n: number) =>
+  `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
 
 export const Customers = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -53,6 +58,13 @@ export const Customers = () => {
   const { submitCustomer, loadingCustomer } = useCreateCustomer();
   const { updateCustomer, loadingUpdate } = useUpdateCustomer();
   const { deleteCustomer } = useDeleteCustomer();
+  const { balances } = useCustomerBalances();
+  // Cliente cuya cuenta corriente está abierta (el diálogo se monta recién ahí).
+  const [accountTarget, setAccountTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const balanceById = new Map(balances.map((b) => [b.customerId, b.balance]));
 
   const queryClient = useQueryClient();
 
@@ -265,6 +277,7 @@ export const Customers = () => {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {customers.map((customer) => {
             const customerId = customer.id || customer._id || "";
+            const balance = balanceById.get(customerId) ?? 0;
             return (
               <Card key={customerId} className="gap-0 p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -302,6 +315,29 @@ export const Customers = () => {
                   <Phone className="h-3.5 w-3.5" />
                   {customer.phone || "Sin teléfono"}
                 </div>
+                <div className="mt-3 flex items-center justify-between gap-2 text-sm">
+                  <span className="text-muted-foreground">Saldo</span>
+                  {balance > 0 ? (
+                    <span className="font-medium tabular-nums text-destructive">
+                      Debe {money(balance)}
+                    </span>
+                  ) : balance < 0 ? (
+                    <span className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                      A favor {money(Math.abs(balance))}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 w-full"
+                  onClick={() => setAccountTarget({ id: customerId, name: customer.name })}
+                >
+                  <Wallet className="h-4 w-4" />
+                  Cuenta corriente
+                </Button>
               </Card>
             );
           })}
@@ -353,6 +389,15 @@ export const Customers = () => {
           isEditing={true}
         />
       </GenericModal>
+
+      {accountTarget && (
+        <CustomerAccountDialog
+          customerId={accountTarget.id}
+          customerName={accountTarget.name}
+          open
+          onOpenChange={(open) => !open && setAccountTarget(null)}
+        />
+      )}
 
       <AlertDialog
         open={!!deleteTarget}

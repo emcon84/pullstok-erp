@@ -17,6 +17,14 @@ vi.mock("../components/hooks/useCustomer", () => ({
   useDeleteCustomer: vi.fn(),
 }));
 
+// Cuenta corriente (cuenta-corriente): estos tests no la ejercitan; se mockea
+// para no disparar requests reales al montar la vista.
+vi.mock("../components/hooks/useCustomerAccount", () => ({
+  useCustomerBalances: vi.fn(() => ({ balances: [], loading: false, error: null })),
+  useCustomerAccount: vi.fn(),
+  useRegisterAccountPayment: vi.fn(),
+}));
+
 import { Customers } from "../views/Customers";
 import { fetchPadron } from "../services/customerService";
 import {

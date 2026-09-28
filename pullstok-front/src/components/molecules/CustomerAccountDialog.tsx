@@ -1,0 +1,241 @@
+import { useEffect, useState } from "react";
+import { toast } from "react-toastify";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useCustomerAccount, useRegisterAccountPayment } from "@/components/hooks/useCustomerAccount";
+import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
+import { round2 } from "@/lib/money";
+import {
+  PAYMENT_METHODS,
+  PAYMENT_METHOD_LABELS,
+  type PaymentMethod,
+} from "@/models/cashSessionModel";
+
+interface CustomerAccountDialogProps {
+  customerId: string;
+  customerName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+const money = (n: number) => `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+
+const parseAmt = (v: string) => parseFloat(v.replace(",", ".")) || 0;
+
+const formatDate = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+};
+
+/**
+ * Cuenta corriente de un cliente: saldo, movimientos (más nuevos primero) y
+ * formulario de cobranza. El monto arranca en el saldo y no puede superarlo
+ * (el servidor también lo rechaza). Una cobranza en EFECTIVO necesita la caja
+ * abierta: entra al arqueo de esa caja.
+ */
+export const CustomerAccountDialog = ({
+  customerId,
+  customerName,
+  open,
+  onOpenChange,
+}: CustomerAccountDialogProps) => {
+  const { account, loading } = useCustomerAccount(customerId);
+  const { registerPayment, loading: saving } = useRegisterAccountPayment();
+  const { session } = useGetCurrentCashSession();
+
+  const balance = account?.balance ?? 0;
+  const [amountStr, setAmountStr] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("EFECTIVO");
+  const [note, setNote] = useState("");
+
+  // El monto se precarga con el saldo (y se recarga cuando cambia: p. ej. tras cobrar).
+  useEffect(() => {
+    setAmountStr(balance > 0 ? String(balance) : "");
+  }, [balance]);
+
+  const amount = round2(parseAmt(amountStr));
+  const exceedsBalance = amount > round2(balance);
+  const needsCashSession = method === "EFECTIVO" && !session;
+  const canSubmit = amount > 0 && !exceedsBalance && !needsCashSession && !saving;
+
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    registerPayment(
+      {
+        customerId,
+        input: {
+          amount,
+          method,
+          ...(method === "EFECTIVO" && session ? { cashSessionId: session.id } : {}),
+          ...(note.trim() ? { note: note.trim() } : {}),
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Cobranza registrada");
+          setNote("");
+        },
+        onError: (error: Error) => {
+          toast.error(error.message || "Error al registrar la cobranza");
+        },
+      },
+    );
+  };
+
+  const balanceLabel = balance > 0 ? "Saldo adeudado" : balance < 0 ? "Saldo a favor" : "Saldo";
+  const balanceTone =
+    balance > 0
+      ? "text-destructive"
+      : balance < 0
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-muted-foreground";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Cuenta corriente — {customerName}</DialogTitle>
+          <DialogDescription>
+            Saldo, movimientos y cobranzas del cliente.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-baseline justify-between gap-3 rounded-lg border p-3">
+          <span className="text-sm text-muted-foreground">{balanceLabel}</span>
+          <span className={`text-2xl font-bold tabular-nums ${balanceTone}`}>
+            {money(Math.abs(balance))}
+          </span>
+        </div>
+
+        {/* ── Movimientos ── */}
+        <div className="max-h-64 overflow-y-auto rounded-lg border">
+          {loading ? (
+            <p className="p-4 text-center text-sm text-muted-foreground">Cargando…</p>
+          ) : !account || account.movements.length === 0 ? (
+            <p className="p-4 text-center text-sm text-muted-foreground">
+              Sin movimientos todavía
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Método</TableHead>
+                  <TableHead className="text-right">Monto</TableHead>
+                  <TableHead>Nota</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {account.movements.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell className="whitespace-nowrap">{formatDate(m.createdAt)}</TableCell>
+                    <TableCell>{m.type === "CHARGE" ? "Venta" : "Cobranza"}</TableCell>
+                    <TableCell>
+                      {m.type === "CHARGE"
+                        ? PAYMENT_METHOD_LABELS.CUENTA_CORRIENTE
+                        : m.method
+                          ? PAYMENT_METHOD_LABELS[m.method]
+                          : "—"}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right tabular-nums ${
+                        m.type === "CHARGE"
+                          ? "text-destructive"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
+                      {money(m.amount)}
+                    </TableCell>
+                    <TableCell className="space-x-2 text-muted-foreground">
+                      {m.saleId && <span>#{m.saleId.slice(0, 8)}</span>}
+                      {m.note && <span>{m.note}</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+
+        {/* ── Registrar cobranza (solo con deuda) ── */}
+        {balance > 0 ? (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="account-payment-amount">Monto a cobrar</Label>
+                <Input
+                  id="account-payment-amount"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={amountStr}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) => setAmountStr(e.target.value)}
+                  className="text-right"
+                  aria-invalid={exceedsBalance || undefined}
+                />
+                {exceedsBalance && (
+                  <p className="text-xs text-destructive">El monto supera el saldo adeudado</p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="account-payment-method">Método de cobro</Label>
+                <NativeSelect
+                  id="account-payment-method"
+                  ariaLabel="Método de cobro"
+                  value={method}
+                  onValueChange={(v) => setMethod(v as PaymentMethod)}
+                  options={PAYMENT_METHODS.map((m) => ({
+                    value: m,
+                    label: PAYMENT_METHOD_LABELS[m],
+                  }))}
+                />
+                {needsCashSession && (
+                  <p className="text-xs text-destructive">Abrí la caja para cobrar en efectivo</p>
+                )}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="account-payment-note">Nota (opcional)</Label>
+              <Input
+                id="account-payment-note"
+                type="text"
+                autoComplete="off"
+                maxLength={500}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </div>
+            <Button className="w-full" onClick={handleSubmit} disabled={!canSubmit}>
+              Registrar cobranza
+            </Button>
+          </div>
+        ) : (
+          balance === 0 && (
+            <p className="text-center text-sm text-muted-foreground">Sin deuda pendiente</p>
+          )
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
