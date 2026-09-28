@@ -194,6 +194,18 @@ describe("PriceKgProductPanel — modal de venta suelta por celda", () => {
       expect(item.loosePriceId).toBe("c-proplan");
     });
 
+    it("redondea a 2 decimales la cantidad suelta (0.285 kg -> 0.29) y el total sale de ese valor", () => {
+      const item = buildCellSaleItem(cell, 0.285, "POR_PESO", 0);
+      expect(item.quantity).toBe(0.29);
+      expect(item.totalPrice).toBe(2668);
+    });
+
+    it("POR_MONTO redondea el monto a 2 decimales", () => {
+      const item = buildCellSaleItem(cell, 0, "POR_MONTO", 4600.004);
+      expect(item.quantity).toBe(4600);
+      expect(item.totalPrice).toBe(4600);
+    });
+
     it("sin id de celda NO incluye loosePriceId y usa productId vacío", () => {
       const item = buildCellSaleItem(
         { priceKg: null, cellId: null, brandName: "", typeName: "" },

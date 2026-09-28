@@ -102,9 +102,14 @@ export const buildCellSaleItem = (
 ): CellSaleItem => {
   const lineName = looseLineName(cell.brandName, cell.typeName);
   const pid = cell.cellId ?? "";
-  const quantity = mode === "POR_MONTO" ? amount : qty;
+  // Siempre 2 decimales (el server rechaza más): el total sale de lo redondeado.
+  const roundedQty = round2(qty);
+  const roundedAmount = round2(amount);
+  const quantity = mode === "POR_MONTO" ? roundedAmount : roundedQty;
   const totalPrice =
-    mode === "POR_MONTO" ? amount : round2((cell.priceKg ?? 0) * qty);
+    mode === "POR_MONTO"
+      ? roundedAmount
+      : round2((cell.priceKg ?? 0) * roundedQty);
   return {
     product: {
       _id: pid,

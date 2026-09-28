@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import type { DataItem } from "../../types";
 import { unitPrice, effectivePrice, computePerUnitPrice } from "./vendorCatalogHelpers";
+import { round2 } from "@/lib/money";
 
 export type SaleMode =
   | "BOLSA_CERRADA"
@@ -40,6 +41,14 @@ export interface VendorCartItem {
 }
 
 const STORAGE_KEY = "vendor-cart";
+
+/** Las ventas sueltas (kg / monto) SIEMPRE llevan cantidad a 2 decimales: el
+ *  server rechaza más de 2 y la suma flotante (0.1 + 0.2) deriva. Las demás
+ *  modalidades (bolsa, unidad, blister) son enteras y no se tocan. */
+const isLooseMode = (mode: SaleMode): boolean =>
+  mode === "POR_PESO" || mode === "POR_MONTO";
+const normalizeQty = (mode: SaleMode, quantity: number): number =>
+  isLooseMode(mode) ? round2(quantity) : quantity;
 
 function readCart(): VendorCartItem[] {
   try {
@@ -101,10 +110,15 @@ export function useVendorCart() {
           (i.saleMode ?? "BOLSA_CERRADA") === mode &&
           (i.loosePriceId ?? null) === (loosePriceId ?? null) &&
           (i.piecesPerBlister ?? null) === (piecesPerBlister ?? null);
+        const qty = normalizeQty(mode, quantity);
+        // Una cantidad suelta que redondea a 0 no crea (ni suma a) ninguna línea.
+        if (isLooseMode(mode) && qty <= 0) return prev;
         const existing = prev.find(matches);
         if (existing) {
           return prev.map((i) =>
-            matches(i) ? { ...i, quantity: i.quantity + quantity, stock } : i,
+            matches(i)
+              ? { ...i, quantity: normalizeQty(mode, i.quantity + qty), stock }
+              : i,
           );
         }
         return [
@@ -125,7 +139,7 @@ export function useVendorCart() {
               ? kgPrice
               : effectivePrice(product, sellsWholesale),
             stock,
-            quantity,
+            quantity: qty,
             branchId,
             saleMode: mode,
             priceKgSuelto: priceKgSueltoOverride ?? product.priceKgSuelto ?? null,
@@ -156,9 +170,10 @@ export function useVendorCart() {
           i.productId === productId &&
           (i.saleMode ?? "BOLSA_CERRADA") === mode &&
           (i.loosePriceId ?? null) === (loosePriceId ?? null);
-        return quantity <= 0
+        const qty = normalizeQty(mode, quantity);
+        return qty <= 0
           ? prev.filter((i) => !matches(i))
-          : prev.map((i) => (matches(i) ? { ...i, quantity } : i));
+          : prev.map((i) => (matches(i) ? { ...i, quantity: qty } : i));
       });
     },
     [],

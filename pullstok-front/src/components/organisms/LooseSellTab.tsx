@@ -19,6 +19,7 @@ import { useVendorRowsKeyboard } from "@/components/hooks/useVendorRowsKeyboard"
 import { LooseSellTable, type LooseCellRow } from "@/components/molecules/LooseSellTable";
 import { parseDecimal, scrollRowInContainer } from "@/components/hooks/vendorRowHelpers";
 import { cn } from "@/lib/utils";
+import { round2 } from "@/lib/money";
 
 type VendorCart = ReturnType<typeof useVendorCart>;
 
@@ -309,7 +310,8 @@ export const LooseSellTab = ({
       return;
     }
     const cur = parseDecimal(qtyByKey[modeKey(r.cellKey)] ?? "1");
-    const value = Number.isNaN(cur) ? 0 : cur;
+    // Siempre 2 decimales (el server rechaza más); 0.004 redondea a 0 = inválido.
+    const value = Number.isNaN(cur) ? 0 : round2(cur);
     if (value <= 0) {
       toast.error(
         saleMode === "POR_MONTO" ? "Ingresá un monto" : "Ingresá una cantidad en kg",
