@@ -99,22 +99,56 @@ como comprobante.
       - `normalizePhone` ya estaba exportado (named export +
         `export default { ..., normalizePhone, ... }`) — NO hizo falta
         exportarlo, contrario a lo que decía la nota original del doc.
-- [ ] T2 — Front: detalle de venta expandible en cada renglón "Venta" del
+- [x] T2 — Front: detalle de venta expandible en cada renglón "Venta" del
       diálogo (`CustomerAccountDialog.tsx`), usando `GET /sales/:id` (nuevo
       método en `saleServices.ts` + hook). Tests primero. Ruta: delegada
-      (writer front).
-- [ ] T3 — Front: botón "Enviar por WhatsApp" en `CustomerAccountDialog.tsx`
+      (writer front). **Hecho** — commit `e548b6b`. Cada renglón CHARGE con
+      `saleId` es un botón (chevron + "Venta") que expande/colapsa una fila
+      anidada con los items de la venta (nombre, cantidad —kg con 2
+      decimales en POR_PESO/POR_MONTO, unidades en el resto—, precio,
+      subtotal); fetch lazy solo la primera vez (cache local en estado del
+      diálogo, no react-query: no hay convención previa de fetch-on-demand
+      por fila en el código base). Loading/error inline. Renglones PAYMENT
+      no son expandibles. TDD estricto: RED confirmado (8 tests nuevos
+      fallando) antes de implementar.
+      - `npx vitest run src/__tests__/customerAccountDialog.test.tsx` →
+        14/14 en RED-previo (sin T2/T3); 19/19 tras implementar T2.
+      - `npx tsc -p tsconfig.app.json --noEmit` → sin errores.
+- [x] T3 — Front: botón "Enviar por WhatsApp" en `CustomerAccountDialog.tsx`
       que llama al endpoint de T1; deshabilitado con hint si el cliente no
       tiene teléfono cargado; toast de éxito/error. Tests primero. Ruta:
-      delegada (mismo writer front, después de T1).
+      delegada (mismo writer front, después de T1). **Hecho** — commit
+      `0431ee8`. Cliente nuevo `sendAccountStatementWhatsapp`
+      (`customerAccountService.ts`) + hook `useSendAccountStatementWhatsapp`
+      (mismo patrón que `useRegisterAccountPayment`). El diálogo no
+      refetchea el teléfono: `Customers.tsx` ya tiene el `Customer` completo
+      al abrir la cuenta corriente, así que se agregó `customerPhone` a
+      `accountTarget` y se lo pasa como prop nueva (opcional) a
+      `CustomerAccountDialog`. Botón deshabilitado + hint "Cargá un teléfono
+      para enviar por WhatsApp" sin teléfono (trim vacío cuenta como sin
+      teléfono); estado "Enviando…" con spinner mientras está pending
+      (bloquea doble click vía `disabled` nativo + guard defensivo en el
+      handler); toast de éxito fijo, toast de error con el `message` del
+      servidor (mismo patrón que `handleSubmit`).
+      - `npx vitest run src/__tests__/customerAccountDialog.test.tsx
+        src/__tests__/customers.cuentaCorriente.test.tsx` → 23/23 (19 del
+        diálogo + 4 de `Customers.tsx`, incluida una aserción nueva de que
+        el botón queda habilitado con el teléfono pasado por props).
+      - `npx tsc -p tsconfig.app.json --noEmit` → sin errores.
+      - `npx vitest run` (suite completa) → 1094/1102 verdes; los 8 fallos
+        restantes son los pre-existentes ya documentados (6 en
+        `priceKgUpdate.test.tsx` + 2 en `productDrawer.test.tsx`), sin
+        relación con este cambio.
 
 ## Progreso
 - Mapeo hecho (WhatsApp/Kapso, PDF, branding, sale detail ya expuesto).
 - T1 (backend) hecho — commit `7ab88d0`, ver detalle arriba.
+- T2 (detalle de venta expandible) hecho — commit `e548b6b`.
+- T3 (botón "Enviar por WhatsApp") hecho — commit `0431ee8`.
 
 ## Próximo paso
-T2 (detalle de venta expandible en el diálogo) y T3 (botón "Enviar por
-WhatsApp", depende del endpoint de T1) — front, writer delegado.
+Feature completa (T1, T2, T3 hechos). Sin próximos pasos pendientes; queda
+a criterio del usuario pedir push/PR cuando corresponda.
 
 ### Contrato del endpoint (para T3 / el writer front)
 `POST /customers/:id/account/statement/whatsapp` — sin body, mismos
