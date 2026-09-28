@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { toast } from "react-toastify";
 
@@ -35,7 +35,7 @@ vi.mock("@/components/ui/native-select", () => ({
 vi.mock("@/components/hooks/useCustomerAccount", () => ({
   useCustomerAccount: vi.fn(),
   useRegisterAccountPayment: vi.fn(),
-  useSendAccountStatementWhatsapp: vi.fn(),
+  useGetAccountStatementLink: vi.fn(),
 }));
 vi.mock("@/components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
@@ -48,7 +48,7 @@ import { CustomerAccountDialog } from "@/components/molecules/CustomerAccountDia
 import {
   useCustomerAccount,
   useRegisterAccountPayment,
-  useSendAccountStatementWhatsapp,
+  useGetAccountStatementLink,
 } from "@/components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { getSaleById } from "@/services/saleServices";
@@ -87,7 +87,7 @@ const setSession = (session: { id: string } | null) =>
   } as never);
 
 const registerPayment = vi.fn();
-const sendStatement = vi.fn();
+const getStatementLink = vi.fn();
 
 const renderDialog = (customerPhone = "+5491122334455") =>
   render(
@@ -113,8 +113,8 @@ describe("CustomerAccountDialog", () => {
       registerPayment,
       loading: false,
     } as never);
-    vi.mocked(useSendAccountStatementWhatsapp).mockReturnValue({
-      sendStatement,
+    vi.mocked(useGetAccountStatementLink).mockReturnValue({
+      getStatementLink,
       loading: false,
     } as never);
     vi.mocked(getSaleById).mockReset();
@@ -291,9 +291,21 @@ describe("CustomerAccountDialog", () => {
     });
   });
 
-  // ── T3: enviar por WhatsApp ──
-  describe("send statement via WhatsApp", () => {
-    const sendButton = () => screen.getByRole("button", { name: /enviar por whatsapp|enviando/i });
+  // ── T4: wa.me fallback (Kapso en sandbox — no puede enviar sin que el
+  // cliente inicie la conversación; queda dormant hasta producción) ──
+  describe("send statement via wa.me", () => {
+    const sendButton = () =>
+      screen.getByRole("button", { name: /enviar por whatsapp|abriendo whatsapp/i });
+    let openSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => Window | null>>;
+
+    beforeEach(() => {
+      openSpy = vi.fn().mockReturnValue(null);
+      vi.stubGlobal("open", openSpy);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
 
     it("disables the button and shows a hint when the customer has no phone", () => {
       renderDialog("   ");
@@ -301,48 +313,58 @@ describe("CustomerAccountDialog", () => {
       expect(screen.getByText("Cargá un teléfono para enviar por WhatsApp")).toBeInTheDocument();
     });
 
-    it("enables the button and calls the endpoint when the customer has a phone", () => {
-      renderDialog("+5491122334455");
+    it("fetches the statement link and opens wa.me with the digits-only phone and the PDF url", () => {
+      renderDialog("+54 9 11 2233-4455");
       expect(sendButton()).not.toBeDisabled();
       expect(
         screen.queryByText("Cargá un teléfono para enviar por WhatsApp"),
       ).not.toBeInTheDocument();
 
       fireEvent.click(sendButton());
-      expect(sendStatement).toHaveBeenCalledWith(
+      expect(getStatementLink).toHaveBeenCalledWith(
         "c-1",
         expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
       );
+
+      const [, callbacks] = getStatementLink.mock.calls[0];
+      callbacks.onSuccess({ url: "https://r2.example.com/estado-cuenta-ana.pdf", filename: "f.pdf" });
+
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      const [waUrl, target, features] = openSpy.mock.calls[0];
+      expect(target).toBe("_blank");
+      expect(features).toBe("noopener,noreferrer");
+      expect(waUrl as string).toMatch(/^https:\/\/wa\.me\/5491122334455\?text=/);
+      const decodedText = decodeURIComponent((waUrl as string).split("?text=")[1]);
+      expect(decodedText).toContain("https://r2.example.com/estado-cuenta-ana.pdf");
+      expect(decodedText).toContain("Ana Gómez");
     });
 
     it("shows a loading state while pending and does not double-fire", () => {
-      vi.mocked(useSendAccountStatementWhatsapp).mockReturnValue({
-        sendStatement,
+      vi.mocked(useGetAccountStatementLink).mockReturnValue({
+        getStatementLink,
         loading: true,
       } as never);
       renderDialog();
 
       expect(sendButton()).toBeDisabled();
       fireEvent.click(sendButton());
-      expect(sendStatement).not.toHaveBeenCalled();
+      expect(getStatementLink).not.toHaveBeenCalled();
     });
 
-    it("toasts on success", () => {
+    it("surfaces the server error message on failure and never opens wa.me", () => {
       renderDialog();
       fireEvent.click(sendButton());
-      const [, callbacks] = sendStatement.mock.calls[0];
+      const [, callbacks] = getStatementLink.mock.calls[0];
 
-      callbacks.onSuccess();
-      expect(toast.success).toHaveBeenCalledWith("Comprobante enviado por WhatsApp");
+      callbacks.onError(new Error("Cliente no encontrado"));
+      expect(toast.error).toHaveBeenCalledWith("Cliente no encontrado");
+      expect(openSpy).not.toHaveBeenCalled();
     });
 
-    it("surfaces the server error message on failure", () => {
+    it("never calls the old Kapso-sending endpoint from this button", () => {
       renderDialog();
       fireEvent.click(sendButton());
-      const [, callbacks] = sendStatement.mock.calls[0];
-
-      callbacks.onError(new Error("El cliente no tiene teléfono cargado"));
-      expect(toast.error).toHaveBeenCalledWith("El cliente no tiene teléfono cargado");
+      expect(getStatementLink).toHaveBeenCalledTimes(1);
     });
   });
 });

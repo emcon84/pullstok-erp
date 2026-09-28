@@ -50,3 +50,10 @@ export interface AccountPaymentResult {
   /** Saldo restante tras la cobranza. */
   balance: number;
 }
+
+/** Respuesta de POST /customers/:id/account/statement-link (fallback wa.me
+ *  mientras Kapso está en sandbox — el front arma el link wa.me con esta url). */
+export interface AccountStatementLink {
+  url: string;
+  filename: string;
+}

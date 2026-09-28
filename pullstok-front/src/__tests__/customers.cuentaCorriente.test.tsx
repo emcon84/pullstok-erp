@@ -21,7 +21,7 @@ vi.mock("../components/hooks/useCustomerAccount", () => ({
   useCustomerBalances: vi.fn(),
   useCustomerAccount: vi.fn(),
   useRegisterAccountPayment: vi.fn(),
-  useSendAccountStatementWhatsapp: vi.fn(),
+  useGetAccountStatementLink: vi.fn(),
 }));
 vi.mock("../components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
@@ -38,7 +38,7 @@ import {
   useCustomerBalances,
   useCustomerAccount,
   useRegisterAccountPayment,
-  useSendAccountStatementWhatsapp,
+  useGetAccountStatementLink,
 } from "../components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "../components/hooks/useCashSession";
 
@@ -86,7 +86,7 @@ describe("Customers — cuenta corriente", () => {
       error: null,
     } as never);
     vi.mocked(useRegisterAccountPayment).mockReturnValue({ registerPayment: vi.fn(), loading: false } as never);
-    vi.mocked(useSendAccountStatementWhatsapp).mockReturnValue({ sendStatement: vi.fn(), loading: false } as never);
+    vi.mocked(useGetAccountStatementLink).mockReturnValue({ getStatementLink: vi.fn(), loading: false } as never);
     vi.mocked(useGetCurrentCashSession).mockReturnValue({ session: null, loading: false, error: null, refetch: vi.fn() } as never);
   });
 

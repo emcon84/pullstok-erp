@@ -17,6 +17,7 @@ import {
   getCustomerBalances,
   getCustomerAccount,
   registerAccountPayment,
+  getAccountStatementLink,
 } from "../services/customerAccountService";
 
 const axiosError = (data: unknown) => ({ isAxiosError: true, response: { data } });
@@ -79,5 +80,27 @@ describe("customerAccountService", () => {
   it("falls back to a generic message for non-HTTP errors", async () => {
     mockGet.mockRejectedValue(new Error("boom"));
     await expect(getCustomerBalances()).rejects.toThrow("Error al obtener los saldos");
+  });
+
+  // wa.me fallback (T4): builds the PDF server-side and returns its URL — no
+  // phone required, Kapso not involved.
+  it("getAccountStatementLink POSTs to /customers/:id/account/statement-link", async () => {
+    mockPost.mockResolvedValue({
+      data: { url: "https://r2.example.com/x.pdf", filename: "estado-cuenta-Ana.pdf" },
+    });
+
+    const res = await getAccountStatementLink("c-1");
+
+    expect(mockPost).toHaveBeenCalledWith(
+      expect.stringMatching(/\/customers\/c-1\/account\/statement-link$/),
+      undefined,
+      { headers: { Authorization: "Bearer tok-1" } },
+    );
+    expect(res).toEqual({ url: "https://r2.example.com/x.pdf", filename: "estado-cuenta-Ana.pdf" });
+  });
+
+  it("getAccountStatementLink throws an Error carrying the server message", async () => {
+    mockPost.mockRejectedValue(axiosError({ error: "CUSTOMER_NOT_FOUND", message: "Cliente no encontrado" }));
+    await expect(getAccountStatementLink("nope")).rejects.toThrow("Cliente no encontrado");
   });
 });

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  getAccountStatementLink,
   getCustomerAccount,
   getCustomerBalances,
   registerAccountPayment,
@@ -8,6 +9,7 @@ import {
 import type {
   AccountPaymentInput,
   AccountPaymentResult,
+  AccountStatementLink,
   CustomerAccount,
   CustomerBalance,
 } from "../../models/customerAccountModel";
@@ -53,7 +55,10 @@ export const useRegisterAccountPayment = () => {
   };
 };
 
-/** Envía el comprobante de cuenta corriente por WhatsApp. No invalida nada:
+/** Envía el comprobante de cuenta corriente por WhatsApp vía Kapso. EN
+ *  SANDBOX Kapso rechaza el envío (403, requiere sesión activa) — queda
+ *  dormant, disponible para cuando la cuenta pase a producción. El botón del
+ *  front usa `useGetAccountStatementLink` mientras tanto. No invalida nada:
  *  enviar el PDF no cambia el saldo ni los movimientos. */
 export const useSendAccountStatementWhatsapp = () => {
   const mutation = useMutation<{ sent: true }, Error, string>({
@@ -62,6 +67,20 @@ export const useSendAccountStatementWhatsapp = () => {
   return {
     sendStatement: mutation.mutate,
     sendStatementAsync: mutation.mutateAsync,
+    loading: mutation.isPending,
+  };
+};
+
+/** Arma el PDF de resumen de cuenta y devuelve su URL pública (sin exigir
+ *  teléfono ni pasar por Kapso): fallback wa.me mientras Kapso está en
+ *  sandbox. No invalida nada: no cambia saldo ni movimientos. */
+export const useGetAccountStatementLink = () => {
+  const mutation = useMutation<AccountStatementLink, Error, string>({
+    mutationFn: (customerId) => getAccountStatementLink(customerId),
+  });
+  return {
+    getStatementLink: mutation.mutate,
+    getStatementLinkAsync: mutation.mutateAsync,
     loading: mutation.isPending,
   };
 };

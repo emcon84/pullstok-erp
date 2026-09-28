@@ -3,6 +3,7 @@ import { API_URL } from "../constants";
 import type {
   AccountPaymentInput,
   AccountPaymentResult,
+  AccountStatementLink,
   CustomerAccount,
   CustomerBalance,
 } from "../models/customerAccountModel";
@@ -80,5 +81,23 @@ export const sendAccountStatementWhatsapp = async (
     return response.data;
   } catch (error) {
     throw toError(error, "Error al enviar el comprobante por WhatsApp");
+  }
+};
+
+/** Arma el PDF de resumen de cuenta y devuelve su URL pública (sin exigir
+ *  teléfono ni pasar por Kapso): fallback wa.me mientras Kapso está en
+ *  sandbox — ver `sendAccountStatementWhatsapp`, que queda dormant. */
+export const getAccountStatementLink = async (
+  customerId: string,
+): Promise<AccountStatementLink> => {
+  try {
+    const response = await axios.post<AccountStatementLink>(
+      `${API_URL}/customers/${customerId}/account/statement-link`,
+      undefined,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    throw toError(error, "Error al generar el resumen de cuenta");
   }
 };

@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/table";
 import {
   useCustomerAccount,
+  useGetAccountStatementLink,
   useRegisterAccountPayment,
-  useSendAccountStatementWhatsapp,
 } from "@/components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { getSaleById } from "@/services/saleServices";
@@ -69,6 +69,15 @@ const formatDate = (iso: string) => {
     : d.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
 };
 
+/** wa.me fallback (Kapso en sandbox, ver useCustomerAccount): arma un link de
+ *  WhatsApp con el PDF ya subido, para que el vendedor lo mande a mano. wa.me
+ *  quiere solo dígitos (código de país incluido, sin "+" ni separadores). */
+const buildWhatsappStatementUrl = (phone: string, customerName: string, pdfUrl: string) => {
+  const digits = phone.replace(/\D/g, "");
+  const message = `Hola ${customerName}! Te comparto el resumen de tu cuenta corriente: ${pdfUrl}`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+};
+
 /**
  * Cuenta corriente de un cliente: saldo, movimientos (más nuevos primero) y
  * formulario de cobranza. El monto arranca en el saldo y no puede superarlo
@@ -85,7 +94,7 @@ export const CustomerAccountDialog = ({
   const { account, loading } = useCustomerAccount(customerId);
   const { registerPayment, loading: saving } = useRegisterAccountPayment();
   const { session } = useGetCurrentCashSession();
-  const { sendStatement, loading: sendingStatement } = useSendAccountStatementWhatsapp();
+  const { getStatementLink, loading: gettingStatementLink } = useGetAccountStatementLink();
 
   const balance = account?.balance ?? 0;
   const [amountStr, setAmountStr] = useState("");
@@ -127,14 +136,20 @@ export const CustomerAccountDialog = ({
     }
   };
 
-  // ── Enviar comprobante por WhatsApp (T3) ──
+  // ── Enviar comprobante por WhatsApp (T4: wa.me fallback — Kapso en sandbox
+  // no puede empujar mensajes sin que el cliente haya iniciado la charla, así
+  // que en vez de mandar por Kapso, armamos el PDF y abrimos WhatsApp con el
+  // link ya cargado para que el vendedor lo mande con un clic) ──
   const hasPhone = !!customerPhone?.trim();
   const handleSendStatement = () => {
-    if (!hasPhone || sendingStatement) return;
-    sendStatement(customerId, {
-      onSuccess: () => toast.success("Comprobante enviado por WhatsApp"),
+    if (!hasPhone || gettingStatementLink) return;
+    getStatementLink(customerId, {
+      onSuccess: ({ url }) => {
+        const waUrl = buildWhatsappStatementUrl(customerPhone!.trim(), customerName, url);
+        window.open(waUrl, "_blank", "noopener,noreferrer");
+      },
       onError: (error: Error) => {
-        toast.error(error.message || "Error al enviar el comprobante por WhatsApp");
+        toast.error(error.message || "Error al generar el resumen de cuenta");
       },
     });
   };
@@ -202,13 +217,13 @@ export const CustomerAccountDialog = ({
           <Button
             variant="outline"
             className="w-full"
-            disabled={!hasPhone || sendingStatement}
+            disabled={!hasPhone || gettingStatementLink}
             onClick={handleSendStatement}
           >
-            {sendingStatement ? (
+            {gettingStatementLink ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Enviando…
+                Abriendo WhatsApp…
               </>
             ) : (
               "Enviar por WhatsApp"

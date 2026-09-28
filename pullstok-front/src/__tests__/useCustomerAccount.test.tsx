@@ -7,22 +7,26 @@ vi.mock("../services/customerAccountService", () => ({
   getCustomerBalances: vi.fn(),
   getCustomerAccount: vi.fn(),
   registerAccountPayment: vi.fn(),
+  getAccountStatementLink: vi.fn(),
 }));
 
 import {
   useCustomerBalances,
   useCustomerAccount,
   useRegisterAccountPayment,
+  useGetAccountStatementLink,
 } from "../components/hooks/useCustomerAccount";
 import {
   getCustomerBalances,
   getCustomerAccount,
   registerAccountPayment,
+  getAccountStatementLink,
 } from "../services/customerAccountService";
 
 const mockBalances = vi.mocked(getCustomerBalances);
 const mockAccount = vi.mocked(getCustomerAccount);
 const mockRegister = vi.mocked(registerAccountPayment);
+const mockStatementLink = vi.mocked(getAccountStatementLink);
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -86,5 +90,26 @@ describe("useCustomerAccount hooks", () => {
     expect(mockRegister).toHaveBeenCalledWith("c-1", { amount: 600, method: "TRANSFERENCIA" });
     await waitFor(() => expect(result.current.account.account?.balance).toBe(400));
     await waitFor(() => expect(result.current.balances.balances[0].balance).toBe(400));
+  });
+
+  // wa.me fallback (T4): builds+uploads the PDF, returns its url — no phone
+  // required, no Kapso call (Kapso is sandboxed and rejects unsolicited sends).
+  it("useGetAccountStatementLink resolves with the PDF url and filename", async () => {
+    mockStatementLink.mockResolvedValue({
+      url: "https://r2.example.com/estado-cuenta-ana.pdf",
+      filename: "estado-cuenta-Ana.pdf",
+    });
+    const { result } = renderHook(() => useGetAccountStatementLink(), { wrapper });
+
+    let link: { url: string; filename: string } | undefined;
+    await act(async () => {
+      link = await result.current.getStatementLinkAsync("c-1");
+    });
+
+    expect(mockStatementLink).toHaveBeenCalledWith("c-1");
+    expect(link).toEqual({
+      url: "https://r2.example.com/estado-cuenta-ana.pdf",
+      filename: "estado-cuenta-Ana.pdf",
+    });
   });
 });
