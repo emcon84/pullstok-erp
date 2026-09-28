@@ -20,5 +20,11 @@ require('esbuild').build({
   // dinámico → bundlean con platform:node/target:node20 (usos de crypto/Buffer
   // del core son bundleables). Si un build futuro fallara, agregarlos a
   // external resuelve en runtime (quedan en node_modules).
-  external: ['sharp', 'pg', '@prisma/client', '@prisma/adapter-pg', 'pdf-parse'],
+  //
+  // - pdfkit: carga sus fuentes estándar (Helvetica.afm, etc.) leyendo un
+  //   archivo .afm en disco con una ruta relativa a su propio __dirname.
+  //   Bundleado, esa ruta pasa a resolver contra dist/ (que no tiene los
+  //   .afm) → ENOENT en producción al primer texto dibujado. External →
+  //   require() en runtime resuelve la carpeta data/ real de node_modules.
+  external: ['sharp', 'pg', '@prisma/client', '@prisma/adapter-pg', 'pdf-parse', 'pdfkit'],
 }).catch((e) => { console.error(e); process.exit(1); });
