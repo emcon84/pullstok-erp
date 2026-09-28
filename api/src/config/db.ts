@@ -61,6 +61,10 @@ const TENANT_MODELS = new Set([
   // (organizationId). Mismo patrón multi-tenant: findFirst / updateMany /
   // deleteMany (nunca findUnique/update/delete) → scope org automático anti-fuga.
   "SavedPlanilla",
+  // Libro de cuenta corriente de clientes (cuenta-corriente). Tenant-scoped
+  // (organizationId). Mismo patrón multi-tenant: findFirst / updateMany /
+  // deleteMany (nunca findUnique/update/delete) → scope org automático anti-fuga.
+  "CustomerAccountMovement",
 ]);
 
 /**

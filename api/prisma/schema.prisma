@@ -44,12 +44,23 @@ enum PriceListType {
 // Medio de pago de una venta (sdd/caja-apertura-cierre). Solo EFECTIVO suma al
 // arqueo de caja (closingByMethod/expectedAmount); TARJETA_*/TRANSFERENCIA/QR
 // son informativos del desglose (no son efectivo en caja física).
+// CUENTA_CORRIENTE = la venta queda a deuda del cliente (no es plata cobrada:
+// genera un CHARGE en el libro CustomerAccountMovement, nunca suma al arqueo).
 enum PaymentMethod {
   EFECTIVO
   TARJETA_CREDITO
   TARJETA_DEBITO
   TRANSFERENCIA
   QR
+  CUENTA_CORRIENTE
+}
+
+// Tipo de movimiento del libro de cuenta corriente de un cliente.
+// CHARGE = deuda que suma al saldo (venta a cuenta corriente); PAYMENT =
+// cobranza que lo reduce. Saldo = Σ CHARGE − Σ PAYMENT.
+enum CustomerAccountMovementType {
+  CHARGE
+  PAYMENT
 }
 
 // Estado de una sesión de caja (sdd/caja-apertura-cierre). OPEN = turno en
@@ -119,6 +130,7 @@ model Organization {
   reviewQueueEntries    ReviewQueueEntry[]
   cashSessions          CashSession[]
   whatsAppOrderDrafts   WhatsAppOrderDraft[]
+  customerAccountMovements CustomerAccountMovement[]
 
   @@map("organizations")
 }
@@ -210,6 +222,7 @@ model Customer {
   invoices       Invoice[]
   conversations  Conversation[]
   whatsAppOrderDrafts WhatsAppOrderDraft[]
+  accountMovements CustomerAccountMovement[]
 
   // Email único POR organización (dos negocios pueden tener el mismo cliente).
   @@unique([organizationId, email])
@@ -688,6 +701,8 @@ model Sale {
   cashSession    CashSession? @relation(fields: [cashSessionId], references: [id])
   // Desglose de medios de pago (sdd/caja-apertura-cierre R6/R7/R8).
   payments       SalePayment[]
+  // Movimientos de cuenta corriente originados por esta venta (CHARGE).
+  accountMovements CustomerAccountMovement[]
 
   @@index([organizationId])
   @@map("sales")
@@ -719,6 +734,8 @@ model CashSession {
   observations   String?
   sales          Sale[]
   payments       SalePayment[]
+  // Cobranzas en EFECTIVO de cuenta corriente registradas en esta sesión (suman al arqueo).
+  accountMovements CustomerAccountMovement[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -746,6 +763,39 @@ model SalePayment {
   @@index([saleId])
   @@index([cashSessionId])
   @@map("sale_payments")
+}
+
+// Libro de cuenta corriente de clientes. Tenant-scoped (organizationId) y en
+// TENANT_MODELS (db.ts) → scope org automático anti-fuga (findFirst/updateMany/
+// deleteMany, NUNCA findUnique/update). Saldo = Σ CHARGE − Σ PAYMENT (por
+// agregación, sin campo denormalizado). amount siempre > 0 (lo valida la app).
+// CHARGE: lo crea createSale en la MISMA transacción (saleId). PAYMENT: cobranza
+// (method + cashSessionId si es EFECTIVO, para sumar al arqueo de esa caja).
+// saleId / cashSessionId onDelete SetNull: borrar la venta o la caja no rompe
+// el libro.
+model CustomerAccountMovement {
+  id             String                      @id @default(uuid())
+  organizationId String
+  organization   Organization                @relation(fields: [organizationId], references: [id])
+  customerId     String
+  customer       Customer                    @relation(fields: [customerId], references: [id])
+  type           CustomerAccountMovementType
+  amount         Float
+  saleId         String?
+  sale           Sale?                       @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  // Solo en PAYMENT: medio con que el cliente pagó (nunca CUENTA_CORRIENTE).
+  method         PaymentMethod?
+  cashSessionId  String?
+  cashSession    CashSession?                @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  note           String?
+  createdById    String?
+  createdAt      DateTime                    @default(now())
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([saleId])
+  @@index([cashSessionId])
+  @@map("customer_account_movements")
 }
 
 model SaleItem {
