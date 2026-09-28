@@ -313,7 +313,10 @@ const saleProductSchema = z.object({
     });
   }
   // <= 2 decimales (multipleOf 0.01) y > 0 (ya garantizado por .positive()).
-  if (Math.round(item.quantity * 100) !== item.quantity * 100) {
+  // Con tolerancia: en IEEE-754 q * 100 no es entero para valores legítimos de
+  // 2 decimales (0.29 * 100 = 28.999999999999996), y un !== exacto los rechaza.
+  const cents = item.quantity * 100;
+  if (Math.abs(cents - Math.round(cents)) > 1e-6) {
     ctx.addIssue({
       code: "custom",
       path: ["quantity"],

@@ -812,6 +812,32 @@ describe("createSaleSchema — saleMode-aware quantity validation (B-06/B-08)", 
     }
   });
 
+  // Float-fragile values: q * 100 is NOT an integer in IEEE-754
+  // (0.29 * 100 = 28.999999999999996) yet they have exactly 2 decimals.
+  it.each(["POR_PESO", "POR_MONTO"] as const)(
+    "%s accepts legit 2dp quantities whose q*100 is float-imprecise",
+    (saleMode) => {
+      for (const quantity of [0.01, 0.07, 0.29, 0.57, 1.13, 1.14, 1.5]) {
+        const result = createSaleSchema.safeParse({
+          products: [{ ...base, saleMode, quantity }],
+        });
+        expect({ quantity, ok: result.success }).toEqual({ quantity, ok: true });
+      }
+    },
+  );
+
+  it.each(["POR_PESO", "POR_MONTO"] as const)(
+    "%s still rejects quantities with more than 2 decimals (1.234, 0.285)",
+    (saleMode) => {
+      for (const quantity of [1.234, 0.285, 0.001]) {
+        const result = createSaleSchema.safeParse({
+          products: [{ ...base, saleMode, quantity }],
+        });
+        expect({ quantity, ok: result.success }).toEqual({ quantity, ok: false });
+      }
+    },
+  );
+
   it("POR_MONTO accepts positive amounts with 2dp", () => {
     const result = createSaleSchema.safeParse({
       products: [{ ...base, saleMode: "POR_MONTO", quantity: 500 }],
