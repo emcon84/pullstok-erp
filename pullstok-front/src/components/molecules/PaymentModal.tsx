@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,9 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { round2 } from "@/lib/money";
 import { clampSurchargePct, computeSurcharge } from "@/lib/surcharge";
+import { useCustomers } from "@/components/hooks/useCustomer";
 import {
-  PAYMENT_METHODS,
+  CHECKOUT_PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
   type PaymentInput,
   type PaymentMethod,
@@ -23,16 +24,54 @@ interface PaymentModalProps {
   cashSessionId?: string;
   discountPct: number;
   /** `surchargePct` es el recargo de tarjeta de crédito (0 = sin recargo);
-   *  `payments` viaja con montos BASE (Σ = total descontado). */
+   *  `payments` viaja con montos BASE (Σ = total descontado). `customerId` solo
+   *  se envía cuando hay una fila CUENTA_CORRIENTE con monto (la deuda va a ese
+   *  cliente). */
   confirmSale: (
     payments?: PaymentInput[],
     cashSessionId?: string,
     discountPct?: number,
     surchargePct?: number,
+    customerId?: string,
   ) => void;
 }
 
 type PayRow = { method: PaymentMethod; amount: string };
+
+/** Selector del cliente de la venta a cuenta corriente. Vive en su propio
+ *  componente para que la lista de clientes solo se pida (useCustomers) cuando
+ *  hay una fila CUENTA_CORRIENTE. */
+const AccountCustomerPicker = ({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+}) => {
+  const { customers } = useCustomers();
+  const options = useMemo(
+    () =>
+      [...(customers ?? [])]
+        .sort((a, b) => a.name.localeCompare(b.name, "es"))
+        .map((c) => ({ value: c.id || c._id || "", label: c.name }))
+        .filter((o) => o.value),
+    [customers],
+  );
+
+  return (
+    <div className="space-y-1 text-left">
+      <Label htmlFor="payment-account-customer">Cliente (cuenta corriente)</Label>
+      <NativeSelect
+        id="payment-account-customer"
+        ariaLabel="Cliente (cuenta corriente)"
+        value={value}
+        onValueChange={onChange}
+        placeholder="Seleccioná un cliente"
+        options={options}
+      />
+    </div>
+  );
+};
 
 const money = (n: number) =>
   n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
@@ -62,6 +101,8 @@ export const PaymentModal = ({
   const [rows, setRows] = useState<PayRow[]>([{ method: "EFECTIVO", amount: "" }]);
   // Recargo de tarjeta % como STRING (mismo patrón que el descuento del panel).
   const [surchargeStr, setSurchargeStr] = useState("");
+  // Cliente de la venta a cuenta corriente ("" = sin elegir).
+  const [customerId, setCustomerId] = useState("");
   const contentRef = useRef<HTMLDivElement>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const rowsRef = useRef(rows);
@@ -74,6 +115,7 @@ export const PaymentModal = ({
     if (!open) return;
     setRows([{ method: "EFECTIVO", amount: String(total) }]);
     setSurchargeStr("");
+    setCustomerId("");
   }, [open, total]);
 
   // Saldo de la primera fila: total − suma de los métodos adicionales.
@@ -88,6 +130,12 @@ export const PaymentModal = ({
   useEffect(() => {
     if (!hasCardRow) setSurchargeStr("");
   }, [hasCardRow]);
+  // Cuenta corriente: el selector de cliente existe solo mientras haya una fila
+  // CUENTA_CORRIENTE; sin ella el cliente se olvida (nunca viaja uno viejo).
+  const hasAccountRow = rows.some((r) => r.method === "CUENTA_CORRIENTE");
+  useEffect(() => {
+    if (!hasAccountRow) setCustomerId("");
+  }, [hasAccountRow]);
   const surchargePct = hasCardRow ? clampSurchargePct(Number(surchargeStr) || 0) : 0;
   const surchargeAmount = computeSurcharge(
     rows.map((r, i) => ({
@@ -108,7 +156,7 @@ export const PaymentModal = ({
   const addRow = useCallback(() => {
     const cur = rowsRef.current;
     const nextMethod =
-      PAYMENT_METHODS.find((m) => !cur.some((r) => r.method === m)) ?? "EFECTIVO";
+      CHECKOUT_PAYMENT_METHODS.find((m) => !cur.some((r) => r.method === m)) ?? "EFECTIVO";
     setRows((prev) => [...prev, { method: nextMethod, amount: "" }]);
     pendingSelectFocus.current = cur.length; // índice de la fila nueva
   }, []);
@@ -164,7 +212,19 @@ export const PaymentModal = ({
     // Montos BASE al servidor; el % solo viaja si quedó una fila de tarjeta
     // de crédito con monto (un % viejo sin tarjeta no debe enviarse).
     const sendsCard = payments.some((p) => p.method === "TARJETA_CREDITO" && p.amount > 0);
-    confirmSale(payments, cashSessionId, discountPct, sendsCard ? surchargePct : 0);
+    // Venta a cuenta corriente: el cliente es obligatorio (el servidor también
+    // lo exige) y solo viaja si hay una fila CUENTA_CORRIENTE con monto.
+    const sendsAccount = payments.some((p) => p.method === "CUENTA_CORRIENTE" && p.amount > 0);
+    if (sendsAccount && !customerId) {
+      toast.error("Seleccioná un cliente para la venta en cuenta corriente");
+      return;
+    }
+    const surcharge = sendsCard ? surchargePct : 0;
+    if (sendsAccount) {
+      confirmSale(payments, cashSessionId, discountPct, surcharge, customerId);
+    } else {
+      confirmSale(payments, cashSessionId, discountPct, surcharge);
+    }
     onOpenChange(false);
   };
 
@@ -258,7 +318,7 @@ export const PaymentModal = ({
                   <NativeSelect
                     value={row.method}
                     onValueChange={(v) => updateMethod(i, v as PaymentMethod)}
-                    options={PAYMENT_METHODS.map((m) => ({
+                    options={CHECKOUT_PAYMENT_METHODS.map((m) => ({
                       value: m,
                       label: PAYMENT_METHOD_LABELS[m],
                     }))}
@@ -337,6 +397,11 @@ export const PaymentModal = ({
                 </div>
               )}
             </div>
+          )}
+
+          {/* ── Cliente de la venta a cuenta corriente (solo con esa fila) ── */}
+          {hasAccountRow && (
+            <AccountCustomerPicker value={customerId} onChange={setCustomerId} />
           )}
 
           {/* ── Total a cobrar (incluye el recargo de tarjeta) ── */}

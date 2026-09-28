@@ -37,7 +37,11 @@ export function useVendorCheckout({
   totalAmount,
   ticketCompany,
 }: UseVendorCheckoutParams) {
-  const { createSale } = useCreateSale();
+  const { createSale, createSaleAsync } = useCreateSale();
+  // La variante async espera al servidor y rechaza con su error (p. ej. cliente
+  // faltante en una venta a cuenta corriente). `mutate` nunca rechaza: sin ella
+  // el carrito se vaciaría aunque el servidor haya rechazado la venta.
+  const sendSale = createSaleAsync ?? createSale;
   const { submitOrder, loading: savingOrder } = useCreateOrder();
 
   const [confirming, setConfirming] = useState(false);
@@ -53,6 +57,7 @@ export function useVendorCheckout({
       cashSessionId?: string,
       discountPct?: number,
       surchargePct?: number,
+      customerId?: string,
     ) => {
       if (cartItems.length === 0) return;
       setConfirming(true);
@@ -108,7 +113,7 @@ export function useVendorCheckout({
           piecesPerBlister:
             i.saleMode === "POR_UNIDAD_BLISTER" ? i.piecesPerBlister ?? undefined : undefined,
         }));
-        await createSale({ cart, payments, cashSessionId, discountPct, surchargePct });
+        await sendSale({ cart, payments, cashSessionId, discountPct, surchargePct, customerId });
         clearCart();
         setPendingTicket(ticket);
         setCartOpen?.(false);
@@ -119,7 +124,7 @@ export function useVendorCheckout({
         setConfirming(false);
       }
     },
-    [cartItems, createSale, clearCart, ticketCompany],
+    [cartItems, sendSale, clearCart, ticketCompany],
   );
 
   // ── Save cart as Pending Order ──

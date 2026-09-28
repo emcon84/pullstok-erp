@@ -11,17 +11,27 @@ export type PaymentMethod =
   | "TARJETA_CREDITO"
   | "TARJETA_DEBITO"
   | "TRANSFERENCIA"
-  | "QR";
+  | "QR"
+  | "CUENTA_CORRIENTE";
 
 export type CashSessionStatus = "OPEN" | "CLOSED";
 
-/** Métodos de pago disponibles para el selector de checkout y el arqueo. */
+/** Métodos de pago REALES (plata cobrada): arqueo de caja, cobranzas y los
+ *  flujos legacy de pago. Excluye CUENTA_CORRIENTE a propósito (no es plata
+ *  cobrada, no entra al arqueo). */
 export const PAYMENT_METHODS: PaymentMethod[] = [
   "EFECTIVO",
   "TARJETA_CREDITO",
   "TARJETA_DEBITO",
   "TRANSFERENCIA",
   "QR",
+];
+
+/** Métodos que ofrece el modal de pago del POS: los reales + venta a cuenta
+ *  corriente (requiere elegir un cliente). */
+export const CHECKOUT_PAYMENT_METHODS: PaymentMethod[] = [
+  ...PAYMENT_METHODS,
+  "CUENTA_CORRIENTE",
 ];
 
 /** Nombres visibles (UI en español) por método. */
@@ -31,6 +41,7 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   TARJETA_DEBITO: "Tarjeta de débito",
   TRANSFERENCIA: "Transferencia",
   QR: "QR",
+  CUENTA_CORRIENTE: "Cuenta corriente",
 };
 
 /** Un pago declarado en una venta (SalePayment persistido). */

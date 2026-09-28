@@ -51,6 +51,9 @@ export interface SaleRequest {
    *  filas TARJETA_CREDITO de `payments` (montos BASE). Ausente = sin recargo:
    *  solo se envía cuando es > 0. El servidor calcula el monto. */
   surchargePct?: number;
+  /** Cliente al que se asigna la deuda cuando hay un pago CUENTA_CORRIENTE
+   *  (el servidor lo exige en ese caso). Ausente en el resto de las ventas. */
+  customerId?: string;
 }
 
 export interface Sale {

@@ -9,9 +9,9 @@ export const useCreateSale = () => {
   const mutation = useMutation<
     void,
     Error,
-    { cart: CartItem[]; orderId?: string; payments?: PaymentInput[]; cashSessionId?: string; discountPct?: number; surchargePct?: number }
+    { cart: CartItem[]; orderId?: string; payments?: PaymentInput[]; cashSessionId?: string; discountPct?: number; surchargePct?: number; customerId?: string }
   >({
-    mutationFn: async ({ cart, orderId, payments, cashSessionId, discountPct, surchargePct }) => {
+    mutationFn: async ({ cart, orderId, payments, cashSessionId, discountPct, surchargePct, customerId }) => {
       const saleRequest = {
         products: cart.map((item) => {
           const saleMode: SaleMode = item.saleMode ?? "BOLSA_CERRADA";
@@ -52,6 +52,8 @@ export const useCreateSale = () => {
         discountPct,
         // Solo viaja cuando hay recargo: el payload de las demás ventas no cambia.
         ...(surchargePct && surchargePct > 0 ? { surchargePct } : {}),
+        // Solo viaja en ventas a cuenta corriente (cliente al que va la deuda).
+        ...(customerId ? { customerId } : {}),
       };
       await createSale(saleRequest, orderId);
     },
@@ -66,6 +68,10 @@ export const useCreateSale = () => {
 
   return {
     createSale: mutation.mutate,
+    /** Variante que espera el resultado y RECHAZA con el error del servidor
+     *  ({ error, message }): el checkout la usa para no vaciar el carrito ni
+     *  dar por vendida una venta que el servidor rechazó. */
+    createSaleAsync: mutation.mutateAsync,
     loading: mutation.isPending,
     error: mutation.error,
     success: mutation.isSuccess,
