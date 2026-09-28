@@ -201,23 +201,18 @@ const registerPayment = async (
 };
 
 /**
- * Genera el PDF del resumen de cuenta (T1) y lo manda por WhatsApp al
- * `Customer.phone` (normalizado). Org/logo se leen con `basePrisma`:
- * `Organization` y `StoreSettings` NO son TENANT_MODELS (ver db.ts), así que
- * el scope de org se aplica a mano (organizationId / where: { id }).
+ * Arma el PDF del resumen de cuenta y lo sube a R2. Org/logo se leen con
+ * `basePrisma`: `Organization` y `StoreSettings` NO son TENANT_MODELS (ver
+ * db.ts), así que el scope de org se aplica a mano (organizationId / where:
+ * { id }). Compartido por `sendAccountStatementWhatsapp` (Kapso, dormant en
+ * sandbox) y `getAccountStatementLink` (fallback wa.me activo).
  */
-const sendAccountStatementWhatsapp = async (customerId: string) => {
+const buildAccountStatementLink = async (
+  customerId: string,
+): Promise<{ url: string; filename: string; customerName: string }> => {
   const organizationId = requireOrganizationId();
 
-  const customer = await prisma.customer.findFirst({ where: { id: customerId } });
-  if (!customer) throw domainError("CUSTOMER_NOT_FOUND", "Cliente no encontrado");
-
-  const phone = normalizePhone(customer.phone);
-  if (!phone) {
-    throw domainError("CUSTOMER_PHONE_REQUIRED", "El cliente no tiene teléfono cargado");
-  }
-
-  const { balance, movements } = await getAccount(customerId);
+  const { customer, balance, movements } = await getAccount(customerId);
 
   const [organization, storeSettings] = await Promise.all([
     basePrisma.organization.findUnique({
@@ -242,7 +237,29 @@ const sendAccountStatementWhatsapp = async (customerId: string) => {
   const key = `account-statements/${customerId}-${Date.now()}.pdf`;
   const url = await uploadToR2(buffer, key, "application/pdf");
 
-  const sent = await sendDocument(phone, url, filename, `Resumen de cuenta — ${customer.name}`);
+  return { url, filename, customerName: customer.name };
+};
+
+/**
+ * Genera el PDF del resumen de cuenta (T1) y lo manda por WhatsApp al
+ * `Customer.phone` (normalizado) vía Kapso. EN SANDBOX Kapso devuelve 403
+ * ("Active sandbox session required") porque no puede empujar mensajes sin
+ * que el cliente haya iniciado la conversación — queda dormant hasta que la
+ * cuenta de Kapso pase a producción. El botón del front usa
+ * `getAccountStatementLink` + wa.me mientras tanto.
+ */
+const sendAccountStatementWhatsapp = async (customerId: string) => {
+  const customer = await prisma.customer.findFirst({ where: { id: customerId } });
+  if (!customer) throw domainError("CUSTOMER_NOT_FOUND", "Cliente no encontrado");
+
+  const phone = normalizePhone(customer.phone);
+  if (!phone) {
+    throw domainError("CUSTOMER_PHONE_REQUIRED", "El cliente no tiene teléfono cargado");
+  }
+
+  const { url, filename, customerName } = await buildAccountStatementLink(customerId);
+
+  const sent = await sendDocument(phone, url, filename, `Resumen de cuenta — ${customerName}`);
   if (!sent) {
     throw domainError("WHATSAPP_SEND_FAILED", "No se pudo enviar el comprobante por WhatsApp");
   }
@@ -250,9 +267,23 @@ const sendAccountStatementWhatsapp = async (customerId: string) => {
   return { sent: true };
 };
 
+/**
+ * Fallback mientras Kapso está en sandbox (ver `sendAccountStatementWhatsapp`):
+ * arma el PDF y devuelve su URL pública, SIN exigir teléfono ni llamar a
+ * Kapso — el front abre un link wa.me con este URL para que el vendedor lo
+ * mande a mano.
+ */
+const getAccountStatementLink = async (
+  customerId: string,
+): Promise<{ url: string; filename: string }> => {
+  const { url, filename } = await buildAccountStatementLink(customerId);
+  return { url, filename };
+};
+
 export default {
   getBalances,
   getAccount,
   registerPayment,
   sendAccountStatementWhatsapp,
+  getAccountStatementLink,
 };

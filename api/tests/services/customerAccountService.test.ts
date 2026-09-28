@@ -366,3 +366,60 @@ describe("customerAccountService.sendAccountStatementWhatsapp", () => {
     ).rejects.toMatchObject({ code: "WHATSAPP_SEND_FAILED" });
   });
 });
+
+// wa.me fallback (Kapso sandbox blocks unsolicited sends): builds the PDF and
+// returns its URL, WITHOUT requiring a phone or calling Kapso's sendDocument.
+// Shares the PDF-build/org-lookup logic with sendAccountStatementWhatsapp.
+describe("customerAccountService.getAccountStatementLink", () => {
+  const movements = [{ id: "m-1", type: "CHARGE", amount: 100, sale: null }];
+  const pdfBuffer = Buffer.from("%PDF-fake");
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    p.customer.findFirst.mockResolvedValue({ id: "c-1", name: "Ana", phone: "3400 111-222" });
+    p.customerAccountMovement.groupBy.mockResolvedValue(sums(100, 0));
+    p.customerAccountMovement.findMany.mockResolvedValue(movements);
+    bp.organization.findUnique.mockResolvedValue({
+      name: "Pullstok",
+      address: "Av. Siempre Viva 742",
+      phone: "3400000000",
+      taxId: "20304050607",
+      taxCondition: "Responsable Inscripto",
+    });
+    bp.storeSettings.findUnique.mockResolvedValue({ logoUrl: "https://cdn.example.com/logo.png" });
+    pdfBuilder.mockResolvedValue(pdfBuffer);
+    r2.mockResolvedValue("https://r2.example.com/account-statements/c-1-1.pdf");
+  });
+
+  it("unknown / other-org customer → CUSTOMER_NOT_FOUND (nothing else runs)", async () => {
+    p.customer.findFirst.mockResolvedValue(null);
+    await expect(
+      customerAccountService.getAccountStatementLink("nope"),
+    ).rejects.toMatchObject({ code: "CUSTOMER_NOT_FOUND" });
+    expect(pdfBuilder).not.toHaveBeenCalled();
+    expect(r2).not.toHaveBeenCalled();
+    expect(wa.sendDocument).not.toHaveBeenCalled();
+  });
+
+  it("builds the PDF and uploads it to R2 without requiring a phone or sending via WhatsApp", async () => {
+    wa.normalizePhone.mockReturnValue(null); // no phone on file — must not matter here
+
+    const result = await customerAccountService.getAccountStatementLink("c-1");
+
+    expect(pdfBuilder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: { name: "Ana" },
+        organization: expect.objectContaining({ name: "Pullstok", taxId: "20304050607" }),
+        logoUrl: "https://cdn.example.com/logo.png",
+        balance: 100,
+        movements,
+      }),
+    );
+    expect(r2).toHaveBeenCalledWith(pdfBuffer, expect.any(String), "application/pdf");
+    expect(wa.sendDocument).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      url: "https://r2.example.com/account-statements/c-1-1.pdf",
+      filename: expect.stringContaining("estado-cuenta-Ana"),
+    });
+  });
+});

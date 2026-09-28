@@ -64,9 +64,20 @@ const sendAccountStatementWhatsapp = async (req: Request, res: Response) => {
   }
 };
 
+// wa.me fallback mientras Kapso está en sandbox: solo arma+sube el PDF.
+const getAccountStatementLink = async (req: Request, res: Response) => {
+  try {
+    const result = await customerAccountService.getAccountStatementLink(req.params.id);
+    res.status(200).json(result);
+  } catch (error: any) {
+    handleError(error, res);
+  }
+};
+
 export default {
   getBalances,
   getAccount,
   registerPayment,
   sendAccountStatementWhatsapp,
+  getAccountStatementLink,
 };

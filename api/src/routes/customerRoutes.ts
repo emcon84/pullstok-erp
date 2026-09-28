@@ -39,6 +39,14 @@ router.post(
   checkBusinessHours,
   customerAccountController.sendAccountStatementWhatsapp,
 );
+// wa.me fallback (Kapso sandbox no puede enviar sin sesión activa): arma el
+// PDF y devuelve su URL, también ANTES de "/:id" a secas.
+router.post(
+  "/:id/account/statement-link",
+  authenticateJWT,
+  checkBusinessHours,
+  customerAccountController.getAccountStatementLink,
+);
 router.get("/:id", authenticateJWT, checkBusinessHours, customerController.getCustomerById);
 router.put(
   "/:id",

@@ -13,6 +13,7 @@ jest.mock("../../src/services/customerAccountService", () => ({
     getAccount: jest.fn(),
     registerPayment: jest.fn(),
     sendAccountStatementWhatsapp: jest.fn(),
+    getAccountStatementLink: jest.fn(),
   },
 }));
 
@@ -21,6 +22,7 @@ const svc = service as unknown as {
   getAccount: jest.Mock;
   registerPayment: jest.Mock;
   sendAccountStatementWhatsapp: jest.Mock;
+  getAccountStatementLink: jest.Mock;
 };
 
 const mockReq = (params: any = {}, body: any = {}) =>
@@ -107,5 +109,36 @@ describe("customerAccountController", () => {
     await controller.sendAccountStatementWhatsapp(mockReq({ id: "c-1" }), res);
     expect(res.status).toHaveBeenCalledWith(status);
     expect(res.json).toHaveBeenCalledWith({ error: code, message: "msg" });
+  });
+
+  // wa.me fallback (T4): only builds+uploads the PDF, no phone/Kapso involved.
+  it("getAccountStatementLink: 200 with the service result, passing the id param", async () => {
+    svc.getAccountStatementLink.mockResolvedValue({
+      url: "https://r2.example.com/x.pdf",
+      filename: "estado-cuenta-Ana.pdf",
+    });
+    const res = mockRes();
+    await controller.getAccountStatementLink(mockReq({ id: "c-1" }), res);
+    expect(svc.getAccountStatementLink).toHaveBeenCalledWith("c-1");
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      url: "https://r2.example.com/x.pdf",
+      filename: "estado-cuenta-Ana.pdf",
+    });
+  });
+
+  it("getAccountStatementLink: CUSTOMER_NOT_FOUND → 404", async () => {
+    svc.getAccountStatementLink.mockRejectedValue(mkErr("CUSTOMER_NOT_FOUND", "Cliente no encontrado"));
+    const res = mockRes();
+    await controller.getAccountStatementLink(mockReq({ id: "c-x" }), res);
+    expect(svc.getAccountStatementLink).toHaveBeenCalledWith("c-x");
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it("getAccountStatementLink: unexpected error → 500", async () => {
+    svc.getAccountStatementLink.mockRejectedValue(new Error("boom"));
+    const res = mockRes();
+    await controller.getAccountStatementLink(mockReq({ id: "c-1" }), res);
+    expect(res.status).toHaveBeenCalledWith(500);
   });
 });
