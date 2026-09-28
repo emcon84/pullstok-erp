@@ -139,16 +139,82 @@ como comprobante.
         restantes son los pre-existentes ya documentados (6 en
         `priceKgUpdate.test.tsx` + 2 en `productDrawer.test.tsx`), sin
         relación con este cambio.
+- [x] T4 — **Fallback wa.me (decisión del usuario, 2026-09-28):** en
+      producción, `sendAccountStatementWhatsapp` (T1/T3, Kapso) empezó a
+      fallar con 403 "Active sandbox session required to send messages" — la
+      cuenta de Kapso está en modo sandbox (restricción del lado de Kapso, no
+      arreglable desde nuestro código) y no puede empujar mensajes que el
+      cliente no inició. Mientras Kapso no pase a producción, el botón
+      "Enviar por WhatsApp" del diálogo REEMPLAZA su comportamiento: en vez
+      de llamar a Kapso, arma el PDF en el backend (mismo pipeline que T1),
+      sube a R2 y abre un link `wa.me` con el mensaje precargado (URL del
+      PDF incluida) para que el vendedor lo mande a mano con un clic. El
+      código de envío por Kapso (`sendDocument`, `sendAccountStatementWhatsapp`,
+      su ruta/controller/tests) queda intacto y sin usar — listo para
+      reactivarse cuando Kapso salga de sandbox; alcanza con volver a cablear
+      el botón al hook viejo. Tests primero. Ruta: delegada (writer full-stack).
+      **Hecho** — commits `ee70831` (backend) y `05fe8f4` (front).
+      - Backend: se extrajo `buildAccountStatementLink` (helper compartido:
+        `getAccount` + org/logo por `basePrisma` + `buildAccountStatementPdf`
+        + `uploadToR2`) de la que ahora cuelgan `sendAccountStatementWhatsapp`
+        (Kapso, sin cambios de comportamiento) y la función nueva
+        `getAccountStatementLink(customerId)` — mismo 404 que las demás, NO
+        exige teléfono, NO llama `sendDocument`. Endpoint nuevo `POST
+        /customers/:id/account/statement-link` (mismos middlewares que sus
+        hermanos, registrado antes de `/:id`).
+        - `npx jest tests/services/customerAccountService.test.ts
+          tests/controllers/customerAccountController.test.ts
+          tests/routes/customerRoutes.test.ts` → RED confirmado (3 suites,
+          errores de compilación por símbolo/ruta inexistente) → GREEN tras
+          implementar: 41/41.
+        - `npx jest --testPathIgnorePatterns "tests/e2e"` → 1663/1664 (2
+          skipped); el único fallo (`botService.test.ts` —
+          `getVendorChatUsageToday`, contención de Prisma bajo carga) se
+          confirmó flaky corriendo el archivo solo: 12/12 en verde, sin
+          relación con este cambio.
+        - `npx tsc --noEmit` → solo los 3 errores pre-existentes conocidos en
+          `api/tests/e2e`.
+      - Front: `getAccountStatementLink` nuevo en `customerAccountService.ts`
+        (POST a `/customers/:id/account/statement-link`) + hook
+        `useGetAccountStatementLink` (reemplaza al viejo `useSendAccountStatementWhatsapp`
+        como lo que usa el botón; el hook viejo queda definido y disponible
+        para cuando se reactive Kapso). El botón, al click: pide el link,
+        arma `https://wa.me/<dígitos>?text=<mensaje codificado>` (`<dígitos>`
+        = `customerPhone` sin nada que no sea dígito — wa.me no quiere "+" ni
+        separadores) con `Hola ${customerName}! Te comparto el resumen de tu
+        cuenta corriente: ${url}`, y abre `window.open(waUrl, "_blank",
+        "noopener,noreferrer")`. Mismo gating sin teléfono; estado "Abriendo
+        WhatsApp…" con spinner mientras está pending; toast de error con el
+        mensaje del servidor si falla la generación del PDF; sin toast de
+        éxito (el usuario todavía tiene que apretar "Enviar" en WhatsApp).
+        Se actualizaron también los tests que mockeaban el hook viejo
+        (`customers.cuentaCorriente.test.tsx`, `useCustomerAccount.test.tsx`)
+        para no romper con el rename.
+        - `npx vitest run src/__tests__/customerAccountDialog.test.tsx
+          src/__tests__/customerAccountService.test.ts
+          src/__tests__/useCustomerAccount.test.tsx
+          src/__tests__/customers.cuentaCorriente.test.tsx` → RED confirmado
+          (hook/función inexistente) → GREEN tras implementar: 35/35 (19 +
+          7 + 5 + 4).
+        - `npx vitest run` (suite completa) → 1097/1105 verdes; los 8 fallos
+          restantes son los mismos pre-existentes ya documentados (6 en
+          `priceKgUpdate.test.tsx` + 2 en `productDrawer.test.tsx`), sin
+          relación con este cambio.
+        - `npx tsc -p tsconfig.app.json --noEmit` → sin errores.
 
 ## Progreso
 - Mapeo hecho (WhatsApp/Kapso, PDF, branding, sale detail ya expuesto).
 - T1 (backend) hecho — commit `7ab88d0`, ver detalle arriba.
 - T2 (detalle de venta expandible) hecho — commit `e548b6b`.
 - T3 (botón "Enviar por WhatsApp") hecho — commit `0431ee8`.
+- T4 (fallback wa.me — Kapso en sandbox en prod) hecho — commits `ee70831`
+  (backend), `05fe8f4` (front).
 
 ## Próximo paso
-Feature completa (T1, T2, T3 hechos). Sin próximos pasos pendientes; queda
-a criterio del usuario pedir push/PR cuando corresponda.
+Feature completa (T1-T4 hechos). Sin próximos pasos pendientes; queda a
+criterio del usuario pedir push/PR cuando corresponda, y volver a cablear el
+botón a `useSendAccountStatementWhatsapp`/Kapso cuando esa cuenta salga de
+sandbox.
 
 ### Contrato del endpoint (para T3 / el writer front)
 `POST /customers/:id/account/statement/whatsapp` — sin body, mismos
