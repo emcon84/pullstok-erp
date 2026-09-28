@@ -35,6 +35,7 @@ vi.mock("@/components/ui/native-select", () => ({
 vi.mock("@/components/hooks/useCustomerAccount", () => ({
   useCustomerAccount: vi.fn(),
   useRegisterAccountPayment: vi.fn(),
+  useSendAccountStatementWhatsapp: vi.fn(),
 }));
 vi.mock("@/components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
@@ -47,6 +48,7 @@ import { CustomerAccountDialog } from "@/components/molecules/CustomerAccountDia
 import {
   useCustomerAccount,
   useRegisterAccountPayment,
+  useSendAccountStatementWhatsapp,
 } from "@/components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { getSaleById } from "@/services/saleServices";
@@ -85,9 +87,18 @@ const setSession = (session: { id: string } | null) =>
   } as never);
 
 const registerPayment = vi.fn();
+const sendStatement = vi.fn();
 
-const renderDialog = () =>
-  render(<CustomerAccountDialog customerId="c-1" customerName="Ana Gómez" open onOpenChange={vi.fn()} />);
+const renderDialog = (customerPhone = "+5491122334455") =>
+  render(
+    <CustomerAccountDialog
+      customerId="c-1"
+      customerName="Ana Gómez"
+      customerPhone={customerPhone}
+      open
+      onOpenChange={vi.fn()}
+    />,
+  );
 
 const amountInput = () => screen.getByLabelText("Monto a cobrar") as HTMLInputElement;
 const methodSelect = () => screen.getByLabelText("Método de cobro") as HTMLSelectElement;
@@ -100,6 +111,10 @@ describe("CustomerAccountDialog", () => {
     setSession({ id: "cs-1" });
     vi.mocked(useRegisterAccountPayment).mockReturnValue({
       registerPayment,
+      loading: false,
+    } as never);
+    vi.mocked(useSendAccountStatementWhatsapp).mockReturnValue({
+      sendStatement,
       loading: false,
     } as never);
     vi.mocked(getSaleById).mockReset();
@@ -273,6 +288,61 @@ describe("CustomerAccountDialog", () => {
       fireEvent.click(screen.getByRole("button", { name: /ver detalle de la venta/i }));
 
       expect(await screen.findByText(/no se pudo cargar el detalle/i)).toBeInTheDocument();
+    });
+  });
+
+  // ── T3: enviar por WhatsApp ──
+  describe("send statement via WhatsApp", () => {
+    const sendButton = () => screen.getByRole("button", { name: /enviar por whatsapp|enviando/i });
+
+    it("disables the button and shows a hint when the customer has no phone", () => {
+      renderDialog("   ");
+      expect(sendButton()).toBeDisabled();
+      expect(screen.getByText("Cargá un teléfono para enviar por WhatsApp")).toBeInTheDocument();
+    });
+
+    it("enables the button and calls the endpoint when the customer has a phone", () => {
+      renderDialog("+5491122334455");
+      expect(sendButton()).not.toBeDisabled();
+      expect(
+        screen.queryByText("Cargá un teléfono para enviar por WhatsApp"),
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(sendButton());
+      expect(sendStatement).toHaveBeenCalledWith(
+        "c-1",
+        expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+      );
+    });
+
+    it("shows a loading state while pending and does not double-fire", () => {
+      vi.mocked(useSendAccountStatementWhatsapp).mockReturnValue({
+        sendStatement,
+        loading: true,
+      } as never);
+      renderDialog();
+
+      expect(sendButton()).toBeDisabled();
+      fireEvent.click(sendButton());
+      expect(sendStatement).not.toHaveBeenCalled();
+    });
+
+    it("toasts on success", () => {
+      renderDialog();
+      fireEvent.click(sendButton());
+      const [, callbacks] = sendStatement.mock.calls[0];
+
+      callbacks.onSuccess();
+      expect(toast.success).toHaveBeenCalledWith("Comprobante enviado por WhatsApp");
+    });
+
+    it("surfaces the server error message on failure", () => {
+      renderDialog();
+      fireEvent.click(sendButton());
+      const [, callbacks] = sendStatement.mock.calls[0];
+
+      callbacks.onError(new Error("El cliente no tiene teléfono cargado"));
+      expect(toast.error).toHaveBeenCalledWith("El cliente no tiene teléfono cargado");
     });
   });
 });

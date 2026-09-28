@@ -63,6 +63,7 @@ export const Customers = () => {
   const [accountTarget, setAccountTarget] = useState<{
     id: string;
     name: string;
+    phone: string;
   } | null>(null);
   const balanceById = new Map(balances.map((b) => [b.customerId, b.balance]));
 
@@ -333,7 +334,9 @@ export const Customers = () => {
                   variant="outline"
                   size="sm"
                   className="mt-3 w-full"
-                  onClick={() => setAccountTarget({ id: customerId, name: customer.name })}
+                  onClick={() =>
+                    setAccountTarget({ id: customerId, name: customer.name, phone: customer.phone })
+                  }
                 >
                   <Wallet className="h-4 w-4" />
                   Cuenta corriente
@@ -394,6 +397,7 @@ export const Customers = () => {
         <CustomerAccountDialog
           customerId={accountTarget.id}
           customerName={accountTarget.name}
+          customerPhone={accountTarget.phone}
           open
           onOpenChange={(open) => !open && setAccountTarget(null)}
         />

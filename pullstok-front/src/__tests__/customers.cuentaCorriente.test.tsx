@@ -21,6 +21,7 @@ vi.mock("../components/hooks/useCustomerAccount", () => ({
   useCustomerBalances: vi.fn(),
   useCustomerAccount: vi.fn(),
   useRegisterAccountPayment: vi.fn(),
+  useSendAccountStatementWhatsapp: vi.fn(),
 }));
 vi.mock("../components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
@@ -37,6 +38,7 @@ import {
   useCustomerBalances,
   useCustomerAccount,
   useRegisterAccountPayment,
+  useSendAccountStatementWhatsapp,
 } from "../components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "../components/hooks/useCashSession";
 
@@ -84,6 +86,7 @@ describe("Customers — cuenta corriente", () => {
       error: null,
     } as never);
     vi.mocked(useRegisterAccountPayment).mockReturnValue({ registerPayment: vi.fn(), loading: false } as never);
+    vi.mocked(useSendAccountStatementWhatsapp).mockReturnValue({ sendStatement: vi.fn(), loading: false } as never);
     vi.mocked(useGetCurrentCashSession).mockReturnValue({ session: null, loading: false, error: null, refetch: vi.fn() } as never);
   });
 
@@ -113,5 +116,7 @@ describe("Customers — cuenta corriente", () => {
     expect(useCustomerAccount).toHaveBeenCalledWith("c-1");
     expect(screen.getByText("Cuenta corriente — Ana Gómez")).toBeInTheDocument();
     expect(screen.getByText("#sale-abc")).toBeInTheDocument();
+    // The dialog gets the customer's phone straight from the caller (no refetch).
+    expect(screen.getByRole("button", { name: /enviar por whatsapp/i })).not.toBeDisabled();
   });
 });

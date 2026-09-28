@@ -3,6 +3,7 @@ import {
   getCustomerAccount,
   getCustomerBalances,
   registerAccountPayment,
+  sendAccountStatementWhatsapp,
 } from "../../services/customerAccountService";
 import type {
   AccountPaymentInput,
@@ -48,6 +49,19 @@ export const useRegisterAccountPayment = () => {
   return {
     registerPayment: mutation.mutate,
     registerPaymentAsync: mutation.mutateAsync,
+    loading: mutation.isPending,
+  };
+};
+
+/** Envía el comprobante de cuenta corriente por WhatsApp. No invalida nada:
+ *  enviar el PDF no cambia el saldo ni los movimientos. */
+export const useSendAccountStatementWhatsapp = () => {
+  const mutation = useMutation<{ sent: true }, Error, string>({
+    mutationFn: (customerId) => sendAccountStatementWhatsapp(customerId),
+  });
+  return {
+    sendStatement: mutation.mutate,
+    sendStatementAsync: mutation.mutateAsync,
     loading: mutation.isPending,
   };
 };

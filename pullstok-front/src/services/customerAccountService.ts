@@ -64,3 +64,21 @@ export const registerAccountPayment = async (
     throw toError(error, "Error al registrar la cobranza");
   }
 };
+
+/** Envía el PDF de resumen de cuenta por WhatsApp al teléfono del cliente
+ *  (sin body: el servidor arma el PDF con la cuenta actual). Errores de
+ *  dominio (sin teléfono, falla de WhatsApp) llegan en `message`. */
+export const sendAccountStatementWhatsapp = async (
+  customerId: string,
+): Promise<{ sent: true }> => {
+  try {
+    const response = await axios.post<{ sent: true }>(
+      `${API_URL}/customers/${customerId}/account/statement/whatsapp`,
+      undefined,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    throw toError(error, "Error al enviar el comprobante por WhatsApp");
+  }
+};

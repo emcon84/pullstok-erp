@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCustomerAccount, useRegisterAccountPayment } from "@/components/hooks/useCustomerAccount";
+import {
+  useCustomerAccount,
+  useRegisterAccountPayment,
+  useSendAccountStatementWhatsapp,
+} from "@/components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { getSaleById } from "@/services/saleServices";
 import { round2 } from "@/lib/money";
@@ -34,6 +38,9 @@ import type { Sale } from "@/models/salesModel";
 interface CustomerAccountDialogProps {
   customerId: string;
   customerName: string;
+  /** Teléfono actual del cliente (para habilitar/deshabilitar "Enviar por
+   *  WhatsApp"): lo pasa el caller, que ya tiene el Customer completo. */
+  customerPhone?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -71,12 +78,14 @@ const formatDate = (iso: string) => {
 export const CustomerAccountDialog = ({
   customerId,
   customerName,
+  customerPhone,
   open,
   onOpenChange,
 }: CustomerAccountDialogProps) => {
   const { account, loading } = useCustomerAccount(customerId);
   const { registerPayment, loading: saving } = useRegisterAccountPayment();
   const { session } = useGetCurrentCashSession();
+  const { sendStatement, loading: sendingStatement } = useSendAccountStatementWhatsapp();
 
   const balance = account?.balance ?? 0;
   const [amountStr, setAmountStr] = useState("");
@@ -116,6 +125,18 @@ export const CustomerAccountDialog = ({
     if (!isExpanded && !saleDetails[saleId] && saleDetailStatus[saleId] !== "loading") {
       fetchSaleDetail(saleId);
     }
+  };
+
+  // ── Enviar comprobante por WhatsApp (T3) ──
+  const hasPhone = !!customerPhone?.trim();
+  const handleSendStatement = () => {
+    if (!hasPhone || sendingStatement) return;
+    sendStatement(customerId, {
+      onSuccess: () => toast.success("Comprobante enviado por WhatsApp"),
+      onError: (error: Error) => {
+        toast.error(error.message || "Error al enviar el comprobante por WhatsApp");
+      },
+    });
   };
 
   // El monto se precarga con el saldo (y se recarga cuando cambia: p. ej. tras cobrar).
@@ -175,6 +196,29 @@ export const CustomerAccountDialog = ({
           <span className={`text-2xl font-bold tabular-nums ${balanceTone}`}>
             {money(Math.abs(balance))}
           </span>
+        </div>
+
+        <div className="space-y-1">
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={!hasPhone || sendingStatement}
+            onClick={handleSendStatement}
+          >
+            {sendingStatement ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Enviando…
+              </>
+            ) : (
+              "Enviar por WhatsApp"
+            )}
+          </Button>
+          {!hasPhone && (
+            <p className="text-xs text-muted-foreground">
+              Cargá un teléfono para enviar por WhatsApp
+            </p>
+          )}
         </div>
 
         {/* ── Movimientos ── */}
