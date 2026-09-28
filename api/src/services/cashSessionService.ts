@@ -154,7 +154,17 @@ const closeCash = async (
     _sum: { amount: true },
   });
   const efectivoSum = byMethod.find((g) => g.method === "EFECTIVO")?._sum?.amount ?? 0;
-  const expectedAmount = round2((session.openingAmount ?? 0) + efectivoSum);
+  // Cobranzas EFECTIVO de cuenta corriente registradas en esta caja: también son
+  // plata física en el cajón → suman al esperado. CustomerAccountMovement es tenant
+  // model (scope org automático). Las ventas CUENTA_CORRIENTE NO suman (no se cobró).
+  const accountCollections = await prisma.customerAccountMovement.aggregate({
+    where: { cashSessionId: id, type: "PAYMENT", method: "EFECTIVO" },
+    _sum: { amount: true },
+  });
+  const efectivoCobranzas = accountCollections._sum?.amount ?? 0;
+  const expectedAmount = round2(
+    (session.openingAmount ?? 0) + efectivoSum + efectivoCobranzas,
+  );
   const closingAmount = input.closingAmount ?? expectedAmount;
   const difference = round2(closingAmount - expectedAmount);
 

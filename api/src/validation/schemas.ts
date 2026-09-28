@@ -395,6 +395,33 @@ export const createSaleSchema = z.object({
     .optional(),
 });
 
+// Cobranza de cuenta corriente (cuenta-corriente): el cliente salda deuda con un
+// medio real (nunca CUENTA_CORRIENTE). EFECTIVO exige cashSessionId (la
+// cobranza suma al arqueo de esa caja); que la caja esté OPEN y que el monto no
+// supere el saldo lo valida el service.
+export const createAccountPaymentSchema = z
+  .object({
+    amount: z.coerce
+      .number()
+      .positive("El monto debe ser mayor a 0")
+      .multipleOf(0.01, "El monto admite hasta 2 decimales"),
+    method: z.enum(
+      ["EFECTIVO", "TARJETA_CREDITO", "TARJETA_DEBITO", "TRANSFERENCIA", "QR"],
+      { message: "Método de pago inválido" },
+    ),
+    cashSessionId: z.string().min(1).optional(),
+    note: z.string().max(500, "La nota admite hasta 500 caracteres").optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.method === "EFECTIVO" && !data.cashSessionId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cashSessionId"],
+        message: "Una cobranza en efectivo requiere la caja abierta (cashSessionId)",
+      });
+    }
+  });
+
 // ---------- Caja (sdd/caja-apertura-cierre) ----------
 // Apertura de caja. branchId/openingAmount/observations opcionales: los
 // CASHIER/VENDEDOR usan su sucursal asignada (el server la resuelve);

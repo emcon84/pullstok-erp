@@ -9,6 +9,7 @@ import {
   cashSessionQuerySchema,
   paymentSchema,
   createSaleSchema,
+  createAccountPaymentSchema,
 } from "../schemas";
 
 describe("openCashSessionSchema", () => {
@@ -240,5 +241,36 @@ describe("createSaleSchema — cuenta corriente (customerId)", () => {
     expect(
       createSaleSchema.safeParse({ products: validProducts, customerId: "" }).success,
     ).toBe(false);
+  });
+});
+
+describe("createAccountPaymentSchema (cobranza de cuenta corriente)", () => {
+  it("accepts a non-cash method with amount", () => {
+    const r = createAccountPaymentSchema.safeParse({ amount: 100.5, method: "TRANSFERENCIA", note: "x" });
+    expect(r.success).toBe(true);
+  });
+
+  it.each(["TARJETA_CREDITO", "TARJETA_DEBITO", "QR"])("accepts %s", (method) => {
+    expect(createAccountPaymentSchema.safeParse({ amount: 1, method }).success).toBe(true);
+  });
+
+  it("rejects CUENTA_CORRIENTE and unknown methods", () => {
+    expect(createAccountPaymentSchema.safeParse({ amount: 1, method: "CUENTA_CORRIENTE" }).success).toBe(false);
+    expect(createAccountPaymentSchema.safeParse({ amount: 1, method: "CHEQUE" }).success).toBe(false);
+  });
+
+  it("rejects amount <= 0 or with more than 2 decimals", () => {
+    expect(createAccountPaymentSchema.safeParse({ amount: 0, method: "QR" }).success).toBe(false);
+    expect(createAccountPaymentSchema.safeParse({ amount: -5, method: "QR" }).success).toBe(false);
+    expect(createAccountPaymentSchema.safeParse({ amount: 1.234, method: "QR" }).success).toBe(false);
+  });
+
+  it("EFECTIVO requires cashSessionId; with it is accepted", () => {
+    const missing = createAccountPaymentSchema.safeParse({ amount: 10, method: "EFECTIVO" });
+    expect(missing.success).toBe(false);
+    if (!missing.success) expect(missing.error.issues[0].path).toEqual(["cashSessionId"]);
+    expect(
+      createAccountPaymentSchema.safeParse({ amount: 10, method: "EFECTIVO", cashSessionId: "cs-1" }).success,
+    ).toBe(true);
   });
 });

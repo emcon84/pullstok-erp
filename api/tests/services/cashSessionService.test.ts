@@ -18,6 +18,9 @@ jest.mock("../../src/config/db", () => ({
     salePayment: {
       groupBy: jest.fn(),
     },
+    customerAccountMovement: {
+      aggregate: jest.fn(),
+    },
     $transaction: jest.fn(),
   },
   basePrisma: {
@@ -37,6 +40,7 @@ const mockedPrisma = prisma as unknown as {
     updateMany: jest.Mock;
   };
   salePayment: { groupBy: jest.Mock };
+  customerAccountMovement: { aggregate: jest.Mock };
   $transaction: jest.Mock;
 };
 
@@ -172,7 +176,45 @@ describe("cashSessionService.openCash", () => {
 });
 
 describe("cashSessionService.closeCash", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Cobranzas EFECTIVO de cuenta corriente de la sesión: por defecto ninguna.
+    mockedPrisma.customerAccountMovement.aggregate.mockResolvedValue({
+      _sum: { amount: null },
+    });
+  });
+
+  it("cuenta-corriente: EFECTIVO account collections of the session add to expectedAmount", async () => {
+    mockedPrisma.cashSession.findFirst.mockResolvedValue({
+      ...openSession,
+      openingAmount: 5000,
+      status: "OPEN",
+    });
+    mockedPrisma.salePayment.groupBy.mockResolvedValue([
+      { method: "EFECTIVO", _sum: { amount: 1500 } },
+    ]);
+    mockedPrisma.customerAccountMovement.aggregate.mockResolvedValue({
+      _sum: { amount: 250 },
+    });
+    mockedPrisma.$transaction.mockImplementation((cb: any) => cb(mockedPrisma));
+    mockedPrisma.cashSession.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await cashSessionService.closeCash(
+      "cs-1",
+      { closingByMethod: { EFECTIVO: 6750 }, closingAmount: 6750 },
+      "u-1",
+      "CASHIER",
+    );
+
+    expect(mockedPrisma.customerAccountMovement.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { cashSessionId: "cs-1", type: "PAYMENT", method: "EFECTIVO" },
+        _sum: { amount: true },
+      }),
+    );
+    expect(result.expectedAmount).toBe(6750); // 5000 + 1500 + 250
+    expect(result.difference).toBe(0);
+  });
 
   it("R3: computes expectedAmount = opening + Σ EFECTIVO and returns difference", async () => {
     mockedPrisma.cashSession.findFirst.mockResolvedValue({
