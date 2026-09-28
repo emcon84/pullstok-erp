@@ -55,16 +55,20 @@ saldarlo después con cobranzas. Módulo completo (decisión del usuario 2026-09
       `POST /customers/:id/account/payments` (cobranza; EFECTIVO suma al arqueo). Tests primero.
       Ruta: delegada (mismo writer).
       Evidencia: 5 suites nuevas/tocadas RED (módulos inexistentes / 2 fail) → GREEN (83 tests); `jest --testPathIgnorePatterns tests/e2e` 111/111 suites, 1630 passed, 2 skipped; `tsc` solo 3 errores preexistentes en tests/e2e. Cobranza: lock `FOR UPDATE` del cliente + re-chequeo de saldo en la tx.
-- [ ] T4 — Front: `CUENTA_CORRIENTE` en modelo/labels (typecheck exhaustivo), selector de cliente en
+- [x] T4 (d57d243) — Front: `CUENTA_CORRIENTE` en modelo/labels (typecheck exhaustivo), selector de cliente en
       `PaymentModal`, `customerId` en `confirmSale → useVendorCheckout → useSales → API`, ticket.
       Tests primero. Ruta: delegada (writer front).
-- [ ] T5 — Front: vista de cuenta corriente en `/Clientes` (saldo, movimientos, registrar cobranza)
+      Evidencia: 4 archivos de test nuevos RED (20 fail, 2 pass) → GREEN (51/51 con los tests de recargo/checkout existentes); `tsc -p tsconfig.app.json --noEmit` limpio; `vitest run` completo 1053 passed / 8 failed (priceKgUpdate + productDrawer, preexistentes: fallan igual sin mis cambios). Extra: `useCreateSale` expone `createSaleAsync` (mutateAsync) y el checkout lo usa, para no vaciar el carrito ni dar por vendida una venta rechazada por el servidor. `PAYMENT_METHODS` sin CC (arqueo/legacy); `CHECKOUT_PAYMENT_METHODS` solo en PaymentModal. Sin nombre de cliente en el ticket (fuera de alcance v1).
+- [x] T5 (959ac48) — Front: vista de cuenta corriente en `/Clientes` (saldo, movimientos, registrar cobranza)
       + service/hook. Tests primero. Ruta: delegada (mismo writer front).
+      Evidencia: 4 archivos de test nuevos RED (módulos inexistentes) → GREEN (24 tests + Customers.test 3/3); `tsc` limpio; `vitest run` completo 1077 passed / 8 failed (los mismos 8 preexistentes); eslint sin errores nuevos en lo tocado (Customers.tsx/Customers.test.tsx conservan sus `any` preexistentes).
 
 ## Progreso
 - Mapper corrido; `main` alineado con `origin/main` = producción (`20cf5e5`).
 
 - Backend T1–T3 hecho (3 commits en `main`, sin push). Migración `20260928120000_customer_account` escrita a mano (la aplica el pipeline).
 
+- Front T4–T5 hecho (2 commits en `main`, sin push).
+
 ## Próximo paso
-T4 → T5 (front) con un writer front. e2e backend pendientes de correr en el VPS.
+Verificación visual en el navegador y e2e backend pendientes de correr en el VPS; push/deploy cuando el usuario lo pida.
