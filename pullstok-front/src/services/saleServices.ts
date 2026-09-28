@@ -53,6 +53,31 @@ export const getSales = async (branchId?: string): Promise<Sale[]> => {
   }
 };
 
+/** Detalle de una venta puntual (usado por el diálogo de cuenta corriente para
+ *  expandir un renglón "Venta" y mostrar qué se vendió). */
+export const getSaleById = async (id: string): Promise<Sale> => {
+  const token = localStorage.getItem("token");
+  try {
+    const response = await axios.get(`${API_URL}/sales/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      console.error(
+        "Error al obtener el detalle de la venta:",
+        error.response?.data || error.message,
+      );
+      throw error.response?.data || error.message;
+    } else {
+      console.error("Error desconocido al obtener el detalle de la venta:", error);
+      throw error;
+    }
+  }
+};
+
 export const deleteSale = async (id: string): Promise<void> => {
   const token = localStorage.getItem("token");
   try {

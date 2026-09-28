@@ -39,6 +39,9 @@ vi.mock("@/components/hooks/useCustomerAccount", () => ({
 vi.mock("@/components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
 }));
+vi.mock("@/services/saleServices", () => ({
+  getSaleById: vi.fn(),
+}));
 
 import { CustomerAccountDialog } from "@/components/molecules/CustomerAccountDialog";
 import {
@@ -46,6 +49,7 @@ import {
   useRegisterAccountPayment,
 } from "@/components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
+import { getSaleById } from "@/services/saleServices";
 
 const movements = [
   {
@@ -98,6 +102,7 @@ describe("CustomerAccountDialog", () => {
       registerPayment,
       loading: false,
     } as never);
+    vi.mocked(getSaleById).mockReset();
   });
 
   it("shows the customer, the current balance and the movements", () => {
@@ -219,5 +224,55 @@ describe("CustomerAccountDialog", () => {
 
     expect(screen.getByText("Saldo a favor")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Registrar cobranza" })).not.toBeInTheDocument();
+  });
+
+  // ── T2: detalle de venta expandible ──
+  describe("sale detail expansion", () => {
+    const saleDetail = {
+      id: "sale-abcdef123456",
+      totalAmount: 1500,
+      saleDate: "2026-09-27T12:00:00.000Z",
+      items: [
+        { id: "i-1", name: "Alimento Gato 3kg", quantity: 2, price: 750, category: "Alimentos", productId: "p-1" },
+      ],
+    };
+
+    it("has no expand control for PAYMENT rows", () => {
+      renderDialog();
+      expect(
+        screen.queryByRole("button", { name: /ver detalle de la venta/i }),
+      ).toBeInTheDocument(); // sanity: exists for the CHARGE row
+      // The PAYMENT row's "Cobranza" cell must not be a button.
+      expect(screen.getByText("Cobranza").closest("button")).toBeNull();
+    });
+
+    it("expands on click, fetches once, and shows the sale items", async () => {
+      vi.mocked(getSaleById).mockResolvedValue(saleDetail as never);
+      renderDialog();
+
+      const toggle = screen.getByRole("button", { name: /ver detalle de la venta/i });
+      fireEvent.click(toggle);
+
+      expect(screen.getByText(/cargando/i)).toBeInTheDocument();
+      expect(await screen.findByText("Alimento Gato 3kg")).toBeInTheDocument();
+      expect(getSaleById).toHaveBeenCalledTimes(1);
+      expect(getSaleById).toHaveBeenCalledWith("sale-abcdef123456");
+
+      // Collapse then re-expand: no second fetch.
+      fireEvent.click(toggle);
+      expect(screen.queryByText("Alimento Gato 3kg")).not.toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(await screen.findByText("Alimento Gato 3kg")).toBeInTheDocument();
+      expect(getSaleById).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows an error state when the fetch fails", async () => {
+      vi.mocked(getSaleById).mockRejectedValue(new Error("network"));
+      renderDialog();
+
+      fireEvent.click(screen.getByRole("button", { name: /ver detalle de la venta/i }));
+
+      expect(await screen.findByText(/no se pudo cargar el detalle/i)).toBeInTheDocument();
+    });
   });
 });

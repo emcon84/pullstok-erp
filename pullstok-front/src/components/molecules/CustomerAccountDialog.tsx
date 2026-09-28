@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,12 +22,14 @@ import {
 } from "@/components/ui/table";
 import { useCustomerAccount, useRegisterAccountPayment } from "@/components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
+import { getSaleById } from "@/services/saleServices";
 import { round2 } from "@/lib/money";
 import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
   type PaymentMethod,
 } from "@/models/cashSessionModel";
+import type { Sale } from "@/models/salesModel";
 
 interface CustomerAccountDialogProps {
   customerId: string;
@@ -34,6 +37,19 @@ interface CustomerAccountDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+type SaleItem = NonNullable<Sale["items"]>[number];
+
+type SaleDetailStatus = "loading" | "done" | "error";
+
+/** Formatea la cantidad de un renglón: kg con 2 decimales en modos sueltos
+ *  (POR_PESO/POR_MONTO), unidades enteras en el resto. */
+const formatItemQuantity = (item: SaleItem) => {
+  const isWeightMode = item.saleMode === "POR_PESO" || item.saleMode === "POR_MONTO";
+  return isWeightMode
+    ? `${item.quantity.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`
+    : `${item.quantity} u.`;
+};
 
 const money = (n: number) => `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
 
@@ -66,6 +82,41 @@ export const CustomerAccountDialog = ({
   const [amountStr, setAmountStr] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("EFECTIVO");
   const [note, setNote] = useState("");
+
+  // ── Detalle de venta expandible (T2) ──
+  const [expandedSaleIds, setExpandedSaleIds] = useState<Set<string>>(new Set());
+  const [saleDetails, setSaleDetails] = useState<Record<string, Sale>>({});
+  const [saleDetailStatus, setSaleDetailStatus] = useState<
+    Record<string, SaleDetailStatus>
+  >({});
+
+  const fetchSaleDetail = async (saleId: string) => {
+    setSaleDetailStatus((prev) => ({ ...prev, [saleId]: "loading" }));
+    try {
+      const sale = await getSaleById(saleId);
+      setSaleDetails((prev) => ({ ...prev, [saleId]: sale }));
+      setSaleDetailStatus((prev) => ({ ...prev, [saleId]: "done" }));
+    } catch {
+      setSaleDetailStatus((prev) => ({ ...prev, [saleId]: "error" }));
+    }
+  };
+
+  const toggleSaleDetail = (saleId: string) => {
+    const isExpanded = expandedSaleIds.has(saleId);
+    setExpandedSaleIds((prev) => {
+      const next = new Set(prev);
+      if (isExpanded) {
+        next.delete(saleId);
+      } else {
+        next.add(saleId);
+      }
+      return next;
+    });
+    // Solo pide la venta la primera vez que se expande (cache en saleDetails).
+    if (!isExpanded && !saleDetails[saleId] && saleDetailStatus[saleId] !== "loading") {
+      fetchSaleDetail(saleId);
+    }
+  };
 
   // El monto se precarga con el saldo (y se recarga cuando cambia: p. ej. tras cobrar).
   useEffect(() => {
@@ -146,32 +197,98 @@ export const CustomerAccountDialog = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {account.movements.map((m) => (
-                  <TableRow key={m.id}>
-                    <TableCell className="whitespace-nowrap">{formatDate(m.createdAt)}</TableCell>
-                    <TableCell>{m.type === "CHARGE" ? "Venta" : "Cobranza"}</TableCell>
-                    <TableCell>
-                      {m.type === "CHARGE"
-                        ? PAYMENT_METHOD_LABELS.CUENTA_CORRIENTE
-                        : m.method
-                          ? PAYMENT_METHOD_LABELS[m.method]
-                          : "—"}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${
-                        m.type === "CHARGE"
-                          ? "text-destructive"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }`}
-                    >
-                      {money(m.amount)}
-                    </TableCell>
-                    <TableCell className="space-x-2 text-muted-foreground">
-                      {m.saleId && <span>#{m.saleId.slice(0, 8)}</span>}
-                      {m.note && <span>{m.note}</span>}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {account.movements.map((m) => {
+                  const isSaleRow = m.type === "CHARGE" && !!m.saleId;
+                  const saleId = m.saleId ?? "";
+                  const isExpanded = isSaleRow && expandedSaleIds.has(saleId);
+                  const status = isSaleRow ? saleDetailStatus[saleId] : undefined;
+                  const detail = isSaleRow ? saleDetails[saleId] : undefined;
+
+                  return (
+                    <Fragment key={m.id}>
+                      <TableRow>
+                        <TableCell className="whitespace-nowrap">{formatDate(m.createdAt)}</TableCell>
+                        <TableCell>
+                          {isSaleRow ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleSaleDetail(saleId)}
+                              aria-expanded={isExpanded}
+                              aria-label={`Ver detalle de la venta #${saleId.slice(0, 8)}`}
+                              className="flex items-center gap-1 hover:underline"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                              )}
+                              Venta
+                            </button>
+                          ) : (
+                            "Cobranza"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {m.type === "CHARGE"
+                            ? PAYMENT_METHOD_LABELS.CUENTA_CORRIENTE
+                            : m.method
+                              ? PAYMENT_METHOD_LABELS[m.method]
+                              : "—"}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right tabular-nums ${
+                            m.type === "CHARGE"
+                              ? "text-destructive"
+                              : "text-emerald-600 dark:text-emerald-400"
+                          }`}
+                        >
+                          {money(m.amount)}
+                        </TableCell>
+                        <TableCell className="space-x-2 text-muted-foreground">
+                          {m.saleId && <span>#{m.saleId.slice(0, 8)}</span>}
+                          {m.note && <span>{m.note}</span>}
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="bg-muted/30 p-0">
+                            {status === "loading" && (
+                              <p className="p-3 text-center text-xs text-muted-foreground">
+                                Cargando detalle…
+                              </p>
+                            )}
+                            {status === "error" && (
+                              <p className="p-3 text-center text-xs text-destructive">
+                                No se pudo cargar el detalle de la venta
+                              </p>
+                            )}
+                            {status === "done" && detail?.items && (
+                              <ul className="divide-y p-3 text-xs">
+                                {detail.items.map((item, idx) => (
+                                  <li
+                                    key={item.id ?? item._id ?? idx}
+                                    className="flex items-center justify-between gap-3 py-1"
+                                  >
+                                    <span className="truncate">{item.name}</span>
+                                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                                      {formatItemQuantity(item)}
+                                    </span>
+                                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                                      {money(item.price)}
+                                    </span>
+                                    <span className="shrink-0 font-medium tabular-nums">
+                                      {money(round2(item.price * item.quantity))}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
