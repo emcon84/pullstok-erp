@@ -10,12 +10,17 @@ const handleError = (error: any, res: Response) => {
   switch (error?.code) {
     case "CUSTOMER_NOT_FOUND":
       return res.status(404).json({ error: error.code, message: error.message });
-    // Sin caja abierta para cobrar en efectivo: payload válido, operación bloqueada.
+    // Sin caja abierta para cobrar en efectivo / sin teléfono cargado: payload
+    // válido, operación bloqueada.
     case "CASH_SESSION_REQUIRED":
+    case "CUSTOMER_PHONE_REQUIRED":
       return res.status(422).json({ error: error.code, message: error.message });
     case "PAYMENT_EXCEEDS_BALANCE":
     case "INVALID_PAYMENT_METHOD":
       return res.status(400).json({ error: error.code, message: error.message });
+    // Falló el envío por WhatsApp (Kapso) — no es culpa del payload del cliente.
+    case "WHATSAPP_SEND_FAILED":
+      return res.status(502).json({ error: error.code, message: error.message });
     default:
       return res.status(500).json({ message: error?.message });
   }
@@ -50,4 +55,18 @@ const registerPayment = async (req: AuthedRequest, res: Response) => {
   }
 };
 
-export default { getBalances, getAccount, registerPayment };
+const sendAccountStatementWhatsapp = async (req: Request, res: Response) => {
+  try {
+    const result = await customerAccountService.sendAccountStatementWhatsapp(req.params.id);
+    res.status(200).json(result);
+  } catch (error: any) {
+    handleError(error, res);
+  }
+};
+
+export default {
+  getBalances,
+  getAccount,
+  registerPayment,
+  sendAccountStatementWhatsapp,
+};

@@ -4,6 +4,7 @@ import {
   verifyWebhookSignature,
   isCatalogQuery,
   buildOrderSummary,
+  sendDocument,
 } from "../../src/services/whatsappService";
 
 // Las funciones puras que testeamos no tocan DB; mockeamos los módulos pesados
@@ -178,6 +179,96 @@ describe("whatsappService", () => {
       expect(buildOrderSummary(items)).toBe(
         "🐾 Te armo el resumen de tu pedido:\n1. Producto",
       );
+    });
+  });
+
+  // Comprobante de cuenta corriente (cuenta-corriente T1): mismo patrón que
+  // sendImage, pero type "document" (link + filename + caption opcional).
+  describe("sendDocument", () => {
+    const originalFetch = global.fetch;
+    const originalEnv = { ...process.env };
+
+    beforeEach(() => {
+      process.env.KAPSO_BASE_URL = "https://api.kapso.ai/meta/whatsapp";
+      process.env.KAPSO_PHONE_NUMBER_ID = "PHONE123";
+      process.env.KAPSO_API_KEY = "key-123";
+    });
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+      process.env = { ...originalEnv };
+    });
+
+    it("posts type: document with link/filename/caption and returns true on 2xx", async () => {
+      const fetchMock = jest.fn().mockResolvedValue({ ok: true });
+      global.fetch = fetchMock as any;
+
+      const result = await sendDocument(
+        "56920403095",
+        "https://cdn.example.com/statement.pdf",
+        "resumen.pdf",
+        "Tu resumen de cuenta",
+      );
+
+      expect(result).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://api.kapso.ai/meta/whatsapp/v24.0/PHONE123/messages",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            "X-API-Key": "key-123",
+            "Content-Type": "application/json",
+          }),
+        }),
+      );
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body).toEqual({
+        messaging_product: "whatsapp",
+        to: "56920403095",
+        type: "document",
+        document: {
+          link: "https://cdn.example.com/statement.pdf",
+          filename: "resumen.pdf",
+          caption: "Tu resumen de cuenta",
+        },
+      });
+    });
+
+    it("omits caption when not provided", async () => {
+      const fetchMock = jest.fn().mockResolvedValue({ ok: true });
+      global.fetch = fetchMock as any;
+
+      await sendDocument("56920403095", "https://cdn.example.com/statement.pdf", "resumen.pdf");
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.document).toEqual({
+        link: "https://cdn.example.com/statement.pdf",
+        filename: "resumen.pdf",
+      });
+    });
+
+    it("returns false on a non-2xx response", async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValue({ ok: false, status: 400, text: async () => "bad request" });
+      global.fetch = fetchMock as any;
+
+      const result = await sendDocument(
+        "56920403095",
+        "https://cdn.example.com/x.pdf",
+        "x.pdf",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("returns false when fetch throws", async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error("network down")) as any;
+      const result = await sendDocument(
+        "56920403095",
+        "https://cdn.example.com/x.pdf",
+        "x.pdf",
+      );
+      expect(result).toBe(false);
     });
   });
 });

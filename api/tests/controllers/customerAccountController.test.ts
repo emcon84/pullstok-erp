@@ -12,6 +12,7 @@ jest.mock("../../src/services/customerAccountService", () => ({
     getBalances: jest.fn(),
     getAccount: jest.fn(),
     registerPayment: jest.fn(),
+    sendAccountStatementWhatsapp: jest.fn(),
   },
 }));
 
@@ -19,6 +20,7 @@ const svc = service as unknown as {
   getBalances: jest.Mock;
   getAccount: jest.Mock;
   registerPayment: jest.Mock;
+  sendAccountStatementWhatsapp: jest.Mock;
 };
 
 const mockReq = (params: any = {}, body: any = {}) =>
@@ -84,5 +86,26 @@ describe("customerAccountController", () => {
     const res = mockRes();
     await controller.getBalances(mockReq(), res);
     expect(res.status).toHaveBeenCalledWith(500);
+  });
+
+  it("sendAccountStatementWhatsapp: 200 with { sent: true }, passing the id param", async () => {
+    svc.sendAccountStatementWhatsapp.mockResolvedValue({ sent: true });
+    const res = mockRes();
+    await controller.sendAccountStatementWhatsapp(mockReq({ id: "c-1" }), res);
+    expect(svc.sendAccountStatementWhatsapp).toHaveBeenCalledWith("c-1");
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ sent: true });
+  });
+
+  it.each([
+    ["CUSTOMER_NOT_FOUND", 404],
+    ["CUSTOMER_PHONE_REQUIRED", 422],
+    ["WHATSAPP_SEND_FAILED", 502],
+  ])("sendAccountStatementWhatsapp maps %s → %i", async (code, status) => {
+    svc.sendAccountStatementWhatsapp.mockRejectedValue(mkErr(code, "msg"));
+    const res = mockRes();
+    await controller.sendAccountStatementWhatsapp(mockReq({ id: "c-1" }), res);
+    expect(res.status).toHaveBeenCalledWith(status);
+    expect(res.json).toHaveBeenCalledWith({ error: code, message: "msg" });
   });
 });

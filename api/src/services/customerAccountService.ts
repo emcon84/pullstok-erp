@@ -1,6 +1,9 @@
-import { prisma } from "../config/db";
+import { prisma, basePrisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
 import { round2 } from "../utils/money";
+import { sendDocument, normalizePhone } from "./whatsappService";
+import { uploadToR2 } from "../config/storage";
+import { buildAccountStatementPdf } from "./accountStatementPdf";
 
 /**
  * Cuenta corriente de clientes (cuenta-corriente) — saldo, extracto y cobranzas.
@@ -197,4 +200,59 @@ const registerPayment = async (
   });
 };
 
-export default { getBalances, getAccount, registerPayment };
+/**
+ * Genera el PDF del resumen de cuenta (T1) y lo manda por WhatsApp al
+ * `Customer.phone` (normalizado). Org/logo se leen con `basePrisma`:
+ * `Organization` y `StoreSettings` NO son TENANT_MODELS (ver db.ts), así que
+ * el scope de org se aplica a mano (organizationId / where: { id }).
+ */
+const sendAccountStatementWhatsapp = async (customerId: string) => {
+  const organizationId = requireOrganizationId();
+
+  const customer = await prisma.customer.findFirst({ where: { id: customerId } });
+  if (!customer) throw domainError("CUSTOMER_NOT_FOUND", "Cliente no encontrado");
+
+  const phone = normalizePhone(customer.phone);
+  if (!phone) {
+    throw domainError("CUSTOMER_PHONE_REQUIRED", "El cliente no tiene teléfono cargado");
+  }
+
+  const { balance, movements } = await getAccount(customerId);
+
+  const [organization, storeSettings] = await Promise.all([
+    basePrisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { name: true, address: true, phone: true, taxId: true, taxCondition: true },
+    }),
+    basePrisma.storeSettings.findUnique({
+      where: { organizationId },
+      select: { logoUrl: true },
+    }),
+  ]);
+
+  const buffer = await buildAccountStatementPdf({
+    customer: { name: customer.name },
+    organization: organization ?? { name: "" },
+    logoUrl: storeSettings?.logoUrl ?? null,
+    balance,
+    movements,
+  });
+
+  const filename = `estado-cuenta-${customer.name.replace(/\s+/g, "-")}.pdf`;
+  const key = `account-statements/${customerId}-${Date.now()}.pdf`;
+  const url = await uploadToR2(buffer, key, "application/pdf");
+
+  const sent = await sendDocument(phone, url, filename, `Resumen de cuenta — ${customer.name}`);
+  if (!sent) {
+    throw domainError("WHATSAPP_SEND_FAILED", "No se pudo enviar el comprobante por WhatsApp");
+  }
+
+  return { sent: true };
+};
+
+export default {
+  getBalances,
+  getAccount,
+  registerPayment,
+  sendAccountStatementWhatsapp,
+};

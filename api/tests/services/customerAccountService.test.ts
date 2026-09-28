@@ -5,7 +5,10 @@
  * transacción que re-chequea el saldo.
  */
 import customerAccountService from "../../src/services/customerAccountService";
-import { prisma } from "../../src/config/db";
+import { prisma, basePrisma } from "../../src/config/db";
+import { sendDocument, normalizePhone } from "../../src/services/whatsappService";
+import { uploadToR2 } from "../../src/config/storage";
+import { buildAccountStatementPdf } from "../../src/services/accountStatementPdf";
 
 jest.mock("../../src/config/db", () => ({
   prisma: {
@@ -14,10 +17,29 @@ jest.mock("../../src/config/db", () => ({
     customerAccountMovement: { findMany: jest.fn(), groupBy: jest.fn() },
     $transaction: jest.fn(),
   },
+  // StoreSettings/Organization NO son TENANT_MODELS (ver db.ts) → se leen con
+  // basePrisma, scopeando por organizationId a mano (T1 — comprobante PDF).
+  basePrisma: {
+    organization: { findUnique: jest.fn() },
+    storeSettings: { findUnique: jest.fn() },
+  },
 }));
 
 jest.mock("../../src/config/tenantContext", () => ({
   requireOrganizationId: jest.fn().mockReturnValue("org-1"),
+}));
+
+jest.mock("../../src/services/whatsappService", () => ({
+  sendDocument: jest.fn(),
+  normalizePhone: jest.fn(),
+}));
+
+jest.mock("../../src/config/storage", () => ({
+  uploadToR2: jest.fn(),
+}));
+
+jest.mock("../../src/services/accountStatementPdf", () => ({
+  buildAccountStatementPdf: jest.fn(),
 }));
 
 const p = prisma as unknown as {
@@ -26,6 +48,15 @@ const p = prisma as unknown as {
   customerAccountMovement: { findMany: jest.Mock; groupBy: jest.Mock };
   $transaction: jest.Mock;
 };
+
+const bp = basePrisma as unknown as {
+  organization: { findUnique: jest.Mock };
+  storeSettings: { findUnique: jest.Mock };
+};
+
+const wa = { sendDocument: sendDocument as jest.Mock, normalizePhone: normalizePhone as jest.Mock };
+const r2 = uploadToR2 as jest.Mock;
+const pdfBuilder = buildAccountStatementPdf as jest.Mock;
 
 const makeTx = () => ({
   $queryRaw: jest.fn().mockResolvedValue([]),
@@ -250,5 +281,88 @@ describe("customerAccountService.registerPayment", () => {
     );
     expect(p.cashSession.findFirst).not.toHaveBeenCalled();
     expect(tx.customerAccountMovement.create.mock.calls[0][0].data.cashSessionId).toBeNull();
+  });
+});
+
+describe("customerAccountService.sendAccountStatementWhatsapp", () => {
+  const movements = [{ id: "m-1", type: "CHARGE", amount: 100, sale: null }];
+  const pdfBuffer = Buffer.from("%PDF-fake");
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    p.customer.findFirst.mockResolvedValue({ id: "c-1", name: "Ana", phone: "3400 111-222" });
+    p.customerAccountMovement.groupBy.mockResolvedValue(sums(100, 0));
+    p.customerAccountMovement.findMany.mockResolvedValue(movements);
+    bp.organization.findUnique.mockResolvedValue({
+      name: "Pullstok",
+      address: "Av. Siempre Viva 742",
+      phone: "3400000000",
+      taxId: "20304050607",
+      taxCondition: "Responsable Inscripto",
+    });
+    bp.storeSettings.findUnique.mockResolvedValue({ logoUrl: "https://cdn.example.com/logo.png" });
+    wa.normalizePhone.mockReturnValue("543400111222");
+    pdfBuilder.mockResolvedValue(pdfBuffer);
+    r2.mockResolvedValue("https://r2.example.com/account-statements/c-1-1.pdf");
+    wa.sendDocument.mockResolvedValue(true);
+  });
+
+  it("unknown / other-org customer → CUSTOMER_NOT_FOUND (nothing else runs)", async () => {
+    p.customer.findFirst.mockResolvedValue(null);
+    await expect(
+      customerAccountService.sendAccountStatementWhatsapp("nope"),
+    ).rejects.toMatchObject({ code: "CUSTOMER_NOT_FOUND" });
+    expect(wa.sendDocument).not.toHaveBeenCalled();
+    expect(r2).not.toHaveBeenCalled();
+  });
+
+  it("customer without a usable phone → CUSTOMER_PHONE_REQUIRED (nothing else runs)", async () => {
+    wa.normalizePhone.mockReturnValue(null);
+    await expect(
+      customerAccountService.sendAccountStatementWhatsapp("c-1"),
+    ).rejects.toMatchObject({
+      code: "CUSTOMER_PHONE_REQUIRED",
+      message: expect.stringContaining("teléfono"),
+    });
+    expect(pdfBuilder).not.toHaveBeenCalled();
+    expect(r2).not.toHaveBeenCalled();
+    expect(wa.sendDocument).not.toHaveBeenCalled();
+  });
+
+  it("builds the PDF, uploads it to R2 and sends it by WhatsApp to the normalized phone", async () => {
+    const result = await customerAccountService.sendAccountStatementWhatsapp("c-1");
+
+    expect(wa.normalizePhone).toHaveBeenCalledWith("3400 111-222");
+    expect(pdfBuilder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: { name: "Ana" },
+        organization: expect.objectContaining({ name: "Pullstok", taxId: "20304050607" }),
+        logoUrl: "https://cdn.example.com/logo.png",
+        balance: 100,
+        movements,
+      }),
+    );
+    expect(r2).toHaveBeenCalledWith(pdfBuffer, expect.any(String), "application/pdf");
+    expect(wa.sendDocument).toHaveBeenCalledWith(
+      "543400111222",
+      "https://r2.example.com/account-statements/c-1-1.pdf",
+      expect.any(String),
+      expect.any(String),
+    );
+    expect(result).toEqual({ sent: true });
+  });
+
+  it("no StoreSettings / no logo → builds the PDF with logoUrl null (never throws)", async () => {
+    bp.storeSettings.findUnique.mockResolvedValue(null);
+    const result = await customerAccountService.sendAccountStatementWhatsapp("c-1");
+    expect(pdfBuilder).toHaveBeenCalledWith(expect.objectContaining({ logoUrl: null }));
+    expect(result).toEqual({ sent: true });
+  });
+
+  it("sendDocument returns false → WHATSAPP_SEND_FAILED", async () => {
+    wa.sendDocument.mockResolvedValue(false);
+    await expect(
+      customerAccountService.sendAccountStatementWhatsapp("c-1"),
+    ).rejects.toMatchObject({ code: "WHATSAPP_SEND_FAILED" });
   });
 });

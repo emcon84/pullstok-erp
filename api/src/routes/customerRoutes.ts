@@ -31,6 +31,14 @@ router.post(
   validate(createAccountPaymentSchema),
   customerAccountController.registerPayment,
 );
+// Comprobante de cuenta por WhatsApp (cuenta-corriente T1): literal bajo
+// "/:id/account", también va ANTES de "/:id" a secas.
+router.post(
+  "/:id/account/statement/whatsapp",
+  authenticateJWT,
+  checkBusinessHours,
+  customerAccountController.sendAccountStatementWhatsapp,
+);
 router.get("/:id", authenticateJWT, checkBusinessHours, customerController.getCustomerById);
 router.put(
   "/:id",

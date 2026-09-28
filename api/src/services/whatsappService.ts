@@ -1299,6 +1299,49 @@ export const sendImage = async (
   }
 };
 
+/**
+ * Gateway de salida: manda un documento (cuenta-corriente T1 — comprobante de
+ * cuenta en PDF). Mismo patrón que sendImage, pero `type: "document"` (link +
+ * filename + caption opcional dentro de `document`, como pide la API de Meta).
+ */
+export const sendDocument = async (
+  to: string,
+  documentUrl: string,
+  filename: string,
+  caption?: string,
+): Promise<boolean> => {
+  const baseUrl =
+    process.env.KAPSO_BASE_URL ?? "https://api.kapso.ai/meta/whatsapp";
+  const url = `${baseUrl}/v24.0/${process.env.KAPSO_PHONE_NUMBER_ID}/messages`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "X-API-Key": process.env.KAPSO_API_KEY!,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "document",
+        document: { link: documentUrl, filename, ...(caption ? { caption } : {}) },
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error(
+        `[kapso] sendDocument no-2xx (${res.status}) a ${to} — url ${documentUrl}`,
+        detail,
+      );
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[kapso] sendDocument falló", err);
+    return false;
+  }
+};
+
 export default {
   verifyWebhookSignature,
   normalizePhone,
@@ -1310,4 +1353,5 @@ export default {
   sendText,
   sendInteractiveButtons,
   sendImage,
+  sendDocument,
 };
