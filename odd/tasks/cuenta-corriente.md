@@ -68,7 +68,8 @@ saldarlo después con cobranzas. Módulo completo (decisión del usuario 2026-09
 
 - Backend T1–T3 hecho (3 commits en `main`, sin push). Migración `20260928120000_customer_account` escrita a mano (la aplica el pipeline).
 
-- Front T4–T5 hecho (2 commits en `main`, sin push).
+- Front T4–T5 hecho (2 commits en `main`).
+- Pusheado a `origin/main` el 2026-09-28 (`20cf5e5..844a523`) a pedido del usuario; el pipeline hace el deploy y aplica la migración.
 
 ## Próximo paso
-Verificación visual en el navegador y e2e backend pendientes de correr en el VPS; push/deploy cuando el usuario lo pida.
+Verificación visual en el navegador y e2e backend pendientes de correr en el VPS. Pendientes fuera de alcance: `deleteCustomer` con movimientos debería dar 409 (hoy 500), nombre del cliente en el ticket, `CashSessionPage` no muestra cobranzas en efectivo en el "esperado" en vivo (el cierre sí las suma).
