@@ -145,6 +145,19 @@ export function rasterFromImageData(image: RgbaBitmap): EscPosRaster {
   return { width: bytesPerRow * 8, height: h, data };
 }
 
+/** Centra el raster en `paperWidth` puntos con blanco a los lados (byte a byte). */
+function centerRaster(image: EscPosRaster, paperWidth: number): EscPosRaster {
+  const srcBytes = image.width >> 3;
+  const paperBytes = paperWidth >> 3;
+  if (srcBytes >= paperBytes) return image;
+  const left = (paperBytes - srcBytes) >> 1;
+  const data = new Uint8Array(paperBytes * image.height);
+  for (let y = 0; y < image.height; y++) {
+    data.set(image.data.subarray(y * srcBytes, (y + 1) * srcBytes), y * paperBytes + left);
+  }
+  return { width: paperBytes * 8, height: image.height, data };
+}
+
 // ── Bytes ──
 
 class EscPosWriter {
@@ -179,8 +192,13 @@ class EscPosWriter {
   cut() {
     return this.raw(GS, 0x56, 1);
   }
-  /** GS v 0 m xL xH yL yH d...: imagen raster en modo normal. */
-  raster({ width, height, data }: EscPosRaster) {
+  /**
+   * GS v 0 m xL xH yL yH d...: imagen raster en modo normal. Se centra en el ancho
+   * del papel rellenando con blanco: muchas térmicas ignoran ESC a en imágenes
+   * raster y las dejan a la izquierda.
+   */
+  raster(image: EscPosRaster) {
+    const { width, height, data } = centerRaster(image, MAX_RASTER_WIDTH);
     const xBytes = width >> 3;
     this.raw(GS, 0x76, 0x30, 0x00, xBytes & 0xff, xBytes >> 8, height & 0xff, height >> 8);
     for (let i = 0; i < data.length; i++) this.bytes.push(data[i]);

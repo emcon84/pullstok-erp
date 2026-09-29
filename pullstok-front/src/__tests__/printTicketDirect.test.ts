@@ -155,7 +155,12 @@ describe("printSaleTicketDirect", () => {
     const bytes = vi.mocked(printBytes).mock.calls[0][0];
     const at = indexOfSeq(bytes, [0x1d, 0x76, 0x30, 0x00]);
     expect(at).toBeGreaterThan(-1);
-    expect(Array.from(bytes.slice(at + 4, at + 10))).toEqual([1, 0, 2, 0, 0xff, 0xff]);
+    // Centrado en 384 puntos (48 bytes por fila): 23 bytes en blanco y el logo (0xff) en el medio.
+    expect(Array.from(bytes.slice(at + 4, at + 8))).toEqual([48, 0, 2, 0]);
+    const row0 = Array.from(bytes.slice(at + 8, at + 8 + 48));
+    expect(row0[22]).toBe(0);
+    expect(row0[23]).toBe(0xff);
+    expect(row0[24]).toBe(0);
   });
 
   it("logo que no se puede rasterizar (null o error) → se imprime igual, sin logo", async () => {

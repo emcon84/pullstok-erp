@@ -232,17 +232,29 @@ describe("encodeSaleTicketEscPos", () => {
     expect(bytes[n - 1]).toBeGreaterThanOrEqual(3);
   });
 
-  it("logo raster: GS v 0 con el ancho/alto en bytes little-endian", () => {
+  it("logo raster: se centra en el ancho del papel rellenando con blanco (no depende de ESC a)", () => {
+    // Muchas térmicas ignoran ESC a en imágenes GS v 0: el centrado va en los bytes.
     const logo: EscPosRaster = { width: 16, height: 3, data: new Uint8Array([1, 2, 3, 4, 5, 6]) };
     const bytes = encodeSaleTicketEscPos(ticket(), { logo });
     const at = indexOfSeq(bytes, [GS, 0x76, 0x30, 0x00]);
     expect(at).toBeGreaterThan(-1);
-    // xL xH = 2 bytes por fila, yL yH = 3 filas.
-    expect(Array.from(bytes.slice(at + 4, at + 8))).toEqual([2, 0, 3, 0]);
-    expect(Array.from(bytes.slice(at + 8, at + 14))).toEqual([1, 2, 3, 4, 5, 6]);
+    // xL xH = 48 bytes por fila (384 puntos = 58 mm), yL yH = 3 filas.
+    expect(Array.from(bytes.slice(at + 4, at + 8))).toEqual([48, 0, 3, 0]);
+    const rows = [0, 1, 2].map((r) => Array.from(bytes.slice(at + 8 + r * 48, at + 8 + (r + 1) * 48)));
+    const expectedRow = (a: number, b: number) => [...Array(23).fill(0), a, b, ...Array(23).fill(0)];
+    expect(rows).toEqual([expectedRow(1, 2), expectedRow(3, 4), expectedRow(5, 6)]);
     // El logo va centrado, antes del nombre del negocio.
     expect(at).toBeGreaterThan(indexOfSeq(bytes, [ESC, 0x61, 0x01]));
     expect(at).toBeLessThan(indexOfSeq(bytes, ascii("Mi Pet Shop")));
+  });
+
+  it("logo raster: uno que ya ocupa todo el ancho del papel no se modifica", () => {
+    const data = new Uint8Array(48 * 2).map((_, i) => (i % 251) + 1);
+    const logo: EscPosRaster = { width: 384, height: 2, data };
+    const bytes = encodeSaleTicketEscPos(ticket(), { logo });
+    const at = indexOfSeq(bytes, [GS, 0x76, 0x30, 0x00]);
+    expect(Array.from(bytes.slice(at + 4, at + 8))).toEqual([48, 0, 2, 0]);
+    expect(Array.from(bytes.slice(at + 8, at + 8 + 96))).toEqual(Array.from(data));
   });
 
   it("sin logo no emite GS v 0", () => {
