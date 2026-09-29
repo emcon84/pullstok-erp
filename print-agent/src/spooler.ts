@@ -13,6 +13,7 @@ export interface RawSpooler {
  */
 const RAW_PRINT_SCRIPT = String.raw`
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;

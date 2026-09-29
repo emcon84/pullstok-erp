@@ -2,6 +2,7 @@ import { runPowerShell } from './spooler';
 
 const LIST_SCRIPT = `
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Printer | ForEach-Object { $_.Name })
 `;
