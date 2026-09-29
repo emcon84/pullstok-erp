@@ -1,6 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -40,8 +42,33 @@ interface StatisticsProps {
   onBack: () => void;
 }
 
+/** Convierte un Date a "YYYY-MM-DD" LOCAL para el value de `<input type=date>`. */
+const dateToInputValue = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+/** Parsea el "YYYY-MM-DD" de `<input type=date>` como fecha LOCAL (no
+ *  `new Date(value)`, que JS interpreta como medianoche UTC y cae en el día
+ *  anterior en husos negativos como Argentina, UTC-3). */
+const inputValueToLocalDate = (value: string): Date => {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
 export const Statistics = ({ type, onBack }: StatisticsProps) => {
   const [period, setPeriod] = useState<PeriodFilter>("monthly");
+  const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+
+  // Al salir de "Diario" se resetea a hoy, para que si el usuario vuelve más
+  // tarde a Diario no arranque en un día lejano ya elegido antes.
+  useEffect(() => {
+    if (period !== "daily") {
+      setSelectedDay(new Date());
+    }
+  }, [period]);
 
   const { sales, loading: salesLoading } = useGetSales();
   const { budgets, loading: budgetsLoading } = useGetBudgets();
@@ -63,7 +90,7 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
 
   const statsData = useMemo(() => {
     if (!data.length) return { chartData: [], total: 0, count: 0 };
-    const dateRange = getDateRange(period);
+    const dateRange = getDateRange(period, period === "daily" ? selectedDay : undefined);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filtered = filterByDateRange(data as any[], dateRange);
     const grouped = groupByPeriod(filtered, period);
@@ -75,17 +102,17 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
         cantidad: items.length,
       }));
     return { chartData, total: calculateTotalAmount(filtered), count: filtered.length };
-  }, [data, period]);
+  }, [data, period, selectedDay]);
 
   // Desglose por medio de pago (solo ventas): reusa el MISMO filtro de período
   // que statsData para que los números cierren con el resto del dashboard.
   const paymentBreakdown = useMemo(() => {
     if (type !== "sales" || !data.length) return [];
-    const dateRange = getDateRange(period);
+    const dateRange = getDateRange(period, period === "daily" ? selectedDay : undefined);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filtered = filterByDateRange(data as any[], dateRange);
     return sumByPaymentMethod(filtered);
-  }, [data, type, period]);
+  }, [data, type, period, selectedDay]);
 
   const totalPayments = paymentBreakdown.reduce((sum, r) => sum + r.amount, 0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -136,18 +163,40 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
         />
       </div>
 
-      <PeriodSelector selected={period} onChange={setPeriod} />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <PeriodSelector selected={period} onChange={setPeriod} />
+        {period === "daily" && (
+          <div className="space-y-2">
+            <Label htmlFor="stats-day-filter">Elegir día</Label>
+            <Input
+              id="stats-day-filter"
+              type="date"
+              className="w-auto"
+              value={dateToInputValue(selectedDay)}
+              onChange={(e) => setSelectedDay(inputValueToLocalDate(e.target.value))}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-5">
           <p className="text-sm text-muted-foreground">Total {label}</p>
-          <p className="mt-1 text-3xl font-bold tracking-tight" style={{ color }}>
+          <p
+            className="mt-1 text-3xl font-bold tracking-tight"
+            style={{ color }}
+            data-testid="stats-count"
+          >
             {statsData.count}
           </p>
         </Card>
         <Card className="p-5">
           <p className="text-sm text-muted-foreground">Monto total</p>
-          <p className="mt-1 text-3xl font-bold tracking-tight" style={{ color }}>
+          <p
+            className="mt-1 text-3xl font-bold tracking-tight"
+            style={{ color }}
+            data-testid="stats-total"
+          >
             {formatCurrency(statsData.total)}
           </p>
         </Card>
