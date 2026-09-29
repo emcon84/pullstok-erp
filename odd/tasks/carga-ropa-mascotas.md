@@ -129,14 +129,23 @@ pendientes tras el cambio de alcance de abajo).
       tests pasando, 2 skipped. `npx tsc --noEmit` → solo los 3 errores
       pre-existentes conocidos en `api/tests/e2e/` (business-hours.e2e,
       loose-sale.e2e), ninguno introducido por este trabajo.
-- [ ] T3 — Correr `load-ropa-mascotas.ts` en modo dry-run en el VPS (SSH,
+- [x] T3 — Correr `load-ropa-mascotas.ts` en modo dry-run en el VPS (SSH,
       solo lectura), mostrar el resumen al usuario (a crear por categoría,
       PENDING, VERIFY) ANTES de pedir autorización para `--apply`.
-- [ ] T4 — Con autorización: `--apply` del loader, luego dry-run y `--apply`
+      Evidencia: dry-run 2026-09-29 — 137 a crear (134 CAPAS/CHAQUETAS/BUZOS
+      + 3 ACCESORIOS DE INDUMENTARIA), 0 ya existentes, 3 PENDING (Jeans y
+      Polar T8/T9/T10 manuscritos), 36 VERIFY (Manta con corderito + Leche
+      y Miel). Resumen mostrado al usuario; autorizó "aplicalo no mas".
+- [x] T4 — Con autorización: `--apply` del loader, luego dry-run y `--apply`
       del script de stock (50u Casa Central).
+      Evidencia: `load-ropa-mascotas.ts --apply` → "APPLIED: 137 products
+      created." `set-ropa-mascotas-stock.ts` dry-run → 137 a poner stock, 0
+      omitidos; `--apply` → "APPLIED: stock 50 set on 137 products (branch
+      Casa Central)." Ambos corridos por SSH en el VPS, 2026-09-29.
 
 ## Próximo paso
-T1-T2 completadas (commit `dd1ec33`). Sigue T3: dry-run de
-`load-ropa-mascotas.ts` en el VPS (SSH, solo lectura), mostrar el resumen
-al usuario (a crear por categoría, PENDING, VERIFY) ANTES de pedir
-autorización para `--apply` (T4).
+Feature cerrada. Pendiente de decisión del dueño (no bloquea nada): revisar
+los 3 PENDING (Jeans y Polar T8/T9/T10) y los 36 VERIFY (Manta con corderito
+como posible manta de cama; Leche y Miel usando talle en vez de cm) — y
+renombrar a mano los 22 productos "ROPA ... JAMIRO"/"ROPA ... LAS CHIQUIS"
+con el nombre de prenda real cuando se sepa.
