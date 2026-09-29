@@ -32,3 +32,6 @@ api/invoices/*
 
 # Certificados locales / staging (NUNCA subir claves privadas)
 api/certs/
+
+# Engram memory export (may contain secrets; transfer manually, never commit)
+.engram/
