@@ -9,7 +9,9 @@ jest.mock("../../src/config/db", () => ({
     categoryVariantOption: { findMany: jest.fn() },
     productVariant: { createMany: jest.fn() },
     branch: { findMany: jest.fn(), findFirst: jest.fn() },
-    productStock: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn(), findMany: jest.fn() },
+    // T1 (odd/tasks/listado-productos-sin-stock.md): sin branchId, getProducts
+    // agrega ProductStock por groupBy (ver productController.stockAggregation.test.ts).
+    productStock: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
     priceKgType: { findMany: jest.fn() },
     $transaction: jest.fn(),
   },
@@ -35,7 +37,7 @@ jest.mock("../../src/services/stockService", () => ({
 const mockedPrisma = prisma as unknown as {
   product: { findMany: jest.Mock };
   branch: { findMany: jest.Mock; findFirst: jest.Mock };
-  productStock: { findFirst: jest.Mock; updateMany: jest.Mock; create: jest.Mock; findMany: jest.Mock };
+  productStock: { findFirst: jest.Mock; updateMany: jest.Mock; create: jest.Mock; findMany: jest.Mock; groupBy: jest.Mock };
   category: { findFirst: jest.Mock };
   categoryVariantOption: { findMany: jest.Mock };
   productVariant: { createMany: jest.Mock };
@@ -56,6 +58,7 @@ describe("productController.getProducts — branchId filter", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedPrisma.priceKgType.findMany.mockResolvedValue([]);
+    mockedPrisma.productStock.groupBy.mockResolvedValue([]);
   });
 
   it("adds stocks include with branchId filter when branchId is provided", async () => {

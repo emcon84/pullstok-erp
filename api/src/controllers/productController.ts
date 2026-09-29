@@ -658,6 +658,34 @@ const getProducts = async (req: Request, res: Response) => {
       };
     };
 
+    // sdd: odd/tasks/listado-productos-sin-stock.md (T1). Sin `?branchId=` el
+    // `include` de arriba NO pide `stocks` (línea ~631): sin esto, el listado
+    // admin "todas las sucursales" queda sin `stocks` y el front cae al
+    // fallback legacy `Product.quantity` (desactualizado para productos
+    // cargados directo en `ProductStock` por scripts de carga masiva). UNA
+    // sola query agregada (groupBy, no N+1) por página — mismo patrón que
+    // `readBranchStockMap` en storeController.ts usa para el storefront.
+    const aggregateProductStocks = async (
+      productIds: string[],
+    ): Promise<Map<string, number>> => {
+      if (productIds.length === 0) return new Map();
+      const sums = await prisma.productStock.groupBy({
+        by: ["productId"],
+        where: { productId: { in: productIds } },
+        _sum: { quantity: true },
+      });
+      return new Map(sums.map((s) => [s.productId, s._sum.quantity ?? 0]));
+    };
+
+    // Adjunta `stocks: [{ quantity }]` a un producto ya mapeado, MISMA forma
+    // que el `include.stocks` existente usa cuando hay `branchId` — el front
+    // (`vendorCatalogHelpers.ts`) lee `stocks?.[0]?.quantity` sin cambios.
+    // Producto sin filas en `ProductStock` → 0 explícito, no `undefined`.
+    const withAggregatedStock = (mapped: any, sums: Map<string, number>) => ({
+      ...mapped,
+      stocks: [{ quantity: sums.get(mapped.id) ?? 0 }],
+    });
+
     // Paginación SERVER-SIDE opt-in (vendor dashboard). Solo se activa cuando
     // `page` y `pageSize` están presentes y son enteros positivos; si vienen
     // malformados o faltan, se mantiene el comportamiento legacy byte-for-byte
@@ -698,10 +726,17 @@ const getProducts = async (req: Request, res: Response) => {
         ]);
       }
 
+      // Sin `branchId` el `include` no trae `stocks` (arriba): se agrega acá
+      // con UNA sola query extra, contada dentro de `dbMs` (es DB, no mapeo).
+      const stockSums = branchId
+        ? null
+        : await aggregateProductStocks(items.map((p: any) => p.id));
       const dbMs = performance.now() - dbStart;
 
       const mapStart = performance.now();
-      const mappedItems = items.map(mapProduct);
+      const mappedItems = stockSums
+        ? items.map(mapProduct).map((p) => withAggregatedStock(p, stockSums))
+        : items.map(mapProduct);
       res.setHeader(
         "Server-Timing",
         formatServerTiming({ db: dbMs, map: performance.now() - mapStart }),
@@ -722,10 +757,17 @@ const getProducts = async (req: Request, res: Response) => {
       // Fallback fuzzy: reintenta tolerando typos comunes (solo si el estricto dio 0).
       products = await prisma.product.findMany({ where: whereFuzzy, include });
     }
+    // Sin `branchId` el `include` no trae `stocks` (arriba): se agrega acá
+    // con UNA sola query extra, contada dentro de `dbMs` (es DB, no mapeo).
+    const stockSums = branchId
+      ? null
+      : await aggregateProductStocks(products.map((p: any) => p.id));
     const dbMs = performance.now() - dbStart;
 
     const mapStart = performance.now();
-    const mappedProducts = products.map(mapProduct);
+    const mappedProducts = stockSums
+      ? products.map(mapProduct).map((p) => withAggregatedStock(p, stockSums))
+      : products.map(mapProduct);
     res.setHeader(
       "Server-Timing",
       formatServerTiming({ db: dbMs, map: performance.now() - mapStart }),

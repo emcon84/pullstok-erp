@@ -11,11 +11,14 @@ jest.mock("../../src/config/db", () => ({
     categoryVariantOption: { findMany: jest.fn() },
     productVariant: { createMany: jest.fn(), deleteMany: jest.fn() },
     branch: { findMany: jest.fn(), findFirst: jest.fn() },
+    // T1 (odd/tasks/listado-productos-sin-stock.md): sin branchId, getProducts
+    // agrega ProductStock por groupBy (ver productController.stockAggregation.test.ts).
     productStock: {
       findFirst: jest.fn(),
       updateMany: jest.fn(),
       create: jest.fn(),
       findMany: jest.fn(),
+      groupBy: jest.fn(),
     },
     priceListEntry: { findMany: jest.fn() },
     $transaction: jest.fn(),
@@ -44,7 +47,7 @@ const mockedPrisma = prisma as unknown as {
   category: { findMany: jest.Mock };
   priceListEntry: { findMany: jest.Mock };
   branch: { findMany: jest.Mock; findFirst: jest.Mock };
-  productStock: { findMany: jest.Mock };
+  productStock: { findMany: jest.Mock; groupBy: jest.Mock };
 };
 
 const mockResponse = () => {
@@ -62,6 +65,7 @@ const query = (q: Record<string, unknown> = {}) =>
 describe("productController.getProducts — planSection y filtro por título", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedPrisma.productStock.groupBy.mockResolvedValue([]);
   });
 
   it("incluye planSection con brand/line/subline/position de la planilla SECO más reciente", async () => {
@@ -106,6 +110,9 @@ describe("productController.getProducts — planSection y filtro por título", (
       },
     });
 
+    // stocks: [{ quantity: 0 }] — sin branchId, getProducts agrega
+    // ProductStock (T1, odd/tasks/listado-productos-sin-stock.md); el mock de
+    // groupBy no devuelve filas para ninguno de los dos productos.
     expect(res.json).toHaveBeenCalledWith([
       {
         id: "p-1",
@@ -119,8 +126,17 @@ describe("productController.getProducts — planSection y filtro por título", (
           subline: "SIEGER PUPPY",
           position: 2,
         },
+        stocks: [{ quantity: 0 }],
       },
-      { id: "p-2", name: "Collar Suelto", price: 500, unitsPerBox: null, perUnitPrice: null, planSection: null },
+      {
+        id: "p-2",
+        name: "Collar Suelto",
+        price: 500,
+        unitsPerBox: null,
+        perUnitPrice: null,
+        planSection: null,
+        stocks: [{ quantity: 0 }],
+      },
     ]);
   });
 

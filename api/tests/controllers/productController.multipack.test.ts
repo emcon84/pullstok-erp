@@ -15,7 +15,9 @@ jest.mock("../../src/config/db", () => ({
     categoryVariantOption: { findMany: jest.fn() },
     productVariant: { createMany: jest.fn(), deleteMany: jest.fn() },
     branch: { findMany: jest.fn(), findFirst: jest.fn() },
-    productStock: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn(), findMany: jest.fn() },
+    // T1 (odd/tasks/listado-productos-sin-stock.md): sin branchId, getProducts
+    // agrega ProductStock por groupBy (ver productController.stockAggregation.test.ts).
+    productStock: { findFirst: jest.fn(), updateMany: jest.fn(), create: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
     priceListEntry: { findMany: jest.fn() },
     $transaction: jest.fn(),
   },
@@ -34,6 +36,7 @@ jest.mock("../../src/services/priceLooseService", () => ({
 
 const mockedPrisma = prisma as unknown as {
   product: { findMany: jest.Mock; count: jest.Mock };
+  productStock: { groupBy: jest.Mock };
 };
 
 const query = (q: Record<string, unknown> = {}) => ({ query: q } as unknown as Request);
@@ -47,7 +50,10 @@ const mockResponse = () => {
 };
 
 describe("productController.getProducts — mapProduct unitsPerBox/perUnitPrice", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedPrisma.productStock.groupBy.mockResolvedValue([]);
+  });
 
   it("expone unitsPerBox y perUnitPrice derivado para un multi-pack vendible", async () => {
     mockedPrisma.product.findMany.mockResolvedValue([

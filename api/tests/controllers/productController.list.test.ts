@@ -5,6 +5,10 @@ import { prisma } from "../../src/config/db";
 jest.mock("../../src/config/db", () => ({
   prisma: {
     product: { findMany: jest.fn(), count: jest.fn() },
+    // T1 (odd/tasks/listado-productos-sin-stock.md): sin branchId, getProducts
+    // agrega ProductStock por groupBy — mockeado acá aunque estos tests no lo
+    // ejercitan directamente (ver productController.stockAggregation.test.ts).
+    productStock: { groupBy: jest.fn() },
     priceKgType: { findMany: jest.fn() },
   },
   basePrisma: {},
@@ -16,6 +20,7 @@ jest.mock("../../src/config/tenantContext", () => ({
 
 const mockedPrisma = prisma as unknown as {
   product: { findMany: jest.Mock; count: jest.Mock };
+  productStock: { groupBy: jest.Mock };
   priceKgType: { findMany: jest.Mock };
 };
 
@@ -52,6 +57,7 @@ describe("productController.getProducts — payload de la lista", () => {
     jest.clearAllMocks();
     mockedPrisma.product.findMany.mockResolvedValue([]);
     mockedPrisma.product.count.mockResolvedValue(0);
+    mockedPrisma.productStock.groupBy.mockResolvedValue([]);
   });
 
   it("lista completa (sin paginar): pide solo los campos de variante que usa el front", async () => {
