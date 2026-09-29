@@ -35,7 +35,7 @@
       -> GREEN (32 passed). Full unit suite 115 suites / 1701 passed, 2 skipped. tsc: solo los 3 errores e2e conocidos.
       Cambios: schema.prisma, migración 20260929120000_customer_optional_fields, Zod (blank -> null),
       fallback "Sin nombre" (balances, getAccount, PDF/filename), mails con `cliente` si no hay nombre,
-      checkout de tienda no envía mail sin email. Commit: COMMIT_T1
+      checkout de tienda no envía mail sin email. Commit: 19ad7a4
 - [x] T2 — API: `POST /customers/:id/account/charges` (cargo histórico: monto, fecha opcional, nota opcional)
       + tests; fallback "Sin nombre" en el extracto PDF/saldos. Ruta: delegada (mismo writer).
       Evidencia: RED (4 suites fallan: TS por API inexistente + PDF 1 failed) -> GREEN (68 passed en las 4 suites).
@@ -43,7 +43,7 @@
       pasa aislado y en re-corrida). tsc: solo los 3 errores e2e conocidos.
       Cambios: createAccountChargeSchema (fecha no futura, tolerancia 5 min), service.registerHistoricalCharge,
       controller + ruta POST /:id/account/charges, PDF: CHARGE sin venta = "Deuda anterior". Orden del extracto ya era createdAt desc.
-      Commit: COMMIT_T2
+      Commit: d85c32d
 - [ ] T3 — Front: formulario de cliente sin campos obligatorios (`Customers.tsx`, `customerModel.ts`) +
       fallback "Sin nombre". Tests primero. Ruta: delegada (writer front).
 - [ ] T4 — Front: "Cargar deuda anterior" en `CustomerAccountDialog` (monto, fecha, nota) + service/hook.
