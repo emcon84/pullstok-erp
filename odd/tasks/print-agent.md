@@ -66,10 +66,10 @@ por el spooler de Windows (texto con la tipografía interna de la impresora). Fa
       spooler RAW por PowerShell (inyectable), config en disco. Tests primero. Ruta: delegada (writer 1). Commit `7ad714a`.
 - [x] T2 — `print-agent/`: build a `.exe` + instalador (`PullstokPrint-Setup.exe`), autoarranque, README de
       instalación/publicación de Release. Ruta: delegada (mismo writer). Commit `e861e71`.
-- [ ] T3 — Front: cliente `directPrintAgent.ts` + `UnifiedPos` agente→fallback panel (bytes con
-      `encodeSaleTicketEscPos` + logo). Tests primero. Ruta: delegada (writer 2).
-- [ ] T4 — Front: UI de configuración (descarga, detección, selector de impresora, prueba). Tests primero.
-      Ruta: delegada (mismo writer 2).
+- [x] T3 — Front: cliente `directPrintAgent.ts` + `UnifiedPos` agente→fallback panel (bytes con
+      `encodeSaleTicketEscPos` + logo). Tests primero. Ruta: delegada (writer 2). Commit `a4e96f4`.
+- [x] T4 — Front: UI de configuración (descarga, detección, selector de impresora, prueba). Tests primero.
+      Ruta: delegada (mismo writer 2). Commit `0c244b1`.
 - [ ] T5 — Prueba real en la PC de caja (usuario) + publicar Release (con OK del usuario).
 
 ## Progreso
@@ -82,5 +82,11 @@ por el spooler de Windows (texto con la tipografía interna de la impresora). Fa
   instala en %LOCALAPPDATA%, crea Run key + entrada de desinstalación, arranca el agente; `uninstall.cmd` lo deja limpio.
   Ruta T1-T2: delegada (un writer). Mismo writer, tests primero.
 
+- T3 (`a4e96f4`): RED = 3 archivos fallando por módulos inexistentes; GREEN = 45 tests en 4 archivos. Flag `pullstok-print-agent-enabled`:
+  apagado => panel directo sin red. `printSaleTicketViaAgent` en `utils/printTicketAgent.ts`; se exportó `loadLogoRaster`.
+  Toast `info` solo al caer al panel. `serialPrinter.ts`/`printTicketDirect.ts`/`PrinterConnectButton` intactos (ask-before-delete).
+- T4 (`0c244b1`): RED = módulo `DirectPrintSettings` inexistente; GREEN = 7 tests. Sección en `/ajustes` (BrandingSettings), todos los roles.
+  Full `vitest run`: solo los 8 fallos preexistentes; `tsc` limpio; eslint sin errores nuevos (2 `any` preexistentes).
+
 ## Próximo paso
-T3–T4 (front). T5 pendiente del usuario.
+T5 pendiente del usuario (prueba real en la caja + publicar Release con su OK).
