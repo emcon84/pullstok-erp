@@ -17,6 +17,7 @@ import { useBranding, useUpdateBranding } from "../components/hooks/useBranding"
 import { AppBrandingForm } from "../components/molecules/AppBrandingForm";
 import { OrganizationFiscalForm } from "../components/molecules/OrganizationFiscalForm";
 import { ArcaSettingsForm } from "../components/molecules/ArcaSettingsForm";
+import { DirectPrintSettings } from "../components/molecules/DirectPrintSettings";
 import { Loader } from "../components/atoms/loader";
 
 export const BrandingSettings = () => {
@@ -84,6 +85,9 @@ export const BrandingSettings = () => {
 
       {/* Configuración ARCA (deuda técnica item 6): antes solo se podía por API */}
       {me?.role === "ADMIN" && <ArcaSettingsForm />}
+
+      {/* Impresión directa de tickets: por PC de caja, cualquier rol que use el POS */}
+      <DirectPrintSettings />
 
       {/* Backup download section — ADMIN only, no plan gating (spec U2, U6) */}
       {me?.role === "ADMIN" && (

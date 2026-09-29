@@ -16,6 +16,11 @@ vi.mock("../services/onboardingService", () => ({
   getMe: vi.fn(),
 }));
 
+// La sección de impresión directa consulta al agente local por red: se aísla.
+vi.mock("../components/molecules/DirectPrintSettings", () => ({
+  DirectPrintSettings: () => null,
+}));
+
 // ---------------------------------------------------------------------------
 // Static imports (after mock registration — vitest hoists the mock above)
 // ---------------------------------------------------------------------------
