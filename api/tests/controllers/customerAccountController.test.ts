@@ -12,6 +12,7 @@ jest.mock("../../src/services/customerAccountService", () => ({
     getBalances: jest.fn(),
     getAccount: jest.fn(),
     registerPayment: jest.fn(),
+    registerHistoricalCharge: jest.fn(),
     sendAccountStatementWhatsapp: jest.fn(),
     getAccountStatementLink: jest.fn(),
   },
@@ -21,6 +22,7 @@ const svc = service as unknown as {
   getBalances: jest.Mock;
   getAccount: jest.Mock;
   registerPayment: jest.Mock;
+  registerHistoricalCharge: jest.Mock;
   sendAccountStatementWhatsapp: jest.Mock;
   getAccountStatementLink: jest.Mock;
 };
@@ -81,6 +83,24 @@ describe("customerAccountController", () => {
     await controller.registerPayment(mockReq({ id: "c-1" }, {}), res);
     expect(res.status).toHaveBeenCalledWith(status);
     expect(res.json).toHaveBeenCalledWith({ error: code, message: "msg" });
+  });
+
+  it("registerHistoricalCharge: 201 and forwards id, body and the user id", async () => {
+    svc.registerHistoricalCharge.mockResolvedValue({ movement: { id: "m-9" }, balance: 800 });
+    const res = mockRes();
+    const body = { amount: 800, note: "ventas 2025" };
+    await controller.registerHistoricalCharge(mockReq({ id: "c-1" }, body), res);
+    expect(svc.registerHistoricalCharge).toHaveBeenCalledWith("c-1", body, "u-1");
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({ movement: { id: "m-9" }, balance: 800 });
+  });
+
+  it("registerHistoricalCharge maps CUSTOMER_NOT_FOUND → 404", async () => {
+    svc.registerHistoricalCharge.mockRejectedValue(mkErr("CUSTOMER_NOT_FOUND", "msg"));
+    const res = mockRes();
+    await controller.registerHistoricalCharge(mockReq({ id: "c-x" }, { amount: 1 }), res);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: "CUSTOMER_NOT_FOUND", message: "msg" });
   });
 
   it("unexpected errors → 500", async () => {

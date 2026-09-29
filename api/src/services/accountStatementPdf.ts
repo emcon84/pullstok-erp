@@ -40,9 +40,10 @@ const MONEY = (n: number) => `$ ${round2(n).toFixed(2)}`;
 const DATE = (d: Date | string) =>
   new Date(d).toLocaleDateString("es-AR", { timeZone: "UTC" });
 
-const MOVEMENT_TYPE_LABEL: Record<AccountStatementMovement["type"], string> = {
-  CHARGE: "Venta",
-  PAYMENT: "Cobranza",
+// Un CHARGE sin venta asociada es un cargo histórico (deuda anterior).
+const movementLabel = (m: AccountStatementMovement): string => {
+  if (m.type === "PAYMENT") return "Cobranza";
+  return m.sale ? "Venta" : "Deuda anterior";
 };
 
 const balanceLabel = (balance: number): string => {
@@ -143,7 +144,7 @@ export const buildAccountStatementPdf = async (
       rowY = 40;
     }
     doc.text(DATE(m.createdAt), COLS.fecha.x, rowY, { width: COLS.fecha.width });
-    doc.text(MOVEMENT_TYPE_LABEL[m.type], COLS.tipo.x, rowY, { width: COLS.tipo.width });
+    doc.text(movementLabel(m), COLS.tipo.x, rowY, { width: COLS.tipo.width });
     doc.text(m.method ?? "-", COLS.metodo.x, rowY, { width: COLS.metodo.width });
     doc.text(round2(m.amount).toFixed(2), COLS.monto.x, rowY, { width: COLS.monto.width });
     doc.text(m.note ?? "-", COLS.nota.x, rowY, { width: COLS.nota.width });

@@ -435,6 +435,39 @@ export const createAccountPaymentSchema = z
     }
   });
 
+// Cargo histórico de cuenta corriente (customer-account-historical): deuda
+// anterior cargada a mano, sin venta asociada. Solo el monto es obligatorio;
+// la fecha (ISO, día o fecha-hora) no puede ser futura (tolerancia de 5 min por
+// desfase de reloj) y por defecto es "ahora"; la nota es el detalle libre.
+const CHARGE_DATE_TOLERANCE_MS = 5 * 60 * 1000;
+
+export const createAccountChargeSchema = z.object({
+  amount: z.coerce
+    .number()
+    .positive("El monto debe ser mayor a 0")
+    .multipleOf(0.01, "El monto admite hasta 2 decimales"),
+  date: z
+    .string()
+    .optional()
+    .transform((value, ctx) => {
+      if (value === undefined) return undefined;
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        ctx.addIssue({ code: "custom", message: "La fecha es inválida" });
+        return z.NEVER;
+      }
+      if (parsed.getTime() > Date.now() + CHARGE_DATE_TOLERANCE_MS) {
+        ctx.addIssue({ code: "custom", message: "La fecha no puede ser futura" });
+        return z.NEVER;
+      }
+      return parsed;
+    }),
+  note: z.preprocess(
+    blankToNull,
+    z.string().max(500, "La nota admite hasta 500 caracteres").nullable().optional(),
+  ),
+});
+
 // ---------- Caja (sdd/caja-apertura-cierre) ----------
 // Apertura de caja. branchId/openingAmount/observations opcionales: los
 // CASHIER/VENDEDOR usan su sucursal asignada (el server la resuelve);

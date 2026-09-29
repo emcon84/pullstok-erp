@@ -8,6 +8,7 @@ import {
   createCustomerSchema,
   updateCustomerSchema,
   createAccountPaymentSchema,
+  createAccountChargeSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -30,6 +31,15 @@ router.post(
   checkBusinessHours,
   validate(createAccountPaymentSchema),
   customerAccountController.registerPayment,
+);
+// Cargo histórico (deuda anterior sin venta): literal bajo "/:id/account", va
+// ANTES de "/:id" a secas.
+router.post(
+  "/:id/account/charges",
+  authenticateJWT,
+  checkBusinessHours,
+  validate(createAccountChargeSchema),
+  customerAccountController.registerHistoricalCharge,
 );
 // Comprobante de cuenta por WhatsApp (cuenta-corriente T1): literal bajo
 // "/:id/account", también va ANTES de "/:id" a secas.

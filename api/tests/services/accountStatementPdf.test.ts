@@ -88,6 +88,27 @@ describe("accountStatementPdf.buildAccountStatementPdf", () => {
     expect(text).toContain("Cobranza");
   });
 
+  it("labels a CHARGE without a sale as \"Deuda anterior\" (historical charge)", async () => {
+    const buffer = await buildAccountStatementPdf({
+      ...baseInput,
+      movements: [
+        {
+          id: "m-h",
+          type: "CHARGE" as const,
+          amount: 800,
+          method: null,
+          note: "ventas 2025",
+          createdAt: new Date("2025-06-01T12:00:00Z"),
+          sale: null,
+        },
+      ],
+    });
+    const text = extractPdfText(buffer);
+    expect(text).toContain("Deuda anterior");
+    expect(text).toContain("ventas 2025");
+    expect(text).not.toContain("Venta");
+  });
+
   it.each([
     [1234.5, "Saldo adeudado"],
     [-50, "Saldo a favor"],

@@ -37,6 +37,12 @@ export interface RegisterPaymentInput {
 // Etiqueta para clientes sin nombre (Customer.name es opcional).
 const NO_NAME_LABEL = "Sin nombre";
 
+export interface RegisterHistoricalChargeInput {
+  amount: number;
+  date?: Date;
+  note?: string | null;
+}
+
 const domainError = (code: string, message: string) => {
   const err: any = new Error(message);
   err.code = code;
@@ -208,6 +214,47 @@ const registerPayment = async (
 };
 
 /**
+ * Registra un cargo histórico (deuda anterior): CHARGE sin venta asociada, con
+ * la fecha indicada (default: ahora) y una nota libre opcional. No crea `Sale`
+ * (no toca stock, caja ni reportes). Devuelve el movimiento y el saldo nuevo.
+ */
+const registerHistoricalCharge = async (
+  customerId: string,
+  input: RegisterHistoricalChargeInput,
+  userId?: string,
+) => {
+  const organizationId = requireOrganizationId();
+
+  const amount = round2(input.amount);
+  if (!(amount > 0)) {
+    throw domainError("INVALID_CHARGE_AMOUNT", "El monto debe ser mayor a 0");
+  }
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId },
+    select: { id: true },
+  });
+  if (!customer) throw domainError("CUSTOMER_NOT_FOUND", "Cliente no encontrado");
+
+  const movement = await prisma.customerAccountMovement.create({
+    data: {
+      organizationId,
+      customerId,
+      type: "CHARGE",
+      amount,
+      saleId: null,
+      note: input.note?.trim() || null,
+      // Sin fecha → se omite y rige el default now() del schema.
+      createdAt: input.date,
+      createdById: userId,
+    },
+  });
+
+  const balance = await computeBalance(prisma, customerId, organizationId);
+  return { movement, balance };
+};
+
+/**
  * Arma el PDF del resumen de cuenta y lo sube a R2. Org/logo se leen con
  * `basePrisma`: `Organization` y `StoreSettings` NO son TENANT_MODELS (ver
  * db.ts), así que el scope de org se aplica a mano (organizationId / where:
@@ -291,6 +338,7 @@ export default {
   getBalances,
   getAccount,
   registerPayment,
+  registerHistoricalCharge,
   sendAccountStatementWhatsapp,
   getAccountStatementLink,
 };

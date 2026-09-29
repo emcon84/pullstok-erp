@@ -14,7 +14,7 @@ jest.mock("../../src/config/db", () => ({
   prisma: {
     customer: { findFirst: jest.fn(), findMany: jest.fn() },
     cashSession: { findFirst: jest.fn() },
-    customerAccountMovement: { findMany: jest.fn(), groupBy: jest.fn() },
+    customerAccountMovement: { findMany: jest.fn(), groupBy: jest.fn(), create: jest.fn() },
     $transaction: jest.fn(),
   },
   // StoreSettings/Organization NO son TENANT_MODELS (ver db.ts) → se leen con
@@ -45,7 +45,7 @@ jest.mock("../../src/services/accountStatementPdf", () => ({
 const p = prisma as unknown as {
   customer: { findFirst: jest.Mock; findMany: jest.Mock };
   cashSession: { findFirst: jest.Mock };
-  customerAccountMovement: { findMany: jest.Mock; groupBy: jest.Mock };
+  customerAccountMovement: { findMany: jest.Mock; groupBy: jest.Mock; create: jest.Mock };
   $transaction: jest.Mock;
 };
 
@@ -309,6 +309,70 @@ describe("customerAccountService.registerPayment", () => {
     );
     expect(p.cashSession.findFirst).not.toHaveBeenCalled();
     expect(tx.customerAccountMovement.create.mock.calls[0][0].data.cashSessionId).toBeNull();
+  });
+});
+
+describe("customerAccountService.registerHistoricalCharge", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    p.customer.findFirst.mockResolvedValue({ id: "c-1" });
+  });
+
+  it("creates a CHARGE without sale, with the given date, note and creator; returns movement + new balance", async () => {
+    const created = { id: "m-1", type: "CHARGE", amount: 800 };
+    p.customerAccountMovement.create.mockResolvedValue(created);
+    p.customerAccountMovement.groupBy.mockResolvedValue(sums(1300, 500));
+    const date = new Date("2025-06-01T00:00:00Z");
+
+    const result = await customerAccountService.registerHistoricalCharge(
+      "c-1",
+      { amount: 800, date, note: "  ventas 2025 " },
+      "u-1",
+    );
+
+    expect(p.customer.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "c-1" } }),
+    );
+    expect(p.customerAccountMovement.create).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        customerId: "c-1",
+        type: "CHARGE",
+        amount: 800,
+        saleId: null,
+        note: "ventas 2025",
+        createdAt: date,
+        createdById: "u-1",
+      },
+    });
+    expect(result).toEqual({ movement: created, balance: 800 });
+  });
+
+  it("defaults the date to now (createdAt omitted) and empty note to null", async () => {
+    p.customerAccountMovement.create.mockResolvedValue({ id: "m-2" });
+    p.customerAccountMovement.groupBy.mockResolvedValue(sums(10, null));
+
+    await customerAccountService.registerHistoricalCharge("c-1", { amount: 10, note: "  " });
+
+    const data = p.customerAccountMovement.create.mock.calls[0][0].data;
+    expect(data.note).toBeNull();
+    expect(data.createdAt).toBeUndefined();
+    expect(data.saleId).toBeNull();
+  });
+
+  it("unknown / other-org customer → CUSTOMER_NOT_FOUND, nothing is written", async () => {
+    p.customer.findFirst.mockResolvedValue(null);
+    await expect(
+      customerAccountService.registerHistoricalCharge("nope", { amount: 10 }),
+    ).rejects.toMatchObject({ code: "CUSTOMER_NOT_FOUND" });
+    expect(p.customerAccountMovement.create).not.toHaveBeenCalled();
+  });
+
+  it("amount <= 0 → INVALID_CHARGE_AMOUNT", async () => {
+    await expect(
+      customerAccountService.registerHistoricalCharge("c-1", { amount: 0 }),
+    ).rejects.toMatchObject({ code: "INVALID_CHARGE_AMOUNT" });
+    expect(p.customerAccountMovement.create).not.toHaveBeenCalled();
   });
 });
 

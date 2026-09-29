@@ -17,6 +17,7 @@ const handleError = (error: any, res: Response) => {
       return res.status(422).json({ error: error.code, message: error.message });
     case "PAYMENT_EXCEEDS_BALANCE":
     case "INVALID_PAYMENT_METHOD":
+    case "INVALID_CHARGE_AMOUNT":
       return res.status(400).json({ error: error.code, message: error.message });
     // Falló el envío por WhatsApp (Kapso) — no es culpa del payload del cliente.
     case "WHATSAPP_SEND_FAILED":
@@ -55,6 +56,19 @@ const registerPayment = async (req: AuthedRequest, res: Response) => {
   }
 };
 
+const registerHistoricalCharge = async (req: AuthedRequest, res: Response) => {
+  try {
+    const result = await customerAccountService.registerHistoricalCharge(
+      req.params.id,
+      req.body,
+      req.user?.id,
+    );
+    res.status(201).json(result);
+  } catch (error: any) {
+    handleError(error, res);
+  }
+};
+
 const sendAccountStatementWhatsapp = async (req: Request, res: Response) => {
   try {
     const result = await customerAccountService.sendAccountStatementWhatsapp(req.params.id);
@@ -78,6 +92,7 @@ export default {
   getBalances,
   getAccount,
   registerPayment,
+  registerHistoricalCharge,
   sendAccountStatementWhatsapp,
   getAccountStatementLink,
 };
