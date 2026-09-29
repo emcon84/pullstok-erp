@@ -7,7 +7,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build": "node scripts/build.mjs"
+    "build:exe": "node scripts/build.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.14.12",

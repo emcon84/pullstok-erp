@@ -69,7 +69,7 @@ Los errores son JSON `{ "message": "..." }` en español.
 pnpm install
 pnpm --filter pullstok-print-agent test        # vitest (spooler simulado; no imprime de verdad)
 pnpm --filter pullstok-print-agent typecheck
-pnpm --filter pullstok-print-agent build        # dist/PullstokPrintAgent.exe + dist/PullstokPrint-Setup.exe
+pnpm --filter pullstok-print-agent build:exe    # dist/PullstokPrintAgent.exe + dist/PullstokPrint-Setup.exe
 ```
 
 `build` hace: esbuild (bundle CJS) > Node SEA (`--experimental-sea-config` + postject sobre una copia de `node.exe`) > se marca el exe como app de ventana (sin consola) y se le quita la firma de Node > instalador con IExpress (viene con Windows; el instalador ejecuta `installer/install.ps1`). Requiere Windows y Node >= 20. La salida está en `print-agent/dist/` (ignorada por git; no se commitean binarios). El `.exe` pesa ~88 MB porque incluye el runtime de Node; el instalador ~25 MB (comprimido).
