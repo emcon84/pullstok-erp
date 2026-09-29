@@ -153,3 +153,55 @@ describe("Customers — autocompletado con padrón ARCA", () => {
     toastErrorSpy.mockRestore();
   });
 });
+
+describe("Customers — sin campos obligatorios", () => {
+  it("guarda un cliente completamente vacío sin enviar strings vacíos", () => {
+    const submitCustomer = vi.fn();
+    (useCreateCustomer as any).mockReturnValue({ submitCustomer, loadingCustomer: false });
+
+    renderCustomers();
+    fireEvent.click(screen.getByRole("button", { name: "Agregar cliente" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(submitCustomer).toHaveBeenCalledTimes(1);
+    expect(submitCustomer.mock.calls[0][0]).toEqual({});
+  });
+
+  it("solo envía los campos completados", () => {
+    const submitCustomer = vi.fn();
+    (useCreateCustomer as any).mockReturnValue({ submitCustomer, loadingCustomer: false });
+
+    renderCustomers();
+    fireEvent.click(screen.getByRole("button", { name: "Agregar cliente" }));
+    fireEvent.change(screen.getByLabelText("Teléfono"), { target: { value: "1155" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(submitCustomer.mock.calls[0][0]).toEqual({ phone: "1155" });
+  });
+
+  it("muestra 'Sin nombre' y no rompe con cliente sin nombre/email/teléfono", () => {
+    vi.mocked(useCustomers).mockReturnValue({
+      customers: [{ id: "c-9", name: null, email: null, phone: null }],
+      loadingCustomer: false,
+      errorCustomer: null,
+    });
+    renderCustomers();
+
+    expect(screen.getByText("Sin nombre")).toBeInTheDocument();
+    expect(screen.getByText("Sin teléfono")).toBeInTheDocument();
+  });
+
+  it("al editar un cliente sin nombre, los campos quedan vacíos", () => {
+    vi.mocked(useCustomers).mockReturnValue({
+      customers: [{ id: "c-9", name: null, email: null, phone: null }],
+      loadingCustomer: false,
+      errorCustomer: null,
+    });
+    renderCustomers();
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.querySelector("svg.lucide-pencil"))!);
+
+    expect((screen.getByLabelText("Nombre") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("");
+  });
+});
+

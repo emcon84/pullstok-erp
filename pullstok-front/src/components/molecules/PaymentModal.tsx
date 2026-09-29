@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { round2 } from "@/lib/money";
 import { clampSurchargePct, computeSurcharge } from "@/lib/surcharge";
 import { useCustomers } from "@/components/hooks/useCustomer";
+import { customerDisplayName } from "@/utils/customerName";
 import {
   CHECKOUT_PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
@@ -52,8 +53,8 @@ const AccountCustomerPicker = ({
   const options = useMemo(
     () =>
       [...(customers ?? [])]
-        .sort((a, b) => a.name.localeCompare(b.name, "es"))
-        .map((c) => ({ value: c.id || c._id || "", label: c.name }))
+        .map((c) => ({ value: c.id || c._id || "", label: customerDisplayName(c) }))
+        .sort((a, b) => a.label.localeCompare(b.label, "es"))
         .filter((o) => o.value),
     [customers],
   );

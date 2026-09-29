@@ -1,3 +1,4 @@
+import { customerDisplayName } from "../utils/customerName";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -86,7 +87,7 @@ const buildExport = (
   title: "Factura",
   documentNumber: invoice.number || "Borrador",
   date: formatDate(invoice.issueDate),
-  customer: invoice.customer?.name,
+  customer: invoice.customer?.name ?? undefined,
   issuer: {
     name: organization?.name,
     taxId: organization?.taxId ?? undefined,
@@ -151,7 +152,7 @@ export const Invoices = () => {
   const handleIssue = async (invoice: Invoice) => {
     const ok = await confirm({
       title: "¿Emitir factura?",
-      description: `Vas a emitir la factura de ${invoice.customer?.name}. Una vez emitida no se podrá editar.`,
+      description: `Vas a emitir la factura de ${customerDisplayName(invoice.customer)}. Una vez emitida no se podrá editar.`,
       confirmLabel: "Sí, emitir",
     });
     if (!ok) return;

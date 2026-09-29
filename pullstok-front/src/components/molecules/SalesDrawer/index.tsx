@@ -26,6 +26,7 @@ import { ProductSelector } from "../ProductSelector";
 import { DocTable } from "../DocTable";
 import { ProductsProps } from "../../../models/productsModel";
 import { Customer } from "../../../models/customerModel";
+import { customerDisplayName } from "../../../utils/customerName";
 import { CartItem } from "../../../models/salesModel";
 import { Order } from "../../../models/orderModel";
 import { Budget } from "../../../models/budgetModel";
@@ -377,7 +378,7 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
                     const id = customer._id || customer.id || "";
                     return (
                       <option key={id} value={id}>
-                        {customer.name}
+                        {customerDisplayName(customer)}
                       </option>
                     );
                   })}

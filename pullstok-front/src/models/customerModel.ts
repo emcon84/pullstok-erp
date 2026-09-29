@@ -1,9 +1,9 @@
 export interface Customer {
   id?: string;
   _id?: string;
-  name: string;
-  email: string;
-  phone: string;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
   taxId?: string | null;
   taxCondition?: string | null;
   address?: string | null;
@@ -11,7 +11,7 @@ export interface Customer {
 }
 
 export interface CreateCustomer {
-  name: string;
+  name?: string;
   email?: string;
   phone?: string;
   taxId?: string;

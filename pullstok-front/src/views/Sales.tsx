@@ -32,6 +32,7 @@ import { useCustomers, useCreateCustomer } from "../components/hooks/useCustomer
 import { useCreateInvoiceFromSale } from "../components/hooks/useInvoices";
 import { toast } from "react-toastify";
 import { exportToPDF } from "../utils/exportToPDF";
+import { customerDisplayName } from "../utils/customerName";
 import { exportToExcel } from "../utils/exportToExcel";
 import { CartItem, Sale } from "../models/salesModel";
 import { isLooseSale, isUnitSale } from "../models/saleModeHelpers";
@@ -115,17 +116,13 @@ export const SalesPage = () => {
       let customerId: string;
 
       if (modal.mode === "create") {
-        if (!modal.newName.trim()) {
-          setModal((m) => ({ ...m, error: "El nombre del cliente es requerido." }));
-          return;
-        }
         const created = await submitCustomerAsync({
-          name: modal.newName.trim(),
-          email: modal.newEmail.trim(),
-          phone: modal.newPhone.trim(),
-          taxId: modal.newTaxId.trim(),
-          taxCondition: modal.newTaxCondition.trim(),
-          address: modal.newAddress.trim(),
+          name: modal.newName.trim() || undefined,
+          email: modal.newEmail.trim() || undefined,
+          phone: modal.newPhone.trim() || undefined,
+          taxId: modal.newTaxId.trim() || undefined,
+          taxCondition: modal.newTaxCondition.trim() || undefined,
+          address: modal.newAddress.trim() || undefined,
         });
         customerId = created.id || created._id || "";
         if (!customerId) {
@@ -468,7 +465,7 @@ export const SalesPage = () => {
                       const cId = c.id || c._id || "";
                       return (
                         <SelectItem key={cId} value={cId}>
-                          {c.name}
+                          {customerDisplayName(c)}
                           {c.taxId ? ` — ${c.taxId}` : ""}
                         </SelectItem>
                       );
@@ -479,9 +476,7 @@ export const SalesPage = () => {
             ) : (
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="new-customer-name">
-                    Nombre <span className="text-destructive">*</span>
-                  </Label>
+<Label htmlFor="new-customer-name">Nombre</Label>
                   <Input
                     id="new-customer-name"
                     placeholder="Ej: Juan Pérez"

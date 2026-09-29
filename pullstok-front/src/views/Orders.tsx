@@ -271,7 +271,7 @@ export const Orders: React.FC = () => {
       const matchesDate = filterDate ? orderDate === filterDate : true;
       const matchesCustomer = filterCustomerName
         ? order.customer &&
-          order.customer.name.toLowerCase().includes(filterCustomerName)
+          (order.customer.name ?? "").toLowerCase().includes(filterCustomerName)
         : true;
       const matchesReceipt = filterReceipt
         ? order.receipt?.toLowerCase().includes(filterReceipt.toLowerCase())

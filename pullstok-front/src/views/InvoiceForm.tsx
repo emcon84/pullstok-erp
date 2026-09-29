@@ -1,3 +1,4 @@
+import { customerDisplayName } from "../utils/customerName";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
@@ -389,7 +390,7 @@ export const InvoiceForm = () => {
                     key={customer.id || customer._id}
                     value={customer.id || customer._id || ""}
                   >
-                    {customer.name}
+                    {customerDisplayName(customer)}
                   </SelectItem>
                 ))}
               </SelectContent>

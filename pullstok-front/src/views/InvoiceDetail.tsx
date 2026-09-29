@@ -206,7 +206,7 @@ export const InvoiceDetail = () => {
     title: "Factura",
     documentNumber: invoice.number || "Borrador",
     date: formatDate(invoice.issueDate),
-    customer: invoice.customer?.name,
+    customer: invoice.customer?.name ?? undefined,
     issuer: {
       name: me?.organization?.name,
       taxId: me?.organization?.taxId ?? undefined,

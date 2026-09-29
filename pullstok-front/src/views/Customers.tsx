@@ -15,6 +15,7 @@ import {
 import { useCustomerBalances } from "../components/hooks/useCustomerAccount";
 import { CustomerAccountDialog } from "../components/molecules/CustomerAccountDialog";
 import { Loader } from "../components/atoms/loader";
+import { customerDisplayName } from "../utils/customerName";
 import { fetchPadron } from "../services/customerService";
 import {
   AlertDialog,
@@ -134,9 +135,9 @@ export const Customers = () => {
   const handleAddCustomer = async () => {
     submitCustomer(
       {
-        name: newCustomerName,
-        email: newCustomerEmail,
-        phone: newCustomerPhone,
+        name: newCustomerName.trim() || undefined,
+        email: newCustomerEmail.trim() || undefined,
+        phone: newCustomerPhone.trim() || undefined,
         taxId: newCustomerTaxId || undefined,
         taxCondition: newCustomerTaxCondition || undefined,
         address: newCustomerAddress || undefined,
@@ -177,9 +178,9 @@ export const Customers = () => {
     );
     if (customerMatch) {
       setEditCustomerId(customerId);
-      setUpdatedCustomerName(customerMatch.name);
-      setUpdatedCustomerEmail(customerMatch.email);
-      setUpdatedCustomerPhone(customerMatch.phone);
+      setUpdatedCustomerName(customerMatch.name ?? "");
+      setUpdatedCustomerEmail(customerMatch.email ?? "");
+      setUpdatedCustomerPhone(customerMatch.phone ?? "");
       setUpdatedCustomerTaxId(customerMatch.taxId ?? "");
       setUpdatedCustomerTaxCondition(customerMatch.taxCondition ?? "");
       setUpdatedCustomerAddress(customerMatch.address ?? "");
@@ -192,9 +193,9 @@ export const Customers = () => {
     updateCustomer(
       {
         id: editCustomerId,
-        name: updatedCustomerName,
-        email: updatedCustomerEmail,
-        phone: updatedCustomerPhone,
+        name: updatedCustomerName.trim() || undefined,
+        email: updatedCustomerEmail.trim() || undefined,
+        phone: updatedCustomerPhone.trim() || undefined,
         taxId: updatedCustomerTaxId || undefined,
         taxCondition: updatedCustomerTaxCondition || undefined,
         address: updatedCustomerAddress || undefined,
@@ -284,10 +285,10 @@ export const Customers = () => {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent font-semibold uppercase text-accent-foreground">
-                      {customer.name?.[0] ?? "C"}
+                      {customerDisplayName(customer)[0]}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{customer.name}</p>
+                      <p className="truncate font-medium">{customerDisplayName(customer)}</p>
                       <p className="truncate text-xs text-muted-foreground">
                         {customer.email}
                       </p>
@@ -306,7 +307,7 @@ export const Customers = () => {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => askDeleteCustomer(customerId, customer.name)}
+                      onClick={() => askDeleteCustomer(customerId, customerDisplayName(customer))}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -335,7 +336,11 @@ export const Customers = () => {
                   size="sm"
                   className="mt-3 w-full"
                   onClick={() =>
-                    setAccountTarget({ id: customerId, name: customer.name, phone: customer.phone })
+                    setAccountTarget({
+                      id: customerId,
+                      name: customerDisplayName(customer),
+                      phone: customer.phone ?? "",
+                    })
                   }
                 >
                   <Wallet className="h-4 w-4" />

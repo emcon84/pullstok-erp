@@ -232,3 +232,22 @@ describe("PaymentModal — cuenta corriente", () => {
     );
   });
 });
+
+describe("PaymentModal — clientes sin nombre", () => {
+  it("lists customers without a name as 'Sin nombre' and does not crash sorting", () => {
+    vi.mocked(useCustomers).mockReturnValue({
+      customers: [
+        { id: "c-3", name: null, email: null, phone: null },
+        { id: "c-1", name: "Ana Gómez", email: "", phone: "" },
+      ],
+      loadingCustomer: false,
+      errorCustomer: null,
+    } as never);
+    render(modal());
+    addAccountRow("400");
+
+    const labels = Array.from(customerSelect().options).map((o) => o.textContent);
+    expect(labels).toEqual(["Seleccioná un cliente", "Ana Gómez", "Sin nombre"]);
+  });
+});
+
