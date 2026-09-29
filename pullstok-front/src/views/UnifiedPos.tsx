@@ -15,7 +15,8 @@ import { ManualProductDialog } from "@/components/molecules/ManualProductDialog"
 import { PrintTicketDialog } from "@/components/molecules/PrintTicketDialog";
 import { useBranches } from "@/components/hooks/useBranches";
 import { useBrandingContext } from "@/contexts/BrandingContext";
-import { printSaleTicket, resolveTicketCompany } from "@/utils/saleTicket";
+import { resolveTicketCompany } from "@/utils/saleTicket";
+import { printSaleTicketViaAgent } from "@/utils/printTicketAgent";
 import ticketLogoUrl from "@/assets/LogoConCirculoNegro.svg";
 import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
@@ -164,7 +165,13 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     setTimeout(() => {
       try {
         // Puede ser síncrona o devolver una promesa: se atrapan ambas.
-        Promise.resolve(printSaleTicket(ticket)).catch(() => {});
+        // Agente local si esta PC lo tiene habilitado; si no (o si falla) panel de Chrome.
+        Promise.resolve(
+          printSaleTicketViaAgent(ticket, {
+            onAgentFailure: () =>
+              toast.info("No se pudo imprimir directo, se abrió el panel de impresión"),
+          }),
+        ).catch(() => {});
       } catch {
         // La venta ya está confirmada: un fallo de impresión no la afecta.
       }

@@ -17,7 +17,7 @@ export interface PrintDirectOptions {
 }
 
 /** Logo → raster de 1 bit; si no se puede, se imprime sin logo (nunca lanza). */
-async function loadLogoRaster(logoUrl?: string | null): Promise<EscPosRaster | null> {
+export async function loadLogoRaster(logoUrl?: string | null): Promise<EscPosRaster | null> {
   if (!logoUrl) return null;
   try {
     const bitmap = await prepareTicketLogoBitmap(logoUrl);

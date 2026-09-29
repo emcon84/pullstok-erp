@@ -24,6 +24,7 @@ vi.mock("@/utils/saleTicket", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/saleTicket")>()),
   printSaleTicket: vi.fn(),
 }));
+vi.mock("@/utils/printTicketAgent", () => ({ printSaleTicketViaAgent: vi.fn() }));
 vi.mock("@/components/molecules/VendorOrderPanel", () => ({
   VendorOrderPanel: ({
     confirmSale,
@@ -52,6 +53,7 @@ import { getMe } from "@/services/onboardingService";
 import { useBrandingContext } from "@/contexts/BrandingContext";
 import { toast } from "react-toastify";
 import { printSaleTicket } from "@/utils/saleTicket";
+import { printSaleTicketViaAgent } from "@/utils/printTicketAgent";
 
 const items = [
   {
@@ -143,6 +145,11 @@ const printed = (times = 1) => waitFor(() => expect(printSaleTicket).toHaveBeenC
 describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Por defecto el "agente" delega en el panel (como con el agente apagado).
+    vi.mocked(printSaleTicketViaAgent).mockImplementation(async (ticket) => {
+      await printSaleTicket(ticket);
+      return "panel";
+    });
     vi.mocked(useCreateSale).mockReturnValue({
       createSale: vi.fn().mockResolvedValue({}),
     } as never);
@@ -307,6 +314,34 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("'Sí': imprime por el agente y avisa con toast SOLO si cayó al panel", async () => {
+    vi.mocked(printSaleTicketViaAgent).mockImplementation(async (_t, opts) => {
+      opts?.onAgentFailure?.(new Error("agente caído"));
+      return "panel";
+    });
+    renderPos();
+    await sell();
+    fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+    await waitFor(() => expect(printSaleTicketViaAgent).toHaveBeenCalledTimes(1));
+    expect(toast.info).toHaveBeenCalledWith(
+      "No se pudo imprimir directo, se abrió el panel de impresión",
+    );
+  });
+
+  it("'Sí': si el agente imprime OK no hay ningún toast", async () => {
+    vi.mocked(printSaleTicketViaAgent).mockResolvedValue("agent");
+    renderPos();
+    await sell();
+    fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+    await waitFor(() => expect(printSaleTicketViaAgent).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(printSaleTicket).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
     expect(toast.error).not.toHaveBeenCalled();
   });
