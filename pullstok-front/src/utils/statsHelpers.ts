@@ -25,14 +25,26 @@ const itemDate = (item: ItemWithCreatedAt): Date | null => {
   return new Date(raw);
 };
 
-export const getDateRange = (period: PeriodFilter): DateRange => {
+export const getDateRange = (
+  period: PeriodFilter,
+  referenceDate: Date = new Date(),
+): DateRange => {
+  if (period === "daily") {
+    // Día completo LOCAL de referenceDate (no "hasta ahora"): un día ya
+    // transcurrido no cambia nada práctico, y simplifica a un solo camino.
+    const start = new Date(referenceDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(referenceDate);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+
+  // weekly/monthly/yearly: sin cambios de comportamiento, siguen anclados a
+  // "ahora" (referenceDate no aplica acá — solo "daily" lo necesita).
   const now = new Date();
   const start = new Date();
 
   switch (period) {
-    case "daily":
-      start.setHours(0, 0, 0, 0);
-      break;
     case "weekly":
       start.setDate(now.getDate() - 7);
       start.setHours(0, 0, 0, 0);
@@ -61,6 +73,12 @@ export const filterByDateRange = <T extends ItemWithCreatedAt>(
   });
 };
 
+/** Clave "YYYY-MM-DD" a partir de los componentes LOCALES de la fecha (no
+ *  `toISOString`, que usa UTC y desplaza el día en husos negativos como
+ *  Argentina, UTC-3, cerca de la medianoche local). */
+const localDateKey = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
 export const groupByPeriod = <T extends ItemWithCreatedAt>(
   items: T[],
   period: PeriodFilter,
@@ -75,12 +93,12 @@ export const groupByPeriod = <T extends ItemWithCreatedAt>(
 
     switch (period) {
       case "daily":
-        key = date.toISOString().split("T")[0]; // YYYY-MM-DD
+        key = localDateKey(date);
         break;
       case "weekly": {
         const weekStart = new Date(date);
         weekStart.setDate(date.getDate() - date.getDay());
-        key = weekStart.toISOString().split("T")[0];
+        key = localDateKey(weekStart);
         break;
       }
       case "monthly":
@@ -156,18 +174,26 @@ export const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
+/** Parsea una clave "YYYY-MM-DD" como fecha LOCAL (no `new Date(key)`, que JS
+ *  interpreta como medianoche UTC y muestra el día anterior en husos
+ *  negativos como Argentina, UTC-3). */
+const parseLocalDateKey = (key: string): Date => {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
 export const formatPeriodLabel = (
   key: string,
   period: PeriodFilter,
 ): string => {
   switch (period) {
     case "daily":
-      return new Date(key).toLocaleDateString("es-ES", {
+      return parseLocalDateKey(key).toLocaleDateString("es-ES", {
         day: "2-digit",
         month: "2-digit",
       });
     case "weekly":
-      return `Semana ${new Date(key).toLocaleDateString("es-ES", {
+      return `Semana ${parseLocalDateKey(key).toLocaleDateString("es-ES", {
         day: "2-digit",
         month: "2-digit",
       })}`;
