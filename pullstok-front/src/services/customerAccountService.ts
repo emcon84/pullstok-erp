@@ -1,6 +1,8 @@
 import axios from "axios";
 import { API_URL } from "../constants";
 import type {
+  AccountChargeInput,
+  AccountChargeResult,
   AccountPaymentInput,
   AccountPaymentResult,
   AccountStatementLink,
@@ -63,6 +65,23 @@ export const registerAccountPayment = async (
     return response.data;
   } catch (error) {
     throw toError(error, "Error al registrar la cobranza");
+  }
+};
+
+/** Carga una deuda anterior (cargo sin venta: no toca stock ni caja). */
+export const createHistoricalCharge = async (
+  customerId: string,
+  input: AccountChargeInput,
+): Promise<AccountChargeResult> => {
+  try {
+    const response = await axios.post<AccountChargeResult>(
+      `${API_URL}/customers/${customerId}/account/charges`,
+      input,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    throw toError(error, "Error al cargar la deuda anterior");
   }
 };
 

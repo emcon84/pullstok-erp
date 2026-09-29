@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  createHistoricalCharge,
   getAccountStatementLink,
   getCustomerAccount,
   getCustomerBalances,
@@ -7,6 +8,8 @@ import {
   sendAccountStatementWhatsapp,
 } from "../../services/customerAccountService";
 import type {
+  AccountChargeInput,
+  AccountChargeResult,
   AccountPaymentInput,
   AccountPaymentResult,
   AccountStatementLink,
@@ -51,6 +54,28 @@ export const useRegisterAccountPayment = () => {
   return {
     registerPayment: mutation.mutate,
     registerPaymentAsync: mutation.mutateAsync,
+    loading: mutation.isPending,
+  };
+};
+
+/** Deuda anterior: refresca el extracto y los saldos. NO invalida la caja: un
+ *  cargo histórico no mueve plata en el arqueo. */
+export const useCreateHistoricalCharge = () => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation<
+    AccountChargeResult,
+    Error,
+    { customerId: string; input: AccountChargeInput }
+  >({
+    mutationFn: ({ customerId, input }) => createHistoricalCharge(customerId, input),
+    onSuccess: (_result, { customerId }) => {
+      queryClient.invalidateQueries({ queryKey: ["customer-account", customerId] });
+      queryClient.invalidateQueries({ queryKey: ["customer-balances"] });
+    },
+  });
+  return {
+    createCharge: mutation.mutate,
+    createChargeAsync: mutation.mutateAsync,
     loading: mutation.isPending,
   };
 };

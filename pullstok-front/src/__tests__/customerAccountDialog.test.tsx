@@ -36,6 +36,7 @@ vi.mock("@/components/hooks/useCustomerAccount", () => ({
   useCustomerAccount: vi.fn(),
   useRegisterAccountPayment: vi.fn(),
   useGetAccountStatementLink: vi.fn(),
+  useCreateHistoricalCharge: vi.fn(),
 }));
 vi.mock("@/components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
@@ -49,6 +50,7 @@ import {
   useCustomerAccount,
   useRegisterAccountPayment,
   useGetAccountStatementLink,
+  useCreateHistoricalCharge,
 } from "@/components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { getSaleById } from "@/services/saleServices";
@@ -88,6 +90,7 @@ const setSession = (session: { id: string } | null) =>
 
 const registerPayment = vi.fn();
 const getStatementLink = vi.fn();
+const createCharge = vi.fn();
 
 const renderDialog = (customerPhone = "+5491122334455") =>
   render(
@@ -115,6 +118,10 @@ describe("CustomerAccountDialog", () => {
     } as never);
     vi.mocked(useGetAccountStatementLink).mockReturnValue({
       getStatementLink,
+      loading: false,
+    } as never);
+    vi.mocked(useCreateHistoricalCharge).mockReturnValue({
+      createCharge,
       loading: false,
     } as never);
     vi.mocked(getSaleById).mockReset();
@@ -367,4 +374,123 @@ describe("CustomerAccountDialog", () => {
       expect(getStatementLink).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("cargar deuda anterior", () => {
+    const localToday = () => {
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    const openForm = () => fireEvent.click(screen.getByRole("button", { name: "Cargar deuda anterior" }));
+    const chargeAmount = () => screen.getByLabelText("Monto de la deuda") as HTMLInputElement;
+    const chargeDate = () => screen.getByLabelText("Fecha de la deuda") as HTMLInputElement;
+    const chargeNote = () => screen.getByLabelText("Detalle (opcional)") as HTMLInputElement;
+    const saveCharge = () => screen.getByRole("button", { name: "Guardar deuda" }) as HTMLButtonElement;
+
+    it("hides the form until the button is pressed, then defaults the date to today with max today", () => {
+      renderDialog();
+      expect(screen.queryByLabelText("Monto de la deuda")).not.toBeInTheDocument();
+
+      openForm();
+
+      expect(chargeDate().value).toBe(localToday());
+      expect(chargeDate().max).toBe(localToday());
+      expect(chargeAmount().value).toBe("");
+    });
+
+    it("is available even when the customer has no debt", () => {
+      setAccount(0);
+      renderDialog();
+      expect(screen.getByRole("button", { name: "Cargar deuda anterior" })).toBeInTheDocument();
+    });
+
+    it("requires an amount greater than zero", () => {
+      renderDialog();
+      openForm();
+      expect(saveCharge()).toBeDisabled();
+
+      fireEvent.change(chargeAmount(), { target: { value: "0" } });
+      expect(saveCharge()).toBeDisabled();
+
+      fireEvent.change(chargeAmount(), { target: { value: "250,5" } });
+      expect(saveCharge()).not.toBeDisabled();
+    });
+
+    it("sends only the amount when the date is today and there is no note", () => {
+      renderDialog();
+      openForm();
+      fireEvent.change(chargeAmount(), { target: { value: "700" } });
+      fireEvent.click(saveCharge());
+
+      expect(createCharge).toHaveBeenCalledTimes(1);
+      expect(createCharge.mock.calls[0][0]).toEqual({ customerId: "c-1", input: { amount: 700 } });
+    });
+
+    it("sends a past date at local noon as ISO plus the trimmed note", () => {
+      renderDialog();
+      openForm();
+      fireEvent.change(chargeAmount(), { target: { value: "1200.50" } });
+      fireEvent.change(chargeDate(), { target: { value: "2026-09-01" } });
+      fireEvent.change(chargeNote(), { target: { value: "  Ventas de agosto " } });
+      fireEvent.click(saveCharge());
+
+      expect(createCharge.mock.calls[0][0]).toEqual({
+        customerId: "c-1",
+        input: {
+          amount: 1200.5,
+          date: new Date("2026-09-01T12:00:00").toISOString(),
+          note: "Ventas de agosto",
+        },
+      });
+    });
+
+    it("toasts success and resets and closes the form on success", () => {
+      createCharge.mockImplementation((_vars, opts) => opts.onSuccess());
+      renderDialog();
+      openForm();
+      fireEvent.change(chargeAmount(), { target: { value: "700" } });
+      fireEvent.click(saveCharge());
+
+      expect(toast.success).toHaveBeenCalledWith("Deuda anterior cargada");
+      expect(screen.queryByLabelText("Monto de la deuda")).not.toBeInTheDocument();
+    });
+
+    it("toasts the server error and keeps the form open", () => {
+      createCharge.mockImplementation((_vars, opts) => opts.onError(new Error("La fecha no puede ser futura")));
+      renderDialog();
+      openForm();
+      fireEvent.change(chargeAmount(), { target: { value: "700" } });
+      fireEvent.click(saveCharge());
+
+      expect(toast.error).toHaveBeenCalledWith("La fecha no puede ser futura");
+      expect(chargeAmount().value).toBe("700");
+    });
+  });
+
+  describe("cargo histórico en la lista de movimientos", () => {
+    const historical = {
+      id: "m-h",
+      type: "CHARGE" as const,
+      amount: 900,
+      saleId: null,
+      note: "Ventas viejas",
+      createdAt: "2026-08-01T12:00:00.000Z",
+    };
+
+    it("labels a CHARGE without sale as 'Deuda anterior' with no expand toggle", () => {
+      vi.mocked(useCustomerAccount).mockReturnValue({
+        account: { customer: { id: "c-1", name: "Ana Gómez" }, balance: 900, movements: [historical] },
+        loading: false,
+        error: null,
+      } as never);
+      renderDialog();
+
+      const table = within(screen.getByRole("table"));
+      expect(table.getByText("Deuda anterior")).toBeInTheDocument();
+      expect(table.getByText("Ventas viejas")).toBeInTheDocument();
+      expect(table.queryByText("Venta")).not.toBeInTheDocument();
+      expect(table.queryByRole("button")).not.toBeInTheDocument();
+    });
+  });
 });
+

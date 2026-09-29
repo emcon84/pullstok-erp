@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  useCreateHistoricalCharge,
   useCustomerAccount,
   useGetAccountStatementLink,
   useRegisterAccountPayment,
@@ -59,6 +60,12 @@ const formatItemQuantity = (item: SaleItem) => {
 };
 
 const money = (n: number) => `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+
+/** YYYY-MM-DD en hora local (lo que espera <input type="date">). */
+const toLocalDateInput = (d: Date) => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 
 const parseAmt = (v: string) => parseFloat(v.replace(",", ".")) || 0;
 
@@ -100,6 +107,50 @@ export const CustomerAccountDialog = ({
   const [amountStr, setAmountStr] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("EFECTIVO");
   const [note, setNote] = useState("");
+
+  // ── Deuda anterior (cargo histórico sin venta) ──
+  const { createCharge, loading: creatingCharge } = useCreateHistoricalCharge();
+  const [chargeOpen, setChargeOpen] = useState(false);
+  const [chargeAmountStr, setChargeAmountStr] = useState("");
+  const [chargeDate, setChargeDate] = useState(() => toLocalDateInput(new Date()));
+  const [chargeNote, setChargeNote] = useState("");
+  const chargeAmount = round2(parseAmt(chargeAmountStr));
+  const todayStr = toLocalDateInput(new Date());
+  const canSubmitCharge =
+    chargeAmount > 0 && !!chargeDate && chargeDate <= todayStr && !creatingCharge;
+
+  const resetChargeForm = () => {
+    setChargeAmountStr("");
+    setChargeDate(toLocalDateInput(new Date()));
+    setChargeNote("");
+    setChargeOpen(false);
+  };
+
+  const handleSubmitCharge = () => {
+    if (!canSubmitCharge) return;
+    // La fecha viaja a mediodía local para que el huso horario no la corra de
+    // día ni la vuelva "futura"; si es hoy se omite (el server usa "ahora").
+    const isToday = chargeDate === toLocalDateInput(new Date());
+    createCharge(
+      {
+        customerId,
+        input: {
+          amount: chargeAmount,
+          ...(isToday ? {} : { date: new Date(`${chargeDate}T12:00:00`).toISOString() }),
+          ...(chargeNote.trim() ? { note: chargeNote.trim() } : {}),
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Deuda anterior cargada");
+          resetChargeForm();
+        },
+        onError: (error: Error) => {
+          toast.error(error.message || "Error al cargar la deuda anterior");
+        },
+      },
+    );
+  };
 
   // ── Detalle de venta expandible (T2) ──
   const [expandedSaleIds, setExpandedSaleIds] = useState<Set<string>>(new Set());
@@ -283,6 +334,8 @@ export const CustomerAccountDialog = ({
                               )}
                               Venta
                             </button>
+                          ) : m.type === "CHARGE" ? (
+                            "Deuda anterior"
                           ) : (
                             "Cobranza"
                           )}
@@ -352,6 +405,59 @@ export const CustomerAccountDialog = ({
             </Table>
           )}
         </div>
+
+        {/* ── Cargar deuda anterior (ventas viejas: monto, fecha y detalle opcional) ── */}
+        {chargeOpen ? (
+          <div className="space-y-3 rounded-lg border p-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="account-charge-amount">Monto de la deuda</Label>
+                <Input
+                  id="account-charge-amount"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={chargeAmountStr}
+                  onChange={(e) => setChargeAmountStr(e.target.value)}
+                  className="text-right"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="account-charge-date">Fecha de la deuda</Label>
+                <Input
+                  id="account-charge-date"
+                  type="date"
+                  max={todayStr}
+                  value={chargeDate}
+                  onChange={(e) => setChargeDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="account-charge-note">Detalle (opcional)</Label>
+              <Input
+                id="account-charge-note"
+                type="text"
+                autoComplete="off"
+                maxLength={500}
+                value={chargeNote}
+                onChange={(e) => setChargeNote(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={resetChargeForm}>
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={handleSubmitCharge} disabled={!canSubmitCharge}>
+                Guardar deuda
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="outline" className="w-full" onClick={() => setChargeOpen(true)}>
+            Cargar deuda anterior
+          </Button>
+        )}
 
         {/* ── Registrar cobranza (solo con deuda) ── */}
         {balance > 0 ? (

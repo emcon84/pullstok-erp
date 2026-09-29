@@ -18,6 +18,7 @@ import {
   getCustomerAccount,
   registerAccountPayment,
   getAccountStatementLink,
+  createHistoricalCharge,
 } from "../services/customerAccountService";
 
 const axiosError = (data: unknown) => ({ isAxiosError: true, response: { data } });
@@ -102,5 +103,27 @@ describe("customerAccountService", () => {
   it("getAccountStatementLink throws an Error carrying the server message", async () => {
     mockPost.mockRejectedValue(axiosError({ error: "CUSTOMER_NOT_FOUND", message: "Cliente no encontrado" }));
     await expect(getAccountStatementLink("nope")).rejects.toThrow("Cliente no encontrado");
+  });
+
+  it("createHistoricalCharge POSTs the debt to /customers/:id/account/charges", async () => {
+    mockPost.mockResolvedValue({ data: { movement: { id: "m-9" }, balance: 700 } });
+    const input = { amount: 700, date: "2026-09-01T15:00:00.000Z", note: "Deuda vieja" };
+
+    const res = await createHistoricalCharge("c-1", input);
+
+    expect(mockPost).toHaveBeenCalledWith(
+      expect.stringMatching(/\/customers\/c-1\/account\/charges$/),
+      input,
+      { headers: { Authorization: "Bearer tok-1" } },
+    );
+    expect(res).toEqual({ movement: { id: "m-9" }, balance: 700 });
+  });
+
+  it("createHistoricalCharge surfaces the server message on error", async () => {
+    mockPost.mockRejectedValue(axiosError({ message: "La fecha no puede ser futura" }));
+
+    await expect(createHistoricalCharge("c-1", { amount: 10 })).rejects.toThrow(
+      "La fecha no puede ser futura",
+    );
   });
 });

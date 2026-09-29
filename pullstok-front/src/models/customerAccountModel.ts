@@ -51,6 +51,22 @@ export interface AccountPaymentResult {
   balance: number;
 }
 
+/** Payload de POST /customers/:id/account/charges (deuda anterior, sin venta). */
+export interface AccountChargeInput {
+  /** > 0, máx. 2 decimales. */
+  amount: number;
+  /** ISO; no futura. Sin fecha = ahora. */
+  date?: string;
+  /** Detalle libre (máx. 500). */
+  note?: string;
+}
+
+export interface AccountChargeResult {
+  movement: AccountMovement;
+  /** Saldo total tras el cargo. */
+  balance: number;
+}
+
 /** Respuesta de POST /customers/:id/account/statement-link (fallback wa.me
  *  mientras Kapso está en sandbox — el front arma el link wa.me con esta url). */
 export interface AccountStatementLink {

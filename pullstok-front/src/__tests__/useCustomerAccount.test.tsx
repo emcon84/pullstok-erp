@@ -8,6 +8,7 @@ vi.mock("../services/customerAccountService", () => ({
   getCustomerAccount: vi.fn(),
   registerAccountPayment: vi.fn(),
   getAccountStatementLink: vi.fn(),
+  createHistoricalCharge: vi.fn(),
 }));
 
 import {
@@ -15,18 +16,21 @@ import {
   useCustomerAccount,
   useRegisterAccountPayment,
   useGetAccountStatementLink,
+  useCreateHistoricalCharge,
 } from "../components/hooks/useCustomerAccount";
 import {
   getCustomerBalances,
   getCustomerAccount,
   registerAccountPayment,
   getAccountStatementLink,
+  createHistoricalCharge,
 } from "../services/customerAccountService";
 
 const mockBalances = vi.mocked(getCustomerBalances);
 const mockAccount = vi.mocked(getCustomerAccount);
 const mockRegister = vi.mocked(registerAccountPayment);
 const mockStatementLink = vi.mocked(getAccountStatementLink);
+const mockCreateCharge = vi.mocked(createHistoricalCharge);
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -111,5 +115,25 @@ describe("useCustomerAccount hooks", () => {
       url: "https://r2.example.com/estado-cuenta-ana.pdf",
       filename: "estado-cuenta-Ana.pdf",
     });
+  });
+
+  it("creating a historical charge refreshes the account and the balances (not the cash register)", async () => {
+    mockCreateCharge.mockResolvedValue({ movement: { id: "m-9" } as never, balance: 1700 });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const localWrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useCreateHistoricalCharge(), { wrapper: localWrapper });
+
+    await act(async () => {
+      await result.current.createChargeAsync({ customerId: "c-1", input: { amount: 700 } });
+    });
+
+    expect(mockCreateCharge).toHaveBeenCalledWith("c-1", { amount: 700 });
+    const keys = invalidate.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+    expect(keys).toContainEqual(["customer-account", "c-1"]);
+    expect(keys).toContainEqual(["customer-balances"]);
+    expect(keys).not.toContainEqual(["cash-sessions"]);
   });
 });
