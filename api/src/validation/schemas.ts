@@ -237,13 +237,23 @@ const bulkProductSchema = z.object({
 export const bulkProductsSchema = z.array(bulkProductSchema).min(1);
 
 // ---------- Clientes ----------
+// customer-account-historical: ningún campo es obligatorio. Los strings vacíos
+// o de solo espacios se normalizan a null (así varios clientes sin email no
+// chocan con unique(organizationId, email): en Postgres los NULL no colisionan).
+const blankToNull = (v: unknown) => {
+  if (typeof v !== "string") return v;
+  const t = v.trim();
+  return t === "" ? null : t;
+};
+const optionalText = z.preprocess(blankToNull, z.string().nullable().optional());
+
 export const createCustomerSchema = z.object({
-  name: z.string().min(1, "El nombre es requerido"),
-  email: z.email().or(z.literal("")).optional(),
-  phone: z.string().optional(),
-  taxId: z.string().optional(),
-  taxCondition: z.string().optional(),
-  address: z.string().optional(),
+  name: optionalText,
+  email: z.preprocess(blankToNull, z.email().nullable().optional()),
+  phone: optionalText,
+  taxId: optionalText,
+  taxCondition: optionalText,
+  address: optionalText,
 });
 export const updateCustomerSchema = createCustomerSchema.partial();
 

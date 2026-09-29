@@ -209,8 +209,8 @@ model BranchAssignment {
 
 model Customer {
   id             String       @id @default(uuid())
-  name           String
-  email          String
+  name           String?
+  email          String?
   phone          String?
   taxId          String?
   taxCondition   String?

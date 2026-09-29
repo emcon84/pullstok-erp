@@ -98,6 +98,24 @@ describe("customerAccountService.getBalances", () => {
     ]);
   });
 
+  it("uses the fallback label \"Sin nombre\" for customers without a name", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([
+      { customerId: "c-1", type: "CHARGE", _sum: { amount: 100 } },
+      { customerId: "c-2", type: "CHARGE", _sum: { amount: 50 } },
+    ]);
+    p.customer.findMany.mockResolvedValue([
+      { id: "c-1", name: null },
+      { id: "c-2", name: "Ana" },
+    ]);
+
+    const result = await customerAccountService.getBalances();
+
+    expect(result).toEqual([
+      { customerId: "c-2", name: "Ana", balance: 50 },
+      { customerId: "c-1", name: "Sin nombre", balance: 100 },
+    ]);
+  });
+
   it("returns [] without querying customers when nobody has movements", async () => {
     p.customerAccountMovement.groupBy.mockResolvedValue([]);
     const result = await customerAccountService.getBalances();
@@ -138,6 +156,16 @@ describe("customerAccountService.getAccount", () => {
       balance: 200,
       movements,
     });
+  });
+
+  it("returns the fallback name \"Sin nombre\" when the customer has no name", async () => {
+    p.customer.findFirst.mockResolvedValue({ id: "c-1", name: null, email: null });
+    p.customerAccountMovement.groupBy.mockResolvedValue(sums(10, 0));
+    p.customerAccountMovement.findMany.mockResolvedValue([]);
+
+    const result = await customerAccountService.getAccount("c-1");
+
+    expect(result.customer).toEqual({ id: "c-1", name: "Sin nombre" });
   });
 
   it("unknown / other-org customer → CUSTOMER_NOT_FOUND", async () => {
@@ -399,6 +427,17 @@ describe("customerAccountService.getAccountStatementLink", () => {
     expect(pdfBuilder).not.toHaveBeenCalled();
     expect(r2).not.toHaveBeenCalled();
     expect(wa.sendDocument).not.toHaveBeenCalled();
+  });
+
+  it("uses \"Sin nombre\" in the PDF and filename for a customer without a name", async () => {
+    p.customer.findFirst.mockResolvedValue({ id: "c-1", name: null, phone: null });
+
+    const result = await customerAccountService.getAccountStatementLink("c-1");
+
+    expect(pdfBuilder).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: { name: "Sin nombre" } }),
+    );
+    expect(result.filename).toBe("estado-cuenta-Sin-nombre.pdf");
   });
 
   it("builds the PDF and uploads it to R2 without requiring a phone or sending via WhatsApp", async () => {

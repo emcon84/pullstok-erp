@@ -632,7 +632,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         const { subject, html } = saleConfirmedEmail({
           org: { name: organization.name },
           storeSettings,
-          customerName: order.customer.name,
+          customerName: order.customer.name ?? "cliente",
           orderRef: order.id.slice(0, 8).toUpperCase(),
           items: sale.items.map((i) => ({
             name: i.name,

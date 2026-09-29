@@ -404,7 +404,7 @@ const checkout = async (req: PublicStoreRequest, res: Response) => {
       const { subject, html } = orderReceivedEmail({
         org,
         storeSettings,
-        customerName: result.customer.name,
+        customerName: result.customer.name ?? "cliente",
         orderRef: result.id.slice(0, 8).toUpperCase(),
         items: result.items.map((i) => ({
           name: nameById.get(i.productId) ?? "Producto",
@@ -414,7 +414,9 @@ const checkout = async (req: PublicStoreRequest, res: Response) => {
         total: result.totalAmount,
       });
 
-      await sendMail({ to: result.customer.email, subject, html });
+      if (result.customer.email) {
+        await sendMail({ to: result.customer.email, subject, html });
+      }
     } catch (mailError: any) {
       console.error(
         `[storeController.checkout] Fallo al enviar mail de pedido (order=${result.id}):`,

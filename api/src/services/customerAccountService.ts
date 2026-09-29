@@ -34,6 +34,9 @@ export interface RegisterPaymentInput {
   note?: string;
 }
 
+// Etiqueta para clientes sin nombre (Customer.name es opcional).
+const NO_NAME_LABEL = "Sin nombre";
+
 const domainError = (code: string, message: string) => {
   const err: any = new Error(message);
   err.code = code;
@@ -86,12 +89,12 @@ const getBalances = async () => {
     where: { id: { in: nonZero.map((b) => b.customerId) } },
     select: { id: true, name: true },
   });
-  const nameById = new Map(customers.map((c) => [c.id, c.name]));
+  const nameById = new Map(customers.map((c) => [c.id, c.name?.trim() || NO_NAME_LABEL]));
 
   return nonZero
     .map((b) => ({
       customerId: b.customerId,
-      name: nameById.get(b.customerId) ?? "",
+      name: nameById.get(b.customerId) ?? NO_NAME_LABEL,
       balance: b.balance,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -113,7 +116,11 @@ const getAccount = async (customerId: string) => {
     }),
   ]);
 
-  return { customer: { id: customer.id, name: customer.name }, balance, movements };
+  return {
+    customer: { id: customer.id, name: customer.name?.trim() || NO_NAME_LABEL },
+    balance,
+    movements,
+  };
 };
 
 /**
