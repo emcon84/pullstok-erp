@@ -44,14 +44,24 @@
       Cambios: createAccountChargeSchema (fecha no futura, tolerancia 5 min), service.registerHistoricalCharge,
       controller + ruta POST /:id/account/charges, PDF: CHARGE sin venta = "Deuda anterior". Orden del extracto ya era createdAt desc.
       Commit: d85c32d
-- [ ] T3 — Front: formulario de cliente sin campos obligatorios (`Customers.tsx`, `customerModel.ts`) +
+- [x] T3 — Front: formulario de cliente sin campos obligatorios (`Customers.tsx`, `customerModel.ts`) +
       fallback "Sin nombre". Tests primero. Ruta: delegada (writer front).
-- [ ] T4 — Front: "Cargar deuda anterior" en `CustomerAccountDialog` (monto, fecha, nota) + service/hook.
+      Evidencia: RED (3 archivos: customerName.test import inexistente; Customers.test 3 failed; paymentModal 1 failed)
+      -> GREEN (28 passed en 4 suites). Full vitest 129 files ok / 8 failed (solo priceKgUpdate+productDrawer, preexistentes). tsc limpio.
+      Cambios: util `customerDisplayName`, modelo Customer opcional, blanks omitidos en create/update (Customers y Sales),
+      fallback en Customers, PaymentModal, SalesDrawer, Sales, Invoices, InvoiceForm, Orders (filtro null-safe).
+      Commit: f8b9b09
+- [x] T4 — Front: "Cargar deuda anterior" en `CustomerAccountDialog` (monto, fecha, nota) + service/hook.
       Tests primero. Ruta: delegada (mismo writer front).
+      Evidencia: RED (dialog 11 failed + hook/service suites sin export) -> GREEN (46 passed en 4 suites).
+      Full vitest 129 files ok / 8 failed (mismos preexistentes). tsc limpio. eslint sin errores en archivos tocados.
+      Cambios: createHistoricalCharge + tipos, hook useCreateHistoricalCharge (invalida cuenta y saldos, NO caja),
+      dialog: form monto/fecha/detalle, fecha a T12:00 local (omitida si es hoy), CHARGE sin venta = "Deuda anterior" sin toggle.
+      Commit: 48dd956
 
 ## Progreso
 - Rama creada desde `main` (`afd9900`). Exploración hecha (customerController, Zod route, schema Prisma,
   cuenta corriente front/back).
 
 ## Próximo paso
-Delegar T1–T2 al writer backend.
+T1–T4 completas. Pendiente: revisión del usuario, despliegue (migración en VPS) y decisión de push/merge.
