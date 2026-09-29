@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { ChevronRight, ChevronDown, ListTree } from "lucide-react";
+import { ChevronRight, ChevronDown, ListTree, Search } from "lucide-react";
 import { getCategories } from "@/services/onboardingService";
 import { Loader } from "@/components/atoms/loader";
-import { buildTree, omitRootsByName, TreeNode } from "@/components/molecules/CategoryTreePicker/tree";
+import { Input } from "@/components/ui/input";
+import { buildTree, filterTree, omitRootsByName, TreeNode } from "@/components/molecules/CategoryTreePicker/tree";
 
 interface CategoryTreePickerProps {
   value: string | null; // selected categoryId
@@ -16,15 +17,20 @@ const TreePickerRow = ({
   depth,
   selectedId,
   onSelect,
+  forceExpanded,
 }: {
   node: TreeNode;
   depth: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Con búsqueda activa, cada rama filtrada arranca abierta (no hace falta
+   *  clickear para llegar al match) — el toggle manual sigue funcionando. */
+  forceExpanded: boolean;
 }) => {
   const [expanded, setExpanded] = useState(false);
   const isLeaf = node.children.length === 0;
   const isSelected = node.id === selectedId;
+  const isExpanded = expanded || forceExpanded;
 
   return (
     <div>
@@ -39,7 +45,7 @@ const TreePickerRow = ({
         }}
       >
         {!isLeaf ? (
-          expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         ) : (
           <ListTree className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         )}
@@ -48,7 +54,7 @@ const TreePickerRow = ({
           <span className="ml-auto text-xs text-muted-foreground">{node.children.length}</span>
         )}
       </button>
-      {expanded && !isLeaf && (
+      {isExpanded && !isLeaf && (
         <div>
           {node.children.map((child) => (
             <TreePickerRow
@@ -57,6 +63,7 @@ const TreePickerRow = ({
               depth={depth + 1}
               selectedId={selectedId}
               onSelect={onSelect}
+              forceExpanded={forceExpanded}
             />
           ))}
         </div>
@@ -72,6 +79,7 @@ export const CategoryTreePicker = ({
 }: CategoryTreePickerProps) => {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
   // Clave estable: evita refetchear si el llamador pasa un array nuevo por render.
   const excludeKey = excludeRootNames?.join("\u0000") ?? "";
 
@@ -84,6 +92,9 @@ export const CategoryTreePicker = ({
   }, [excludeKey]);
 
   if (loading) return <Loader />;
+
+  const searchActive = query.trim().length > 0;
+  const visibleTree = filterTree(tree, query);
 
   // Find selected category name for breadcrumb
   const findName = (nodes: TreeNode[], id: string): string | null => {
@@ -103,16 +114,32 @@ export const CategoryTreePicker = ({
           📁 {selectedName}
         </div>
       )}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar categoría…"
+          className="h-8 pl-7 text-sm"
+        />
+      </div>
       <div className="max-h-[200px] overflow-y-auto rounded-md border">
-        {tree.map((root) => (
-          <TreePickerRow
-            key={root.id}
-            node={root}
-            depth={0}
-            selectedId={value}
-            onSelect={onChange}
-          />
-        ))}
+        {visibleTree.length === 0 ? (
+          <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+            Sin resultados para "{query.trim()}"
+          </p>
+        ) : (
+          visibleTree.map((root) => (
+            <TreePickerRow
+              key={root.id}
+              node={root}
+              depth={0}
+              selectedId={value}
+              onSelect={onChange}
+              forceExpanded={searchActive}
+            />
+          ))
+        )}
       </div>
     </div>
   );

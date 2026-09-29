@@ -35,3 +35,31 @@ export const buildTree = (flat: Category[]): TreeNode[] => {
   }
   return roots;
 };
+
+/**
+ * Poda el árbol dejando solo los nodos cuyo nombre matchea `query`
+ * (case-insensitive, substring) o que tienen al menos un descendiente que
+ * matchea. Un nodo que matchea se conserva COMPLETO (con todos sus hijos,
+ * matcheen o no) — así buscar "farmacia" no oculta sus subcategorías. Query
+ * vacío/solo espacios devuelve el árbol sin tocar.
+ */
+export const filterTree = (tree: TreeNode[], query: string): TreeNode[] => {
+  const q = query.trim().toLowerCase();
+  if (!q) return tree;
+
+  const walk = (nodes: TreeNode[]): TreeNode[] =>
+    nodes.reduce<TreeNode[]>((acc, node) => {
+      const selfMatches = node.name.toLowerCase().includes(q);
+      if (selfMatches) {
+        acc.push(node);
+        return acc;
+      }
+      const prunedChildren = walk(node.children);
+      if (prunedChildren.length > 0) {
+        acc.push({ ...node, children: prunedChildren });
+      }
+      return acc;
+    }, []);
+
+  return walk(tree);
+};
