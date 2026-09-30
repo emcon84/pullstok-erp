@@ -6,6 +6,7 @@ import {
   getAgentHealth,
   getAgentPrinters,
   isAgentEnabled,
+  pairAgent,
   printAgentTest,
   printBytesViaAgent,
   setAgentBaseUrl,
@@ -134,5 +135,31 @@ describe("directPrintAgent — cliente HTTP", () => {
     const err = await p;
     expect(err).toBeInstanceOf(DirectPrintAgentError);
     expect(err.message).toMatch(/tiempo|respond/i);
+  });
+});
+
+describe("directPrintAgent — emparejamiento", () => {
+  const fetchMock = vi.fn();
+  beforeEach(() => {
+    localStorage.clear();
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("pairAgent: POST /pair con {code} y devuelve el resultado", async () => {
+    fetchMock.mockResolvedValue(json({ ok: true, agentId: "a1", name: "Caja" }));
+    await expect(pairAgent("ABCDE-12345")).resolves.toEqual({ ok: true, agentId: "a1", name: "Caja" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${DEFAULT_AGENT_URL}/pair`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ code: "ABCDE-12345" });
+  });
+
+  it("pairAgent: el agente responde error -> DirectPrintAgentError con su mensaje", async () => {
+    fetchMock.mockResolvedValue(json({ message: "Código de emparejamiento inválido o vencido" }, 400));
+    const err = await pairAgent("bad").catch((e) => e);
+    expect(err).toBeInstanceOf(DirectPrintAgentError);
+    expect(err.message).toMatch(/inválido/);
   });
 });

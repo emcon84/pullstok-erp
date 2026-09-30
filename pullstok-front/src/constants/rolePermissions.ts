@@ -44,6 +44,7 @@ export const ROLE_VISIBLE_PATHS: Record<string, Role[]> = {
   "/facturacion": ["ADMIN", "MANAGEMENT"], // gated by plan too
   "/asistente-ia": ["ADMIN", "MANAGEMENT"], // gated by plan too
   "/usuarios": ["ADMIN", "MANAGEMENT"], // NEW — user management
+  "/impresoras": ["ADMIN", "MANAGEMENT"], // impresión desde el celular (relay)
 };
 
 /**

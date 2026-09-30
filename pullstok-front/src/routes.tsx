@@ -90,6 +90,9 @@ const SuperadminUsersPage = lazy(() =>
     default: m.SuperadminUsersPage,
   })),
 );
+const PrintersPage = lazy(() =>
+  import("./views/PrintersPage").then((m) => ({ default: m.PrintersPage })),
+);
 const BranchesPage = lazy(() =>
   import("./views/BranchesPage").then((m) => ({ default: m.BranchesPage })),
 );
@@ -310,6 +313,7 @@ const AppRoutes = () => (
         <Route path="/facturacion/:id/editar" element={<InvoiceForm />} />
         <Route path="/usuarios" element={<UsersPage />} />
         <Route path="/sucursales" element={<BranchesPage />} />
+        <Route path="/impresoras" element={<PrintersPage />} />
         <Route path="/scanner" element={<StockScannerPage />} />
         <Route path="/actualizar-precios" element={<BulkPriceUpdate />} />
         <Route path="/precios-por-kilo" element={<PriceKgUpdate />} />

@@ -10,12 +10,17 @@ export const AGENT_ENABLED_KEY = "pullstok-print-agent-enabled";
 
 const QUICK_TIMEOUT_MS = 2000;
 const PRINT_TIMEOUT_MS = 3000;
+// Emparejar viaja agente -> servidor -> agente: necesita más margen que un /health.
+const PAIR_TIMEOUT_MS = 15000;
 
 export interface AgentHealth {
   name: string;
   version: string;
   printer: string | null;
   platform: string;
+  /** Agente >= 1.1.0: si ya está emparejado con el servidor (relay). */
+  paired?: boolean;
+  serverUrl?: string;
 }
 
 export class DirectPrintAgentError extends Error {
@@ -134,4 +139,27 @@ export async function printBytesViaAgent(bytes: Uint8Array): Promise<void> {
 
 export async function printAgentTest(): Promise<void> {
   await agentFetch("/test", { method: "POST" }, PRINT_TIMEOUT_MS);
+}
+
+export interface PairAgentResult {
+  ok: boolean;
+  agentId: string;
+  name: string | null;
+}
+
+/**
+ * Canjea un código de emparejamiento en el agente local: el agente lo valida
+ * contra el servidor y guarda sus credenciales (nunca las devuelve al navegador).
+ */
+export async function pairAgent(code: string): Promise<PairAgentResult> {
+  const response = await agentFetch(
+    "/pair",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    },
+    PAIR_TIMEOUT_MS,
+  );
+  return response.json();
 }
