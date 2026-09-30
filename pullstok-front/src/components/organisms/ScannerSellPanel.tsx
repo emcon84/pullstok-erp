@@ -10,6 +10,8 @@ import {
   type ScanSellResult,
   type ScannedProduct,
 } from "@/components/hooks/useScannerSell";
+import { useTicketPrint } from "@/components/hooks/useTicketPrint";
+import { TicketPrintPrompt } from "@/components/molecules/TicketPrintPrompt";
 import { VendorCartSheet } from "@/components/molecules/VendorCartSheet";
 import { getProductStock } from "@/services/productService";
 import { getMe } from "@/services/onboardingService";
@@ -70,8 +72,31 @@ export const ScannerSellPanel = ({
   // Caja OPEN de la sucursal (R8/R9): se propaga al confirmar la venta.
   const { session: currentSession } = useGetCurrentCashSession(branchId ?? undefined);
 
+  // Tras cobrar: un toque para imprimir el ticket (agente local -> relay al local
+  // -> panel del navegador). El ticket sale del checkout (pendingTicket).
+  const { pendingTicket, dismissTicket } = checkout;
+  const ticketPrint = useTicketPrint(branchId);
+  const { reset: resetTicketPrint } = ticketPrint;
+  useEffect(() => {
+    // Una venta nueva reemplaza al ticket pendiente: el estado anterior ya no aplica.
+    resetTicketPrint();
+  }, [pendingTicket, resetTicketPrint]);
+  const closeTicketPrompt = useCallback(() => {
+    resetTicketPrint();
+    dismissTicket();
+  }, [resetTicketPrint, dismissTicket]);
+
   return (
     <>
+      {pendingTicket && (
+        <TicketPrintPrompt
+          state={ticketPrint.state}
+          onPrint={() => void ticketPrint.print(pendingTicket)}
+          onChoose={ticketPrint.choose}
+          onDismiss={closeTicketPrompt}
+        />
+      )}
+
       {sell.lastAdded && (
         <div className="flex items-center gap-3 rounded-xl border border-green-300 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
           <p className="min-w-0 flex-1 text-base font-semibold leading-snug text-green-900 dark:text-green-100">

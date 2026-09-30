@@ -119,3 +119,72 @@ export const createPairingCode = async (name: string): Promise<PairingCodeResult
     throw toError(error, "Error al generar el código de emparejamiento");
   }
 };
+
+// ---------- Impresión desde el celular (cualquier rol operativo) ----------
+
+/** Impresora activa tal como la ve un vendedor/cajero (sin datos del equipo). */
+export interface ActivePrinter {
+  id: string;
+  name: string;
+  branchId: string | null;
+  agentOnline: boolean;
+}
+
+export type PrintJobStatus = "PENDING" | "PRINTED" | "ERROR" | "EXPIRED";
+
+export interface CreatedPrintJob {
+  id: string;
+  status: PrintJobStatus;
+  expiresAt: string;
+}
+
+export interface PrintJobInfo {
+  id: string;
+  printerId: string;
+  status: PrintJobStatus;
+  errorMessage: string | null;
+  createdAt?: string;
+  expiresAt?: string;
+  completedAt?: string | null;
+}
+
+/** Impresoras activas de la org para elegir a dónde imprimir (VENDEDOR/CASHIER/ADMIN/MANAGEMENT). */
+export const getActivePrinters = async (): Promise<ActivePrinter[]> => {
+  try {
+    const res = await axios.get<ActivePrinter[]>(`${API_URL}/print-jobs/printers`, {
+      headers: authHeaders(),
+    });
+    return res.data;
+  } catch (error) {
+    throw toError(error, "Error al obtener las impresoras");
+  }
+};
+
+/** Encola el ticket (bytes ESC/POS en base64) para la impresora elegida. */
+export const createPrintJob = async (
+  printerId: string,
+  payloadBase64: string,
+): Promise<CreatedPrintJob> => {
+  try {
+    const res = await axios.post<CreatedPrintJob>(
+      `${API_URL}/print-jobs`,
+      { printerId, payloadBase64 },
+      { headers: authHeaders() },
+    );
+    return res.data;
+  } catch (error) {
+    throw toError(error, "No se pudo enviar el ticket a la impresora");
+  }
+};
+
+/** Estado de un job (el celular lo consulta por polling). */
+export const getPrintJob = async (id: string): Promise<PrintJobInfo> => {
+  try {
+    const res = await axios.get<PrintJobInfo>(`${API_URL}/print-jobs/${id}`, {
+      headers: authHeaders(),
+    });
+    return res.data;
+  } catch (error) {
+    throw toError(error, "No se pudo consultar el estado de la impresión");
+  }
+};

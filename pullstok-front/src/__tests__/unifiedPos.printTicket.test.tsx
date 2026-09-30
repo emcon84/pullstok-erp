@@ -25,6 +25,10 @@ vi.mock("@/utils/saleTicket", async (importOriginal) => ({
   printSaleTicket: vi.fn(),
 }));
 vi.mock("@/utils/printTicketAgent", () => ({ printSaleTicketViaAgent: vi.fn() }));
+vi.mock("@/utils/relayPrint", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/relayPrint")>()),
+  watchPrintJob: vi.fn(),
+}));
 vi.mock("@/components/molecules/VendorOrderPanel", () => ({
   VendorOrderPanel: ({
     confirmSale,
@@ -54,6 +58,7 @@ import { useBrandingContext } from "@/contexts/BrandingContext";
 import { toast } from "react-toastify";
 import { printSaleTicket } from "@/utils/saleTicket";
 import { printSaleTicketViaAgent } from "@/utils/printTicketAgent";
+import { JOB_MESSAGES, watchPrintJob } from "@/utils/relayPrint";
 
 const items = [
   {
@@ -330,6 +335,41 @@ describe("UnifiedPos — ¿Imprimir ticket? tras la venta", () => {
     expect(toast.info).toHaveBeenCalledWith(
       "No se pudo imprimir directo, se abrió el panel de impresión",
     );
+  });
+
+  it("'Sí': pasa la sucursal del POS al orden de impresión", async () => {
+    vi.mocked(printSaleTicketViaAgent).mockResolvedValue("agent");
+    renderPos();
+    await sell();
+    fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+    await waitFor(() => expect(printSaleTicketViaAgent).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(printSaleTicketViaAgent).mock.calls[0][1]).toMatchObject({ branchId: "branch-1" });
+  });
+
+  it("'Sí' por el relay: avisa 'Impreso' cuando el job se imprime", async () => {
+    vi.mocked(printSaleTicketViaAgent).mockImplementation(async (_t, opts) => {
+      opts?.onRelayJob?.("job-1", { id: "p1", name: "Caja", branchId: "branch-1", agentOnline: true });
+      return "relay";
+    });
+    vi.mocked(watchPrintJob).mockResolvedValue({ phase: "printed", message: JOB_MESSAGES.printed });
+    renderPos();
+    await sell();
+    fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(JOB_MESSAGES.printed));
+    expect(watchPrintJob).toHaveBeenCalledWith("job-1", expect.any(Function));
+    expect(printSaleTicket).not.toHaveBeenCalled();
+  });
+
+  it("'Sí' por el relay: avisa claro si el ticket venció", async () => {
+    vi.mocked(printSaleTicketViaAgent).mockImplementation(async (_t, opts) => {
+      opts?.onRelayJob?.("job-1", { id: "p1", name: "Caja", branchId: "branch-1", agentOnline: false });
+      return "relay";
+    });
+    vi.mocked(watchPrintJob).mockResolvedValue({ phase: "expired", message: JOB_MESSAGES.expired });
+    renderPos();
+    await sell();
+    fireEvent.click(await screen.findByRole("button", { name: /sí, imprimir/i }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(JOB_MESSAGES.expired));
   });
 
   it("'Sí': si el agente imprime OK no hay ningún toast", async () => {

@@ -20,6 +20,9 @@ vi.mock("axios", () => ({
 import {
   createPairingCode,
   createPrinter,
+  createPrintJob,
+  getActivePrinters,
+  getPrintJob,
   deletePrinter,
   getPrintAgents,
   getPrinters,
@@ -81,5 +84,42 @@ describe("printerService (admin)", () => {
   it("surfaces the backend message on errors", async () => {
     mockPost.mockRejectedValue(axiosError({ message: "Ya existe una impresora con ese nombre" }));
     await expect(createPrinter({ name: "Caja" })).rejects.toThrow("Ya existe una impresora con ese nombre");
+  });
+});
+
+describe("printerService (phone printing)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.setItem("token", "tok-1");
+  });
+
+  it("getActivePrinters GETs /print-jobs/printers (any operational role)", async () => {
+    mockGet.mockResolvedValue({ data: [{ id: "p1", name: "Caja", branchId: "b1", agentOnline: true }] });
+    const res = await getActivePrinters();
+    expect(mockGet).toHaveBeenCalledWith(expect.stringMatching(/\/print-jobs\/printers$/), headers);
+    expect(res[0].id).toBe("p1");
+  });
+
+  it("createPrintJob POSTs printerId + payloadBase64 and returns the job", async () => {
+    mockPost.mockResolvedValue({ data: { id: "j1", status: "PENDING", expiresAt: "2026-09-30T12:15:00Z" } });
+    const res = await createPrintJob("p1", "G0A=");
+    expect(mockPost).toHaveBeenCalledWith(
+      expect.stringMatching(/\/print-jobs$/),
+      { printerId: "p1", payloadBase64: "G0A=" },
+      headers,
+    );
+    expect(res.id).toBe("j1");
+  });
+
+  it("getPrintJob GETs /print-jobs/:id", async () => {
+    mockGet.mockResolvedValue({ data: { id: "j1", status: "PRINTED" } });
+    const res = await getPrintJob("j1");
+    expect(mockGet).toHaveBeenCalledWith(expect.stringMatching(/\/print-jobs\/j1$/), headers);
+    expect(res.status).toBe("PRINTED");
+  });
+
+  it("surfaces the backend message when creating the job fails", async () => {
+    mockPost.mockRejectedValue(axiosError({ message: "La impresora está desactivada" }));
+    await expect(createPrintJob("p1", "x")).rejects.toThrow("La impresora está desactivada");
   });
 });

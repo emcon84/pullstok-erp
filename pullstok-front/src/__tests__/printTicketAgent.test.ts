@@ -9,11 +9,18 @@ vi.mock("@/utils/saleTicket", async () => {
   return { ...actual, printSaleTicket: vi.fn() };
 });
 vi.mock("@/utils/ticketLogo", () => ({ prepareTicketLogoBitmap: vi.fn() }));
+vi.mock("@/utils/relayPrint", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/relayPrint")>()),
+  loadRelayPrinters: vi.fn(),
+  sendTicketToRelay: vi.fn(),
+  rememberPrinter: vi.fn(),
+}));
 
 import { printSaleTicketViaAgent } from "@/utils/printTicketAgent";
 import { isAgentEnabled, printBytesViaAgent } from "@/utils/directPrintAgent";
 import { buildSaleTicket, printSaleTicket } from "@/utils/saleTicket";
 import { prepareTicketLogoBitmap } from "@/utils/ticketLogo";
+import { loadRelayPrinters, rememberPrinter, sendTicketToRelay } from "@/utils/relayPrint";
 
 const ticket = (over = {}) =>
   buildSaleTicket({
@@ -30,6 +37,7 @@ describe("printSaleTicketViaAgent", () => {
     vi.mocked(isAgentEnabled).mockReturnValue(true);
     vi.mocked(printBytesViaAgent).mockResolvedValue(undefined);
     vi.mocked(prepareTicketLogoBitmap).mockResolvedValue(null as never);
+    vi.mocked(loadRelayPrinters).mockResolvedValue([]);
   });
 
   it("agente deshabilitado: va directo al panel, sin tocar el agente ni avisar", async () => {
@@ -80,5 +88,94 @@ describe("printSaleTicketViaAgent", () => {
       }),
     ).resolves.toBe("panel");
     expect(printSaleTicket).toHaveBeenCalled();
+  });
+});
+
+describe("printSaleTicketViaAgent — relay por servidor (celular)", () => {
+  const p1 = { id: "p1", name: "Caja", branchId: "b1", agentOnline: true };
+  const p2 = { id: "p2", name: "Depósito", branchId: "b1", agentOnline: true };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.mocked(isAgentEnabled).mockReturnValue(false);
+    vi.mocked(prepareTicketLogoBitmap).mockResolvedValue(null as never);
+    vi.mocked(loadRelayPrinters).mockResolvedValue([p1]);
+    vi.mocked(sendTicketToRelay).mockResolvedValue({ id: "job-1" });
+  });
+
+  it("agente local OK: no consulta ni usa el relay", async () => {
+    vi.mocked(isAgentEnabled).mockReturnValue(true);
+    vi.mocked(printBytesViaAgent).mockResolvedValue(undefined);
+    await expect(printSaleTicketViaAgent(ticket(), { branchId: "b1" })).resolves.toBe("agent");
+    expect(loadRelayPrinters).not.toHaveBeenCalled();
+    expect(sendTicketToRelay).not.toHaveBeenCalled();
+  });
+
+  it("sin agente local y con una impresora de la sucursal: manda el job al relay", async () => {
+    const onRelayJob = vi.fn();
+    await expect(printSaleTicketViaAgent(ticket(), { branchId: "b1", onRelayJob })).resolves.toBe("relay");
+    expect(sendTicketToRelay).toHaveBeenCalledWith(expect.anything(), "p1");
+    expect(onRelayJob).toHaveBeenCalledWith("job-1", p1);
+    expect(rememberPrinter).toHaveBeenCalledWith("b1", "p1");
+    expect(printSaleTicket).not.toHaveBeenCalled();
+  });
+
+  it("el agente local falla: prueba el relay antes del panel y no avisa del panel", async () => {
+    vi.mocked(isAgentEnabled).mockReturnValue(true);
+    vi.mocked(printBytesViaAgent).mockRejectedValue(new Error("caído"));
+    const onAgentFailure = vi.fn();
+    await expect(printSaleTicketViaAgent(ticket(), { branchId: "b1", onAgentFailure })).resolves.toBe("relay");
+    expect(onAgentFailure).not.toHaveBeenCalled();
+    expect(printSaleTicket).not.toHaveBeenCalled();
+  });
+
+  it("agente local falla y no hay relay: avisa y cae al panel", async () => {
+    vi.mocked(isAgentEnabled).mockReturnValue(true);
+    vi.mocked(printBytesViaAgent).mockRejectedValue(new Error("caído"));
+    vi.mocked(loadRelayPrinters).mockResolvedValue([]);
+    const onAgentFailure = vi.fn();
+    await expect(printSaleTicketViaAgent(ticket(), { branchId: "b1", onAgentFailure })).resolves.toBe("panel");
+    expect(onAgentFailure).toHaveBeenCalledTimes(1);
+    expect(printSaleTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin impresoras activas: panel de Chrome", async () => {
+    vi.mocked(loadRelayPrinters).mockResolvedValue([]);
+    await expect(printSaleTicketViaAgent(ticket(), { branchId: "b1" })).resolves.toBe("panel");
+    expect(sendTicketToRelay).not.toHaveBeenCalled();
+    expect(printSaleTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("varias impresoras sin recordada: pide elegir y recuerda la elegida", async () => {
+    vi.mocked(loadRelayPrinters).mockResolvedValue([p1, p2]);
+    const chooseRelayPrinter = vi.fn().mockResolvedValue("p2");
+    await expect(printSaleTicketViaAgent(ticket(), { branchId: "b1", chooseRelayPrinter })).resolves.toBe("relay");
+    expect(chooseRelayPrinter).toHaveBeenCalledWith([p1, p2]);
+    expect(sendTicketToRelay).toHaveBeenCalledWith(expect.anything(), "p2");
+    expect(rememberPrinter).toHaveBeenCalledWith("b1", "p2");
+  });
+
+  it("varias impresoras y el usuario cancela la selección: no imprime ni abre el panel", async () => {
+    vi.mocked(loadRelayPrinters).mockResolvedValue([p1, p2]);
+    const chooseRelayPrinter = vi.fn().mockResolvedValue(null);
+    await expect(printSaleTicketViaAgent(ticket(), { branchId: "b1", chooseRelayPrinter })).resolves.toBe("cancelled");
+    expect(sendTicketToRelay).not.toHaveBeenCalled();
+    expect(printSaleTicket).not.toHaveBeenCalled();
+  });
+
+  it("varias impresoras y sin selector disponible: panel", async () => {
+    vi.mocked(loadRelayPrinters).mockResolvedValue([p1, p2]);
+    await expect(printSaleTicketViaAgent(ticket(), { branchId: "b1" })).resolves.toBe("panel");
+    expect(sendTicketToRelay).not.toHaveBeenCalled();
+  });
+
+  it("el relay falla al crear el job: avisa por onRelayFailure y cae al panel", async () => {
+    const boom = new Error("La impresora está desactivada");
+    vi.mocked(sendTicketToRelay).mockRejectedValue(boom);
+    const onRelayFailure = vi.fn();
+    await expect(printSaleTicketViaAgent(ticket(), { branchId: "b1", onRelayFailure })).resolves.toBe("panel");
+    expect(onRelayFailure).toHaveBeenCalledWith(boom);
+    expect(printSaleTicket).toHaveBeenCalledTimes(1);
   });
 });

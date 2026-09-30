@@ -17,6 +17,7 @@ import { useBranches } from "@/components/hooks/useBranches";
 import { useBrandingContext } from "@/contexts/BrandingContext";
 import { resolveTicketCompany } from "@/utils/saleTicket";
 import { printSaleTicketViaAgent } from "@/utils/printTicketAgent";
+import { watchPrintJob } from "@/utils/relayPrint";
 import ticketLogoUrl from "@/assets/LogoConCirculoNegro.svg";
 import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
@@ -168,15 +169,27 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         // Agente local si esta PC lo tiene habilitado; si no (o si falla) panel de Chrome.
         Promise.resolve(
           printSaleTicketViaAgent(ticket, {
+            branchId,
             onAgentFailure: () =>
               toast.info("No se pudo imprimir directo, se abrió el panel de impresión"),
+            // Relay al local: el ticket quedó en cola; se avisa cuando sale o falla.
+            onRelayJob: (jobId, printer) => {
+              toast.info(`Enviado a ${printer.name}…`);
+              void watchPrintJob(jobId, () => {}).then((result) => {
+                if (result.phase === "printed") toast.success(result.message);
+                else if (result.phase === "expired" || result.phase === "error")
+                  toast.error(result.message);
+              });
+            },
+            onRelayFailure: () =>
+              toast.info("No se pudo enviar a la impresora del local, se abrió el panel de impresión"),
           }),
         ).catch(() => {});
       } catch {
         // La venta ya está confirmada: un fallo de impresión no la afecta.
       }
     }, PRINT_AFTER_CLOSE_MS);
-  }, [pendingTicket, dismissTicket]);
+  }, [pendingTicket, dismissTicket, branchId]);
 
   const registerGridApi = useCallback(
     (api: { focusSelectedRow: () => void; clearSearch?: () => void }) => {
