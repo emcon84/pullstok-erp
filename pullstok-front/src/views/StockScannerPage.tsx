@@ -27,6 +27,8 @@ import {
   isCatalogStale,
 } from "@/lib/offlineCatalog";
 import type { OfflineProduct } from "@/lib/offlineCatalog";
+import { ScannerSellPanel } from "@/components/organisms/ScannerSellPanel";
+import type { ScanSellResult, ScannedProduct } from "@/components/hooks/useScannerSell";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -95,6 +97,20 @@ export const StockScannerPage = () => {
   const [priceEditOpen, setPriceEditOpen] = useState(false);
   const [priceInput, setPriceInput] = useState("");
   const lastScannedRef = useRef("");
+
+  // Modo "Vender": cada escaneo suma 1 al carrito (ScannerSellPanel) en vez de
+  // abrir la tarjeta de stock. Refs porque scanLoop/lookupProduct corren en
+  // closures viejas (mismo motivo que correctingRef).
+  const [appMode, setAppMode] = useState<"stock" | "sell">("stock");
+  const sellModeRef = useRef(false);
+  const sellHandlerRef = useRef<((p: ScannedProduct) => Promise<ScanSellResult>) | null>(null);
+  const scanLoopRef = useRef<(() => void) | null>(null);
+  const registerSellHandler = useCallback(
+    (h: ((p: ScannedProduct) => Promise<ScanSellResult>) | null) => {
+      sellHandlerRef.current = h;
+    },
+    [],
+  );
 
   // Assignment panel
   const [notFoundCode, setNotFoundCode] = useState("");
@@ -244,6 +260,19 @@ export const StockScannerPage = () => {
     } catch { /* best-effort audio feedback; ignore failures */ }
   };
 
+  // Modo Vender: suma el producto escaneado al carrito y deja la cámara lista
+  // para el siguiente (pausa corta para no re-leer el mismo código).
+  const handleSellScan = async (p: Product) => {
+    const result = await sellHandlerRef.current?.(p as unknown as ScannedProduct);
+    if (result && !result.ok) toast.error(result.message);
+    else playBeep();
+    setManualCode("");
+    lastScannedRef.current = "";
+    if (scanningRef.current && scanLoopRef.current) {
+      scanTimerRef.current = setTimeout(scanLoopRef.current, 1500);
+    }
+  };
+
   const lookupProduct = async (code: string) => {
     const c = code.trim();
     if (!c) return;
@@ -280,6 +309,11 @@ export const StockScannerPage = () => {
     try {
       // 1) LOCAL primero: catálogo en IndexedDB/memoria (instantáneo + offline).
       const local = lookupProductByCode(c);
+      if (local && sellModeRef.current) {
+        await handleSellScan(mapOfflineProduct(local));
+        setLoading(false);
+        return;
+      }
       if (local) {
         setProduct(mapOfflineProduct(local));
         setAssignOpen(false);
@@ -315,6 +349,8 @@ export const StockScannerPage = () => {
         setAssignOpen(true);
         stopScanner();
         setTimeout(() => searchInputRef.current?.focus(), 300);
+      } else if (sellModeRef.current) {
+        await handleSellScan(data);
       } else {
         setProduct(data);
         setAssignOpen(false);
@@ -370,12 +406,12 @@ export const StockScannerPage = () => {
       });
       const data = await res.json();
       if (res.ok && data.id) {
-        setProduct(data);
         setAssignOpen(false);
         lastScannedRef.current = "";
         toast.success("¡Código asignado!");
-        playBeep();
         stopScanner();
+        if (sellModeRef.current) await handleSellScan(data);
+        else { setProduct(data); playBeep(); }
       } else {
         toast.error(data.message || "Error al asignar código");
       }
@@ -464,6 +500,7 @@ export const StockScannerPage = () => {
         } catch { /* frame read errors are transient; keep scanning */ }
         scanTimerRef.current = setTimeout(scanLoop, 350);
       };
+      scanLoopRef.current = scanLoop;
       scanLoop();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Permiso de cámara denegado");
@@ -620,6 +657,29 @@ export const StockScannerPage = () => {
         </p>
       )}
 
+      {/* Modo: Stock (ajuste de inventario) | Vender (escanear y cobrar) */}
+      {!assignToId && (
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1" role="group" aria-label="Modo del scanner">
+          {([["stock", "Stock"], ["sell", "Vender"]] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={appMode === value}
+              onClick={() => {
+                sellModeRef.current = value === "sell";
+                if (value === "sell") setProduct(null);
+                setAppMode(value);
+              }}
+              className={`h-12 rounded-lg text-base font-semibold transition-colors ${
+                appMode === value ? "bg-background text-primary shadow" : "text-muted-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Branch selector (spec F2): admin/management pick any branch; a
           vendedor/cashier with several assignments picks among their own. */}
       {mode.kind === "selector" && (isAdminSelector || product) && (
@@ -679,7 +739,7 @@ export const StockScannerPage = () => {
       {loading && <p className="text-center text-sm text-muted-foreground py-2">Buscando...</p>}
 
       {/* Product card */}
-      {product && !loading && (
+      {product && !loading && appMode === "stock" && (
         <Card className="p-4 space-y-3">
           <h2 className="text-lg font-semibold">{product.name}</h2>
           {product.description && <p className="text-sm text-muted-foreground">{product.description}</p>}
@@ -838,6 +898,14 @@ export const StockScannerPage = () => {
             <Camera className="h-4 w-4 mr-2" />Escanear otro
           </Button>
         </Card>
+      )}
+
+      {appMode === "sell" && (
+        <>
+          <ScannerSellPanel branchId={effectiveBranchId} registerScanHandler={registerSellHandler} />
+          {/* Espacio para que la barra fija no tape el final de la pantalla */}
+          <div className="h-16" aria-hidden />
+        </>
       )}
 
       {/* Assign code panel — fullscreen Sheet */}
