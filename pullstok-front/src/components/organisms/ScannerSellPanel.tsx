@@ -73,8 +73,8 @@ export const ScannerSellPanel = ({
   return (
     <>
       {sell.lastAdded && (
-        <div className="flex items-center gap-3 rounded-xl border border-green-300 bg-green-50 p-3">
-          <p className="min-w-0 flex-1 text-base font-semibold leading-snug text-green-900">
+        <div className="flex items-center gap-3 rounded-xl border border-green-300 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
+          <p className="min-w-0 flex-1 text-base font-semibold leading-snug text-green-900 dark:text-green-100">
             Agregado: {sell.lastAdded.name} ×{sell.lastAdded.quantity}
           </p>
           <Button
@@ -99,8 +99,9 @@ export const ScannerSellPanel = ({
       )}
 
       {cart.itemCount > 0 && (
-        // Por encima de la BottomBar móvil (h-16, z-50); en escritorio pegada abajo.
-        <div className="fixed inset-x-0 bottom-16 z-40 border-t bg-background p-3 shadow-lg lg:bottom-0">
+        // Móvil: el fondo opaco se extiende detrás de la BottomBar (h-16, z-50) para no dejar
+        // un hueco por donde se vea el contenido; en escritorio pegada abajo.
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background p-3 pb-[calc(4rem+0.75rem)] shadow-lg lg:pb-3">
           <button
             type="button"
             aria-label="Ver pedido"
