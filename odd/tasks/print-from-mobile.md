@@ -102,3 +102,13 @@ Aplicar la migración por el pipeline, e2e en el VPS, construir el .exe 1.1.0 y 
 - UX: tras emparejar un equipo, guiar o crear sola la impresora (hoy hay que ir a "Nueva impresora").
 - Sin estado "en proceso" en los jobs: el agente debe reportar antes del siguiente poll.
 - `DirectPrintSettings` no muestra el estado `paired` del agente.
+
+## Actualización (2026-09-30, tarde)
+- Ticket del scanner sin encabezado de empresa: corregido con el hook `useTicketCompany` compartido con
+  UnifiedPos (`84932a6`, en main). El logo en celular NO está verificado (si falla la rasterización, imprime sin logo
+  en silencio); el usuario debe comparar un ticket del celular con el de la caja.
+- Varias impresoras / varias PCs: hoy cada PC imprime en su térmica local (agente local primero); el celular usa la
+  impresora recordada por sucursal, si no la única de la sucursal, si no pregunta. El usuario dijo "está bien así
+  por ahora". Ideas pendientes: (A) impresora predeterminada por sucursal; (B) imprimir donde está abierta la caja
+  (verificar si el sistema distingue cajas dentro de una sucursal; no se verificó).
+- VendorDashboard y PriceKgLookup llaman a useVendorCheckout sin ticketCompany (no imprimen hoy).
