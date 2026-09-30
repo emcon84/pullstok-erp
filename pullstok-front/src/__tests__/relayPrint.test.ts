@@ -14,6 +14,7 @@ import {
   JOB_MESSAGES,
   encodeTicketPayload,
   getRememberedPrinterId,
+  fetchRelayPrinters,
   loadRelayPrinters,
   rememberPrinter,
   resolveRelayTarget,
@@ -154,6 +155,23 @@ describe("loadRelayPrinters", () => {
   it("returns [] (never throws) when the request fails, e.g. 403", async () => {
     vi.mocked(getActivePrinters).mockRejectedValue(new Error("403"));
     await expect(loadRelayPrinters()).resolves.toEqual([]);
+  });
+});
+
+describe("fetchRelayPrinters", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetRelayPrintersCache();
+  });
+
+  it("throws the request error instead of returning []", async () => {
+    vi.mocked(getActivePrinters).mockRejectedValue(new Error("Sin permiso"));
+    await expect(fetchRelayPrinters()).rejects.toThrow("Sin permiso");
+  });
+
+  it("returns an empty list when there are simply no printers", async () => {
+    vi.mocked(getActivePrinters).mockResolvedValue([]);
+    await expect(fetchRelayPrinters()).resolves.toEqual([]);
   });
 });
 

@@ -92,6 +92,7 @@ export const ScannerSellPanel = ({
         <TicketPrintPrompt
           state={ticketPrint.state}
           onPrint={() => void ticketPrint.print(pendingTicket)}
+          onUseBrowserPanel={() => void ticketPrint.printInBrowser(pendingTicket)}
           onChoose={ticketPrint.choose}
           onDismiss={closeTicketPrompt}
         />

@@ -95,6 +95,45 @@ describe("useTicketPrint", () => {
     expect(result.current.state.message).toMatch(/panel de impresión/i);
   });
 
+  it("passes panelFallback:false so the phone never opens the browser panel on its own", async () => {
+    vi.mocked(printSaleTicketViaAgent).mockResolvedValue("agent");
+    const { result } = renderHook(() => useTicketPrint("b1"));
+    await act(async () => {
+      await result.current.print(ticket);
+    });
+    expect(printSaleTicketViaAgent).toHaveBeenCalledWith(
+      ticket,
+      expect.objectContaining({ panelFallback: false }),
+    );
+  });
+
+  it("relay failure: error phase whose message includes the real cause", async () => {
+    vi.mocked(printSaleTicketViaAgent).mockImplementation(async (_t, o?: Opts) => {
+      o?.onRelayFailure?.(new Error("No tenés permiso para ver las impresoras"));
+      return "failed";
+    });
+    const { result } = renderHook(() => useTicketPrint("b1"));
+    await act(async () => {
+      await result.current.print(ticket);
+    });
+    expect(result.current.state.phase).toBe("error");
+    expect(result.current.state.message).toContain("No se pudo imprimir el ticket");
+    expect(result.current.state.message).toContain("No tenés permiso para ver las impresoras");
+  });
+
+  it("no-printers: error phase with the admin hint", async () => {
+    vi.mocked(printSaleTicketViaAgent).mockResolvedValue("no-printers");
+    const { result } = renderHook(() => useTicketPrint("b1"));
+    await act(async () => {
+      await result.current.print(ticket);
+    });
+    expect(result.current.state).toMatchObject({
+      phase: "error",
+      message:
+        "No hay impresoras del local configuradas. Pedile a un administrador que cree una en Impresoras.",
+    });
+  });
+
   it("several printers: exposes the choices, waits, then continues with the chosen one", async () => {
     let chosen: string | null = "unset";
     vi.mocked(printSaleTicketViaAgent).mockImplementation(async (_t, o?: Opts) => {

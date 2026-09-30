@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { printSaleTicketViaAgent } from "@/utils/printTicketAgent";
 import { JOB_MESSAGES, watchPrintJob, type RelayPrinter } from "@/utils/relayPrint";
-import type { SaleTicket } from "@/utils/saleTicket";
+import { printSaleTicket, type SaleTicket } from "@/utils/saleTicket";
 
 export type TicketPrintPhase =
   | "idle"
@@ -21,6 +21,14 @@ export interface TicketPrintState {
 }
 
 const IDLE: TicketPrintState = { phase: "idle", message: "" };
+
+const NO_PRINTERS_MESSAGE =
+  "No hay impresoras del local configuradas. Pedile a un administrador que cree una en Impresoras.";
+
+function failureMessage(cause: unknown): string {
+  const detail = cause instanceof Error && cause.message ? cause.message : "";
+  return detail ? `${JOB_MESSAGES.error}: ${detail}` : JOB_MESSAGES.error;
+}
 
 /**
  * Imprime el ticket de una venta con el orden agente local -> relay al local ->
@@ -51,9 +59,14 @@ export function useTicketPrint(branchId: string | null) {
       if (busy.current) return;
       busy.current = true;
       update({ phase: "sending", message: JOB_MESSAGES.sending });
+      let relayError: unknown;
       try {
         const result = await printSaleTicketViaAgent(ticket, {
           branchId,
+          panelFallback: false,
+          onRelayFailure: (error) => {
+            relayError = error;
+          },
           chooseRelayPrinter: (printers) =>
             new Promise<string | null>((resolve) => {
               chooser.current = resolve;
@@ -73,6 +86,10 @@ export function useTicketPrint(branchId: string | null) {
         else if (result === "panel")
           update({ phase: "panel", message: "Se abrió el panel de impresión del navegador." });
         else if (result === "cancelled") update(IDLE);
+        else if (result === "failed")
+          update({ phase: "error", message: failureMessage(relayError) });
+        else if (result === "no-printers")
+          update({ phase: "error", message: NO_PRINTERS_MESSAGE });
         // "relay": el estado lo lleva watchPrintJob.
       } catch {
         update({ phase: "error", message: JOB_MESSAGES.error });
@@ -97,5 +114,18 @@ export function useTicketPrint(branchId: string | null) {
     update(IDLE);
   }, [update]);
 
-  return { state, print, choose, reset };
+  /** Acción explícita del usuario: abre el panel de impresión del navegador. */
+  const printInBrowser = useCallback(
+    async (ticket: SaleTicket) => {
+      try {
+        await printSaleTicket(ticket);
+        update({ phase: "panel", message: "Se abrió el panel de impresión del navegador." });
+      } catch {
+        update({ phase: "error", message: JOB_MESSAGES.error });
+      }
+    },
+    [update],
+  );
+
+  return { state, print, choose, reset, printInBrowser };
 }

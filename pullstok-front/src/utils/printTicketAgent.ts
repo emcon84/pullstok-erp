@@ -2,7 +2,7 @@ import { isAgentEnabled, printBytesViaAgent } from "@/utils/directPrintAgent";
 import { encodeSaleTicketEscPos } from "@/utils/escpos";
 import { loadLogoRaster } from "@/utils/printTicketDirect";
 import {
-  loadRelayPrinters,
+  fetchRelayPrinters,
   rememberPrinter,
   resolveRelayTarget,
   sendTicketToRelay,
@@ -28,9 +28,14 @@ export interface PrintViaAgentOptions {
    * null si el usuario cancela. Sin este callback, varias impresoras => panel.
    */
   chooseRelayPrinter?: (printers: RelayPrinter[]) => Promise<string | null>;
+  /**
+   * Si el agente/relay no imprimió, abrir el panel de Chrome (default true). En
+   * false nunca se abre: devuelve "failed" (el relay falló) o "no-printers".
+   */
+  panelFallback?: boolean;
 }
 
-export type PrintViaAgentResult = "agent" | "relay" | "panel" | "cancelled";
+export type PrintViaAgentResult = "agent" | "relay" | "panel" | "cancelled" | "failed" | "no-printers";
 
 /**
  * Orden de impresión del ticket:
@@ -59,7 +64,11 @@ export async function printSaleTicketViaAgent(
   }
 
   const relay = await tryRelay(ticket, options);
-  if (relay !== "unavailable") return relay;
+  if (relay === "relay" || relay === "cancelled") return relay;
+
+  if (options.panelFallback === false) {
+    return relay === "failed" ? "failed" : "no-printers";
+  }
 
   if (agentFailed) {
     try {
@@ -80,10 +89,10 @@ export async function printSaleTicketViaAgent(
 async function tryRelay(
   ticket: SaleTicket,
   options: PrintViaAgentOptions,
-): Promise<"relay" | "cancelled" | "unavailable"> {
+): Promise<"relay" | "cancelled" | "unavailable" | "failed"> {
   const branchId = options.branchId ?? null;
   try {
-    const target = resolveRelayTarget(await loadRelayPrinters(), branchId);
+    const target = resolveRelayTarget(await fetchRelayPrinters(), branchId);
     let printer: RelayPrinter | undefined;
 
     if (target.kind === "printer") {
@@ -110,6 +119,6 @@ async function tryRelay(
     } catch {
       // Aviso accesorio.
     }
-    return "unavailable";
+    return "failed";
   }
 }

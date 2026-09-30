@@ -114,15 +114,23 @@ export function _resetRelayPrintersCache(): void {
   printersCache = null;
 }
 
-/** Nunca lanza: sin permiso (403), sin red o sin impresoras => lista vacía. */
-export async function loadRelayPrinters(): Promise<RelayPrinter[]> {
+/**
+ * Lista de impresoras activas (cache corto). LANZA si el pedido falla (401/403/500,
+ * sin red), para distinguir "falló" de "no hay impresoras" (lista vacía).
+ */
+export async function fetchRelayPrinters(): Promise<RelayPrinter[]> {
   if (printersCache && Date.now() - printersCache.at < PRINTERS_TTL_MS) {
     return printersCache.printers;
   }
+  const printers = await getActivePrinters();
+  printersCache = { at: Date.now(), printers };
+  return printers;
+}
+
+/** Nunca lanza: sin permiso (403), sin red o sin impresoras => lista vacía. */
+export async function loadRelayPrinters(): Promise<RelayPrinter[]> {
   try {
-    const printers = await getActivePrinters();
-    printersCache = { at: Date.now(), printers };
-    return printers;
+    return await fetchRelayPrinters();
   } catch {
     return [];
   }

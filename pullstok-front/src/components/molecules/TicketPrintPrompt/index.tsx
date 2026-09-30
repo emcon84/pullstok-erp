@@ -7,6 +7,8 @@ interface TicketPrintPromptProps {
   onPrint: () => void;
   onChoose: (printerId: string | null) => void;
   onDismiss: () => void;
+  /** Opcional: abre el panel de impresión del navegador (acción explícita tras un error). */
+  onUseBrowserPanel?: () => void;
 }
 
 /**
@@ -14,7 +16,7 @@ interface TicketPrintPromptProps {
  * (Imprimiendo… / Impreso / Venció / Error). Pensada para el celular: botones
  * grandes y colores del tema (claro/oscuro).
  */
-export function TicketPrintPrompt({ state, onPrint, onChoose, onDismiss }: TicketPrintPromptProps) {
+export function TicketPrintPrompt({ state, onPrint, onChoose, onDismiss, onUseBrowserPanel }: TicketPrintPromptProps) {
   const { phase, message, printers } = state;
   const working = phase === "sending" || phase === "pending";
   const failed = phase === "expired" || phase === "error";
@@ -89,6 +91,11 @@ export function TicketPrintPrompt({ state, onPrint, onChoose, onDismiss }: Ticke
           <Button variant="outline" className="h-14 text-base" onClick={onDismiss}>
             Cerrar
           </Button>
+          {onUseBrowserPanel && (
+            <Button variant="outline" className="h-14 text-base" onClick={onUseBrowserPanel}>
+              Usar el panel del navegador
+            </Button>
+          )}
         </div>
       )}
     </div>
