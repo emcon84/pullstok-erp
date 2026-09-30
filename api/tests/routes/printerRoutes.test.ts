@@ -48,3 +48,36 @@ describe("printAgentRoutes — pairing is public", () => {
     expect(layers.slice(0, idx).filter((l) => !l.route)).toHaveLength(0);
   });
 });
+
+describe("printJobRoutes — role gate", () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const jobRoutes = require("../../src/routes/printJobRoutes").default;
+  const gate = (role: string) => {
+    const res: any = {};
+    res.status = jest.fn().mockReturnValue(res);
+    res.json = jest.fn().mockReturnValue(res);
+    const next = jest.fn();
+    stackOf(jobRoutes)[1].handle({ user: { role } }, res, next);
+    return { res, next };
+  };
+
+  it.each(["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"])("allows %s", (role) => {
+    expect(gate(role).next).toHaveBeenCalled();
+  });
+
+  it.each(["EMPLOYEE", "SUPERADMIN"])("rejects %s with 403", (role) => {
+    const { res, next } = gate(role);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it("agent endpoints use authenticateAgent and no user auth", () => {
+    const agentLayers = stackOf(printAgentRoutes).filter((l) => l.route);
+    for (const path of ["/heartbeat", "/jobs", "/jobs/:id/result"]) {
+      const layer = agentLayers.find((l) => l.route!.path === path)!;
+      const names = (layer.route as any).stack.map((s: any) => s.handle.name);
+      expect(names).toContain("authenticateAgent");
+      expect(names).not.toContain("authenticate");
+    }
+  });
+});

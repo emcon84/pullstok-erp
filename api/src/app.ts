@@ -22,6 +22,11 @@ app.use(
   }),
 );
 
+// Los tickets ESC/POS (base64, hasta 256 KB decodificados ≈ 350 KB) superan el
+// límite por defecto de 100 KB: esta ruta parsea primero con un tope mayor y el
+// parser global de abajo ya no vuelve a leer el body.
+app.use("/api/print-jobs", express.json({ limit: "512kb" }));
+
 // JSON parser con captura del body crudo. Kapso firma el body EXACTO con un
 // HMAC (x-webhook-signature), y `JSON.stringify` del body ya parseado NO
 // reproduce los bytes originales → hay que verificar la firma contra este

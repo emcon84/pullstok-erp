@@ -1410,3 +1410,18 @@ export const createPairingCodeSchema = z.object({
 export const pairAgentSchema = z.object({
   code: z.string().trim().min(1, "El código es requerido"),
 });
+
+export const createPrintJobSchema = z.object({
+  printerId: z.string().min(1, "La impresora es requerida"),
+  // ~4/3 del tope decodificado (256 KB): corta antes de decodificar algo enorme.
+  payloadBase64: z.string().min(1, "El ticket es requerido").max(360_000, "El ticket es demasiado grande"),
+});
+
+export const agentHeartbeatSchema = z.object({
+  localPrinters: z.array(z.string().max(200)).max(100).optional(),
+});
+
+export const agentJobResultSchema = z.object({
+  status: z.enum(["PRINTED", "ERROR"]),
+  errorMessage: z.string().max(500).optional(),
+});
