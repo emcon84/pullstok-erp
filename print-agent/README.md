@@ -22,7 +22,7 @@ Abrí en el navegador de esa PC: <http://127.0.0.1:9123/health>
 Debe mostrar algo como:
 
 ```json
-{"name":"pullstok-print-agent","version":"1.0.0","printer":null,"platform":"win32"}
+{"name":"pullstok-print-agent","version":"1.1.0","printer":null,"platform":"win32","paired":false,"serverUrl":"https://app.pullstok.com/api"}
 ```
 
 `printer: null` es normal hasta elegir la impresora desde la configuración del sistema. Para ver las impresoras detectadas: <http://127.0.0.1:9123/printers>.
@@ -46,7 +46,7 @@ Detiene el agente, quita el inicio automático y borra la carpeta de instalació
 ## Configuración (`%APPDATA%\PullstokPrint\config.json`)
 
 ```json
-{ "printer": "OCOM 58", "port": 9123, "allowedOrigins": ["https://app.pullstok.com", "http://localhost:5173"] }
+{ "printer": "OCOM 58", "port": 9123, "allowedOrigins": ["https://app.pullstok.com", "http://localhost:5173"], "serverUrl": "https://app.pullstok.com/api", "agentId": null, "agentToken": null }
 ```
 
 Variables de entorno opcionales: `PULLSTOK_PRINT_CONFIG` (ruta del config), `PULLSTOK_PRINT_PORT`.
@@ -60,6 +60,15 @@ Variables de entorno opcionales: `PULLSTOK_PRINT_CONFIG` (ruta del config), `PUL
 | PUT | `/config` | Body `{ "printer": "..." }`; valida que exista y lo guarda |
 | POST | `/print` | Body binario `application/octet-stream` (máx. 1 MB); 409 sin impresora, 502 si falla el spooler |
 | POST | `/test` | Imprime un ticket de prueba |
+| POST | `/pair` | Body `{ "code": "XXXXX-XXXXX" }`; canjea el código de emparejamiento en el servidor y guarda las credenciales (nunca las devuelve) |
+
+## Impresión desde el celular (relay por servidor)
+
+Una vez emparejado, el agente se conecta **hacia afuera** al servidor (sin abrir puertos): envía un latido cada ~30 s con las impresoras de Windows detectadas y consulta trabajos cada ~3 s. Cada trabajo se imprime en la impresora de Windows asignada (`localName`) y el resultado (PRINTED/ERROR) se informa antes del siguiente pedido, para no imprimir dos veces. Ante errores de red reintenta con espera de 1 s hasta 30 s; si el servidor responde 401 deja de consultar y `/health` pasa a `paired: false` (hay que volver a emparejar).
+
+- Emparejar: en el sistema, Impresoras > "Emparejar este equipo" (genera un código y lo envía solo a `POST /pair`), o manualmente con el código.
+- `agentToken` (`<agentId>.<secreto>`) se guarda en `config.json` y solo se envía en el header `Authorization: Bearer`; nunca se escribe en `agent.log`.
+- Los trabajos que esperan más de 15 minutos vencen en el servidor y no se imprimen.
 
 Los errores son JSON `{ "message": "..." }` en español.
 

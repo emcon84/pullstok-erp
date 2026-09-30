@@ -14,6 +14,10 @@ export interface AgentDeps {
   version: string;
   platform?: string;
   log?: (msg: string) => void;
+  relay?: {
+    pair(code: string): Promise<unknown>;
+    status(): { paired: boolean };
+  };
 }
 
 class HttpError extends Error {
@@ -114,7 +118,29 @@ export function createAgentServer(deps: AgentDeps): Server {
           version: deps.version,
           printer: deps.config.get().printer,
           platform: deps.platform ?? process.platform,
+          paired: deps.relay?.status().paired ?? false,
+          serverUrl: deps.config.get().serverUrl,
         });
+      case '/pair': {
+        expect('POST');
+        if (!deps.relay) throw new HttpError(409, 'El emparejamiento no está disponible en este agente.');
+        const raw = await readBody(req, 4 * 1024);
+        let body: { code?: unknown };
+        try {
+          body = JSON.parse(raw.toString('utf8'));
+        } catch {
+          throw new HttpError(400, 'El cuerpo debe ser JSON válido.');
+        }
+        if (!body || typeof body.code !== 'string' || !body.code.trim()) {
+          throw new HttpError(400, 'Falta el código de emparejamiento.');
+        }
+        try {
+          return sendJson(res, 200, await deps.relay.pair(body.code.trim()));
+        } catch (e) {
+          const status = (e as { status?: number }).status;
+          throw new HttpError(typeof status === 'number' ? status : 502, (e as Error).message);
+        }
+      }
       case '/printers':
         expect('GET');
         return sendJson(res, 200, { printers: await listPrinters() });

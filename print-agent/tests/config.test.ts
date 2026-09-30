@@ -48,3 +48,23 @@ describe('config store', () => {
     expect(resolveConfigPath({ APPDATA: '/roaming' })).toBe(join('/roaming', 'PullstokPrint', 'config.json'));
   });
 });
+
+describe('relay credentials', () => {
+  it('defaults to the production API and no credentials', () => {
+    expect(DEFAULT_CONFIG.serverUrl).toBe('https://app.pullstok.com/api');
+    expect(DEFAULT_CONFIG.agentId).toBeNull();
+    expect(DEFAULT_CONFIG.agentToken).toBeNull();
+  });
+
+  it('persists credentials and drops invalid values', () => {
+    const p = join(mkdtempSync(join(tmpdir(), 'pp-')), 'config.json');
+    const store = createConfigStore(p);
+    store.update({ serverUrl: 'https://x.test/api', agentId: 'a1', agentToken: 'a1.secret' });
+    const cfg = createConfigStore(p).get();
+    expect(cfg).toMatchObject({ serverUrl: 'https://x.test/api', agentId: 'a1', agentToken: 'a1.secret' });
+    store.update({ serverUrl: 42 as unknown as string, agentToken: '' });
+    const next = createConfigStore(p).get();
+    expect(next.serverUrl).toBe('https://app.pullstok.com/api');
+    expect(next.agentToken).toBeNull();
+  });
+});

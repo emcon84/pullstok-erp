@@ -2,6 +2,7 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createConfigStore, resolveConfigPath } from './config';
 import { listWindowsPrinters } from './printers';
+import { createRelay } from './relay';
 import { createAgentServer } from './server';
 import { createWindowsSpooler } from './spooler';
 
@@ -24,12 +25,16 @@ function log(msg: string) {
 const config = createConfigStore(configPath);
 const port = Number(process.env.PULLSTOK_PRINT_PORT) || config.get().port;
 
+const spooler = createWindowsSpooler();
+const relay = createRelay({ config, spooler, listPrinters: listWindowsPrinters, log });
+
 const server = createAgentServer({
-  spooler: createWindowsSpooler(),
+  spooler,
   listPrinters: listWindowsPrinters,
   config,
   version: VERSION,
   log,
+  relay,
 });
 
 server.on('error', (e: NodeJS.ErrnoException) => {
@@ -37,10 +42,14 @@ server.on('error', (e: NodeJS.ErrnoException) => {
   process.exit(1);
 });
 
-server.listen(port, '127.0.0.1', () => log(`Pullstok print agent ${VERSION} listening on 127.0.0.1:${port}`));
+server.listen(port, '127.0.0.1', () => {
+  log(`Pullstok print agent ${VERSION} listening on 127.0.0.1:${port}`);
+  relay.start(); // no-op until the agent is paired
+});
 
 function shutdown(signal: string) {
   log(`${signal} received, shutting down`);
+  relay.stop();
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 2000).unref();
 }

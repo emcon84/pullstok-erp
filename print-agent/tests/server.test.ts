@@ -28,6 +28,8 @@ let base: string;
 let spooler: FakeSpooler;
 let store: ConfigStore;
 let lister: () => Promise<string[]>;
+let pairImpl: (code: string) => Promise<unknown>;
+let pairedState = false;
 
 async function listen(s: Server) {
   await new Promise<void>((r) => s.listen(0, '127.0.0.1', r));
@@ -47,12 +49,15 @@ async function start(initial: Partial<AgentConfig> = {}) {
     config: store,
     version: '1.2.3',
     platform: 'win32',
+    relay: { pair: (code) => pairImpl(code), status: () => ({ paired: pairedState }) },
   });
   await listen(server);
 }
 
 beforeEach(async () => {
   lister = async () => ['OCOM 58', 'PDF'];
+  pairedState = false;
+  pairImpl = async () => ({ ok: true, agentId: 'a1', name: 'Caja' });
   await start({ printer: 'OCOM 58' });
 });
 afterEach(stop);
@@ -66,6 +71,8 @@ describe('GET /health', () => {
       version: '1.2.3',
       printer: 'OCOM 58',
       platform: 'win32',
+      paired: false,
+      serverUrl: DEFAULT_CONFIG.serverUrl,
     });
   });
 });
@@ -237,5 +244,64 @@ describe('origin allow-list and CORS', () => {
     await start({ printer: 'OCOM 58', allowedOrigins: ['https://otro.example'] });
     expect((await fetch(`${base}/health`, { headers: { Origin: 'https://otro.example' } })).status).toBe(200);
     expect((await fetch(`${base}/health`, { headers: { Origin: ALLOWED } })).status).toBe(403);
+  });
+});
+
+describe('POST /pair', () => {
+  const post = (body: unknown, headers: Record<string, string> = {}) =>
+    fetch(`${base}/pair`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+    });
+
+  it('forwards the code to the relay and returns its result (no token)', async () => {
+    let seen = '';
+    pairImpl = async (code) => {
+      seen = code;
+      return { ok: true, agentId: 'a1', name: 'Caja' };
+    };
+    const res = await post({ code: 'ABCDE-12345' }, { Origin: ALLOWED });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, agentId: 'a1', name: 'Caja' });
+    expect(seen).toBe('ABCDE-12345');
+  });
+
+  it('rejects origins that are not allowed', async () => {
+    const res = await post({ code: 'x' }, { Origin: 'https://evil.example' });
+    expect(res.status).toBe(403);
+  });
+
+  it('answers the preflight with PNA headers for an allowed origin', async () => {
+    const res = await fetch(`${base}/pair`, {
+      method: 'OPTIONS',
+      headers: { Origin: ALLOWED, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type' },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-private-network')).toBe('true');
+  });
+
+  it('validates the code', async () => {
+    expect((await post({})).status).toBe(400);
+    expect((await post('not json')).status).toBe(400);
+  });
+
+  it('propagates the relay error status and message', async () => {
+    pairImpl = async () => {
+      throw Object.assign(new Error('Código de emparejamiento inválido o vencido'), { status: 400 });
+    };
+    const res = await post({ code: 'bad' });
+    expect(res.status).toBe(400);
+    expect((await res.json()).message).toMatch(/inválido/);
+  });
+
+  it('reports paired state in /health', async () => {
+    pairedState = true;
+    const body = await (await fetch(`${base}/health`)).json();
+    expect(body.paired).toBe(true);
+  });
+
+  it('rejects non-POST methods', async () => {
+    expect((await fetch(`${base}/pair`)).status).toBe(405);
   });
 });

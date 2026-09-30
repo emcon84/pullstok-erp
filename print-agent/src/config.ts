@@ -5,6 +5,11 @@ export interface AgentConfig {
   printer: string | null;
   port: number;
   allowedOrigins: string[];
+  /** API base used by the relay (outbound polling). */
+  serverUrl: string;
+  /** Credentials obtained when pairing; the token is `<agentId>.<secret>`. */
+  agentId: string | null;
+  agentToken: string | null;
 }
 
 export interface ConfigStore {
@@ -16,7 +21,12 @@ export const DEFAULT_CONFIG: AgentConfig = {
   printer: null,
   port: 9123,
   allowedOrigins: ['https://app.pullstok.com', 'http://localhost:5173'],
+  serverUrl: 'https://app.pullstok.com/api',
+  agentId: null,
+  agentToken: null,
 };
+
+const nonEmpty = (v: unknown): string | null => (typeof v === 'string' && v.length > 0 ? v : null);
 
 export function resolveConfigPath(env: NodeJS.ProcessEnv = process.env): string {
   if (env.PULLSTOK_PRINT_CONFIG) return env.PULLSTOK_PRINT_CONFIG;
@@ -34,6 +44,9 @@ function sanitize(raw: unknown): AgentConfig {
     printer: typeof r.printer === 'string' && r.printer.length > 0 ? r.printer : null,
     port: validPort ? (r.port as number) : DEFAULT_CONFIG.port,
     allowedOrigins: [...(validOrigins ? (r.allowedOrigins as string[]) : DEFAULT_CONFIG.allowedOrigins)],
+    serverUrl: (nonEmpty(r.serverUrl) ?? DEFAULT_CONFIG.serverUrl).replace(/\/+$/, ''),
+    agentId: nonEmpty(r.agentId),
+    agentToken: nonEmpty(r.agentToken),
   };
 }
 
