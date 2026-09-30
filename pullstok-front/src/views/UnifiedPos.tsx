@@ -473,7 +473,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           </div>
 
           {/* ── Segmented tabs + Abrir bolsa button ── */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex w-fit gap-1 rounded-lg bg-muted p-1">
               {tabs.map((t) => (
                 <button
