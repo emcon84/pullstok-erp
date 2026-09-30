@@ -18,6 +18,10 @@ vi.mock("@/components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(() => ({ session: { id: "cs1" }, loading: false })),
 }));
 
+vi.mock("@/components/hooks/useTicketCompany", () => ({
+  useTicketCompany: vi.fn(() => ({ businessName: "Mi Pet Shop", taxId: "30-1" })),
+}));
+
 const confirmSale = vi.fn();
 vi.mock("@/components/hooks/useVendorCheckout", () => ({
   useVendorCheckout: vi.fn(() => ({
@@ -53,6 +57,7 @@ import type { ScanSellResult, ScannedProduct } from "@/components/hooks/useScann
 import { getProductStock } from "@/services/productService";
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
+import { useTicketCompany } from "@/components/hooks/useTicketCompany";
 
 const mockGetProductStock = vi.mocked(getProductStock);
 
@@ -160,6 +165,17 @@ describe("ScannerSellPanel", () => {
 
     fireEvent.click(screen.getByText("cobrar"));
     expect(confirmSale).toHaveBeenCalled();
+  });
+
+  it("passes the ticket company header (from useTicketCompany) to the checkout", async () => {
+    const { scan } = renderPanel("b1");
+    await scan();
+    expect(vi.mocked(useTicketCompany)).toHaveBeenCalledWith("b1");
+    expect(vi.mocked(useVendorCheckout)).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        ticketCompany: expect.objectContaining({ businessName: "Mi Pet Shop", taxId: "30-1" }),
+      }),
+    );
   });
 
   it("wires checkout and the cash session to the scanner's branch", async () => {

@@ -10,6 +10,7 @@ import {
   type ScanSellResult,
   type ScannedProduct,
 } from "@/components/hooks/useScannerSell";
+import { useTicketCompany } from "@/components/hooks/useTicketCompany";
 import { useTicketPrint } from "@/components/hooks/useTicketPrint";
 import { TicketPrintPrompt } from "@/components/molecules/TicketPrintPrompt";
 import { VendorCartSheet } from "@/components/molecules/VendorCartSheet";
@@ -61,6 +62,7 @@ export const ScannerSellPanel = ({
     return () => registerScanHandler(null);
   }, [registerScanHandler, sell.addScanned]);
 
+  const ticketCompany = useTicketCompany(branchId);
   const checkout = useVendorCheckout({
     branchId: branchId ?? "",
     cartOpen,
@@ -68,6 +70,7 @@ export const ScannerSellPanel = ({
     cartItems: cart.items,
     clearCart: cart.clearCart,
     totalAmount: cart.totalAmount,
+    ticketCompany,
   });
   // Caja OPEN de la sucursal (R8/R9): se propaga al confirmar la venta.
   const { session: currentSession } = useGetCurrentCashSession(branchId ?? undefined);

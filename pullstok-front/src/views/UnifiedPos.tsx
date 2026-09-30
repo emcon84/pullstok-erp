@@ -13,12 +13,9 @@ import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecul
 import { OpenBagDialog } from "@/components/molecules/OpenBagDialog";
 import { ManualProductDialog } from "@/components/molecules/ManualProductDialog";
 import { PrintTicketDialog } from "@/components/molecules/PrintTicketDialog";
-import { useBranches } from "@/components/hooks/useBranches";
-import { useBrandingContext } from "@/contexts/BrandingContext";
-import { resolveTicketCompany } from "@/utils/saleTicket";
+import { useTicketCompany } from "@/components/hooks/useTicketCompany";
 import { printSaleTicketViaAgent } from "@/utils/printTicketAgent";
 import { watchPrintJob } from "@/utils/relayPrint";
-import ticketLogoUrl from "@/assets/LogoConCirculoNegro.svg";
 import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,22 +105,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const sellsWholesale = me?.sellsWholesale ?? false;
 
-  // Encabezado del ticket térmico: logo/nombre del branding, CUIT/condición y
-  // dirección/teléfono de la organización (cache de ["me"]). La sucursal
-  // (dirección/teléfono propios) solo la puede listar ADMIN/MANAGEMENT
-  // (GET /branches); para el resto queda deshabilitada y rige la organización.
-  const { branding } = useBrandingContext();
-  const canListBranches = me?.role === "ADMIN" || me?.role === "MANAGEMENT";
-  const { branches } = useBranches(canListBranches);
-  const ticketCompany = resolveTicketCompany({
-    businessName: branding.displayName,
-    // Logo negro empaquetado en la app: mismo origen (sin CORS) y oscuro sobre
-    // transparente, que es lo que se ve en papel térmico. El logo de branding
-    // está pensado para el tema oscuro y no se imprime bien.
-    logoUrl: ticketLogoUrl,
-    org: me?.organization,
-    branch: branches.find((b) => b.id === branchId),
-  });
+  // Encabezado del ticket térmico (logo, CUIT, dirección, teléfono).
+  const ticketCompany = useTicketCompany(branchId);
 
   // Carrito ÚNICO de todo el POS (compartido entre ambas pestañas vía props).
   const cart = useVendorCart();
