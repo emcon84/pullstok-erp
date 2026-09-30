@@ -40,6 +40,8 @@ import whatsappRoutes from "./whatsappRoutes";
 import whatsappOrderRoutes from "./whatsappOrderRoutes";
 import moduleRoutes from "./moduleRoutes";
 import savedPlanillaRoutes from "./savedPlanillaRoutes";
+import printerRoutes from "./printerRoutes";
+import printAgentRoutes from "./printAgentRoutes";
 
 const router = Router();
 
@@ -89,6 +91,9 @@ router.use("/whatsapp", whatsappRoutes);
 router.use("/whatsapp-orders", whatsappOrderRoutes);
 router.use("/modules", moduleRoutes);
 router.use("/saved-planillas", savedPlanillaRoutes);
+router.use("/printers", printerRoutes);
+// Agente de impresión: auth propia (token del agente), nunca el JWT de usuario.
+router.use("/print-agent", printAgentRoutes);
 router.use("/", arcaRoutes);
 
 export default router;

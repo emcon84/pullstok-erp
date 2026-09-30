@@ -1391,3 +1391,22 @@ export const savePlanillaSchema = z
       .min(1, "Debe enviar al menos una fila"),
   })
   .strip();
+
+// ---------- Impresión desde el celular (print-from-mobile) ----------
+export const createPrinterSchema = z.object({
+  name: z.string().trim().min(1, "El nombre es requerido"),
+  branchId: z.string().min(1).nullable().optional(),
+  agentId: z.string().min(1).nullable().optional(),
+  localName: z.string().trim().min(1).nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const updatePrinterSchema = createPrinterSchema.partial();
+
+export const createPairingCodeSchema = z.object({
+  name: z.string().trim().min(1, "El nombre es requerido"),
+});
+
+export const pairAgentSchema = z.object({
+  code: z.string().trim().min(1, "El código es requerido"),
+});

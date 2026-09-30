@@ -131,6 +131,9 @@ model Organization {
   cashSessions          CashSession[]
   whatsAppOrderDrafts   WhatsAppOrderDraft[]
   customerAccountMovements CustomerAccountMovement[]
+  printers              Printer[]
+  printAgents           PrintAgent[]
+  printJobs             PrintJob[]
 
   @@map("organizations")
 }
@@ -192,6 +195,8 @@ model Branch {
   quotations     Quotation[]
   cashSessions   CashSession[]
   invoices       Invoice[]          @relation("InvoiceBranch")
+  printers       Printer[]
+  printJobs      PrintJob[]
 
   @@unique([organizationId, name])
   @@map("branches")
@@ -1486,4 +1491,81 @@ model SavedPlanilla {
 
   @@index([organizationId, createdAt])
   @@map("saved_planillas")
+}
+
+// ---------- Impresión desde el celular (relay por servidor) ----------
+// Agente de impresión instalado en una PC del local (print-agent/). Se empareja
+// UNA vez con un código de un solo uso y después se autentica con su token
+// (Authorization: Bearer <agentId>.<secreto>); solo se guarda el hash SHA-256.
+model PrintAgent {
+  id                String    @id @default(uuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  name              String
+  // null hasta que el agente se empareja.
+  tokenHash         String?
+  // Código de emparejamiento de un solo uso (solo hash) + vencimiento.
+  pairingCodeHash   String?   @unique
+  pairingExpiresAt  DateTime?
+  lastSeenAt        DateTime?
+  // Nombres de las impresoras del SO que el agente reportó en el heartbeat.
+  localPrinters     String[]  @default([])
+  createdAt         DateTime  @default(now())
+  printers          Printer[]
+
+  @@index([organizationId])
+  @@map("print_agents")
+}
+
+// Impresora registrada (ticketera) de una organización. `localName` es el
+// nombre de la impresora en el SO de la PC donde corre el agente.
+model Printer {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  branchId       String?
+  branch         Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  agentId        String?
+  agent          PrintAgent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  localName      String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  jobs           PrintJob[]
+
+  @@unique([organizationId, name])
+  @@index([agentId])
+  @@map("printers")
+}
+
+enum PrintJobStatus {
+  PENDING
+  PRINTED
+  ERROR
+  EXPIRED
+  CANCELLED
+}
+
+// Trabajo de impresión: el celular genera los bytes ESC/POS y el agente los
+// imprime. Vence a los 15 min para no imprimir tickets viejos.
+model PrintJob {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  printerId      String
+  printer        Printer        @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  status         PrintJobStatus @default(PENDING)
+  payload        Bytes
+  errorMessage   String?
+  createdAt      DateTime       @default(now())
+  expiresAt      DateTime
+  completedAt    DateTime?
+  createdById    String?
+
+  @@index([organizationId, status])
+  @@index([printerId, status])
+  @@map("print_jobs")
 }

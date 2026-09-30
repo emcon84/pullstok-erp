@@ -65,6 +65,13 @@ const TENANT_MODELS = new Set([
   // (organizationId). Mismo patrón multi-tenant: findFirst / updateMany /
   // deleteMany (nunca findUnique/update/delete) → scope org automático anti-fuga.
   "CustomerAccountMovement",
+  // Impresión desde el celular (print-from-mobile). Tenant-scoped
+  // (organizationId). Mismo patrón multi-tenant: findFirst / updateMany /
+  // deleteMany (nunca findUnique/update/delete). El canje del código de
+  // emparejamiento corre sin tenant y usa basePrisma explícitamente.
+  "Printer",
+  "PrintAgent",
+  "PrintJob",
 ]);
 
 /**
