@@ -9,6 +9,9 @@ térmica del local, sin depender del WiFi ni de que el celular esté en la misma
 - IMPORTANTE: probablemente haya MÁS DE UNA ticketera (varios locales/sucursales y/o varias en un mismo local).
   El diseño debe contemplar múltiples impresoras desde el inicio.
 
+- PC de caja apagada (usuario, 2026-09-30): el job espera en cola y se imprime al prender, pero vence a los
+  15 minutos (estado EXPIRED + aviso al usuario); nunca se imprimen tickets viejos.
+
 ## Hechos verificados
 - `print-agent/` (Windows, ESC/POS crudo) corre en la PC de caja y el front le habla por `localhost`
   (`directPrintAgent.ts`, `printTicketAgent.ts`). Desde un celular `localhost` es el propio celular: no sirve tal cual.
@@ -32,9 +35,38 @@ térmica del local, sin depender del WiFi ni de que el celular esté en la misma
 - La impresión real no se puede probar sin la impresora: la valida el usuario en el local.
 
 ## Tareas
-- [ ] Por definir tras explorar (modelo de impresoras/jobs, canal agente↔servidor, UI celular).
+- Plan propuesto tras explorar (2026-09-30, sin confirmar). Decisiones de arquitectura:
+  el CELULAR genera los bytes ESC/POS (el logo se rasteriza con canvas en el navegador; `encodeSaleTicketEscPos`
+  es puro) y el backend solo los encola; el agente consulta por polling saliente (sin dependencias nuevas, sin
+  abrir puertos); auth del agente con token propio por agente (guardar solo el hash), nunca con el JWT de usuario;
+  el token NO va en la query string (header `Authorization`). Jobs con vencimiento corto para que no salgan
+  tickets viejos al prender la PC.
+- [x] T1 — Backend: modelos `Printer` + `PrintJob` (tenant-scoped, migración por pipeline), alta/listado de
+      impresoras (ADMIN), emparejamiento de agente (token de un solo uso → agente recibe su token), tests primero.
+- [x] T2 — Backend: crear job (VENDEDOR/CASHIER/ADMIN/MANAGEMENT, valida que la impresora sea de la org, tope de
+      tamaño), endpoints del agente (pendientes, confirmar impreso/error, heartbeat), vencimiento, tests primero.
+- [ ] T3 — print-agent: emparejamiento + loop de polling con backoff, soporte de varias impresoras locales
+      por agente, reporte de estado; tests primero (spooler inyectado).
+- [ ] T4 — Front: pantalla admin de impresoras (alta, emparejar, estado online) + en celular botón "Imprimir"
+      con selector de impresora (recuerda la última por sucursal) y estado del job; tests primero.
   Bloqueado solo por orden: terminar `scanner-sell-mode` primero. El print-agent ya fue probado en la PC de
   caja (usuario, 2026-09-30): imprime bien.
+
+## Evidencia T1/T2 (2026-09-30, backend, rama feat/print-relay)
+- T1 commit `6723a8e` (modelos Printer/PrintAgent/PrintJob + migración `20260930120000_print_relay` + admin
+  `/api/printers` + emparejamiento `POST /api/print-agent/pair`). T2 commit `9aef838` (`POST/GET /api/print-jobs`,
+  agente `heartbeat` / `GET jobs` / `POST jobs/:id/result` con `authenticateAgent`).
+- RED observado: jest falló con TS2307 "Cannot find module" (servicio, controllers, middleware) antes de implementar.
+- GREEN: T1 26 tests + routes 7; T2 43 tests (agentAuth, printJobController, printAgentController, routes);
+  `npx jest --testPathIgnorePatterns e2e` = 122 suites, 1779 passed, 2 skipped.
+- `npx tsc --noEmit`: sin errores fuera de `tests/e2e/*` (3 errores previos, ajenos). `npx prisma validate` OK.
+- Migración NO aplicada (no hay BD local): el SQL se contrastó contra `prisma migrate diff --from-empty --to-schema`
+  (mismos índices y FKs). Falta aplicarla por el pipeline y probar e2e en el VPS.
+- Ruta: delegated direct (un writer), trigger de escritura 2+ archivos.
+- Decisiones: token del agente `<agentId>.<secreto>` (hash SHA-256 + timingSafeEqual); código de emparejamiento
+  XXXXX-XXXXX (10 min, solo hash, índice único); `express.json` 512kb solo para `/api/print-jobs`.
+- Pendiente conocido: sin estado "en proceso" el agente podría reimprimir si un poll ocurre antes de reportar
+  (el agente debe reportar antes del siguiente poll).
 
 ## Próximo paso
 Terminar `scanner-sell-mode`; luego explorar `print-agent/` y el backend para partir en tareas.
