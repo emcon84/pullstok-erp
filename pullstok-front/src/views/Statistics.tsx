@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { PeriodSelector } from "../components/molecules/PeriodSelector";
 import { StatsChart } from "../components/molecules/StatsChart";
+import { RankedBarChart } from "../components/molecules/RankedBarChart";
 import { ExportButtons } from "../components/molecules/ExportButtons";
 import {
   PeriodFilter,
@@ -26,6 +27,8 @@ import {
   formatPeriodLabel,
   sumByPaymentMethod,
 } from "../utils/statsHelpers";
+import { aggregateSalesByCategory, aggregateTopProducts } from "../utils/salesAggregations";
+import type { Sale } from "../models/salesModel";
 import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
 import { useGetSales } from "../components/hooks/useSales";
@@ -112,6 +115,17 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filtered = filterByDateRange(data as any[], dateRange);
     return sumByPaymentMethod(filtered);
+  }, [data, type, period, selectedDay]);
+
+  // Rankings por monto (solo ventas): mismo filtro de período que statsData.
+  const rankings = useMemo(() => {
+    if (type !== "sales" || !data.length) return { categories: [], products: [] };
+    const dateRange = getDateRange(period, period === "daily" ? selectedDay : undefined);
+    const filtered = filterByDateRange(data as Sale[], dateRange);
+    return {
+      categories: aggregateSalesByCategory(filtered),
+      products: aggregateTopProducts(filtered),
+    };
   }, [data, type, period, selectedDay]);
 
   const totalPayments = paymentBreakdown.reduce((sum, r) => sum + r.amount, 0);
@@ -264,6 +278,27 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
           height={360}
         />
       </Card>
+
+      {type === "sales" && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="min-w-0 p-5">
+            <RankedBarChart
+              title="Ventas por categoría"
+              note="Montos de renglones, antes de descuentos y recargos de la venta."
+              data={rankings.categories}
+              color={color}
+            />
+          </Card>
+          <Card className="min-w-0 p-5">
+            <RankedBarChart
+              title="Productos más vendidos"
+              note="Top 10 por monto, antes de descuentos y recargos de la venta."
+              data={rankings.products}
+              color={color}
+            />
+          </Card>
+        </div>
+      )}
 
       <Card className="gap-0 overflow-hidden p-0">
         <div className="border-b p-4">
