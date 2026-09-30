@@ -89,3 +89,16 @@ térmica del local, sin depender del WiFi ni de que el celular esté en la misma
 
 ## Próximo paso
 Aplicar la migración por el pipeline, e2e en el VPS, construir el .exe 1.1.0 y probar de punta a punta en el local.
+
+## Cierre (2026-09-30)
+- Verificado por el usuario en producción: imprime desde el celular en la térmica de la caja (relay OK).
+- Agente 1.1.0 publicado (Release `print-agent-v1.1.0`); aviso de actualización en Ajustes (`8932eea`);
+  errores del relay visibles en el celular en vez de caer al panel (`673e6c5`).
+- Causa de la confusión: "Equipo" (PC con el agente, en línea) ≠ "Impresora" (entrada a crear con
+  "Nueva impresora"). Sin impresora creada, el celular decía "no hay impresoras configuradas".
+
+## Pendientes / mejoras
+- Emparejar sin completar deja equipos huérfanos ("Caja" x3): reutilizar o limpiar los no emparejados.
+- UX: tras emparejar un equipo, guiar o crear sola la impresora (hoy hay que ir a "Nueva impresora").
+- Sin estado "en proceso" en los jobs: el agente debe reportar antes del siguiente poll.
+- `DirectPrintSettings` no muestra el estado `paired` del agente.
