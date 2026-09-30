@@ -45,9 +45,9 @@ térmica del local, sin depender del WiFi ni de que el celular esté en la misma
       impresoras (ADMIN), emparejamiento de agente (token de un solo uso → agente recibe su token), tests primero.
 - [x] T2 — Backend: crear job (VENDEDOR/CASHIER/ADMIN/MANAGEMENT, valida que la impresora sea de la org, tope de
       tamaño), endpoints del agente (pendientes, confirmar impreso/error, heartbeat), vencimiento, tests primero.
-- [ ] T3 — print-agent: emparejamiento + loop de polling con backoff, soporte de varias impresoras locales
+- [x] T3 — print-agent: emparejamiento + loop de polling con backoff, soporte de varias impresoras locales
       por agente, reporte de estado; tests primero (spooler inyectado).
-- [ ] T4 — Front: pantalla admin de impresoras (alta, emparejar, estado online) + en celular botón "Imprimir"
+- [x] T4 — Front: pantalla admin de impresoras (alta, emparejar, estado online) + en celular botón "Imprimir"
       con selector de impresora (recuerda la última por sucursal) y estado del job; tests primero.
   Bloqueado solo por orden: terminar `scanner-sell-mode` primero. El print-agent ya fue probado en la PC de
   caja (usuario, 2026-09-30): imprime bien.
@@ -68,5 +68,24 @@ térmica del local, sin depender del WiFi ni de que el celular esté en la misma
 - Pendiente conocido: sin estado "en proceso" el agente podría reimprimir si un poll ocurre antes de reportar
   (el agente debe reportar antes del siguiente poll).
 
+## Evidencia T3/T4 (2026-09-30, rama feat/print-relay)
+- T3 commit `0e9f949` (print-agent 1.1.0: `src/relay.ts`, `POST /pair`, `/health` con `paired`+`serverUrl`, config
+  `serverUrl`/`agentId`/`agentToken`). RED: vitest falló (relay.test.ts sin módulo, config/server con 8 fallos);
+  GREEN: `npx vitest run` en print-agent = 6 archivos, 61 tests; `npx tsc --noEmit` OK.
+  Un test (no loguear el token) falló primero y llevó a agregar redacción en el log del relay.
+- Deviación backend `490b7fb`: `GET /api/print-jobs/printers` (impresoras activas para VENDEDOR/CASHIER/ADMIN/
+  MANAGEMENT). Sin esto el celular del vendedor no podía descubrir impresoras (`/api/printers` es solo ADMIN/MGMT).
+  RED: jest (listActivePrinters inexistente + ruta ausente); GREEN: 45 suites print/controllers, 520 tests.
+- T4a commit `c32ba94` (pantalla `/impresoras`, `PairThisPcDialog`, `pairAgent` en directPrintAgent, nav + permisos).
+- T4b commit `e72a63b` (`utils/relayPrint.ts`, `useTicketPrint`, orden agente -> relay -> panel en
+  `printSaleTicketViaAgent`, tarjeta "Imprimir ticket" en ScannerSellPanel, relay en UnifiedPos).
+- Front: tests nuevos RED observados antes de implementar; suite completa `npx vitest run src/__tests__` =
+  1215 passed, 8 failed (los 8 previos: priceKgUpdate x6, productDrawer x2). `npx tsc -p tsconfig.app.json
+  --noEmit` limpio; eslint limpio en archivos tocados salvo 1 error previo `no-explicit-any` en UnifiedPos.tsx:295.
+- Ruta: delegated direct (un writer).
+- NO verificado: impresión real extremo a agente (PC de caja) y celular; migración no aplicada/e2e en VPS; .exe y
+  Release sin construir (los hace el usuario); modo oscuro y táctil sin revisión visual; DirectPrintSettings no
+  muestra aún el estado `paired`.
+
 ## Próximo paso
-Terminar `scanner-sell-mode`; luego explorar `print-agent/` y el backend para partir en tareas.
+Aplicar la migración por el pipeline, e2e en el VPS, construir el .exe 1.1.0 y probar de punta a punta en el local.
