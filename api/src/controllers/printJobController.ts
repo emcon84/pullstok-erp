@@ -2,6 +2,7 @@ import { Response } from "express";
 import { prisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
 import { AuthedRequest } from "../middlewares/authMiddleware";
+import { AGENT_ONLINE_WINDOW_MS } from "../services/printAgentTokens";
 
 /** Tope del ticket ESC/POS ya decodificado (un logo rasterizado entra de sobra). */
 export const MAX_PAYLOAD_BYTES = 256 * 1024;
@@ -89,6 +90,38 @@ export const getPrintJob = async (req: AuthedRequest, res: Response) => {
         ? "EXPIRED"
         : job.status;
     res.status(200).json({ ...job, status });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * VENDEDOR/CASHIER/ADMIN/MANAGEMENT: impresoras ACTIVAS de la org para elegir a
+ * dónde imprimir desde el celular. Proyección mínima (sin agente ni nombres
+ * locales de Windows): el alta/edición sigue siendo de ADMIN/MANAGEMENT.
+ */
+export const listActivePrinters = async (_req: AuthedRequest, res: Response) => {
+  try {
+    const printers = await prisma.printer.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        branchId: true,
+        agent: { select: { lastSeenAt: true } },
+      },
+      orderBy: { name: "asc" },
+    });
+    res.status(200).json(
+      printers.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        branchId: p.branchId ?? null,
+        agentOnline:
+          !!p.agent?.lastSeenAt &&
+          Date.now() - new Date(p.agent.lastSeenAt).getTime() < AGENT_ONLINE_WINDOW_MS,
+      })),
+    );
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

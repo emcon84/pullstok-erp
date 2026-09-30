@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import {
   createPrintJob,
   getPrintJob,
+  listActivePrinters,
   MAX_PAYLOAD_BYTES,
   JOB_TTL_MS,
 } from "../../src/controllers/printJobController";
@@ -10,7 +11,7 @@ import { runWithTenant } from "../../src/config/tenantContext";
 
 jest.mock("../../src/config/db", () => ({
   prisma: {
-    printer: { findFirst: jest.fn() },
+    printer: { findFirst: jest.fn(), findMany: jest.fn() },
     printJob: { create: jest.fn(), findFirst: jest.fn() },
   },
 }));
@@ -144,5 +145,30 @@ describe("getPrintJob", () => {
     const res = mockResponse();
     await getPrintJob(mockRequest({ id: "j1" }), res);
     expect((res.json as jest.Mock).mock.calls[0][0].status).toBe("EXPIRED");
+  });
+});
+
+describe("listActivePrinters", () => {
+  beforeEach(() => jest.resetAllMocks());
+
+  it("lists only active printers of the org with a safe projection and online flag", async () => {
+    db.printer.findMany.mockResolvedValue([
+      { id: "p1", name: "Caja", branchId: "b1", agent: { lastSeenAt: new Date() } },
+      { id: "p2", name: "Depósito", branchId: null, agent: { lastSeenAt: new Date(Date.now() - 10 * 60_000) } },
+      { id: "p3", name: "Sin agente", branchId: "b1", agent: null },
+    ]);
+    const res = mockResponse();
+
+    await listActivePrinters(mockRequest(), res);
+
+    const args = db.printer.findMany.mock.calls[0][0];
+    expect(args.where).toEqual({ isActive: true });
+    expect(res.status).toHaveBeenCalledWith(200);
+    const body = (res.json as jest.Mock).mock.calls[0][0];
+    expect(body).toEqual([
+      { id: "p1", name: "Caja", branchId: "b1", agentOnline: true },
+      { id: "p2", name: "Depósito", branchId: null, agentOnline: false },
+      { id: "p3", name: "Sin agente", branchId: "b1", agentOnline: false },
+    ]);
   });
 });

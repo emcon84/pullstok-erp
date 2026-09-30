@@ -1,5 +1,6 @@
 import printerRoutes from "../../src/routes/printerRoutes";
 import printAgentRoutes from "../../src/routes/printAgentRoutes";
+import printJobRoutes from "../../src/routes/printJobRoutes";
 
 jest.mock("../../src/config/db", () => ({ prisma: {}, basePrisma: {} }));
 
@@ -79,5 +80,15 @@ describe("printJobRoutes — role gate", () => {
       expect(names).toContain("authenticateAgent");
       expect(names).not.toContain("authenticate");
     }
+  });
+});
+
+describe("printJobRoutes — active printer list for operational roles", () => {
+  it("registers GET /printers before GET /:id", () => {
+    const gets = stackOf(printJobRoutes)
+      .filter((l) => l.route?.methods.get)
+      .map((l) => l.route!.path);
+    expect(gets.indexOf("/printers")).toBeGreaterThanOrEqual(0);
+    expect(gets.indexOf("/printers")).toBeLessThan(gets.indexOf("/:id"));
   });
 });
