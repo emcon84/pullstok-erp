@@ -142,3 +142,42 @@ describe("DirectPrintSettings — Impresión directa de tickets", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("DirectPrintSettings — actualización del agente", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(isAgentEnabled).mockReturnValue(false);
+    vi.mocked(getAgentPrinters).mockResolvedValue(["OCOM 58"]);
+  });
+
+  const INSTALLER =
+    "https://github.com/emcon84/pullstok-erp/releases/latest/download/PullstokPrint-Setup.exe";
+
+  it("agente conectado con versión vieja: avisa y ofrece descargar el instalador", async () => {
+    vi.mocked(getAgentHealth).mockResolvedValue({ ...health("OCOM 58"), version: "1.0.0" });
+    render(<DirectPrintSettings />);
+
+    expect(await screen.findByText(/hay una versión nueva/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /descargar instalador/i })).toHaveAttribute(
+      "href",
+      INSTALLER,
+    );
+  });
+
+  it("agente con la versión actual o más nueva: no muestra el aviso", async () => {
+    vi.mocked(getAgentHealth).mockResolvedValue({ ...health("OCOM 58"), version: "1.1.0" });
+    render(<DirectPrintSettings />);
+
+    await screen.findByText(/conectado v1\.1\.0/i);
+    expect(screen.queryByText(/hay una versión nueva/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /descargar instalador/i })).not.toBeInTheDocument();
+  });
+
+  it("compara versiones numéricamente (1.10.0 es más nueva que 1.2.0)", async () => {
+    vi.mocked(getAgentHealth).mockResolvedValue({ ...health("OCOM 58"), version: "1.10.0" });
+    render(<DirectPrintSettings />);
+
+    await screen.findByText(/conectado v1\.10\.0/i);
+    expect(screen.queryByText(/hay una versión nueva/i)).not.toBeInTheDocument();
+  });
+});

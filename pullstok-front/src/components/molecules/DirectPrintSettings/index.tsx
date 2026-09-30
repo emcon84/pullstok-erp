@@ -23,6 +23,20 @@ import {
 const INSTALLER_URL =
   "https://github.com/emcon84/pullstok-erp/releases/latest/download/PullstokPrint-Setup.exe";
 
+// Última versión publicada del agente (subir junto con print-agent/package.json).
+const LATEST_AGENT_VERSION = "1.1.0";
+
+// true si `current` es estrictamente menor que `latest`; compara numéricamente por tramo.
+const isOlderVersion = (current: string, latest: string) => {
+  const a = current.split(".").map((n) => parseInt(n, 10) || 0);
+  const b = latest.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0);
+    if (diff !== 0) return diff < 0;
+  }
+  return false;
+};
+
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
 
@@ -136,6 +150,24 @@ export function DirectPrintSettings() {
             <p>
               Si Windows muestra SmartScreen, elegí &quot;Más información&quot; y luego
               &quot;Ejecutar de todas formas&quot;.
+            </p>
+            <Button asChild variant="outline">
+              <a href={INSTALLER_URL} download>
+                <Download className="mr-2 h-4 w-4" />
+                Descargar instalador
+              </a>
+            </Button>
+          </div>
+        )}
+
+        {connected && isOlderVersion(health.version, LATEST_AGENT_VERSION) && (
+          <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+            <p className="font-medium">
+              Hay una versión nueva del agente (v{LATEST_AGENT_VERSION}).
+            </p>
+            <p>
+              Descargá el instalador y ejecutalo: actualiza el agente y conserva la
+              impresora elegida.
             </p>
             <Button asChild variant="outline">
               <a href={INSTALLER_URL} download>
