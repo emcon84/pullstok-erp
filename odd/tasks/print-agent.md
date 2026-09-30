@@ -70,7 +70,7 @@ por el spooler de Windows (texto con la tipografía interna de la impresora). Fa
       `encodeSaleTicketEscPos` + logo). Tests primero. Ruta: delegada (writer 2). Commit `a4e96f4`.
 - [x] T4 — Front: UI de configuración (descarga, detección, selector de impresora, prueba). Tests primero.
       Ruta: delegada (mismo writer 2). Commit `0c244b1`.
-- [ ] T5 — Prueba real en la PC de caja (usuario) + publicar Release (con OK del usuario).
+- [x] T5 — (prueba real OK y Release publicado, según el usuario, 2026-09-30) Prueba real en la PC de caja (usuario) + publicar Release (con OK del usuario).
 
 ## Progreso
 - Rama `feat/print-agent` creada desde `main` (`8e9f9c2`). Mapeo hecho.
