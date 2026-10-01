@@ -5,6 +5,8 @@
  */
 import {
   createCustomerSchema,
+  createProviderSchema,
+  updateProviderSchema,
   updateCustomerSchema,
   createAccountChargeSchema,
 } from "../../src/validation/schemas";
@@ -108,5 +110,74 @@ describe("createAccountChargeSchema — cargo histórico (T2)", () => {
 
   it("rechaza notas de más de 500 caracteres", () => {
     expect(createAccountChargeSchema.safeParse({ amount: 10, note: "x".repeat(501) }).success).toBe(false);
+  });
+});
+
+describe("customer — campos de import GFLOW", () => {
+  it("acepta code/locality/province/zone/isActive y normaliza vacíos a null", () => {
+    const r = createCustomerSchema.safeParse({
+      code: " C-001 ",
+      locality: "Rosario",
+      province: "Santa Fe",
+      zone: "  ",
+      isActive: false,
+    });
+    expect(r.success).toBe(true);
+    expect(r.data).toMatchObject({
+      code: "C-001",
+      locality: "Rosario",
+      province: "Santa Fe",
+      zone: null,
+      isActive: false,
+    });
+  });
+
+  it("rechaza isActive no booleano", () => {
+    expect(createCustomerSchema.safeParse({ isActive: "no" }).success).toBe(false);
+  });
+});
+
+describe("createProviderSchema / updateProviderSchema", () => {
+  it("exige nombre", () => {
+    expect(createProviderSchema.safeParse({}).success).toBe(false);
+    expect(createProviderSchema.safeParse({ name: "   " }).success).toBe(false);
+  });
+
+  it("acepta solo el nombre (back-compat) y recorta espacios", () => {
+    const r = createProviderSchema.safeParse({ name: "  Alican  " });
+    expect(r.success).toBe(true);
+    expect(r.data!.name).toBe("Alican");
+  });
+
+  it("acepta todos los campos administrativos", () => {
+    const r = createProviderSchema.safeParse({
+      name: "Distribuidora SA",
+      code: "P-10",
+      taxId: "30-12345678-9",
+      taxCondition: "RI",
+      address: "Calle 1",
+      locality: "CABA",
+      province: "Buenos Aires",
+      phone: "11 1234",
+      email: "prov@mail.com",
+      classification: "GAST",
+      accountingRef: "2001 Proveedores Varios",
+      isActive: true,
+    });
+    expect(r.success).toBe(true);
+    expect(r.data!.accountingRef).toBe("2001 Proveedores Varios");
+  });
+
+  it("normaliza strings vacíos a null y valida el email", () => {
+    const r = createProviderSchema.safeParse({ name: "X", email: "", code: " " });
+    expect(r.success).toBe(true);
+    expect(r.data!.email).toBeNull();
+    expect(r.data!.code).toBeNull();
+    expect(createProviderSchema.safeParse({ name: "X", email: "no-mail" }).success).toBe(false);
+  });
+
+  it("update es parcial pero no permite nombre vacío", () => {
+    expect(updateProviderSchema.safeParse({ isActive: false }).success).toBe(true);
+    expect(updateProviderSchema.safeParse({ name: "" }).success).toBe(false);
   });
 });

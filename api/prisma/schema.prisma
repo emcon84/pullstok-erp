@@ -34,6 +34,14 @@ enum Plan {
   PREMIUM
 }
 
+// Modo de interfaz por organización. OPERATIVO = punto de venta / comercio
+// (POS, tienda, dashboard). ADMINISTRATIVO = uso como sistema contable /
+// administrativo (home launcher por áreas, sin entradas de POS).
+enum UiMode {
+  OPERATIVO
+  ADMINISTRATIVO
+}
+
 // Tipo de layout de la planilla de precios del proveedor Alican
 // (sdd/alican-wholesale-price-list).
 enum PriceListType {
@@ -95,6 +103,9 @@ model Organization {
   // "no configurado" → el front cae al comportamiento legacy por plan + suelto
   // condicional (ver resolveEffectiveModules en config/planLimits.ts).
   enabledModules        String[]    @default([])
+  // Modo de interfaz (ver enum UiMode). Default OPERATIVO: las orgs existentes
+  // no cambian de comportamiento. Solo SUPERADMIN lo modifica.
+  uiMode                UiMode      @default(OPERATIVO)
   users                 User[]
   products              Product[]
   providers             Provider[]
@@ -220,6 +231,13 @@ model Customer {
   taxId          String?
   taxCondition   String?
   address        String?
+  // Alta masiva desde sistema legado (GFLOW): código de cliente legado, zona
+  // geográfica/comercial y activo/inactivo (los inactivos se conservan).
+  code           String?
+  locality       String?
+  province       String?
+  zone           String?
+  isActive       Boolean      @default(true)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   orders         Order[]
@@ -231,6 +249,8 @@ model Customer {
 
   // Email único POR organización (dos negocios pueden tener el mismo cliente).
   @@unique([organizationId, email])
+  // Código legado único POR organización (varios NULL no colisionan en Postgres).
+  @@unique([organizationId, code])
   @@index([organizationId])
   @@map("customers")
 }
@@ -304,11 +324,29 @@ model ProductVariant {
 model Provider {
   id             String       @id @default(uuid())
   name           String
+  // Datos administrativos del proveedor (alta masiva desde GFLOW). Todo opcional:
+  // los Provider creados por la planilla mayorista solo tienen `name`.
+  code           String?
+  taxId          String?
+  taxCondition   String?
+  address        String?
+  locality       String?
+  province       String?
+  phone          String?
+  email          String?
+  classification String?
+  // Referencia contable legada en texto libre (ej. "2001 Proveedores Varios").
+  // Más adelante pasará a ser una relación con el plan de cuentas.
+  accountingRef  String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   products       Product[]
 
   @@unique([organizationId, name])
+  // Código legado único POR organización (varios NULL no colisionan en Postgres).
+  @@unique([organizationId, code])
   @@index([organizationId])
   @@map("providers")
 }

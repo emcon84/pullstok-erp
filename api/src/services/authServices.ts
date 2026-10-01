@@ -82,6 +82,8 @@ class AuthService {
         // los usa para armar el sidebar sin pegarle a GET /api/modules en cada
         // login. Array vacío = "no configurado" → fallback legacy por plan.
         enabledModules: user.organization?.enabledModules ?? [],
+        // Modo de interfaz (OPERATIVO | ADMINISTRATIVO). null para SUPERADMIN.
+        uiMode: user.organization?.uiMode ?? null,
       },
     };
   }
@@ -231,6 +233,7 @@ class AuthService {
             ingresosBrutos: true,
             inicioActividades: true,
             enabledModules: true,
+            uiMode: true,
           },
         },
       },

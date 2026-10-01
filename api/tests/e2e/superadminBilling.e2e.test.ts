@@ -122,6 +122,32 @@ describe('E2E: billing manual de superadmin (plan + pago)', () => {
     expect(res.body.plan).toBe('BASICO');
   });
 
+  it('PATCH /organizations/:id/ui-mode cambia el modo de interfaz y el listado lo expone', async () => {
+    const res = await request(app)
+      .patch(`/api/superadmin/organizations/${organizationId}/ui-mode`)
+      .set('Authorization', `Bearer ${superadminToken}`)
+      .send({ uiMode: 'ADMINISTRATIVO' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.uiMode).toBe('ADMINISTRATIVO');
+
+    const list = await request(app)
+      .get('/api/superadmin/organizations')
+      .set('Authorization', `Bearer ${superadminToken}`);
+    expect(list.body.find((o: any) => o.id === organizationId).uiMode).toBe(
+      'ADMINISTRATIVO',
+    );
+  });
+
+  it('PATCH /organizations/:id/ui-mode rechaza un valor inválido', async () => {
+    const res = await request(app)
+      .patch(`/api/superadmin/organizations/${organizationId}/ui-mode`)
+      .set('Authorization', `Bearer ${superadminToken}`)
+      .send({ uiMode: 'CONTABLE' });
+
+    expect(res.status).toBe(400);
+  });
+
   it('PATCH /organizations/:id/billing registra un pago: paidUntil = ahora + 1 mes', async () => {
     const before = new Date();
 

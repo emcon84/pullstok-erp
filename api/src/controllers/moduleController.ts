@@ -9,7 +9,7 @@ import {
   validateModules,
   type ModuleRegistryEntry,
 } from "../config/planLimits";
-import type { Plan } from "@prisma/client";
+import type { Plan, UiMode } from "@prisma/client";
 
 // Módulos por negocio (sdd/modulos-por-negocio). Organization NO está en
 // TENANT_MODELS (ver db.ts) — es un modelo 1:1 de plataforma, así que se
@@ -22,12 +22,13 @@ interface OrgModulesPayload {
   planAllowed: string[];
   enabledModules: string[];
   hasPriceKg: boolean;
+  uiMode: UiMode;
 }
 
 const getOrgModules = async (organizationId: string): Promise<OrgModulesPayload> => {
   const org = await basePrisma.organization.findUnique({
     where: { id: organizationId },
-    select: { plan: true, enabledModules: true },
+    select: { plan: true, enabledModules: true, uiMode: true },
   });
   if (!org) {
     throw new Error("Organización no encontrada");
@@ -47,7 +48,14 @@ const getOrgModules = async (organizationId: string): Promise<OrgModulesPayload>
     enabled: effective.includes(m.key),
   }));
 
-  return { registry, plan, planAllowed, enabledModules, hasPriceKg };
+  return {
+    registry,
+    plan,
+    planAllowed,
+    enabledModules,
+    hasPriceKg,
+    uiMode: org.uiMode,
+  };
 };
 
 /** GET /api/modules — estado de módulos de SU organización (cualquier rol). */

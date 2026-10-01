@@ -92,6 +92,10 @@ export const updateOrganizationPlanSchema = z.object({
   plan: z.enum(["BASICO", "PRO", "PREMIUM"]),
 });
 
+export const updateOrganizationUiModeSchema = z.object({
+  uiMode: z.enum(["OPERATIVO", "ADMINISTRATIVO"]),
+});
+
 export const registerBillingPaymentSchema = z.object({
   action: z.literal("pay"),
 });
@@ -254,8 +258,34 @@ export const createCustomerSchema = z.object({
   taxId: optionalText,
   taxCondition: optionalText,
   address: optionalText,
+  // Alta masiva desde GFLOW: código legado, zona/localidad/provincia y activo.
+  code: optionalText,
+  locality: optionalText,
+  province: optionalText,
+  zone: optionalText,
+  isActive: z.boolean().optional(),
 });
 export const updateCustomerSchema = createCustomerSchema.partial();
+
+// ---------- Proveedores ----------
+// El nombre es obligatorio (lo usa la planilla mayorista y agrupa productos);
+// el resto de los datos administrativos son opcionales y los strings vacíos
+// se normalizan a null, igual que en clientes.
+export const createProviderSchema = z.object({
+  name: z.string().trim().min(1, "El nombre es requerido"),
+  code: optionalText,
+  taxId: optionalText,
+  taxCondition: optionalText,
+  address: optionalText,
+  locality: optionalText,
+  province: optionalText,
+  phone: optionalText,
+  email: z.preprocess(blankToNull, z.email().nullable().optional()),
+  classification: optionalText,
+  accountingRef: optionalText,
+  isActive: z.boolean().optional(),
+});
+export const updateProviderSchema = createProviderSchema.partial();
 
 // ---------- Ventas ----------
 // saleMode (sdd/venta-alimento-suelto B-08): opcional en el payload —

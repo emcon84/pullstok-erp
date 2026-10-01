@@ -92,7 +92,7 @@ describe("E2E: Modules API", () => {
     expect(res.status).toBe(200);
     expect(res.body.plan).toBe("PRO");
     expect(Array.isArray(res.body.registry)).toBe(true);
-    expect(res.body.registry.length).toBe(13);
+    expect(res.body.registry.length).toBe(14);
     expect(res.body.enabledModules).toEqual([]);
     expect(res.body.hasPriceKg).toBe(false);
     // PRO: permite los módulos PRO pero no bot (PREMIUM).

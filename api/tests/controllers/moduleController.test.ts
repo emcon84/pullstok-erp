@@ -48,6 +48,7 @@ describe("moduleController", () => {
       mockedDb.organization.findUnique.mockResolvedValue({
         plan: "PRO",
         enabledModules: [],
+        uiMode: "ADMINISTRATIVO",
       });
       mockedDb.priceKgPrice.count.mockResolvedValue(0);
 
@@ -58,7 +59,7 @@ describe("moduleController", () => {
 
       expect(mockedDb.organization.findUnique).toHaveBeenCalledWith({
         where: { id: orgId },
-        select: { plan: true, enabledModules: true },
+        select: { plan: true, enabledModules: true, uiMode: true },
       });
       expect(mockedDb.priceKgPrice.count).toHaveBeenCalledWith({
         where: { organizationId: orgId },
@@ -69,6 +70,7 @@ describe("moduleController", () => {
       expect(body.plan).toBe("PRO");
       expect(body.enabledModules).toEqual([]);
       expect(body.hasPriceKg).toBe(false);
+      expect(body.uiMode).toBe("ADMINISTRATIVO");
       // planAllowed contiene todos los módulos permitidos por PRO
       expect(body.planAllowed).toContain("pricing");
       expect(body.planAllowed).toContain("tienda");

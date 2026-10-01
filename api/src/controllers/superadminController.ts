@@ -2,7 +2,7 @@ import { Response } from "express";
 import AuthService from "../services/authServices";
 import { basePrisma } from "../config/db";
 import { AuthedRequest } from "../middlewares/authMiddleware";
-import { Plan } from "@prisma/client";
+import { Plan, UiMode } from "@prisma/client";
 
 /** Crea una organización (negocio cliente) + su usuario ADMIN inicial. */
 export const createOrganization = async (req: AuthedRequest, res: Response) => {
@@ -38,6 +38,7 @@ export const listOrganizations = async (_req: AuthedRequest, res: Response) => {
         isActive: true,
         createdAt: true,
         plan: true,
+        uiMode: true,
         paidUntil: true,
         _count: { select: { users: true, products: true } },
       },
@@ -83,6 +84,23 @@ export const updateOrganizationPlan = async (
     const org = await basePrisma.organization.update({
       where: { id: req.params.id },
       data: { plan },
+    });
+    res.status(200).json(org);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+/** Cambia el modo de interfaz (OPERATIVO / ADMINISTRATIVO) de una organización. */
+export const updateOrganizationUiMode = async (
+  req: AuthedRequest,
+  res: Response,
+) => {
+  const { uiMode } = req.body as { uiMode: UiMode };
+  try {
+    const org = await basePrisma.organization.update({
+      where: { id: req.params.id },
+      data: { uiMode },
     });
     res.status(200).json(org);
   } catch (error: any) {

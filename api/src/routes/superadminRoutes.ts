@@ -4,6 +4,7 @@ import { validate } from "../middlewares/validate";
 import {
   createOrganizationSchema,
   updateOrganizationPlanSchema,
+  updateOrganizationUiModeSchema,
   registerBillingPaymentSchema,
   superadminCreateUserSchema,
 } from "../validation/schemas";
@@ -12,6 +13,7 @@ import {
   listOrganizations,
   setOrganizationActive,
   updateOrganizationPlan,
+  updateOrganizationUiMode,
   registerOrganizationBilling,
   clearOrganizationConversations,
   listOrgUsers,
@@ -37,6 +39,11 @@ router.patch(
   "/organizations/:id/plan",
   validate(updateOrganizationPlanSchema),
   updateOrganizationPlan,
+);
+router.patch(
+  "/organizations/:id/ui-mode",
+  validate(updateOrganizationUiModeSchema),
+  updateOrganizationUiMode,
 );
 router.patch(
   "/organizations/:id/billing",

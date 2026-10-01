@@ -55,6 +55,17 @@ describe('Customer Controller', () => {
       expect(res.json).toHaveBeenCalledWith(created);
     });
 
+    it('devuelve 409 si el código legado ya existe en la org', async () => {
+      mockedPrisma.customer.create.mockRejectedValue({
+        code: 'P2002',
+        meta: { target: ['organizationId', 'code'] },
+      });
+      const res = mockResponse();
+      await customerController.createCustomer(mockRequest({}, { code: 'C-1' }), res);
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({ message: 'Ya existe un cliente con ese código' });
+    });
+
     it('devuelve 400 si Prisma lanza un error', async () => {
       mockedPrisma.customer.create.mockRejectedValue(new Error('Error creating customer'));
 
@@ -80,6 +91,19 @@ describe('Customer Controller', () => {
 
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(customers);
+    });
+
+    it('filtra por activos y busca por nombre/código/CUIT/email', async () => {
+      mockedPrisma.customer.findMany.mockResolvedValue([]);
+
+      const req = { params: {}, body: {}, query: { q: ' C-1 ', active: 'false' } } as unknown as Request;
+      await customerController.getCustomers(req, mockResponse());
+
+      const arg = mockedPrisma.customer.findMany.mock.calls[0][0];
+      expect(arg.where.isActive).toBe(false);
+      expect(arg.where.OR).toEqual(
+        expect.arrayContaining([{ code: { contains: 'C-1', mode: 'insensitive' } }]),
+      );
     });
 
     it('devuelve 500 si Prisma lanza un error', async () => {

@@ -118,6 +118,7 @@ describe('AuthService', () => {
           branchIds: ['b-1', 'b-2'],
           plan: null,
           enabledModules: [],
+          uiMode: null,
         },
       });
     });
