@@ -47,6 +47,7 @@ import { FilterChips } from "../components/molecules/FilterChips";
 import { TransitionSearchInput } from "../components/molecules/TransitionSearchInput";
 import { planTitleKeyOf } from "@/lib/printGrouping";
 import { VendorChatWidget } from "@/components/organisms/VendorChat";
+import { useUiMode } from "@/hooks/useUiMode";
 import {
   parseFilterTerms,
   matchesProductFilter,
@@ -59,6 +60,10 @@ type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
 const PRINT_SETTLE_MS = 400;
 
 export const Dashboard = () => {
+  // En modo ADMINISTRATIVO /stock reutiliza esta vista recortada: solo el
+  // listado de productos, sin POS, estadísticas, venta rápida ni chat de ventas.
+  const isAdminMode = useUiMode() === "ADMINISTRATIVO";
+  const showVendorChat = !isAdminMode;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerProduct, setDrawerProduct] = useState<DataItem | null>(null);
   const [quickPriceProduct, setQuickPriceProduct] = useState<DataItem | null>(null);
@@ -120,11 +125,11 @@ export const Dashboard = () => {
 
   // ── Vendor/Cashier quick-sale POS unificado ──
   // Widget de chat de asistente de ventas (FAB flotante)
-  if (branchMode.kind === "single") {
+  if (branchMode.kind === "single" && !isAdminMode) {
     return (
       <>
         <UnifiedPos branchId={branchMode.branchId} />
-        <VendorChatWidget sellerId={currentUser?.id ?? ""} />
+        {showVendorChat && <VendorChatWidget sellerId={currentUser?.id ?? ""} />}
       </>
     );
   }
@@ -335,9 +340,11 @@ export const Dashboard = () => {
       {/* Encabezado + acciones */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {isAdminMode ? "Stock" : "Dashboard"}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Resumen y stock de tu negocio
+            {isAdminMode ? "Productos y existencias" : "Resumen y stock de tu negocio"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -349,7 +356,7 @@ export const Dashboard = () => {
             <Upload className="h-4 w-4" />
             Importar CSV
           </Button>
-          {(userRole === "ADMIN" || userRole === "MANAGEMENT") && (
+          {!isAdminMode && (userRole === "ADMIN" || userRole === "MANAGEMENT") && (
             <Button variant="outline" onClick={() => setSecoReportOpen(true)}>
               <Barcode className="h-4 w-4" />
               Alimento seco · barras
@@ -359,14 +366,17 @@ export const Dashboard = () => {
             <Printer className="h-4 w-4" />
             Imprimir listado
           </Button>
-          <Button variant="outline" onClick={addSales}>
-            <ShoppingCart className="h-4 w-4" />
-            Nueva venta
-          </Button>
+          {!isAdminMode && (
+            <Button variant="outline" onClick={addSales}>
+              <ShoppingCart className="h-4 w-4" />
+              Nueva venta
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Stat cards */}
+      {/* Stat cards (no en modo ADMINISTRATIVO) */}
+      {!isAdminMode && (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Ventas"
@@ -403,6 +413,7 @@ export const Dashboard = () => {
           color="info"
         />
       </div>
+      )}
 
       {/* Indicador de sucursal seleccionada */}
       {selectedBranchName && (
@@ -444,7 +455,7 @@ export const Dashboard = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los proveedores</SelectItem>
-              <SelectItem value="PURINA">PURINA</SelectItem>
+              {!isAdminMode && <SelectItem value="PURINA">PURINA</SelectItem>}
               {availableProviders.map((name) => (
                 <SelectItem key={name} value={name}>
                   {name}
@@ -537,7 +548,7 @@ export const Dashboard = () => {
       <GenericModal isOpen={isModalUploadOpen} onClose={closeModalUpload}>
         <ModalContentUploadCsv />
       </GenericModal>
-      <VendorChatWidget sellerId={currentUser?.id ?? ""} />
+      {showVendorChat && <VendorChatWidget sellerId={currentUser?.id ?? ""} />}
     </div>
   );
 };

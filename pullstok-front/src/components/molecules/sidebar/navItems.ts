@@ -4,6 +4,7 @@ import {
   ClipboardList,
   ShoppingCart,
   Truck,
+  Factory,
   Users,
   Store,
   Receipt,
@@ -46,6 +47,8 @@ export interface NavGroup {
   label: string;
   icon: typeof LayoutDashboard;
   items: NavItem[];
+  /** Grupo de un único link directo (sin acordeón). Solo modo ADMINISTRATIVO. */
+  flat?: boolean;
 }
 
 export const navGroups: NavGroup[] = [
@@ -76,6 +79,7 @@ export const navGroups: NavGroup[] = [
       { to: "/pedidos-whatsapp", label: "Pedidos WhatsApp", icon: MessageCircle, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
       { to: "/facturas", label: "Remitos", icon: Truck, visibleRoles: ["ADMIN", "MANAGEMENT", "CASHIER"] },
       { to: "/Clientes", label: "Clientes", icon: Users, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
+      { to: "/Proveedores", label: "Proveedores", icon: Factory, moduleKey: "proveedores", visibleRoles: ["ADMIN", "MANAGEMENT"] },
     ],
   },
   {

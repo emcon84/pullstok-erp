@@ -2,6 +2,7 @@ import axios from "axios";
 import { API_URL } from "../constants";
 import { Plan } from "./onboardingService";
 import type { BranchData } from "./branchService";
+import type { UiMode } from "./modulesService";
 
 // ── Types shared with userService ───────────────────────────
 
@@ -43,6 +44,7 @@ export interface SuperadminOrganization {
   isActive: boolean;
   createdAt: string;
   plan: Plan;
+  uiMode: UiMode;
   paidUntil: string | null;
   isPaymentOverdue: boolean;
   _count: {
@@ -94,6 +96,30 @@ export const createOrganization = async (
     if (axios.isAxiosError(error)) {
       throw new Error(
         error.response?.data?.message || "Error creating organization",
+      );
+    }
+    throw new Error("An unknown error occurred");
+  }
+};
+
+export const updateOrganizationUiMode = async ({
+  id,
+  uiMode,
+}: {
+  id: string;
+  uiMode: UiMode;
+}): Promise<SuperadminOrganization> => {
+  try {
+    const response = await axios.patch<SuperadminOrganization>(
+      `${API_URL}/superadmin/organizations/${id}/ui-mode`,
+      { uiMode },
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Error updating organization UI mode",
       );
     }
     throw new Error("An unknown error occurred");

@@ -1,11 +1,17 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Phone, Users, Wallet } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Users, Wallet, Search } from "lucide-react";
 import { toast } from "react-toastify";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GenericModal } from "../components/molecules/GenericModal";
-import { ModalContentCustomer } from "../components/molecules/GenericModal/ModalContentCustomer";
+import {
+  ModalContentCustomer,
+  EMPTY_CUSTOMER_EXTRA,
+  type CustomerExtra,
+} from "../components/molecules/GenericModal/ModalContentCustomer";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   useCreateCustomer,
   useCustomers,
@@ -40,7 +46,11 @@ export const Customers = () => {
   const [newCustomerTaxId, setNewCustomerTaxId] = useState("");
   const [newCustomerTaxCondition, setNewCustomerTaxCondition] = useState("");
   const [newCustomerAddress, setNewCustomerAddress] = useState("");
+  const [newCustomerExtra, setNewCustomerExtra] = useState<CustomerExtra>(EMPTY_CUSTOMER_EXTRA);
   const [loadingPadron, setLoadingPadron] = useState(false);
+  // Filtros de la lista (búsqueda por nombre/código/CUIT + estado).
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   const [editCustomerId, setEditCustomerId] = useState<string | null>(null);
   const [updatedCustomerName, setUpdatedCustomerName] = useState("");
@@ -49,6 +59,7 @@ export const Customers = () => {
   const [updatedCustomerTaxId, setUpdatedCustomerTaxId] = useState("");
   const [updatedCustomerTaxCondition, setUpdatedCustomerTaxCondition] = useState("");
   const [updatedCustomerAddress, setUpdatedCustomerAddress] = useState("");
+  const [updatedCustomerExtra, setUpdatedCustomerExtra] = useState<CustomerExtra>(EMPTY_CUSTOMER_EXTRA);
 
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
@@ -141,6 +152,11 @@ export const Customers = () => {
         taxId: newCustomerTaxId || undefined,
         taxCondition: newCustomerTaxCondition || undefined,
         address: newCustomerAddress || undefined,
+        code: newCustomerExtra.code.trim() || undefined,
+        locality: newCustomerExtra.locality.trim() || undefined,
+        province: newCustomerExtra.province.trim() || undefined,
+        zone: newCustomerExtra.zone.trim() || undefined,
+        isActive: newCustomerExtra.isActive ? undefined : false,
       },
       {
         onSuccess: () => {
@@ -184,6 +200,13 @@ export const Customers = () => {
       setUpdatedCustomerTaxId(customerMatch.taxId ?? "");
       setUpdatedCustomerTaxCondition(customerMatch.taxCondition ?? "");
       setUpdatedCustomerAddress(customerMatch.address ?? "");
+      setUpdatedCustomerExtra({
+        code: customerMatch.code ?? "",
+        locality: customerMatch.locality ?? "",
+        province: customerMatch.province ?? "",
+        zone: customerMatch.zone ?? "",
+        isActive: customerMatch.isActive !== false,
+      });
       setIsEditModalOpen(true);
     }
   };
@@ -199,6 +222,12 @@ export const Customers = () => {
         taxId: updatedCustomerTaxId || undefined,
         taxCondition: updatedCustomerTaxCondition || undefined,
         address: updatedCustomerAddress || undefined,
+        // El backend normaliza "" a null, así que acá se puede limpiar el campo.
+        code: updatedCustomerExtra.code.trim(),
+        locality: updatedCustomerExtra.locality.trim(),
+        province: updatedCustomerExtra.province.trim(),
+        zone: updatedCustomerExtra.zone.trim(),
+        isActive: updatedCustomerExtra.isActive,
       },
       {
         onSuccess: () => {
@@ -221,6 +250,7 @@ export const Customers = () => {
     setNewCustomerTaxId("");
     setNewCustomerTaxCondition("");
     setNewCustomerAddress("");
+    setNewCustomerExtra(EMPTY_CUSTOMER_EXTRA);
   };
 
   const closeEditModal = () => {
@@ -232,7 +262,18 @@ export const Customers = () => {
     setUpdatedCustomerTaxId("");
     setUpdatedCustomerTaxCondition("");
     setUpdatedCustomerAddress("");
+    setUpdatedCustomerExtra(EMPTY_CUSTOMER_EXTRA);
   };
+
+  const term = search.trim().toLowerCase();
+  const visibleCustomers = (customers ?? []).filter((c) => {
+    if (statusFilter === "active" && c.isActive === false) return false;
+    if (statusFilter === "inactive" && c.isActive !== false) return false;
+    if (!term) return true;
+    return [c.name, c.code, c.taxId, c.email].some((v) =>
+      (v ?? "").toLowerCase().includes(term),
+    );
+  });
 
   if (loading) {
     return (
@@ -267,6 +308,40 @@ export const Customers = () => {
         </Button>
       </div>
 
+      {customers && customers.length > 0 && (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nombre, código o CUIT"
+              aria-label="Buscar clientes"
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-1" role="group" aria-label="Filtrar por estado">
+            {(
+              [
+                ["all", "Todos"],
+                ["active", "Activos"],
+                ["inactive", "Inactivos"],
+              ] as const
+            ).map(([value, label]) => (
+              <Button
+                key={value}
+                type="button"
+                size="sm"
+                variant={statusFilter === value ? "default" : "outline"}
+                onClick={() => setStatusFilter(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!customers || customers.length === 0 ? (
         <Card className="flex flex-col items-center justify-center gap-2 p-12 text-center">
           <Users className="h-8 w-8 text-muted-foreground" />
@@ -277,7 +352,12 @@ export const Customers = () => {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {customers.map((customer) => {
+          {visibleCustomers.length === 0 && (
+            <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
+              Ningún cliente coincide con la búsqueda.
+            </p>
+          )}
+          {visibleCustomers.map((customer) => {
             const customerId = customer.id || customer._id || "";
             const balance = balanceById.get(customerId) ?? 0;
             return (
@@ -290,8 +370,17 @@ export const Customers = () => {
                     <div className="min-w-0">
                       <p className="truncate font-medium">{customerDisplayName(customer)}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {customer.email}
+                        {[customer.code, customer.email].filter(Boolean).join(" · ")}
                       </p>
+                      {(customer.locality || customer.province || customer.zone) && (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[customer.locality, customer.province].filter(Boolean).join(", ")}
+                          {customer.zone ? ` · Zona ${customer.zone}` : ""}
+                        </p>
+                      )}
+                      {customer.isActive === false && (
+                        <Badge variant="secondary" className="mt-1">Inactivo</Badge>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-1">
@@ -360,6 +449,8 @@ export const Customers = () => {
           taxId={newCustomerTaxId}
           taxCondition={newCustomerTaxCondition}
           address={newCustomerAddress}
+          extra={newCustomerExtra}
+          setExtra={setNewCustomerExtra}
           setName={setNewCustomerName}
           setEmail={setNewCustomerEmail}
           setPhone={setNewCustomerPhone}
@@ -383,6 +474,8 @@ export const Customers = () => {
           taxId={updatedCustomerTaxId}
           taxCondition={updatedCustomerTaxCondition}
           address={updatedCustomerAddress}
+          extra={updatedCustomerExtra}
+          setExtra={setUpdatedCustomerExtra}
           setName={setUpdatedCustomerName}
           setEmail={setUpdatedCustomerEmail}
           setPhone={setUpdatedCustomerPhone}

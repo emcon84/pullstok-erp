@@ -10,6 +10,7 @@ import { useOrgModules } from "../components/hooks/useOrgModules";
 import type {
   ModuleRegistryEntry,
   Plan,
+  UiMode,
 } from "../services/modulesService";
 
 export interface OrgModulesContextValue {
@@ -18,6 +19,8 @@ export interface OrgModulesContextValue {
   planAllowed: string[];
   enabledModules: string[];
   hasPriceKg: boolean;
+  /** null = todavía no cargó (usar el fallback de localStorage, ver useUiMode). */
+  uiMode: UiMode | null;
   isLoading: boolean;
   refresh: () => void;
 }
@@ -31,6 +34,7 @@ const DEFAULT_CONTEXT: OrgModulesContextValue = {
   planAllowed: EMPTY_STRINGS,
   enabledModules: EMPTY_STRINGS,
   hasPriceKg: false,
+  uiMode: null,
   isLoading: true,
   refresh: () => {},
 };
@@ -59,6 +63,7 @@ export const OrgModulesProvider = ({ children }: { children: ReactNode }) => {
     planAllowed: modules?.planAllowed ?? EMPTY_STRINGS,
     enabledModules: modules?.enabledModules ?? EMPTY_STRINGS,
     hasPriceKg: modules?.hasPriceKg ?? false,
+    uiMode: modules?.uiMode ?? null,
     isLoading: loading,
     refresh,
   };

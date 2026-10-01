@@ -3,6 +3,9 @@ import { API_URL } from "../constants";
 
 export type Plan = "BASICO" | "PRO" | "PREMIUM";
 
+// Modo de interfaz de la organización (lo define el SUPERADMIN).
+export type UiMode = "OPERATIVO" | "ADMINISTRATIVO";
+
 export interface ModuleRegistryEntry {
   key: string;
   label: string;
@@ -16,6 +19,7 @@ export interface OrgModules {
   planAllowed: string[];
   enabledModules: string[];
   hasPriceKg: boolean;
+  uiMode?: UiMode;
 }
 
 const authHeaders = () => ({

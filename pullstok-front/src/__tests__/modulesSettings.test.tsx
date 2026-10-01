@@ -29,6 +29,7 @@ const baseContext = {
   planAllowed: ["stock", "ventas", "pricing"],
   enabledModules: ["stock", "ventas", "pricing"],
   hasPriceKg: false,
+  uiMode: null,
   isLoading: false,
   refresh: vi.fn(),
 };

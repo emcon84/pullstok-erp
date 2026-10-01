@@ -2,6 +2,24 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+
+/** Campos de import GFLOW (código legado, ubicación y estado). */
+export interface CustomerExtra {
+  code: string;
+  locality: string;
+  province: string;
+  zone: string;
+  isActive: boolean;
+}
+
+export const EMPTY_CUSTOMER_EXTRA: CustomerExtra = {
+  code: "",
+  locality: "",
+  province: "",
+  zone: "",
+  isActive: true,
+};
 
 interface NewCustomer {
   name: string;
@@ -10,6 +28,8 @@ interface NewCustomer {
   taxId: string;
   taxCondition: string;
   address: string;
+  extra: CustomerExtra;
+  setExtra: (extra: CustomerExtra) => void;
   setName: (name: string) => void;
   setEmail: (email: string) => void;
   setPhone: (phone: string) => void;
@@ -31,6 +51,8 @@ export const ModalContentCustomer: React.FC<NewCustomer> = ({
   taxId,
   taxCondition,
   address,
+  extra,
+  setExtra,
   setName,
   setEmail,
   setPhone,
@@ -129,6 +151,50 @@ export const ModalContentCustomer: React.FC<NewCustomer> = ({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="+54 11 1234 5678"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="c-code">Código</Label>
+        <Input
+          id="c-code"
+          value={extra.code}
+          onChange={(e) => setExtra({ ...extra, code: e.target.value })}
+          placeholder="Código del sistema anterior"
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="c-locality">Localidad</Label>
+          <Input
+            id="c-locality"
+            value={extra.locality}
+            onChange={(e) => setExtra({ ...extra, locality: e.target.value })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="c-province">Provincia</Label>
+          <Input
+            id="c-province"
+            value={extra.province}
+            onChange={(e) => setExtra({ ...extra, province: e.target.value })}
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="c-zone">Zona</Label>
+        <Input
+          id="c-zone"
+          value={extra.zone}
+          onChange={(e) => setExtra({ ...extra, zone: e.target.value })}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+        <Label htmlFor="c-active">Cliente activo</Label>
+        <Switch
+          id="c-active"
+          checked={extra.isActive}
+          onCheckedChange={(checked) => setExtra({ ...extra, isActive: checked })}
         />
       </div>
 

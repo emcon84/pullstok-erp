@@ -36,13 +36,20 @@ import {
   useRegisterOrganizationBilling,
   useSetOrganizationActive,
   useUpdateOrganizationPlan,
+  useUpdateOrganizationUiMode,
 } from "../../components/hooks/useSuperadmin";
+import type { UiMode } from "../../services/modulesService";
 import { OrganizationCreateForm } from "./OrganizationCreateForm";
 
 const PLAN_OPTIONS: { value: Plan; label: string }[] = [
   { value: "BASICO", label: "Básico" },
   { value: "PRO", label: "Pro" },
   { value: "PREMIUM", label: "Premium" },
+];
+
+const UI_MODE_OPTIONS: { value: UiMode; label: string }[] = [
+  { value: "OPERATIVO", label: "Operativo" },
+  { value: "ADMINISTRATIVO", label: "Administrativo" },
 ];
 
 /**
@@ -59,6 +66,7 @@ export const OrganizationsList = () => {
   const { organizations, loadingOrganizations, errorOrganizations } =
     useOrganizations();
   const { changePlan, loadingPlanChange } = useUpdateOrganizationPlan();
+  const { changeUiMode, loadingUiModeChange } = useUpdateOrganizationUiMode();
   const { registerPayment, loadingPayment } = useRegisterOrganizationBilling();
   const { toggleActive, loadingToggleActive } = useSetOrganizationActive();
   const { clearConversations, loadingClearConversations } =
@@ -74,6 +82,21 @@ export const OrganizationsList = () => {
         },
         onError: (error) => {
           toast.error(`Error al cambiar el plan: ${error.message}`);
+        },
+      },
+    );
+  };
+
+  const handleUiModeChange = (org: SuperadminOrganization, uiMode: UiMode) => {
+    if (uiMode === org.uiMode) return;
+    changeUiMode(
+      { id: org.id, uiMode },
+      {
+        onSuccess: () => {
+          toast.success(`Modo de interfaz de ${org.name} actualizado`);
+        },
+        onError: (error) => {
+          toast.error(`Error al cambiar el modo de interfaz: ${error.message}`);
         },
       },
     );
@@ -184,6 +207,7 @@ export const OrganizationsList = () => {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Plan</TableHead>
+                <TableHead>Modo de interfaz</TableHead>
                 <TableHead>Pago</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Usuarios</TableHead>
@@ -213,6 +237,30 @@ export const OrganizationsList = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {PLAN_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={org.uiMode ?? "OPERATIVO"}
+                      onValueChange={(value) =>
+                        handleUiModeChange(org, value as UiMode)
+                      }
+                      disabled={loadingUiModeChange}
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        className="w-[150px]"
+                        aria-label={`Modo de interfaz de ${org.name}`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {UI_MODE_OPTIONS.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>
                             {opt.label}
                           </SelectItem>

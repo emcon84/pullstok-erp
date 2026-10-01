@@ -5,6 +5,7 @@ import ProtectedLayout from "./layouts/ProtectedLayout";
 import OnboardingLayout from "./layouts/OnboardingLayout";
 import SuperadminLayout from "./layouts/SuperadminLayout";
 import { Loader } from "./components/atoms/loader";
+import { useUiMode } from "./hooks/useUiMode";
 
 const LoginPage = lazy(() =>
   import("./views/LoginPage").then((m) => ({ default: m.LoginPage })),
@@ -55,6 +56,9 @@ const SalesPage = lazy(() =>
 );
 const Customers = lazy(() =>
   import("./views/Customers").then((m) => ({ default: m.Customers })),
+);
+const Providers = lazy(() =>
+  import("./views/Providers").then((m) => ({ default: m.Providers })),
 );
 const Categories = lazy(() =>
   import("./views/Categories").then((m) => ({ default: m.Categories })),
@@ -168,6 +172,15 @@ const GeneratedBarcodes = lazy(() =>
 const ManualProducts = lazy(() =>
   import("./views/ManualProducts").then((m) => ({ default: m.ManualProducts })),
 );
+
+const AdminHome = lazy(() =>
+  import("./views/AdminHome").then((m) => ({ default: m.AdminHome })),
+);
+
+// Home: orgs en modo ADMINISTRATIVO ven el launcher por áreas; el resto el
+// Dashboard de siempre (OPERATIVO no cambia).
+const HomeRoute = () =>
+  useUiMode() === "ADMINISTRATIVO" ? <AdminHome /> : <Dashboard />;
 
 const AppRoutes = () => (
   <Router>
@@ -294,7 +307,9 @@ const AppRoutes = () => (
 
       {/* Rutas autenticadas: MainLayout persistente, solo el contenido suspende */}
       <Route element={<ProtectedLayout />}>
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard" element={<HomeRoute />} />
+        {/* Stock (modo ADMINISTRATIVO): mismo listado de productos del Dashboard. */}
+        <Route path="/stock" element={<Dashboard />} />
         <Route path="/presupuestos" element={<Quotations />} />
         <Route path="/pedidos" element={<Orders />} />
         <Route path="/pedidos-whatsapp" element={<WhatsappOrders />} />
@@ -302,6 +317,7 @@ const AppRoutes = () => (
         <Route path="/Ventas" element={<SalesPage />} />
         <Route path="/caja" element={<CashSessionPage />} />
         <Route path="/Clientes" element={<Customers />} />
+        <Route path="/Proveedores" element={<Providers />} />
         <Route path="/categorias" element={<Categories />} />
         <Route path="/carga-manual" element={<ManualProducts />} />
         <Route path="/tienda" element={<Tienda />} />

@@ -6,6 +6,7 @@ import {
   registerOrganizationBilling,
   setOrganizationActive,
   updateOrganizationPlan,
+  updateOrganizationUiMode,
   CreateOrganizationPayload,
   SuperadminOrganization,
 } from "../../services/superadminService";
@@ -69,6 +70,26 @@ export const useUpdateOrganizationPlan = () => {
   return {
     changePlan: mutation.mutate,
     loadingPlanChange: mutation.isPending,
+  };
+};
+
+export const useUpdateOrganizationUiMode = () => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation<
+    SuperadminOrganization,
+    Error,
+    { id: string; uiMode: SuperadminOrganization["uiMode"] }
+  >({
+    mutationFn: updateOrganizationUiMode,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+    },
+  });
+
+  return {
+    changeUiMode: mutation.mutate,
+    loadingUiModeChange: mutation.isPending,
   };
 };
 

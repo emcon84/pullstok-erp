@@ -33,6 +33,8 @@ export interface Organization {
   // Módulos habilitados por negocio (sdd/modulos-por-negocio): el backend los
   // incluye en getMe (login y /auth/me). Array vacío = "no configurado".
   enabledModules?: string[];
+  // Modo de interfaz (OPERATIVO | ADMINISTRATIVO), definido por el SUPERADMIN.
+  uiMode?: "OPERATIVO" | "ADMINISTRATIVO";
 }
 
 export interface Me {

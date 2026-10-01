@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { logout } from "../../../controllers/authController";
 import { navGroups, vendorSimpleNav, filterNavItemsByModules, resolveEffectiveModules } from "./navItems";
 import { filterNavItemsByRole } from "@/constants/rolePermissions";
+import { buildAdminNavGroups } from "@/constants/adminWorkspace";
+import { useUiMode } from "@/hooks/useUiMode";
 import { usePendingOrdersCount } from "../../hooks/useOrder";
 import { useUnreadMessagesCount } from "../../hooks/useChat";
 import { useTheme } from "@/hooks/useTheme";
@@ -22,7 +24,7 @@ import { useOrgModulesContext } from "@/contexts/OrgModulesContext";
 import { BrandLogo } from "@/components/atoms/BrandLogo";
 import { InstallButton } from "@/components/atoms/InstallButton";
 import { RefreshDataButton } from "@/components/atoms/RefreshDataButton";
-import type { NavItem } from "./navItems";
+import type { NavGroup, NavItem } from "./navItems";
 
 interface SidebarContentProps {
   onNavigate?: () => void;
@@ -67,29 +69,38 @@ export const SidebarContent = ({
     () => resolveEffectiveModules(enabledModules, plan, hasPriceKg),
     [enabledModules, plan, hasPriceKg],
   );
-  const flatItems: NavItem[] =
-    role === "VENDEDOR"
-      ? vendorSimpleNav
-      : navGroups.flatMap((g) =>
-          filterNavItemsByRole(filterNavItemsByModules(g.items, effectiveModules), role),
-        );
+  // Modo ADMINISTRATIVO: grupos por área desde constants/adminWorkspace.ts (sin
+  // entradas de POS/tienda/bot). OPERATIVO: menú de siempre, sin cambios.
+  const isAdminMode = useUiMode() === "ADMINISTRATIVO";
+  const visibleGroups: NavGroup[] = useMemo(
+    () =>
+      isAdminMode
+        ? buildAdminNavGroups(effectiveModules, role)
+        : navGroups.map((g) => ({
+            ...g,
+            items: filterNavItemsByRole(
+              filterNavItemsByModules(g.items, effectiveModules),
+              role,
+            ),
+          })),
+    [isAdminMode, effectiveModules, role],
+  );
+  // VENDEDOR usa el menú plano simple solo en modo operativo.
+  const useVendorNav = role === "VENDEDOR" && !isAdminMode;
+  const flatItems: NavItem[] = useVendorNav
+    ? vendorSimpleNav
+    : visibleGroups.flatMap((g) => g.items);
 
   // Auto-open group containing the current route
   useEffect(() => {
     const currentPath = location.pathname;
-    for (const group of navGroups) {
-      const visibleItems = filterNavItemsByRole(
-        filterNavItemsByModules(group.items, effectiveModules),
-        user?.role,
-      );
-      if (visibleItems.some((item) => currentPath === item.to || currentPath.startsWith(item.to + "/"))) {
+    for (const group of visibleGroups) {
+      if (group.items.some((item) => currentPath === item.to || currentPath.startsWith(item.to + "/"))) {
         setOpenGroups((prev) => new Set(prev).add(group.label));
         break;
       }
     }
-    // effectiveModules / user?.role son estables entre renders: el effect solo
-    // se re-ejecuta si cambian (o al navegar).
-  }, [location.pathname, user?.role, effectiveModules]);
+  }, [location.pathname, visibleGroups]);
 
   const toggleGroup = (label: string) => {
     setOpenGroups((prev) => {
@@ -208,7 +219,7 @@ export const SidebarContent = ({
         </nav>
       ) : (
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
-        {user?.role === "VENDEDOR" ? (
+        {useVendorNav ? (
           <div className="space-y-1">
             {vendorSimpleNav.map(({ to, label, icon: Icon }) => {
               const count = badgeCount(to);
@@ -241,12 +252,32 @@ export const SidebarContent = ({
             })}
           </div>
         ) : (
-          navGroups.map((group) => {
-            const visibleItems = filterNavItemsByRole(
-              filterNavItemsByModules(group.items, effectiveModules),
-              user?.role,
-            );
+          visibleGroups.map((group) => {
+            const visibleItems = group.items;
             if (visibleItems.length === 0) return null;
+
+            // Grupo de un solo link directo (ej. "Inicio" en modo admin).
+            if (group.flat) {
+              const { to, label, icon: Icon } = visibleItems[0];
+              return (
+                <NavLink
+                  key={group.label}
+                  to={to}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {label}
+                </NavLink>
+              );
+            }
 
             const isOpen = openGroups.has(group.label);
             const GroupIcon = group.icon;
