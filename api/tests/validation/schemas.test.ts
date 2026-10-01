@@ -1550,3 +1550,46 @@ describe("schemas — puntoVenta/branchId (sdd/sucursales-pv-facturacion)", () =
     });
   });
 });
+
+// ── Venta libre: línea ad-hoc sin producto (free line) ──
+describe("createSaleSchema — venta libre (freeLine)", () => {
+  const free = { freeLine: true, name: "Hueso molido", quantity: 0.35, lineTotal: 2800, price: 0 };
+
+  it("accepts a free line with name, kg quantity and total (no productId/loosePriceId)", () => {
+    const result = createSaleSchema.safeParse({ products: [free] });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.products[0].freeLine).toBe(true);
+      expect(result.data.products[0].lineTotal).toBe(2800);
+    }
+  });
+
+  it("accepts a free line without price (the total is authoritative)", () => {
+    const { price: _price, ...noPrice } = free;
+    expect(createSaleSchema.safeParse({ products: [noPrice] }).success).toBe(true);
+  });
+
+  it.each([
+    ["empty name", { name: "   " }],
+    ["missing name", { name: undefined }],
+    ["name too long", { name: "x".repeat(121) }],
+    ["zero total", { lineTotal: 0 }],
+    ["negative total", { lineTotal: -1 }],
+    ["missing total", { lineTotal: undefined }],
+    ["total with > 2 decimals", { lineTotal: 10.123 }],
+    ["zero quantity", { quantity: 0 }],
+    ["quantity with > 3 decimals", { quantity: 0.3501 }],
+    ["productId alongside", { productId: "p-1" }],
+    ["loosePriceId alongside", { loosePriceId: "cell-1" }],
+  ])("rejects a free line with %s", (_label, over) => {
+    const result = createSaleSchema.safeParse({ products: [{ ...free, ...over }] });
+    expect(result.success).toBe(false);
+  });
+
+  it("does not loosen the rules of regular lines (still needs productId)", () => {
+    const result = createSaleSchema.safeParse({
+      products: [{ quantity: 1, price: 100, name: "x", lineTotal: 100 }],
+    });
+    expect(result.success).toBe(false);
+  });
+});

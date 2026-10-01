@@ -295,7 +295,14 @@ export const updateProviderSchema = createProviderSchema.partial();
 // la línea: loosePriceId (celda de la planilla, loose-lines-stock) o productId
 // (backwards-compat). Discriminated-union rechazada: rompe backward-compat con
 // payloads legacy sin saleMode (D7).
-const saleProductSchema = z.object({
+//
+// Venta libre (freeLine): línea ad-hoc SIN producto ni celda (ej. "Hueso
+// molido", 350 g, $2800). Contrato: { freeLine: true, name, quantity (kg, <= 3
+// decimales: 0.350 = 350 g), lineTotal (total en $, <= 2 decimales) }. El
+// lineTotal es el monto autoritativo de la línea; `price` se ignora (se
+// normaliza a 0 si no viene). No admite productId ni loosePriceId.
+const FREE_LINE_NAME_MAX = 120;
+const saleProductObject = z.object({
   // Opcional: los renglones sueltos desde la planilla mandan loosePriceId sin
   // productId físico (SaleItem.productId null en la DB).
   productId: z.string().min(1).optional(),
@@ -317,7 +324,50 @@ const saleProductSchema = z.object({
   // cargado ad-hoc por el vendedor (no persistido en Product). Requerido y
   // > 1 SOLO cuando saleMode === "POR_UNIDAD_BLISTER" (ver superRefine).
   piecesPerBlister: z.coerce.number().int().optional(),
-}).superRefine((item, ctx) => {
+  // Venta libre: ver comentario sobre saleProductObject.
+  freeLine: z.literal(true).optional(),
+  lineTotal: z.coerce.number().optional(),
+});
+const saleProductRefined = saleProductObject.superRefine((item, ctx) => {
+  if (item.freeLine) {
+    const name = item.name?.trim() ?? "";
+    if (name.length === 0 || name.length > FREE_LINE_NAME_MAX) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["name"],
+        message: `La venta libre requiere un nombre (hasta ${FREE_LINE_NAME_MAX} caracteres)`,
+      });
+    }
+    if (item.productId || item.loosePriceId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["productId"],
+        message: "La venta libre no admite productId ni loosePriceId",
+      });
+    }
+    if (item.lineTotal === undefined || !(item.lineTotal > 0)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["lineTotal"],
+        message: "La venta libre requiere un total mayor a 0",
+      });
+    } else if (Math.abs(item.lineTotal * 100 - Math.round(item.lineTotal * 100)) > 1e-6) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["lineTotal"],
+        message: "El total de la venta libre admite hasta 2 decimales",
+      });
+    }
+    // Cantidad en kg con gramos de resolución (3 decimales), como POR_PESO.
+    if (Math.abs(item.quantity * 1000 - Math.round(item.quantity * 1000)) > 1e-6) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["quantity"],
+        message: "La cantidad de la venta libre admite hasta 3 decimales (kg)",
+      });
+    }
+    return;
+  }
   const mode = item.saleMode ?? "BOLSA_CERRADA";
   if (mode === "BOLSA_CERRADA" || mode === "POR_UNIDAD" || mode === "POR_UNIDAD_BLISTER") {
     if (!item.productId) {
@@ -366,6 +416,18 @@ const saleProductSchema = z.object({
     });
   }
 });
+// En la venta libre el total manda: `price` es opcional y se normaliza a 0.
+const saleProductSchema = z.preprocess((raw) => {
+  if (
+    raw &&
+    typeof raw === "object" &&
+    (raw as { freeLine?: unknown }).freeLine === true &&
+    (raw as { price?: unknown }).price === undefined
+  ) {
+    return { ...raw, price: 0 };
+  }
+  return raw;
+}, saleProductRefined);
 // Medio de pago de una venta (sdd/caja-apertura-cierre). La suma de
 // payments[].amount DEBE ser igual al total calculado server-side (nunca se
 // confía en un total enviado por el cliente). Solo EFECTIVO suma al arqueo.

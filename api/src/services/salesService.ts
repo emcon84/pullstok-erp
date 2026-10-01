@@ -7,6 +7,9 @@ import { round2 } from "../utils/money";
 import { computePerUnitPrice } from "../utils/unitsPerBox";
 import { resolveCellForProduct, looseLineName, CellWithNames } from "./looseSaleService";
 
+/** Categoría con la que se persisten las líneas de venta libre (SaleItem.category es obligatoria). */
+export const FREE_LINE_CATEGORY = "Venta libre";
+
 interface IProductSale {
   productId?: string;
   name?: string;
@@ -29,6 +32,10 @@ interface IProductSale {
   // sdd/venta-pastillas-sueltas-blister: cuántas pastillas tenía ESE blister
   // en ESA venta. Solo presente cuando saleMode === "POR_UNIDAD_BLISTER".
   piecesPerBlister?: number;
+  // Venta libre: línea ad-hoc sin producto/celda. quantity = kg (<= 3 dec),
+  // lineTotal = total en $ de la línea (autoritativo; price se ignora).
+  freeLine?: boolean;
+  lineTotal?: number;
 }
 
 interface ISaleRequest {
@@ -172,6 +179,37 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
     }[] = [];
 
     for (const item of saleRequest.products) {
+      // ── Venta libre: línea ad-hoc sin producto ni celda ──
+      // Se persiste sin migración como un renglón POR_PESO (kg) con productId y
+      // loosePriceId null (mismo shape que un suelto cuya celda se borró). No hay
+      // stock que validar/descontar y NUNCA se crea un Product. Modelo de
+      // confianza: igual que las líneas BOLSA_CERRADA/POR_PESO, el monto lo
+      // declara el vendedor (lineTotal); el server valida forma y positividad y
+      // lo redondea con round2, pero no puede contrastarlo contra un catálogo.
+      if (item.freeLine) {
+        const name = (item.name ?? "").trim();
+        const freeQty = Number(String(item.quantity));
+        const freeTotal = round2(Number(String(item.lineTotal)));
+        if (!name || !(freeQty > 0) || !(freeTotal > 0)) {
+          throw new Error(
+            "La venta libre requiere nombre, cantidad (kg) y total mayores a 0",
+          );
+        }
+        saleItems.push({
+          productId: null,
+          loosePriceId: null,
+          name,
+          quantity: freeQty,
+          category: FREE_LINE_CATEGORY,
+          // Snapshot por kg: kg × price reproduce el total (invoice/reportes).
+          price: freeTotal / freeQty,
+          saleMode: "POR_PESO",
+          piecesPerBlister: null,
+        });
+        totalAmount += freeTotal;
+        continue;
+      }
+
       if (!item.productId && !item.loosePriceId) {
         throw new Error("Faltan campos requeridos en un producto de la venta");
       }
