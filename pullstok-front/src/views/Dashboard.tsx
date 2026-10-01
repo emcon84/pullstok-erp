@@ -24,6 +24,9 @@ import { ProductsTable } from "../components/molecules/ProductsTable";
 import { PrintProductList } from "../components/molecules/PrintProductList";
 import { ProductDrawer } from "../components/molecules/ProductDrawer";
 import { QuickPriceModal } from "../components/molecules/QuickPriceModal";
+import { ScannedProductDialog } from "../components/molecules/ScannedProductDialog";
+import { useScanCapture } from "../components/hooks/useScanCapture";
+import { API_URL } from "@/constants";
 import { SecoBarcodesReportDialog } from "../components/molecules/SecoBarcodesReportDialog";
 import { Statistics } from "./Statistics";
 import { useProducts, useProductFacets } from "../components/hooks/useProducts";
@@ -123,9 +126,56 @@ export const Dashboard = () => {
   // Admin drill-down: when ?branch=X is set, use it for the product hook only.
   const branchFilter = searchParams.get("branch") || undefined;
 
+  // ── Escaneo con pistola (listado de productos del admin) ──
+  // Producto escaneado pendiente en el modal (null = cerrado). Los hooks van
+  // ANTES del early return del POS para no alterar el orden de hooks; cuando el
+  // usuario ve el POS (vendedor/cajero en modo OPERATIVO) `enabled` es false y
+  // su flujo (UnifiedPos) queda intacto. En modo ADMINISTRATIVO el listado se
+  // muestra aunque el usuario tenga una sola sucursal, así que ahí sí captura.
+  const showsPos = branchMode.kind === "single" && !isAdminMode;
+  const [scannedProduct, setScannedProduct] = useState<DataItem | null>(null);
+  const handleScan = useCallback(async (barcode: string) => {
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch(
+        `${API_URL}/products/by-scan/${encodeURIComponent(barcode)}`,
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } },
+      );
+      if (res.status === 404) {
+        toast.error("Producto no encontrado para ese código");
+        return;
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Error al procesar el código" }));
+        toast.error(err.message || "Error al procesar el código");
+        return;
+      }
+      const data = await res.json();
+      if (data.isScale) {
+        // Etiqueta de balanza = celda suelta: el admin no la edita desde acá.
+        toast.info(`Etiqueta de balanza: ${data.looseName}`);
+        return;
+      }
+      setScannedProduct(data.product);
+    } catch (e: any) {
+      toast.error(e?.message || "Error al escanear");
+    }
+  }, []);
+  useScanCapture({
+    enabled:
+      !showsPos &&
+      !selectedStat &&
+      !drawerOpen &&
+      !quickPriceProduct &&
+      !isModalSalesOpen &&
+      !isModalUploadOpen &&
+      !secoReportOpen,
+    onScan: handleScan,
+  });
+
   // ── Vendor/Cashier quick-sale POS unificado ──
   // Widget de chat de asistente de ventas (FAB flotante)
-  if (branchMode.kind === "single" && !isAdminMode) {
+  if (showsPos) {
     return (
       <>
         <UnifiedPos branchId={branchMode.branchId} />
@@ -211,6 +261,15 @@ export const Dashboard = () => {
   }, []);
   const openQuickPrice = useCallback((data: DataItem) => setQuickPriceProduct(data), []);
   const closeQuickPrice = () => setQuickPriceProduct(null);
+  // Editar desde el modal de escaneo: abre el drawer con el producto del
+  // listado (misma forma que ProductsTable pasa a onEdit); si no está en el
+  // listado, cae al escaneado normalizando id -> _id.
+  const editScannedProduct = (scanned: DataItem) => {
+    const id = scanned._id ?? scanned.id;
+    const fromList = products.find((p) => (p._id ?? p.id) === id);
+    setScannedProduct(null);
+    openEditDrawer(fromList ?? { ...scanned, _id: id });
+  };
   const closeDrawer = () => {
     setDrawerOpen(false);
     setDrawerProduct(null);
@@ -526,6 +585,14 @@ export const Dashboard = () => {
 
       {/* Product Drawer (create/edit) */}
       <ProductDrawer open={drawerOpen} onClose={closeDrawer} product={drawerProduct} />
+
+      {/* Producto escaneado con la pistola → Editar abre el drawer */}
+      <ScannedProductDialog
+        product={scannedProduct}
+        open={!!scannedProduct}
+        onClose={() => setScannedProduct(null)}
+        onEdit={editScannedProduct}
+      />
 
       {/* Quick price modal (solo precio, atajo Ctrl+Shift+P / Enter) */}
       <QuickPriceModal open={!!quickPriceProduct} onClose={closeQuickPrice} product={quickPriceProduct} />
