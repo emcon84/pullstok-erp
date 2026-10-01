@@ -801,14 +801,25 @@ describe("createSaleSchema — saleMode-aware quantity validation (B-06/B-08)", 
     expect(result.success).toBe(true);
   });
 
-  it("POR_PESO rejects quantity with more than 2 decimals (1.234 — B-06)", () => {
+  // Scale labels carry grams (3 decimals of kg): POR_PESO must accept them so
+  // the total matches the scale's own label (0.285 kg x price/kg).
+  it("POR_PESO accepts quantity with 3 decimals (scale grams, 0.285)", () => {
+    for (const quantity of [0.285, 1.234, 0.001, 0.007, 2.345]) {
+      const result = createSaleSchema.safeParse({
+        products: [{ ...base, saleMode: "POR_PESO", quantity }],
+      });
+      expect({ quantity, ok: result.success }).toEqual({ quantity, ok: true });
+    }
+  });
+
+  it("POR_PESO rejects quantity with more than 3 decimals (1.2345)", () => {
     const result = createSaleSchema.safeParse({
-      products: [{ ...base, saleMode: "POR_PESO", quantity: 1.234 }],
+      products: [{ ...base, saleMode: "POR_PESO", quantity: 1.2345 }],
     });
     expect(result.success).toBe(false);
     if (!result.success) {
       const flat = result.error.issues.map((i) => i.message).join(" | ");
-      expect(flat).toMatch(/0\.01|2|decimal/i);
+      expect(flat).toMatch(/3 decimales/i);
     }
   });
 
@@ -826,17 +837,14 @@ describe("createSaleSchema — saleMode-aware quantity validation (B-06/B-08)", 
     },
   );
 
-  it.each(["POR_PESO", "POR_MONTO"] as const)(
-    "%s still rejects quantities with more than 2 decimals (1.234, 0.285)",
-    (saleMode) => {
-      for (const quantity of [1.234, 0.285, 0.001]) {
-        const result = createSaleSchema.safeParse({
-          products: [{ ...base, saleMode, quantity }],
-        });
-        expect({ quantity, ok: result.success }).toEqual({ quantity, ok: false });
-      }
-    },
-  );
+  it("POR_MONTO still rejects amounts with more than 2 decimals (1.234, 0.285)", () => {
+    for (const quantity of [1.234, 0.285, 0.001]) {
+      const result = createSaleSchema.safeParse({
+        products: [{ ...base, saleMode: "POR_MONTO", quantity }],
+      });
+      expect({ quantity, ok: result.success }).toEqual({ quantity, ok: false });
+    }
+  });
 
   it("POR_MONTO accepts positive amounts with 2dp", () => {
     const result = createSaleSchema.safeParse({
@@ -879,7 +887,7 @@ describe("createSaleSchema — saleMode-aware quantity validation (B-06/B-08)", 
     const result = createSaleSchema.safeParse({
       products: [
         { ...base, quantity: 3 },
-        { ...base, quantity: 1.234, saleMode: "POR_PESO" },
+        { ...base, quantity: 1.2345, saleMode: "POR_PESO" },
       ],
     });
     expect(result.success).toBe(false);

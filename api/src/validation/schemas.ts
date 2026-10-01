@@ -322,15 +322,17 @@ const saleProductSchema = z.object({
         "Las ventas sueltas requieren loosePriceId o productId para identificar la línea",
     });
   }
-  // <= 2 decimales (multipleOf 0.01) y > 0 (ya garantizado por .positive()).
+  // POR_MONTO: <= 2 decimales (es un monto). POR_PESO: <= 3 decimales (gramos
+  // de la balanza: 0.285 kg), así el total coincide con la etiqueta.
   // Con tolerancia: en IEEE-754 q * 100 no es entero para valores legítimos de
   // 2 decimales (0.29 * 100 = 28.999999999999996), y un !== exacto los rechaza.
-  const cents = item.quantity * 100;
-  if (Math.abs(cents - Math.round(cents)) > 1e-6) {
+  const decimals = mode === "POR_PESO" ? 3 : 2;
+  const scaled = item.quantity * 10 ** decimals;
+  if (Math.abs(scaled - Math.round(scaled)) > 1e-6) {
     ctx.addIssue({
       code: "custom",
       path: ["quantity"],
-      message: "La cantidad suelta admite hasta 2 decimales",
+      message: `La cantidad suelta admite hasta ${decimals} decimales`,
     });
   }
 });

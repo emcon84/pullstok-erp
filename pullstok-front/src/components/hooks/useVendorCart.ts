@@ -42,13 +42,21 @@ export interface VendorCartItem {
 
 const STORAGE_KEY = "vendor-cart";
 
-/** Las ventas sueltas (kg / monto) SIEMPRE llevan cantidad a 2 decimales: el
- *  server rechaza más de 2 y la suma flotante (0.1 + 0.2) deriva. Las demás
- *  modalidades (bolsa, unidad, blister) son enteras y no se tocan. */
+/** Las ventas sueltas llevan cantidad redondeada: POR_PESO a 3 decimales (los
+ *  gramos de la balanza, así el total coincide con la etiqueta) y POR_MONTO a 2
+ *  (es un monto). El server rechaza más decimales y la suma flotante
+ *  (0.1 + 0.2) deriva. Las demás modalidades (bolsa, unidad, blister) son
+ *  enteras y no se tocan. */
 const isLooseMode = (mode: SaleMode): boolean =>
   mode === "POR_PESO" || mode === "POR_MONTO";
+const round3 = (n: number): number =>
+  Math.round((n + Number.EPSILON) * 1000) / 1000;
 const normalizeQty = (mode: SaleMode, quantity: number): number =>
-  isLooseMode(mode) ? round2(quantity) : quantity;
+  mode === "POR_PESO"
+    ? round3(quantity)
+    : mode === "POR_MONTO"
+      ? round2(quantity)
+      : quantity;
 
 function readCart(): VendorCartItem[] {
   try {

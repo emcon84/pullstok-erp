@@ -21,10 +21,16 @@ describe("useVendorCart — loose quantity rounding (2dp)", () => {
     localStorage.clear();
   });
 
-  it("addToCart rounds a 3-decimal scale weight half-up (0.285 -> 0.29)", () => {
+  it("addToCart keeps a 3-decimal scale weight untouched (0.285 stays 0.285)", () => {
     const { result } = renderHook(() => useVendorCart());
     act(() => result.current.addToCart(product, 0.285, "b1", 0, "POR_PESO", 9200, "c1"));
-    expect(result.current.items[0].quantity).toBe(0.29);
+    expect(result.current.items[0].quantity).toBe(0.285);
+  });
+
+  it("addToCart rounds POR_PESO beyond 3 decimals half-up (0.2854 -> 0.285)", () => {
+    const { result } = renderHook(() => useVendorCart());
+    act(() => result.current.addToCart(product, 0.2854, "b1", 0, "POR_PESO", 9200, "c1"));
+    expect(result.current.items[0].quantity).toBe(0.285);
   });
 
   it("addToCart rounds POR_MONTO amounts too", () => {
@@ -43,21 +49,21 @@ describe("useVendorCart — loose quantity rounding (2dp)", () => {
 
   it("a loose quantity that rounds to 0 does not create a line", () => {
     const { result } = renderHook(() => useVendorCart());
-    act(() => result.current.addToCart(product, 0.004, "b1", 0, "POR_PESO", 9200, "c1"));
+    act(() => result.current.addToCart(product, 0.0004, "b1", 0, "POR_PESO", 9200, "c1"));
     expect(result.current.items).toHaveLength(0);
   });
 
-  it("updateQuantity rounds loose lines to 2dp", () => {
+  it("updateQuantity rounds POR_PESO lines to 3dp", () => {
     const { result } = renderHook(() => useVendorCart());
     act(() => result.current.addToCart(product, 1, "b1", 0, "POR_PESO", 9200, "c1"));
-    act(() => result.current.updateQuantity("p-1", 0.285, "POR_PESO", "c1"));
-    expect(result.current.items[0].quantity).toBe(0.29);
+    act(() => result.current.updateQuantity("p-1", 0.2854, "POR_PESO", "c1"));
+    expect(result.current.items[0].quantity).toBe(0.285);
   });
 
   it("updateQuantity to a value that rounds to 0 removes the line", () => {
     const { result } = renderHook(() => useVendorCart());
     act(() => result.current.addToCart(product, 1, "b1", 0, "POR_PESO", 9200, "c1"));
-    act(() => result.current.updateQuantity("p-1", 0.004, "POR_PESO", "c1"));
+    act(() => result.current.updateQuantity("p-1", 0.0004, "POR_PESO", "c1"));
     expect(result.current.items).toHaveLength(0);
   });
 
