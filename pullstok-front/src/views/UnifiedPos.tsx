@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Landmark, ShoppingCart, PackageOpen, PackagePlus, Minus, Plus } from "lucide-react";
+import { Landmark, ShoppingCart, PackageOpen, PackagePlus, Minus, Plus, Scale } from "lucide-react";
 import { toast } from "react-toastify";
 import { API_URL } from "@/constants";
 import { VendorCatalogTab } from "@/components/organisms/VendorCatalogTab";
 import { LooseSellTab } from "@/components/organisms/LooseSellTab";
-import { useVendorCart } from "@/components/hooks/useVendorCart";
+import { useVendorCart, type FreeLineInput } from "@/components/hooks/useVendorCart";
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecules/VendorOrderPanel";
 import { OpenBagDialog } from "@/components/molecules/OpenBagDialog";
 import { ManualProductDialog } from "@/components/molecules/ManualProductDialog";
+import { FreeLineDialog } from "@/components/molecules/FreeLineDialog";
 import { PrintTicketDialog } from "@/components/molecules/PrintTicketDialog";
 import { useTicketCompany } from "@/components/hooks/useTicketCompany";
 import { printSaleTicketViaAgent } from "@/utils/printTicketAgent";
@@ -101,6 +102,10 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // Modal "Producto manual": el vendedor carga nombre + precio de algo que no
   // encuentra; se crea en el server y se suma al pedido como BOLSA_CERRADA.
   const [manualOpen, setManualOpen] = useState(false);
+
+  // Modal "Venta libre": nombre + gramos + precio total, sin crear producto;
+  // la línea va solo al carrito único (cart.addFreeLine).
+  const [freeOpen, setFreeOpen] = useState(false);
 
   // Modal de pago: lo abre la tecla V (listado y panel) y el botón Vender.
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -203,6 +208,16 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
       toast.success(`${product.name} agregado`);
     },
     [addToCart, branchId],
+  );
+
+  // Venta libre confirmada en el diálogo → línea ad-hoc del pedido (sin producto).
+  const { addFreeLine } = cart;
+  const handleFreeLine = useCallback(
+    (line: FreeLineInput) => {
+      addFreeLine(line, branchId);
+      toast.success(`${line.name} agregado`);
+    },
+    [addFreeLine, branchId],
   );
 
   // Tecla T: alterna entre "Por unidad" y "Suelto".
@@ -348,7 +363,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // mismo con "Producto manual": el nombre tipeado rápido + Enter (>= 6
   // caracteres) se confundiría con un escaneo.
   useEffect(() => {
-    if (openBagDialogOpen || manualOpen) return; // El diálogo maneja su propio input
+    if (openBagDialogOpen || manualOpen || freeOpen) return; // El diálogo maneja su propio input
     let buffer = "";
     let lastKeyAt = 0;
     const onKey = (e: KeyboardEvent) => {
@@ -395,7 +410,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [handleScan, openBagDialogOpen, manualOpen]);
+  }, [handleScan, openBagDialogOpen, manualOpen, freeOpen]);
 
   // Teclas +/- del teclado para ajustar la cantidad del modal de escaneo sin
   // mouse. Solo mientras el modal está abierto (scanProduct), y en captura
@@ -512,6 +527,15 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             >
               <PackagePlus className="h-4 w-4 mr-2" />
               Producto manual
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setFreeOpen(true)}
+              className="whitespace-nowrap"
+              aria-label="Venta libre"
+            >
+              <Scale className="h-4 w-4 mr-2" />
+              Venta libre
             </Button>
           </div>
         </div>
@@ -724,6 +748,14 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
       open={manualOpen}
       onOpenChange={setManualOpen}
       onCreated={handleManualCreated}
+      onClosed={exitToGrid}
+    />
+
+    {/* ── Modal de Venta libre (vuelve el foco al listado al cerrarse) ── */}
+    <FreeLineDialog
+      open={freeOpen}
+      onOpenChange={setFreeOpen}
+      onSubmit={handleFreeLine}
       onClosed={exitToGrid}
     />
 

@@ -7,6 +7,7 @@ import {
 import { PAYMENT_METHOD_LABELS, type PaymentInput } from "@/models/cashSessionModel";
 import type { VendorCartItem } from "@/components/hooks/useVendorCart";
 import { prepareTicketLogo } from "@/utils/ticketLogo";
+import { formatFreeLineWeight } from "@/lib/freeLine";
 
 /**
  * Ticket de venta NO fiscal para impresora térmica de 58 mm.
@@ -23,7 +24,13 @@ export type SaleTicketItem = Pick<VendorCartItem, "name" | "price" | "quantity">
   Partial<
     Pick<
       VendorCartItem,
-      "saleMode" | "priceKgSuelto" | "perUnitPrice" | "looseName" | "piecesPerBlister"
+      | "saleMode"
+      | "priceKgSuelto"
+      | "perUnitPrice"
+      | "looseName"
+      | "piecesPerBlister"
+      | "isFreeLine"
+      | "lineTotal"
     >
   >;
 
@@ -167,6 +174,14 @@ export function resolveTicketCompany(src: {
 // ── Modelo ──
 
 function buildLine(item: SaleTicketItem): SaleTicketLine {
+  // Venta libre: el detalle es el peso ("350 g") y el total es el tipeado.
+  if (item.isFreeLine) {
+    return {
+      label: item.name,
+      detail: formatFreeLineWeight(item.quantity),
+      total: round2(item.lineTotal ?? item.price * item.quantity),
+    };
+  }
   const mode = item.saleMode ?? "BOLSA_CERRADA";
   const isLoose = mode === "POR_PESO" || mode === "POR_MONTO";
   const label = isLoose ? item.looseName || item.name : item.name;

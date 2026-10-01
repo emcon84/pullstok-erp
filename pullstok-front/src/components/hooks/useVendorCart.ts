@@ -2,6 +2,13 @@ import { useState, useCallback, useEffect } from "react";
 import type { DataItem } from "../../types";
 import { unitPrice, effectivePrice, computePerUnitPrice } from "./vendorCatalogHelpers";
 import { round2 } from "@/lib/money";
+import { gramsToKg } from "@/lib/freeLine";
+
+/** Id único de una línea libre (crypto.randomUUID si existe; fallback para tests/HTTP). */
+const newFreeLineId = (): string =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export type SaleMode =
   | "BOLSA_CERRADA"
@@ -38,7 +45,24 @@ export interface VendorCartItem {
   /** Producto manual (cargado a mano en el POS): el server no valida stock, así
    *  que la línea no se topea por `stock` (que viaja en 0). */
   isManual?: boolean;
+  /** Venta libre: línea ad-hoc sin producto (nombre + kg + total tipeado). El
+   *  productId es sintético ("free-…", solo identifica la línea en el carrito) y
+   *  nunca viaja al server. `quantity` está en kg; `lineTotal` es el monto
+   *  autoritativo de la línea (price = lineTotal / quantity es solo derivado). */
+  isFreeLine?: boolean;
+  lineTotal?: number;
 }
+
+/** Datos tipeados de una línea de venta libre (gramos y total en $). */
+export interface FreeLineInput {
+  name: string;
+  grams: number;
+  total: number;
+}
+
+/** Total de una línea: el monto tipeado en venta libre; precio × cantidad en el resto. */
+export const lineAmount = (i: VendorCartItem): number =>
+  i.isFreeLine && i.lineTotal !== undefined ? i.lineTotal : i.price * i.quantity;
 
 const STORAGE_KEY = "vendor-cart";
 
@@ -165,6 +189,28 @@ export function useVendorCart() {
     [],
   );
 
+  // Venta libre: agrega una línea ad-hoc (kg + total tipeado) con id sintético
+  // único, así dos líneas iguales NO se fusionan. Sin producto, sin stock.
+  const addFreeLine = useCallback((input: FreeLineInput, branchId: string) => {
+    const kg = gramsToKg(input.grams);
+    const total = round2(input.total);
+    setItems((prev) => [
+      ...prev,
+      {
+        productId: `free-${newFreeLineId()}`,
+        name: input.name.trim(),
+        code: "",
+        price: total / kg,
+        stock: 0,
+        quantity: kg,
+        branchId,
+        saleMode: "POR_PESO",
+        isFreeLine: true,
+        lineTotal: total,
+      },
+    ]);
+  }, []);
+
   const updateQuantity = useCallback(
     (
       productId: string,
@@ -175,6 +221,7 @@ export function useVendorCart() {
       setItems((prev) => {
         const mode = saleMode ?? "BOLSA_CERRADA";
         const matches = (i: VendorCartItem) =>
+          !i.isFreeLine && // la venta libre es inmutable (solo se quita)
           i.productId === productId &&
           (i.saleMode ?? "BOLSA_CERRADA") === mode &&
           (i.loosePriceId ?? null) === (loosePriceId ?? null);
@@ -208,7 +255,7 @@ export function useVendorCart() {
     setItems([]);
   }, []);
 
-  const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const totalAmount = items.reduce((sum, i) => sum + lineAmount(i), 0);
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return {
@@ -216,6 +263,7 @@ export function useVendorCart() {
     totalAmount,
     itemCount,
     addToCart,
+    addFreeLine,
     updateQuantity,
     removeFromCart,
     clearCart,

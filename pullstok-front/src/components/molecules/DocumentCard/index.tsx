@@ -17,6 +17,7 @@ import { DocTable } from "../DocTable";
 
 interface DocItem {
   quantity?: number;
+  quantityLabel?: string;
   name?: string;
   price?: number;
 }

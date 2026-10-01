@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 
 export interface DocItem {
   quantity?: number;
+  /** Cantidad ya formateada (ej. "350 g" en una venta libre); si viene, se
+   *  muestra en lugar del número crudo. El total se sigue calculando con `quantity`. */
+  quantityLabel?: string;
   name?: string;
   price?: number;
 }
@@ -51,8 +54,8 @@ export const DocTable = ({ items, showUnitPrice, onRemove }: DocTableProps) => {
               <td className="font-medium sm:hidden">{it.name ?? "—"}</td>
 
               <td className="tabular-nums text-muted-foreground sm:table-cell sm:w-16 sm:px-3 sm:py-2 sm:text-center sm:text-foreground">
-                <span className="sm:hidden">Cant.: {it.quantity ?? 1}</span>
-                <span className="hidden sm:inline">{it.quantity ?? 1}</span>
+                <span className="sm:hidden">Cant.: {it.quantityLabel ?? it.quantity ?? 1}</span>
+                <span className="hidden sm:inline">{it.quantityLabel ?? it.quantity ?? 1}</span>
               </td>
 
               {/* Producto — solo en desktop */}

@@ -35,7 +35,7 @@ import { exportToPDF } from "../utils/exportToPDF";
 import { customerDisplayName } from "../utils/customerName";
 import { exportToExcel } from "../utils/exportToExcel";
 import { CartItem, Sale } from "../models/salesModel";
-import { isLooseSale, isUnitSale } from "../models/saleModeHelpers";
+import { isLooseSale, isUnitSale, saleItemQuantityLabel } from "../models/saleModeHelpers";
 import type { PaymentInput } from "../models/cashSessionModel";
 
 const TAX_CONDITIONS = [
@@ -351,7 +351,14 @@ export const SalesPage = () => {
                 title={`Fecha: ${new DateObject(sale.saleDate).format(
                   "DD-MM-YYYY",
                 )}`}
-                items={(sale.items || sale.products || []) as never[]}
+                items={
+                  (sale.items
+                    ? sale.items.map((it) => ({
+                        ...it,
+                        quantityLabel: saleItemQuantityLabel(it),
+                      }))
+                    : sale.products || []) as never[]
+                }
                 total={sale.totalAmount}
                 onExportPDF={() => exportToPDF(buildExport(sale))}
                 onExportExcel={() => exportToExcel(buildExport(sale))}

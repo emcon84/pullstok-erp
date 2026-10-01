@@ -23,10 +23,17 @@ export interface CartItem {
    *  conteo AD-HOC cargado por el vendedor. Solo presente cuando saleMode ===
    *  "POR_UNIDAD_BLISTER"; el backend lo exige para recomputar el precio. */
   piecesPerBlister?: number | null;
+  /** Venta libre: línea ad-hoc sin producto (nombre + kg + total). Viaja como
+   *  { freeLine, name, quantity (kg), lineTotal } y el server la persiste sin
+   *  productId/loosePriceId. `lineTotal` es el monto autoritativo de la línea. */
+  freeLine?: boolean;
+  lineTotal?: number;
 }
 
 export interface SaleRequest {
   products: {
+    freeLine?: true;
+    lineTotal?: number;
     productId?: string;
     quantity: string;
     name?: string;
@@ -66,7 +73,8 @@ export interface Sale {
     quantity: number;
     price: number;
     category: string;
-    productId: string;
+    /** null en líneas sueltas por celda / venta libre. */
+    productId?: string | null;
     /** Modo de venta del renglón: POR_PESO / POR_MONTO = línea suelta de la
      *  planilla; ausente/BOLSA_CERRADA = bolsa % física. */
     saleMode?: SaleMode;

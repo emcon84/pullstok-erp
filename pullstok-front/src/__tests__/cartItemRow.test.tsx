@@ -109,3 +109,32 @@ describe("CartItemRow — closed bags", () => {
     expect((plus as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe("CartItemRow — línea de venta libre", () => {
+  const free = makeItem({
+    productId: "free-1",
+    name: "Hueso molido",
+    price: 2800 / 0.35,
+    quantity: 0.35,
+    loosePriceId: undefined,
+    isFreeLine: true,
+    lineTotal: 2800,
+  });
+
+  it("muestra gramos y total tipeado, sin stepper ni input de cantidad", () => {
+    render(<CartItemRow item={free} onUpdateQty={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByText("Hueso molido")).toBeInTheDocument();
+    expect(screen.getByText("350 g")).toBeInTheDocument();
+    expect(screen.getByText(/\$2\.800/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Aumentar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Disminuir" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Cantidad" })).not.toBeInTheDocument();
+  });
+
+  it("se puede quitar", () => {
+    const onRemove = vi.fn();
+    render(<CartItemRow item={free} onUpdateQty={vi.fn()} onRemove={onRemove} />);
+    fireEvent.click(screen.getByRole("button", { name: "Quitar" }));
+    expect(onRemove).toHaveBeenCalled();
+  });
+});

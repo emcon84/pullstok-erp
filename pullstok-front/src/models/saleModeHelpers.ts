@@ -1,4 +1,5 @@
 import type { Sale, SaleMode } from "./salesModel";
+import { formatFreeLineWeight, isFreeLineSaleItem } from "../lib/freeLine";
 
 // sdd/venta-por-unidad-multpack — clasificación de una venta por sus modos de
 // renglón. Funciones puras para que Sales.tsx (y tests) las usen sin duplicar
@@ -15,6 +16,16 @@ export const isLooseSale = (sale: Sale): boolean =>
 /** ¿La venta tiene al menos un renglón vendido POR UNIDAD (multi-pack)? */
 export const isUnitSale = (sale: Sale): boolean =>
   (sale.items || []).some((item) => item.saleMode === "POR_UNIDAD");
+
+/** Cantidad legible de un renglón de venta cuando necesita unidad propia: la
+ *  venta libre se muestra en gramos ("350 g"). `undefined` = usar el número crudo. */
+export const saleItemQuantityLabel = (item: {
+  saleMode?: SaleMode;
+  productId?: string | null;
+  loosePriceId?: string | null;
+  quantity: number;
+}): string | undefined =>
+  isFreeLineSaleItem(item) ? formatFreeLineWeight(item.quantity) : undefined;
 
 /** Etiqueta legible para el modo de venta de un renglón. Modo ausente o
  *  desconocido → "Caja" (backward-compat con ventas heredadas). */

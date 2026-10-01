@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { VendorCartItem } from "@/components/hooks/useVendorCart";
 import { parseDecimal } from "@/components/hooks/vendorRowHelpers";
+import { formatFreeLineWeight } from "@/lib/freeLine";
 
 const MODE_LABEL: Record<string, string> = {
   POR_PESO: "por kg",
@@ -97,7 +98,40 @@ export const CartItemRow = ({ item, onUpdateQty, onRemove }: CartItemRowProps) =
   const mode = item.saleMode ?? "BOLSA_CERRADA";
   const isBolsa = mode === "BOLSA_CERRADA";
   const isLoose = mode === "POR_PESO" || mode === "POR_MONTO";
-  const showStepper = mode !== "POR_MONTO";
+  const showStepper = mode !== "POR_MONTO" && !item.isFreeLine;
+
+  if (item.isFreeLine) {
+    // Venta libre: sin stepper ni cantidad editable (el total es el tipeado);
+    // solo se puede quitar y volver a cargar.
+    return (
+      <div
+        data-line-key={item.productId}
+        className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium truncate">{item.name}</p>
+            <Badge variant="secondary" className="text-[10px] px-1 py-0">
+              libre
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">{formatFreeLineWeight(item.quantity)}</p>
+          <p className="text-xs font-semibold">
+            ${(item.lineTotal ?? item.price * item.quantity).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          aria-label="Quitar"
+          onClick={onRemove}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div

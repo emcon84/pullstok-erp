@@ -99,9 +99,10 @@ export function useVendorCheckout({
             category: "",
           },
           quantity: i.quantity,
-          totalPrice:
-            (i.saleMode === "POR_UNIDAD" ? (i.perUnitPrice ?? i.price) : i.price) *
-            i.quantity,
+          totalPrice: i.isFreeLine
+            ? (i.lineTotal ?? i.price * i.quantity)
+            : (i.saleMode === "POR_UNIDAD" ? (i.perUnitPrice ?? i.price) : i.price) *
+              i.quantity,
           saleMode: i.saleMode ?? "BOLSA_CERRADA",
           // Ventas sueltas: la celda de la planilla que identifica la línea.
           loosePriceId: i.loosePriceId,
@@ -112,6 +113,8 @@ export function useVendorCheckout({
           // falta un branch extra en el ternario de arriba.
           piecesPerBlister:
             i.saleMode === "POR_UNIDAD_BLISTER" ? i.piecesPerBlister ?? undefined : undefined,
+          // Venta libre: sin producto ni celda; el total tipeado viaja exacto.
+          ...(i.isFreeLine ? { freeLine: true, lineTotal: i.lineTotal } : {}),
         }));
         await sendSale({ cart, payments, cashSessionId, discountPct, surchargePct, customerId });
         clearCart();
@@ -134,6 +137,12 @@ export function useVendorCheckout({
   // (conversión order → sale ya existente).
   const handleSaveOrder = useCallback(() => {
     if (cartItems.length === 0) return;
+    // Un pedido guardado exige productId por renglón: la venta libre no tiene
+    // producto, así que se vende directo (no se puede dejar pendiente).
+    if (cartItems.some((i) => i.isFreeLine)) {
+      toast.error("Las líneas de venta libre no se pueden guardar en un pedido: vendelas directo");
+      return;
+    }
     const orderPayload: CreateOrder = {
       type: "sale",
       products: cartItems.map((i) => ({

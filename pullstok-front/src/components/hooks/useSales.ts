@@ -15,6 +15,19 @@ export const useCreateSale = () => {
       const saleRequest = {
         products: cart.map((item) => {
           const saleMode: SaleMode = item.saleMode ?? "BOLSA_CERRADA";
+          if (item.freeLine) {
+            // Venta libre: sin productId ni loosePriceId. `quantity` va en kg y
+            // `lineTotal` es el monto autoritativo de la línea (el server ignora price).
+            return {
+              freeLine: true as const,
+              name: item.product.name,
+              quantity: item.quantity.toString(),
+              lineTotal: item.lineTotal ?? item.totalPrice,
+              price: item.product.price.toString(),
+              category: "",
+              saleMode: "POR_PESO" as SaleMode,
+            };
+          }
           if (item.loosePriceId) {
             // Venta suelta desde la planilla: la línea se identifica por
             // loosePriceId (SR único en el backend, saleProductSchema). NO se
