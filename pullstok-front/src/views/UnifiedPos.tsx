@@ -20,8 +20,14 @@ import { Loader } from "@/components/atoms/loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { imgSrc, effectivePrice, computePerUnitPrice } from "@/components/hooks/vendorCatalogHelpers";
+import {
+  imgSrc,
+  effectivePrice,
+  computePerUnitPrice,
+  isFarmaciaProduct,
+  isValidPiecesPerBlister,
+} from "@/components/hooks/vendorCatalogHelpers";
+import { BlisterLooseFields } from "@/components/molecules/BlisterLooseFields";
 import { getMe } from "@/services/onboardingService";
 import {
   Dialog,
@@ -292,9 +298,9 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // sdd/venta-pastillas-sueltas-blister: switch activo (SOLO FARMACIA) → la
   // línea se agrega POR_UNIDAD_BLISTER con el conteo ad-hoc de piecesPerBlister;
   // requiere piecesPerBlister entero > 1 (mismo criterio que el server, T1).
-  const isFarmacia = scanProduct?.category?.name === "FARMACIA";
+  const isFarmacia = isFarmaciaProduct(scanProduct);
   const isBlisterSale = isFarmacia && sellLooseBlister;
-  const piecesPerBlisterValid = Number.isInteger(piecesPerBlister) && piecesPerBlister > 1;
+  const piecesPerBlisterValid = isValidPiecesPerBlister(piecesPerBlister);
 
   const handleConfirmScan = useCallback(() => {
     if (!scanProduct) return;
@@ -606,38 +612,12 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             activarlo se pide "Pastillas por blister" y el stepper de cantidad
             de arriba pasa a representar "cantidad de pastillas a vender". */}
         {isFarmacia && (
-          <div className="flex items-center gap-2">
-            <Switch
-              id="sell-loose-blister"
-              checked={sellLooseBlister}
-              onCheckedChange={(v) => {
-                setSellLooseBlister(v);
-                if (!v) setPiecesPerBlister(0);
-              }}
-            />
-            <Label htmlFor="sell-loose-blister" className="cursor-pointer text-sm font-medium">
-              Vender pastillas sueltas
-            </Label>
-          </div>
-        )}
-
-        {isBlisterSale && (
-          <div className="space-y-1.5">
-            <Label htmlFor="pieces-per-blister-input">Pastillas por blister</Label>
-            <Input
-              id="pieces-per-blister-input"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={3}
-              value={piecesPerBlister || ""}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, "").slice(0, 3);
-                setPiecesPerBlister(digits === "" ? 0 : parseInt(digits, 10));
-              }}
-              className="h-9 w-20 text-center tabular-nums"
-            />
-          </div>
+          <BlisterLooseFields
+            checked={sellLooseBlister}
+            onCheckedChange={setSellLooseBlister}
+            pieces={piecesPerBlister}
+            onPiecesChange={setPiecesPerBlister}
+          />
         )}
 
         {(() => {

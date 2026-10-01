@@ -9,12 +9,17 @@ import { Loader } from "@/components/atoms/loader";
 import { ProductDrawer } from "@/components/molecules/ProductDrawer";
 import { VendorSearchBar } from "@/components/molecules/VendorSearchBar";
 import { ProductTable } from "@/components/molecules/ProductTable";
+import {
+  LooseBlisterDialog,
+  type LooseBlisterResult,
+} from "@/components/molecules/LooseBlisterDialog";
 import { getMe } from "@/services/onboardingService";
 import { useVendorCatalog } from "@/components/hooks/useVendorCatalog";
 import { useVendorRowsKeyboard } from "@/components/hooks/useVendorRowsKeyboard";
 import { useVendorCart, type SaleMode } from "@/components/hooks/useVendorCart";
 import {
   branchQty,
+  isFarmaciaProduct,
   isUnitSellable,
   unitStock,
   saleModeForProduct,
@@ -188,6 +193,26 @@ export const VendorCatalogTab = ({
     [catalog.items, qtyByKey, keyOf],
   );
 
+  // Producto FARMACIA pendiente en el diálogo "Vender pastillas sueltas"
+  // (null = sin diálogo). qty = cantidad de la fila al confirmar.
+  const [looseTarget, setLooseTarget] = useState<{ product: DataItem; qty: number } | null>(null);
+
+  // Multi-pack: la fila puede estar en modo "Caja" o "Por unidad". Agrega o
+  // actualiza la línea del MODO actual (líneas distintas por modo).
+  const addLine = useCallback(
+    (p: DataItem, qty: number) => {
+      const mode = modeFor(p);
+      const existing = itemFor(p, mode);
+      if (existing) {
+        cart.updateQuantity(keyOf(p), qty, mode);
+      } else {
+        cart.addToCart(p, qty, branchId, branchQty(p), mode, undefined, undefined, undefined, sellsWholesale);
+      }
+      toast.success(`"${p.name}" agregado al pedido`);
+    },
+    [modeFor, itemFor, cart, keyOf, branchId, sellsWholesale],
+  );
+
   const commit = useCallback(
     (index: number) => {
       const p = catalog.items[index];
@@ -201,18 +226,42 @@ export const VendorCatalogTab = ({
       const key = keyOf(p);
       const cur = parseDecimal(qtyByKey[key] ?? "1");
       const qty = Number.isNaN(cur) ? 1 : Math.max(1, Math.round(cur));
-      // Multi-pack: la fila puede estar en modo "Caja" o "Por unidad". El commit
-      // agrega/actualiza la línea del MODO actual (líneas distintas por modo).
-      const mode = modeFor(p);
-      const existing = itemFor(p, mode);
-      if (existing) {
-        cart.updateQuantity(key, qty, mode);
-      } else {
-        cart.addToCart(p, qty, branchId, stock, mode, undefined, undefined, undefined, sellsWholesale);
+      // FARMACIA: antes de sumar se ofrece "Vender pastillas sueltas" (mismo
+      // contrato que el modal de escaneo). El diálogo confirma con addLine.
+      if (isFarmaciaProduct(p)) {
+        setLooseTarget({ product: p, qty });
+        return;
       }
-      toast.success(`"${p.name}" agregado al pedido`);
+      addLine(p, qty);
     },
-    [catalog.items, qtyByKey, keyOf, modeFor, itemFor, cart, branchId, sellsWholesale],
+    [catalog.items, qtyByKey, keyOf, addLine],
+  );
+
+  const confirmLooseBlister = useCallback(
+    (result: LooseBlisterResult) => {
+      const target = looseTarget;
+      setLooseTarget(null);
+      if (!target) return;
+      const p = target.product;
+      if (result.loose) {
+        cart.addToCart(
+          p,
+          result.quantity,
+          branchId,
+          branchQty(p),
+          "POR_UNIDAD_BLISTER",
+          undefined,
+          undefined,
+          undefined,
+          sellsWholesale,
+          result.piecesPerBlister,
+        );
+        toast.success(`"${p.name}" agregado al pedido`);
+      } else {
+        addLine(p, result.quantity);
+      }
+    },
+    [looseTarget, cart, branchId, sellsWholesale, addLine],
   );
 
   const registerInput = useCallback((index: number, el: HTMLInputElement | null) => {
@@ -450,6 +499,18 @@ export const VendorCatalogTab = ({
         )}
         <div ref={catalog.sentinelRef} className="h-1" aria-hidden="true" />
       </div>
+
+      {/* ── Diálogo de pastillas sueltas (solo productos FARMACIA) ── */}
+      {looseTarget && (
+        <LooseBlisterDialog
+          product={looseTarget.product}
+          initialQty={looseTarget.qty}
+          sellsWholesale={sellsWholesale}
+          maxWholeQty={maxSellable(looseTarget.product)}
+          onConfirm={confirmLooseBlister}
+          onCancel={() => setLooseTarget(null)}
+        />
+      )}
 
       {/* ── Product Drawer (stock across all branches) ── */}
       <ProductDrawer

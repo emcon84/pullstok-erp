@@ -62,6 +62,21 @@ export const computePerUnitPrice = (
   return Math.ceil(perUnit / UNIT_PRICE_ROUND_STEP) * UNIT_PRICE_ROUND_STEP;
 };
 
+/**
+ * sdd/venta-pastillas-sueltas-blister — ¿el producto admite la venta de
+ * pastillas sueltas? Criterio: categoría FARMACIA. La categoría llega como
+ * objeto ({ name }) desde by-scan/catálogo o como string legacy.
+ */
+export const isFarmaciaProduct = (p: object | null | undefined): boolean => {
+  const c = (p as { category?: unknown } | null | undefined)?.category;
+  const name = typeof c === "string" ? c : (c as { name?: string } | null | undefined)?.name;
+  return name === "FARMACIA";
+};
+
+/** Pastillas por blister válidas: entero > 1 (mismo criterio que el server). */
+export const isValidPiecesPerBlister = (n: number): boolean =>
+  Number.isInteger(n) && n > 1;
+
 /** Cantidad de cajas completas que hay en `units` unidades de stock
  *  (división entera; para mostrar stock de unidades convertido en cajas). */
 export const boxCountFromUnits = (units: number, unitsPerBox: number): number =>
