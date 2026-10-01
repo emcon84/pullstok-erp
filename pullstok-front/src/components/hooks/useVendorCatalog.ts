@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useInfiniteProducts, useProductFacets } from "./useProducts";
+import { useInfiniteProducts } from "./useProducts";
 import { readStoredFilter } from "./vendorCatalogHelpers";
 import { scrollRowInContainer } from "./vendorRowHelpers";
 
 /**
- * Dominio del catálogo del vendor: búsqueda con debounce, listado paginado +
- * facets, selección por teclado y scroll infinito. No conoce nada de ventas,
+ * Dominio del catálogo del vendor: búsqueda con debounce, listado paginado,
+ * selección por teclado y scroll infinito. No conoce nada de ventas,
  * pedidos ni del carrito.
  */
 export function useVendorCatalog(branchId: string) {
@@ -48,11 +48,6 @@ export function useVendorCatalog(branchId: string) {
       undefined,
       onlyCarried,
     );
-
-  // Complete facets for the filter chips: all org categories plus variant
-  // groups for the selected category. Independent of the paginated list.
-  const { categories: facetsCategories, variants: facetsVariants, titles: facetsTitles } =
-    useProductFacets(categoryFilter.trim() || undefined);
 
   // Infinite scroll: load the next page when the sentinel enters the viewport.
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -133,9 +128,6 @@ export function useVendorCatalog(branchId: string) {
     isFetchingNextPage,
     hasNextPage,
     loadMore,
-    facetsCategories,
-    facetsVariants,
-    facetsTitles,
     sentinelRef,
     resetSelection,
     moveSelection,

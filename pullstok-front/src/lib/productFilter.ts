@@ -78,8 +78,9 @@ export function parseFilterTerms(filter: string): string[][] {
 }
 
 /**
- * Haystack sobre el que se matchea: nombre + código + valores de variantes
- * (incluye la marca). Mismo criterio que usaba el Dashboard original.
+ * Haystack sobre el que se matchea: nombre + código + código de barras +
+ * valores de variantes (incluye la marca). El barcode permite encontrar el
+ * producto tipeando el código cuando la pistola falla.
  */
 export function productHaystack(product: DataItem): string {
   type VariantAssignment = { option?: { value?: string } };
@@ -88,7 +89,7 @@ export function productHaystack(product: DataItem): string {
   })
     ?.variantAssignments?.map((pv) => pv.option?.value ?? "")
     .join(" ");
-  return `${product.name} ${product.code || ""} ${variantValues || ""}`.toLowerCase();
+  return `${product.name} ${product.code || ""} ${product.barcode || ""} ${variantValues || ""}`.toLowerCase();
 }
 
 // Sinónimos de RAZA (razas pequeñas vs medianas/grandes). Mantener las listas

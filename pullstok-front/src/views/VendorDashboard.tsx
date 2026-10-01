@@ -6,7 +6,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Loader } from "@/components/atoms/loader";
 import { ProductDrawer } from "@/components/molecules/ProductDrawer";
-import { FilterChips } from "@/components/molecules/FilterChips";
 import { VendorSearchBar } from "@/components/molecules/VendorSearchBar";
 import { ProductTable } from "@/components/molecules/ProductTable";
 import { QuantityModal } from "@/components/molecules/QuantityModal";
@@ -105,39 +104,6 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
     [catalog.setFilter, catalog.resetSelection],
   );
 
-  const handleFilterChange = useCallback(
-    (f: string) => {
-      catalog.setFilter(f);
-      catalog.resetSelection();
-    },
-    [catalog.setFilter, catalog.resetSelection],
-  );
-
-  const handleCategoryChange = useCallback(
-    (c: string) => {
-      catalog.setCategoryFilter(c);
-      catalog.resetSelection();
-    },
-    [catalog.setCategoryFilter, catalog.resetSelection],
-  );
-
-  const handleTitleChange = useCallback(
-    (key: string | null) => {
-      // Server-side: el título se envía como ?title=<key> junto con los demás
-      // filtros (AND). Toggle del chip activo deselecciona (null) y refetchea.
-      catalog.setTitleFilter(key);
-      catalog.resetSelection();
-    },
-    [catalog.setTitleFilter, catalog.resetSelection],
-  );
-
-  const handleClearFilters = useCallback(() => {
-    catalog.setFilter("");
-    catalog.setCategoryFilter("");
-    catalog.setTitleFilter(null);
-    catalog.resetSelection();
-  }, [catalog.setFilter, catalog.setCategoryFilter, catalog.setTitleFilter, catalog.resetSelection]);
-
   const handleAssignBarcode = useCallback(
     (product: DataItem) => {
       const id = product._id || product.id;
@@ -183,19 +149,6 @@ export const VendorDashboard = ({ branchId }: VendorDashboardProps) => {
           items={catalog.items}
           onOpenQty={openQtyModal}
           inputRef={catalog.searchInputRef}
-        />
-        <FilterChips
-          products={catalog.items}
-          quickCategories={catalog.facetsCategories.map((c) => c.name)}
-          quickVariants={catalog.facetsVariants}
-          titles={catalog.facetsTitles}
-          titleFilter={catalog.titleFilter}
-          onTitleChange={handleTitleChange}
-          filter={catalog.filter}
-          categoryFilter={catalog.categoryFilter}
-          onFilterChange={handleFilterChange}
-          onCategoryChange={handleCategoryChange}
-          onClear={handleClearFilters}
         />
         {/* "Solo lo que trabajo": oculta productos desmarcados (carried=false) */}
         <div className="flex items-center gap-2">

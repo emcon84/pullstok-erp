@@ -144,6 +144,28 @@ describe("matchesProductFilter", () => {
   });
 });
 
+describe("matchesProductFilter — código de barras tipeado a mano", () => {
+  const withBarcode = product({ name: "Alimento X", code: "AX-1", barcode: "7790001234567" });
+
+  it("encuentra el producto por su código de barras completo", () => {
+    expect(matchesProductFilter(withBarcode, parseFilterTerms("7790001234567"))).toBe(true);
+  });
+
+  it("encuentra por un fragmento del código de barras", () => {
+    expect(matchesProductFilter(withBarcode, parseFilterTerms("1234567"))).toBe(true);
+  });
+
+  it("es insensible a mayúsculas (códigos internos alfanuméricos)", () => {
+    const internal = product({ barcode: "INT00042" });
+    expect(matchesProductFilter(internal, parseFilterTerms("int00042"))).toBe(true);
+  });
+
+  it("no matchea otro código de barras ni un producto sin barcode", () => {
+    expect(matchesProductFilter(withBarcode, parseFilterTerms("9999999"))).toBe(false);
+    expect(matchesProductFilter(product(), parseFilterTerms("7790001234567"))).toBe(false);
+  });
+});
+
 describe("isPurinaProduct", () => {
   it("matchea las marcas del grupo Purina por prefijo de nombre", () => {
     expect(isPurinaProduct(product({ name: "PRO PLAN DOG ADULT X3KG" }))).toBe(true);

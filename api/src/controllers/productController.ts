@@ -349,12 +349,15 @@ export function buildProductSearchWhere(
     return found && found.length > 0 ? found : [token];
   };
 
-  // Campos donde matchea un token: nombre, código, categoría o valor de variante.
+  // Campos donde matchea un token: nombre, código, categoría, valor de variante
+  // o código de barras (para encontrar el producto cuando la pistola falla y el
+  // código se tipea a mano). `barcode` va al final: no mueve los índices previos.
   const fieldClauses = (w: string) => [
     { name: { contains: w, mode: "insensitive" } },
     { code: { contains: w, mode: "insensitive" } },
     { category: { name: { contains: w, mode: "insensitive" } } },
     variantMatch(w),
+    { barcode: { contains: w, mode: "insensitive" } },
   ];
 
   /**

@@ -81,8 +81,6 @@ const queryClient = new QueryClient();
 
 const mockUseVendorCatalog = vi.mocked(useVendorCatalog);
 
-const TITLE_KEY = "SIEGER|SUPER PREMIUM PARA PERROS|SIEGER PUPPY";
-
 function makeCatalog(overrides: Record<string, unknown> = {}) {
   return {
     filter: "",
@@ -102,9 +100,6 @@ function makeCatalog(overrides: Record<string, unknown> = {}) {
     sentinelRef: { current: null },
     resetSelection: vi.fn(),
     registerRow: vi.fn(),
-    facetsCategories: [{ name: "Alimentos" }, { name: "Accesorios" }],
-    facetsVariants: [],
-    facetsTitles: [{ key: TITLE_KEY, label: "SIEGER PUPPY", count: 3 }],
     ...overrides,
   };
 }
@@ -157,51 +152,32 @@ function renderVendor(catalogOverrides: Record<string, unknown> = {}) {
   return catalog;
 }
 
-function clickPill(text: string) {
-  const el = screen
-    .getAllByText(text)
-    .find((n) => n.className.includes("cursor-pointer"));
-  if (!el) throw new Error(`pill ${text} not found`);
-  fireEvent.click(el);
-}
-
-describe("VendorDashboard — filtro de títulos de planilla (server-side, AND)", () => {
+describe("VendorDashboard — sin chips de filtros rápidos", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("renderiza los chips de títulos desde las facets del catálogo", () => {
+  it("no renderiza las filas de chips (categorías, títulos de planilla, marcas)", () => {
     renderVendor();
 
-    expect(screen.getByText("Títulos")).toBeInTheDocument();
-    expect(screen.getByText("SIEGER PUPPY (3)")).toBeInTheDocument();
+    expect(screen.queryByText("Títulos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Categorías")).not.toBeInTheDocument();
+    expect(screen.queryByText("Marca")).not.toBeInTheDocument();
   });
 
-  it("elegir un título NO limpia la categoría (filtros combinados AND)", () => {
-    const catalog = renderVendor({ categoryFilter: "Alimentos" });
+  it("mantiene el switch 'Solo lo que trabajo'", () => {
+    renderVendor();
 
-    clickPill("SIEGER PUPPY (3)");
-
-    expect(catalog.setTitleFilter).toHaveBeenCalledWith(TITLE_KEY);
-    // Sin exclusión mutua: elegir título no toca la categoría.
-    expect(catalog.setCategoryFilter).not.toHaveBeenCalled();
+    expect(screen.getByText("Solo lo que trabajo")).toBeInTheDocument();
   });
 
-  it("elegir una categoría NO limpia el título (filtros combinados AND)", () => {
-    const catalog = renderVendor({ titleFilter: TITLE_KEY });
+  it("sin resultados con un filtro activo ofrece 'Limpiar filtros' que resetea la búsqueda", () => {
+    const catalog = renderVendor({ filter: "zzz" });
 
-    clickPill("Accesorios");
+    fireEvent.click(screen.getByRole("button", { name: "Limpiar filtros" }));
 
-    expect(catalog.setCategoryFilter).toHaveBeenCalledWith("Accesorios");
-    // Sin exclusión mutua: elegir categoría no toca el título.
-    expect(catalog.setTitleFilter).not.toHaveBeenCalled();
-  });
-
-  it("toggle del título activo lo deselecciona (null) y refetchea sin ?title=", () => {
-    const catalog = renderVendor({ titleFilter: TITLE_KEY });
-
-    clickPill("SIEGER PUPPY (3)");
-
+    expect(catalog.setFilter).toHaveBeenCalledWith("");
+    expect(catalog.setCategoryFilter).toHaveBeenCalledWith("");
     expect(catalog.setTitleFilter).toHaveBeenCalledWith(null);
   });
 });

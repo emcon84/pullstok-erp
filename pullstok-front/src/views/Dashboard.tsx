@@ -29,7 +29,7 @@ import { useScanCapture } from "../components/hooks/useScanCapture";
 import { API_URL } from "@/constants";
 import { SecoBarcodesReportDialog } from "../components/molecules/SecoBarcodesReportDialog";
 import { Statistics } from "./Statistics";
-import { useProducts, useProductFacets } from "../components/hooks/useProducts";
+import { useProducts } from "../components/hooks/useProducts";
 import { useStockSummary } from "../components/hooks/useStockSummary";
 import { DataItem } from "../types";
 import { useGetSales, useCreateSale } from "../components/hooks/useSales";
@@ -46,9 +46,7 @@ import { Label } from "@/components/ui/label";
 import { resolveDashboardBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
 import { UnifiedPos } from "./UnifiedPos";
-import { FilterChips } from "../components/molecules/FilterChips";
 import { TransitionSearchInput } from "../components/molecules/TransitionSearchInput";
-import { planTitleKeyOf } from "@/lib/printGrouping";
 import { VendorChatWidget } from "@/components/organisms/VendorChat";
 import { useUiMode } from "@/hooks/useUiMode";
 import {
@@ -73,23 +71,12 @@ export const Dashboard = () => {
   const [isModalSalesOpen, setIsModalSalesOpen] = useState(false);
   const [isModalUploadOpen, setIsModalUploadOpen] = useState(false);
   const [filter, setFilter] = useState("");
-  // Sube cuando el filtro lo cambia algo que NO es el input (chips, limpiar):
-  // remonta TransitionSearchInput para que muestre el valor nuevo.
-  const [filterVersion, setFilterVersion] = useState(0);
-  const setFilterFromOutside = useCallback((value: string) => {
-    setFilter(value);
-    setFilterVersion((v) => v + 1);
-  }, []);
-  const [categoryFilter, setCategoryFilter] = useState("");
   const [providerFilter, setProviderFilter] = useState("");
-  // Título de planilla SECO (sdd/alican-plan-titles): filtro client-side por
-  // la clave compuesta [brand, line, subline].filter(Boolean).join("|").
-  const [titleFilter, setTitleFilter] = useState<string | null>(null);
   // "Solo lo que trabajo": default OFF → muestra todo el catálogo. Al encenderlo
   // acota a los productos marcados (carried=true). El check nunca borra nada.
   const [onlyCarried, setOnlyCarried] = useState(false);
   // Tipo de planilla ALICAN (SECO/WET): null = Todos (comportamiento actual).
-  // Filtra el listado server-side y define qué títulos muestran las facets.
+  // Filtra el listado server-side (priceListType).
   const [planType, setPlanType] = useState<"SECO" | "WET" | null>(null);
   const [selectedStat, setSelectedStat] = useState<StatType>(null);
   const [secoReportOpen, setSecoReportOpen] = useState(false);
@@ -189,12 +176,6 @@ export const Dashboard = () => {
     loading: productsLoading,
     error: productsError,
   } = useProducts(branchFilter, undefined, undefined, planType ?? undefined);
-  // Títulos de planilla (facets del backend): chips para el filtro client-side.
-  // En modo WET la planilla es plana y el backend devuelve titles vacíos.
-  const { titles: facetTitles } = useProductFacets(
-    undefined,
-    planType ?? undefined,
-  );
   const { sales, loading: salesLoading } = useGetSales(resolvedBranchId);
   const { budgets, loading: loadingBudgets } = useGetBudgets(resolvedBranchId);
   const { orders, loading: loadingOrders } = useOrders(resolvedBranchId);
@@ -222,23 +203,18 @@ export const Dashboard = () => {
   const addSales = () => setIsModalSalesOpen(true);
   const addUpload = () => setIsModalUploadOpen(true);
 
-  // Cambio de tipo de planilla ALICAN (Todos/SECO/WET). Los títulos de
-  // planilla son por tipo: al cambiar se limpia el filtro de título activo
-  // (una key SECO no aplica en WET y viceversa) y se refetch con el nuevo tipo.
+  // Cambio de tipo de planilla ALICAN (Todos/SECO/WET): refetch con el nuevo tipo.
   const handlePlanTypeChange = (t: "SECO" | "WET" | null) => {
     setPlanType(t);
-    if (t !== planType) setTitleFilter(null);
   };
 
-  // El selector de tipo y los chips de títulos de planilla son filtros
-  // específicos de ALICAN: solo se muestran cuando ese proveedor está
-  // seleccionado. Al salir de ALICAN se limpian (las claves de título y el
-  // tipo no aplican a otros proveedores).
+  // El selector de tipo es un filtro específico de ALICAN: solo se muestra
+  // cuando ese proveedor está seleccionado. Al salir de ALICAN se limpia (el
+  // tipo no aplica a otros proveedores).
   const isAlican = providerFilter.toLowerCase() === "alican";
   const handleProviderChange = (name: string) => {
     setProviderFilter(name);
     if (name.toLowerCase() !== "alican") {
-      setTitleFilter(null);
       setPlanType(null);
     }
   };
@@ -311,12 +287,6 @@ export const Dashboard = () => {
   const filterTerms = useMemo(() => parseFilterTerms(filter), [filter]);
   const filteredProducts = useMemo(() => {
     let list = products;
-    if (categoryFilter) {
-      list = list.filter((p) => {
-        const cat = (p as any).category?.name || p.category || "";
-        return String(cat).toLowerCase().includes(categoryFilter.toLowerCase());
-      });
-    }
     if (providerFilter) {
       // "PURINA" es un filtro por marca (no un proveedor): incluye todos los
       // productos del grupo Purina (Pro Plan, Cat Chow, Dog Chow, Excellent).
@@ -329,15 +299,12 @@ export const Dashboard = () => {
         });
       }
     }
-    if (titleFilter) {
-      list = list.filter((p) => planTitleKeyOf(p) === titleFilter);
-    }
     if (onlyCarried) {
       list = list.filter((p) => p.carried !== false);
     }
     if (filterTerms.length === 0) return list;
     return list.filter((product) => matchesProductFilter(product, filterTerms));
-  }, [products, filterTerms, categoryFilter, providerFilter, titleFilter, onlyCarried]);
+  }, [products, filterTerms, providerFilter, onlyCarried]);
 
   // El área de impresión (una fila oculta por producto, ~80% del costo de cada
   // tecla) sigue SIEMPRE montada — montarla con estado + afterprint deja el
@@ -493,10 +460,8 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {/* Búsqueda: estado local + transición (ver TransitionSearchInput). El
-          key remonta el input cuando el filtro cambia desde afuera (chips / limpiar). */}
+      {/* Búsqueda: estado local + transición (ver TransitionSearchInput). */}
       <TransitionSearchInput
-        key={filterVersion}
         initialValue={filter}
         placeholder="Buscar por nombre, código o variante..."
         onValueChange={setFilter}
@@ -563,19 +528,6 @@ export const Dashboard = () => {
           </div>
         </div>
       )}
-
-      {/* ── Filter chips ── */}
-      <FilterChips
-        products={products}
-        filter={filter}
-        categoryFilter={categoryFilter}
-        titles={isAlican ? facetTitles : undefined}
-        titleFilter={isAlican ? titleFilter : null}
-        onTitleChange={setTitleFilter}
-        onFilterChange={setFilterFromOutside}
-        onCategoryChange={setCategoryFilter}
-        onClear={() => { setFilterFromOutside(""); setCategoryFilter(""); setProviderFilter(""); setTitleFilter(null); }}
-      />
 
       {/* Tabla de productos / stock */}
       <ProductsTable products={filteredProducts} onEdit={openEditDrawer} onDuplicate={openDuplicateDrawer} onQuickPrice={openQuickPrice} branchMode={!!branchFilter} />

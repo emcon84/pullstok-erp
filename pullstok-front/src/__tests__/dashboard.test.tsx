@@ -109,9 +109,6 @@ const mockUseStockSummary = vi.mocked(useStockSummary);
 const mockUseGetBudgets = vi.mocked(useGetBudgets);
 const mockUseOrders = vi.mocked(useOrders);
 
-const SIEGER_KEY = "SIEGER|SUPER PREMIUM PARA PERROS|SIEGER PUPPY";
-const MAXXIUM_KEY = "MAXXIUM|MAXXIUM PERROS";
-
 const products = [
   {
     _id: "p1",
@@ -159,7 +156,7 @@ async function selectProvider(name: string) {
   fireEvent.click(await screen.findByText(name));
 }
 
-describe("Dashboard — filtro client-side por título de planilla", () => {
+describe("Dashboard — filtros específicos de ALICAN y sin chips rápidos", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
@@ -167,14 +164,6 @@ describe("Dashboard — filtro client-side por título de planilla", () => {
       products,
       loading: false,
       error: null,
-    } as never);
-    mockUseProductFacets.mockReturnValue({
-      titles: [
-        { key: SIEGER_KEY, label: "SIEGER PUPPY", count: 1 },
-        { key: MAXXIUM_KEY, label: "MAXXIUM PERROS", count: 1 },
-      ],
-      categories: [],
-      variants: [],
     } as never);
     mockUseGetSales.mockReturnValue({ sales: [], loading: false } as never);
     mockUseCreateSale.mockReturnValue({ createSale: vi.fn() } as never);
@@ -197,7 +186,7 @@ describe("Dashboard — filtro client-side por título de planilla", () => {
     expect(screen.queryByText("WET")).not.toBeInTheDocument();
   });
 
-  it("al elegir ALICAN aparecen el selector de tipo (etiqueta Tipo) y los títulos", async () => {
+  it("al elegir ALICAN aparece el selector de tipo (etiqueta Tipo), sin chips de títulos", async () => {
     renderDashboard();
 
     await selectProvider("ALICAN");
@@ -206,9 +195,8 @@ describe("Dashboard — filtro client-side por título de planilla", () => {
     expect(screen.getByText("Todos")).toBeInTheDocument();
     expect(screen.getByText("SECO")).toBeInTheDocument();
     expect(screen.getByText("WET")).toBeInTheDocument();
-    expect(screen.getByText("Títulos")).toBeInTheDocument();
-    expect(screen.getByText("SIEGER PUPPY (1)")).toBeInTheDocument();
-    expect(screen.getByText("MAXXIUM PERROS (1)")).toBeInTheDocument();
+    expect(screen.queryByText("Títulos")).not.toBeInTheDocument();
+    expect(screen.queryByText("SIEGER PUPPY (1)")).not.toBeInTheDocument();
   });
 
   it("al salir de ALICAN se ocultan los filtros específicos", async () => {
@@ -223,43 +211,32 @@ describe("Dashboard — filtro client-side por título de planilla", () => {
     expect(screen.queryByText("Títulos")).not.toBeInTheDocument();
   });
 
-  it("renderiza los chips de títulos desde las facets (client-side)", async () => {
-    renderDashboard();
-    await selectProvider("ALICAN");
 
-    expect(screen.getByText("Títulos")).toBeInTheDocument();
-    expect(screen.getByText("SIEGER PUPPY (1)")).toBeInTheDocument();
-    expect(screen.getByText("MAXXIUM PERROS (1)")).toBeInTheDocument();
+  it("no monta chips de categoría/variante y no pide las facets (menos requests)", () => {
+    renderDashboard();
+
+    expect(screen.queryByText("limpiar todo")).not.toBeInTheDocument();
+    expect(mockUseProductFacets).not.toHaveBeenCalled();
   });
 
-  it("elegir un título filtra por la clave compuesta [brand, line, subline]", async () => {
+  it("tipear el código de barras en el buscador encuentra el producto", async () => {
+    mockUseProducts.mockReturnValue({
+      products: [
+        { _id: "b1", name: "Alimento Con Barras", price: 1, quantity: 1, barcode: "7790001234567" },
+        { _id: "b2", name: "Otro Producto", price: 1, quantity: 1, barcode: "7791112223334" },
+      ],
+      loading: false,
+      error: null,
+    } as never);
     renderDashboard();
-    await selectProvider("ALICAN");
-    expect(screen.getByTestId("products-table").textContent).toContain(
-      "Collar Suelto",
+
+    fireEvent.change(
+      screen.getByPlaceholderText("Buscar por nombre, código o variante..."),
+      { target: { value: "7790001234567" } },
     );
 
-    clickPill("SIEGER PUPPY (1)");
-
-    const table = screen.getByTestId("products-table");
-    expect(table.textContent).toBe("Puppy A");
-    expect(table.textContent).not.toContain("Perros 15kg");
-    expect(table.textContent).not.toContain("Collar Suelto");
-  });
-
-  it("toggle del título activo lo deselecciona y restaura la lista completa", async () => {
-    renderDashboard();
-    await selectProvider("ALICAN");
-
-    clickPill("MAXXIUM PERROS (1)");
-    expect(screen.getByTestId("products-table").textContent).toBe("Perros 15kg");
-
-    clickPill("MAXXIUM PERROS (1)");
-    expect(screen.getByTestId("products-table").textContent).toContain(
-      "Puppy A",
-    );
-    expect(screen.getByTestId("products-table").textContent).toContain(
-      "Collar Suelto",
+    await waitFor(() =>
+      expect(screen.getByTestId("products-table").textContent).toBe("Alimento Con Barras"),
     );
   });
 });
@@ -272,14 +249,6 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
       products,
       loading: false,
       error: null,
-    } as never);
-    mockUseProductFacets.mockReturnValue({
-      titles: [
-        { key: SIEGER_KEY, label: "SIEGER PUPPY", count: 1 },
-        { key: MAXXIUM_KEY, label: "MAXXIUM PERROS", count: 1 },
-      ],
-      categories: [],
-      variants: [],
     } as never);
     mockUseGetSales.mockReturnValue({ sales: [], loading: false } as never);
     mockUseCreateSale.mockReturnValue({ createSale: vi.fn() } as never);
@@ -302,27 +271,18 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
     expect(screen.getByText("WET")).toBeInTheDocument();
   });
 
-  it("cambiar a WET limpia el título activo y pasa priceListType=WET a los hooks", async () => {
+  it("cambiar a WET pasa priceListType=WET a useProducts", async () => {
     renderDashboard();
     await selectProvider("ALICAN");
 
-    // Primero se elige un título (filtro client-side activo).
-    clickPill("SIEGER PUPPY (1)");
-    expect(screen.getByTestId("products-table").textContent).toBe("Puppy A");
-
     clickPill("WET");
 
-    // El filtro por título se limpió al cambiar de tipo → lista completa.
-    expect(screen.getByTestId("products-table").textContent).toBe(
-      "Puppy A | Perros 15kg | Collar Suelto",
-    );
     expect(mockUseProducts).toHaveBeenLastCalledWith(
       undefined,
       undefined,
       undefined,
       "WET",
     );
-    expect(mockUseProductFacets).toHaveBeenLastCalledWith(undefined, "WET");
   });
 
   it("volver a Todos quita el priceListType (undefined) de los hooks", async () => {
@@ -338,7 +298,6 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
       undefined,
       undefined,
     );
-    expect(mockUseProductFacets).toHaveBeenLastCalledWith(undefined, undefined);
   });
 
   it("'Solo lo que trabajo' default OFF muestra todo; al encenderlo oculta los desmarcados", async () => {
@@ -397,30 +356,6 @@ describe("Dashboard — selector de tipo de planilla ALICAN (SECO/WET)", () => {
     expect(tableCallbacks.onEdit.size).toBe(1);
     expect(tableCallbacks.onDuplicate.size).toBe(1);
     expect(tableCallbacks.onQuickPrice.size).toBe(1);
-  });
-
-  it("'limpiar todo' vacía el buscador y muestra todo el catálogo", async () => {
-    renderDashboard();
-    const getInput = () =>
-      screen.getByPlaceholderText(
-        "Buscar por nombre, código o variante...",
-      ) as HTMLInputElement;
-    fireEvent.change(getInput(), { target: { value: "collar" } });
-    await waitFor(() =>
-      expect(screen.getByTestId("products-table").textContent).toBe(
-        "Collar Suelto",
-      ),
-    );
-
-    fireEvent.click(screen.getByText("limpiar todo"));
-
-    // El input se remonta (key) al cambiar el filtro desde afuera: re-consultar.
-    await waitFor(() => expect(getInput().value).toBe(""));
-    await waitFor(() =>
-      expect(screen.getByTestId("products-table").textContent).toBe(
-        "Puppy A | Perros 15kg | Collar Suelto",
-      ),
-    );
   });
 
   describe("área de impresión (costosa: una fila por producto)", () => {

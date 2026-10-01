@@ -145,9 +145,6 @@ function makeCatalog(overrides: Record<string, unknown> = {}) {
     sentinelRef: { current: null },
     resetSelection: vi.fn(),
     registerRow: vi.fn(),
-    facetsCategories: [],
-    facetsVariants: [],
-    facetsTitles: [],
     ...overrides,
   };
 }

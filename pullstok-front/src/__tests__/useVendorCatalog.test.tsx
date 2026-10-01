@@ -81,12 +81,10 @@ describe("useVendorCatalog — filtro por título de planilla (server-side)", ()
     expect(result.current.titleFilter).toBe("MAXXIUM|MAXXIUM PERROS");
   });
 
-  it("expone facetsTitles desde useProductFacets para los chips", () => {
-    const { result } = renderCatalog();
+  it("no pide las facets (los chips de filtros rápidos ya no existen)", () => {
+    renderCatalog();
 
-    expect(result.current.facetsTitles).toEqual([
-      { key: "MAXXIUM|MAXXIUM PERROS", label: "MAXXIUM PERROS", count: 2 },
-    ]);
+    expect(mockUseProductFacets).not.toHaveBeenCalled();
   });
 
   it("toggle a null deja de enviar ?title=", async () => {

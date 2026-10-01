@@ -184,9 +184,6 @@ describe("VendorCatalogTab — producto manual con quantity 0", () => {
       sentinelRef: { current: null },
       resetSelection: vi.fn(),
       registerRow: vi.fn(),
-      facetsCategories: [],
-      facetsVariants: [],
-      facetsTitles: [],
     } as never);
     const cart = {
       items: [],

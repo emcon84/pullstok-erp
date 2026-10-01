@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { toast } from "react-toastify";
 import { Loader } from "@/components/atoms/loader";
 import { ProductDrawer } from "@/components/molecules/ProductDrawer";
-import { FilterChips } from "@/components/molecules/FilterChips";
 import { VendorSearchBar } from "@/components/molecules/VendorSearchBar";
 import { ProductTable } from "@/components/molecules/ProductTable";
 import { getMe } from "@/services/onboardingService";
@@ -321,37 +320,6 @@ export const VendorCatalogTab = ({
     [catalog.setFilter, resetSelection],
   );
 
-  const handleFilterChange = useCallback(
-    (f: string) => {
-      catalog.setFilter(f);
-      resetSelection();
-    },
-    [catalog.setFilter, resetSelection],
-  );
-
-  const handleCategoryChange = useCallback(
-    (c: string) => {
-      catalog.setCategoryFilter(c);
-      resetSelection();
-    },
-    [catalog.setCategoryFilter, resetSelection],
-  );
-
-  const handleTitleChange = useCallback(
-    (key: string | null) => {
-      catalog.setTitleFilter(key);
-      resetSelection();
-    },
-    [catalog.setTitleFilter, resetSelection],
-  );
-
-  const handleClearFilters = useCallback(() => {
-    catalog.setFilter("");
-    catalog.setCategoryFilter("");
-    catalog.setTitleFilter(null);
-    resetSelection();
-  }, [catalog.setFilter, catalog.setCategoryFilter, catalog.setTitleFilter, resetSelection]);
-
   const handleAssignBarcode = useCallback(
     (product: DataItem) => {
       const id = product._id || product.id;
@@ -387,19 +355,6 @@ export const VendorCatalogTab = ({
           items={catalog.items}
           onOpenQty={searchEnter}
           inputRef={catalog.searchInputRef}
-        />
-        <FilterChips
-          products={catalog.items}
-          quickCategories={catalog.facetsCategories.map((c) => c.name)}
-          quickVariants={catalog.facetsVariants}
-          titles={catalog.facetsTitles}
-          titleFilter={catalog.titleFilter}
-          onTitleChange={handleTitleChange}
-          filter={catalog.filter}
-          categoryFilter={catalog.categoryFilter}
-          onFilterChange={handleFilterChange}
-          onCategoryChange={handleCategoryChange}
-          onClear={handleClearFilters}
         />
         {/* "Solo lo que trabajo": oculta productos desmarcados (carried=false).
             Default ON. El toggle permite ver todo el catálogo al apagarlo. */}

@@ -1,9 +1,9 @@
 import { buildProductSearchWhere } from '../../src/controllers/productController';
 
 describe('buildProductSearchWhere', () => {
-  it('palabra suelta → OR entre nombre, código, categoría y variante', () => {
+  it('palabra suelta → OR entre nombre, código, categoría, variante y código de barras', () => {
     const where = buildProductSearchWhere('Purina');
-    expect(where.OR).toHaveLength(4);
+    expect(where.OR).toHaveLength(5);
     expect(where.OR[0]).toEqual({ name: { contains: 'Purina', mode: 'insensitive' } });
     expect(where.OR[2]).toEqual({
       category: { name: { contains: 'Purina', mode: 'insensitive' } },
@@ -32,6 +32,7 @@ describe('buildProductSearchWhere', () => {
             },
           },
         },
+        { barcode: { contains: 'cat', mode: 'insensitive' } },
       ],
     });
   });
@@ -40,7 +41,7 @@ describe('buildProductSearchWhere', () => {
     const where = buildProductSearchWhere('Purina, Proplan');
     expect(where.OR).toHaveLength(2);
     // Cada término es un OR propio de nombre/código/categoría/variante
-    expect(where.OR[0].OR).toHaveLength(4);
+    expect(where.OR[0].OR).toHaveLength(5);
     expect(where.OR[0].OR[0]).toEqual({ name: { contains: 'Purina', mode: 'insensitive' } });
     expect(where.OR[1].OR[0]).toEqual({ name: { contains: 'Proplan', mode: 'insensitive' } });
   });
@@ -48,7 +49,7 @@ describe('buildProductSearchWhere', () => {
   it('término con espacios dentro de la coma → AND dentro de ese término', () => {
     const where = buildProductSearchWhere('Purina, cat chow');
     expect(where.OR).toHaveLength(2);
-    expect(where.OR[0].OR).toHaveLength(4);
+    expect(where.OR[0].OR).toHaveLength(5);
     expect(where.OR[1].AND).toHaveLength(2);
   });
 
@@ -113,6 +114,16 @@ describe('buildProductSearchWhere', () => {
     expect(where.AND[1].OR[0]).toEqual({ name: { contains: 'chow', mode: 'insensitive' } });
   });
 
+  it('un código tipeado a mano matchea también por código de barras (insensible a mayúsculas)', () => {
+    const where = buildProductSearchWhere('7790001234567');
+    expect(where.OR).toEqual(
+      expect.arrayContaining([
+        { code: { contains: '7790001234567', mode: 'insensitive' } },
+        { barcode: { contains: '7790001234567', mode: 'insensitive' } },
+      ]),
+    );
+  });
+
   it('incluye la categoría entre los campos buscados', () => {
     const where = buildProductSearchWhere('perros');
     expect(where.OR).toEqual(
@@ -136,7 +147,7 @@ describe('buildProductSearchWhere', () => {
 
   it('sin grupo que contenga el token → no expande (comportamiento intacto)', () => {
     const where = buildProductSearchWhere('adulto', [['Cachorro', 'puppy']]);
-    expect(where.OR).toHaveLength(4);
+    expect(where.OR).toHaveLength(5);
     const names = where.OR
       .map((o: { name?: { contains: string } }) => o.name?.contains)
       .filter(Boolean);
