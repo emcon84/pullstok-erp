@@ -78,7 +78,6 @@ describe("customerAccountController", () => {
 
   it.each([
     ["CUSTOMER_NOT_FOUND", 404],
-    ["PAYMENT_EXCEEDS_BALANCE", 400],
     ["INVALID_PAYMENT_METHOD", 400],
     ["CASH_SESSION_REQUIRED", 422],
   ])("registerPayment maps %s → %i", async (code, status) => {
@@ -131,7 +130,6 @@ describe("customerAccountController", () => {
     ["MOVEMENT_NOT_FOUND", 404],
     ["MOVEMENT_IMMUTABLE", 422],
     ["CASH_SESSION_CLOSED", 422],
-    ["MOVEMENT_BALANCE_NEGATIVE", 400],
   ])("update/deleteMovement map %s → %i", async (code, status) => {
     svc.updateMovement.mockRejectedValue(mkErr(code, "msg"));
     svc.deleteMovement.mockRejectedValue(mkErr(code, "msg"));

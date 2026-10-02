@@ -14,7 +14,9 @@ import { buildAccountStatementPdf } from "./accountStatementPdf";
  * de `$transaction` el `tx` NO tiene scope automático → organizationId EXPLÍCITO.
  *
  * Saldo = Σ CHARGE − Σ PAYMENT, siempre por agregación (sin campo denormalizado).
- * Saldo > 0 = el cliente debe plata.
+ * Saldo > 0 = el cliente debe plata; saldo < 0 = saldo a favor (anticipo o
+ * cobranza que excedió la deuda). Un cargo nuevo se compensa solo contra el
+ * saldo a favor: no hay lógica de consumo aparte.
  */
 
 // Medios con los que un cliente puede saldar deuda: nunca CUENTA_CORRIENTE.
@@ -138,10 +140,11 @@ const getAccount = async (customerId: string) => {
 
 /**
  * Registra una cobranza (PAYMENT). Reglas: método distinto de CUENTA_CORRIENTE;
- * monto ≤ saldo (sin sobrepago); EFECTIVO exige una caja OPEN de la org (la
- * cobranza suma al arqueo de esa caja). El saldo se RE-CHEQUEA dentro de la
- * transacción, con el cliente bloqueado (FOR UPDATE) para que dos cobranzas
- * simultáneas no puedan pasarse del saldo.
+ * monto > 0 (puede exceder la deuda o el cliente no deber nada: el excedente /
+ * anticipo queda como saldo a favor, saldo negativo); EFECTIVO exige una caja
+ * OPEN de la org (la cobranza suma al arqueo de esa caja). El saldo se calcula
+ * dentro de la transacción con el cliente bloqueado (FOR UPDATE) para que el
+ * saldo devuelto sea consistente con cobranzas simultáneas.
  */
 const registerPayment = async (
   customerId: string,
@@ -194,14 +197,6 @@ const registerPayment = async (
     await tx.$queryRaw`SELECT "id" FROM "customers" WHERE "id" = ${customerId} AND "organizationId" = ${organizationId} FOR UPDATE`;
 
     const balance = await computeBalance(tx as unknown as LedgerClient, customerId, organizationId);
-    if (amount > balance) {
-      throw domainError(
-        "PAYMENT_EXCEEDS_BALANCE",
-        balance > 0
-          ? `El monto supera el saldo adeudado ($${balance.toFixed(2)})`
-          : "El cliente no tiene saldo adeudado",
-      );
-    }
 
     const movement = await tx.customerAccountMovement.create({
       data: {
@@ -255,18 +250,9 @@ const loadEditableMovement = async (
   return movement;
 };
 
-const assertBalanceNotNegative = (balanceAfter: number) => {
-  if (balanceAfter < 0) {
-    throw domainError(
-      "MOVEMENT_BALANCE_NEGATIVE",
-      "El cambio dejaría el saldo del cliente en negativo",
-    );
-  }
-};
-
 /**
  * Edits amount / date / note of a manual CHARGE or a PAYMENT (never its method).
- * Runs with the customer locked FOR UPDATE; the resulting balance can't be < 0.
+ * Runs with the customer locked FOR UPDATE; the resulting balance may be negative (credit).
  */
 const updateMovement = async (
   customerId: string,
@@ -298,7 +284,6 @@ const updateMovement = async (
     }
     if (input.date !== undefined) data.createdAt = input.date;
     if (input.note !== undefined) data.note = input.note?.trim() || null;
-    assertBalanceNotNegative(balanceAfter);
 
     // Singular update is forbidden on tenant models (config/db.ts): updateMany gets the org scope.
     await tx.customerAccountMovement.updateMany({
@@ -310,7 +295,7 @@ const updateMovement = async (
   });
 };
 
-/** Hard-deletes a manual CHARGE or a PAYMENT; the resulting balance can't be < 0. */
+/** Hard-deletes a manual CHARGE or a PAYMENT; the resulting balance may be negative (credit). */
 const deleteMovement = async (customerId: string, movementId: string, _userId?: string) => {
   const organizationId = requireOrganizationId();
 
@@ -327,7 +312,6 @@ const deleteMovement = async (customerId: string, movementId: string, _userId?: 
     const balance = await computeBalance(tx as unknown as LedgerClient, customerId, organizationId);
 
     const balanceAfter = round2(balance + (movement.type === "CHARGE" ? -movement.amount : movement.amount));
-    assertBalanceNotNegative(balanceAfter);
 
     // Singular delete is forbidden on tenant models (config/db.ts): deleteMany gets the org scope.
     await tx.customerAccountMovement.deleteMany({

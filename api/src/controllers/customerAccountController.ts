@@ -19,9 +19,7 @@ const handleError = (error: any, res: Response) => {
     case "MOVEMENT_IMMUTABLE":
     case "CASH_SESSION_CLOSED":
       return res.status(422).json({ error: error.code, message: error.message });
-    case "MOVEMENT_BALANCE_NEGATIVE":
     case "INVALID_MOVEMENT_AMOUNT":
-    case "PAYMENT_EXCEEDS_BALANCE":
     case "INVALID_PAYMENT_METHOD":
     case "INVALID_CHARGE_AMOUNT":
       return res.status(400).json({ error: error.code, message: error.message });
