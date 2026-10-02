@@ -36,8 +36,16 @@ const makeTx = () => ({
     groupBy: jest.fn(),
     create: jest.fn(),
     findFirst: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    updateMany: jest.fn(),
+    deleteMany: jest.fn(),
+    // The tenant extension (config/db.ts) throws on singular update/delete for
+    // multi-tenant models, so the mock must fail the same way.
+    update: jest.fn(() => {
+      throw new Error('Operación "update" no permitida en modelo multi-tenant');
+    }),
+    delete: jest.fn(() => {
+      throw new Error('Operación "delete" no permitida en modelo multi-tenant');
+    }),
   },
 });
 
@@ -91,11 +99,8 @@ describe("customerAccountService.updateMovement / deleteMovement", () => {
     tx = makeTx();
     p.$transaction.mockImplementation((cb: any) => cb(tx));
     p.customer.findFirst.mockResolvedValue({ id: "c-1" });
-    tx.customerAccountMovement.update.mockImplementation(async ({ data, where }: any) => ({
-      id: where.id,
-      ...data,
-    }));
-    tx.customerAccountMovement.delete.mockResolvedValue({});
+    tx.customerAccountMovement.updateMany.mockResolvedValue({ count: 1 });
+    tx.customerAccountMovement.deleteMany.mockResolvedValue({ count: 1 });
   });
 
   it("locks the customer row and scopes the movement lookup by org + customer", async () => {
@@ -115,8 +120,8 @@ describe("customerAccountService.updateMovement / deleteMovement", () => {
       date,
       note: "  vieja ",
     });
-    expect(tx.customerAccountMovement.update).toHaveBeenCalledWith({
-      where: { id: "m-1" },
+    expect(tx.customerAccountMovement.updateMany).toHaveBeenCalledWith({
+      where: { id: "m-1", customerId: "c-1", organizationId: "org-1" },
       data: { amount: 250.46, createdAt: date, note: "vieja" },
     });
     expect(r.balance).toBe(150.46);
@@ -126,8 +131,8 @@ describe("customerAccountService.updateMovement / deleteMovement", () => {
   it("only sends provided fields; empty note becomes null", async () => {
     setup(payment, 200);
     await customerAccountService.updateMovement("c-1", "m-2", { note: "   " });
-    expect(tx.customerAccountMovement.update).toHaveBeenCalledWith({
-      where: { id: "m-2" },
+    expect(tx.customerAccountMovement.updateMany).toHaveBeenCalledWith({
+      where: { id: "m-2", customerId: "c-1", organizationId: "org-1" },
       data: { note: null },
     });
   });
@@ -143,7 +148,7 @@ describe("customerAccountService.updateMovement / deleteMovement", () => {
     await expect(customerAccountService.updateMovement("c-1", "m-2", { amount: 400 })).rejects.toMatchObject({
       code: "MOVEMENT_BALANCE_NEGATIVE",
     });
-    expect(tx.customerAccountMovement.update).not.toHaveBeenCalled();
+    expect(tx.customerAccountMovement.updateMany).not.toHaveBeenCalled();
   });
 
   it("rejects lowering a CHARGE below what was already paid", async () => {
@@ -161,8 +166,8 @@ describe("customerAccountService.updateMovement / deleteMovement", () => {
     await expect(customerAccountService.deleteMovement("c-1", "m-1")).rejects.toMatchObject({
       code: "MOVEMENT_IMMUTABLE",
     });
-    expect(tx.customerAccountMovement.update).not.toHaveBeenCalled();
-    expect(tx.customerAccountMovement.delete).not.toHaveBeenCalled();
+    expect(tx.customerAccountMovement.updateMany).not.toHaveBeenCalled();
+    expect(tx.customerAccountMovement.deleteMany).not.toHaveBeenCalled();
   });
 
   it("EFECTIVO payment on a CLOSED cash session cannot be edited or deleted", async () => {
@@ -204,7 +209,9 @@ describe("customerAccountService.updateMovement / deleteMovement", () => {
   it("deletes a PAYMENT: balance goes up", async () => {
     setup(payment, 200);
     const r = await customerAccountService.deleteMovement("c-1", "m-2", "u-1");
-    expect(tx.customerAccountMovement.delete).toHaveBeenCalledWith({ where: { id: "m-2" } });
+    expect(tx.customerAccountMovement.deleteMany).toHaveBeenCalledWith({
+      where: { id: "m-2", customerId: "c-1", organizationId: "org-1" },
+    });
     expect(r).toEqual({ deletedId: "m-2", balance: 300 });
   });
 
@@ -219,6 +226,6 @@ describe("customerAccountService.updateMovement / deleteMovement", () => {
     await expect(customerAccountService.deleteMovement("c-1", "m-1")).rejects.toMatchObject({
       code: "MOVEMENT_BALANCE_NEGATIVE",
     });
-    expect(tx.customerAccountMovement.delete).not.toHaveBeenCalled();
+    expect(tx.customerAccountMovement.deleteMany).not.toHaveBeenCalled();
   });
 });

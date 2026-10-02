@@ -300,7 +300,12 @@ const updateMovement = async (
     if (input.note !== undefined) data.note = input.note?.trim() || null;
     assertBalanceNotNegative(balanceAfter);
 
-    const updated = await tx.customerAccountMovement.update({ where: { id: movementId }, data });
+    // Singular update is forbidden on tenant models (config/db.ts): updateMany gets the org scope.
+    await tx.customerAccountMovement.updateMany({
+      where: { id: movementId, customerId, organizationId },
+      data,
+    });
+    const updated = await tx.customerAccountMovement.findFirst({ where: { id: movementId, customerId } });
     return { movement: updated, balance: balanceAfter };
   });
 };
@@ -324,7 +329,10 @@ const deleteMovement = async (customerId: string, movementId: string, _userId?: 
     const balanceAfter = round2(balance + (movement.type === "CHARGE" ? -movement.amount : movement.amount));
     assertBalanceNotNegative(balanceAfter);
 
-    await tx.customerAccountMovement.delete({ where: { id: movementId } });
+    // Singular delete is forbidden on tenant models (config/db.ts): deleteMany gets the org scope.
+    await tx.customerAccountMovement.deleteMany({
+      where: { id: movementId, customerId, organizationId },
+    });
     return { deletedId: movementId, balance: balanceAfter };
   });
 };
