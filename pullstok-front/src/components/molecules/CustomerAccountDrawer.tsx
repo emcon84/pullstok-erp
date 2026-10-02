@@ -63,6 +63,8 @@ const formatItemQuantity = (item: SaleItem) => {
     : `${item.quantity} u.`;
 };
 
+const CREDIT_DEFAULT_NOTE = "Saldo a favor";
+
 const money = (n: number) => `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
 
 /** YYYY-MM-DD en hora local (lo que espera <input type="date">). */
@@ -108,11 +110,12 @@ const buildWhatsappStatementUrl = (phone: string, customerName: string, pdfUrl: 
 
 /**
  * Cuenta corriente de un cliente en un drawer: saldo, movimientos (más nuevos
- * primero), cobranza y deuda anterior (formularios colapsables). La cobranza
- * arranca vacía ("Cobrar todo" carga el saldo) y no puede superarlo (el
- * servidor también lo rechaza). Una cobranza en EFECTIVO necesita la caja
- * abierta: entra al arqueo de esa caja. Deudas anteriores y cobranzas se
- * pueden editar o borrar; las ventas no.
+ * primero), cobranza, saldo a favor y deuda anterior (formularios colapsables).
+ * La cobranza arranca vacía ("Cobrar todo" carga la deuda, solo si hay) y puede
+ * superar la deuda: el excedente queda como saldo a favor (saldo negativo).
+ * "Cargar saldo a favor" es un anticipo (un PAYMENT más) disponible siempre.
+ * Una cobranza en EFECTIVO necesita la caja abierta: entra al arqueo de esa
+ * caja. Deudas anteriores y cobranzas se pueden editar o borrar; las ventas no.
  */
 export const CustomerAccountDrawer = ({
   customerId,
@@ -139,15 +142,15 @@ export const CustomerAccountDrawer = ({
   const [paymentDate, setPaymentDate] = useState(todayStr);
   const [method, setMethod] = useState<PaymentMethod>("EFECTIVO");
   const [note, setNote] = useState("");
+  // "credit" = anticipo ("Cargar saldo a favor"): mismo PAYMENT, otro encuadre.
+  const [creditMode, setCreditMode] = useState(false);
 
   const amount = round2(parseAmt(amountStr));
-  // Al editar, el tope es el saldo + lo que esa cobranza ya descontó.
-  const maxPayable = round2(balance + (editingPayment?.amount ?? 0));
-  const exceedsBalance = amount > maxPayable;
+  // Lo que excede la deuda queda como saldo a favor (en modo anticipo, todo).
+  const creditExcess = !editingPayment && !creditMode ? round2(amount - Math.max(balance, 0)) : 0;
   const needsCashSession = !editingPayment && method === "EFECTIVO" && !session;
   const canSubmitPayment =
     amount > 0 &&
-    !exceedsBalance &&
     !needsCashSession &&
     !!paymentDate &&
     paymentDate <= todayStr &&
@@ -160,6 +163,7 @@ export const CustomerAccountDrawer = ({
     setMethod("EFECTIVO");
     setNote("");
     setEditingPayment(null);
+    setCreditMode(false);
     setPaymentOpen(false);
   };
 
@@ -206,12 +210,16 @@ export const CustomerAccountDrawer = ({
           method,
           ...dateToSend(paymentDate),
           ...(method === "EFECTIVO" && session ? { cashSessionId: session.id } : {}),
-          ...(note.trim() ? { note: note.trim() } : {}),
+          ...(note.trim()
+            ? { note: note.trim() }
+            : creditMode
+              ? { note: CREDIT_DEFAULT_NOTE }
+              : {}),
         },
       },
       {
         onSuccess: () => {
-          toast.success("Cobranza registrada");
+          toast.success(creditMode ? "Saldo a favor cargado" : "Cobranza registrada");
           resetPaymentForm();
         },
         onError: (error: Error) => {
@@ -402,6 +410,7 @@ export const CustomerAccountDrawer = ({
         : "text-muted-foreground";
 
   const paymentFormVisible = paymentOpen || !!editingPayment;
+  const creditForm = creditMode && !editingPayment;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -460,14 +469,16 @@ export const CustomerAccountDrawer = ({
             )}
           </div>
 
-          {/* ── Cargar cobranza (con deuda, o editando una cobranza) ── */}
+          {/* ── Cargar cobranza / saldo a favor (siempre disponibles, o editando una cobranza) ── */}
           {paymentFormVisible ? (
             <div className="space-y-3 rounded-lg border p-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="account-payment-amount">Monto a cobrar</Label>
-                    {!editingPayment && (
+                    <Label htmlFor="account-payment-amount">
+                      {creditForm ? "Monto del saldo a favor" : "Monto a cobrar"}
+                    </Label>
+                    {!editingPayment && !creditForm && balance > 0 && (
                       <Button
                         type="button"
                         variant="link"
@@ -488,14 +499,17 @@ export const CustomerAccountDrawer = ({
                     onFocus={(e) => e.currentTarget.select()}
                     onChange={(e) => setAmountStr(e.target.value)}
                     className="text-right"
-                    aria-invalid={exceedsBalance || undefined}
                   />
-                  {exceedsBalance && (
-                    <p className="text-xs text-destructive">El monto supera el saldo adeudado</p>
+                  {creditExcess > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Quedarán {money(creditExcess)} como saldo a favor
+                    </p>
                   )}
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="account-payment-date">Fecha de la cobranza</Label>
+                  <Label htmlFor="account-payment-date">
+                    {creditForm ? "Fecha del saldo a favor" : "Fecha de la cobranza"}
+                  </Label>
                   <Input
                     id="account-payment-date"
                     type="date"
@@ -540,18 +554,29 @@ export const CustomerAccountDrawer = ({
                   Cancelar
                 </Button>
                 <Button className="flex-1" onClick={handleSubmitPayment} disabled={!canSubmitPayment}>
-                  {editingPayment ? "Guardar cambios" : "Registrar cobranza"}
+                  {editingPayment
+                    ? "Guardar cambios"
+                    : creditForm
+                      ? "Registrar saldo a favor"
+                      : "Registrar cobranza"}
                 </Button>
               </div>
             </div>
-          ) : balance > 0 ? (
-            <Button variant="outline" className="w-full" onClick={() => setPaymentOpen(true)}>
-              Cargar cobranza
-            </Button>
           ) : (
-            balance === 0 && (
-              <p className="text-center text-sm text-muted-foreground">Sin deuda pendiente</p>
-            )
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button variant="outline" onClick={() => setPaymentOpen(true)}>
+                Cargar cobranza
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCreditMode(true);
+                  setPaymentOpen(true);
+                }}
+              >
+                Cargar saldo a favor
+              </Button>
+            </div>
           )}
 
           {/* ── Cargar deuda anterior (ventas viejas: monto, fecha y detalle opcional) ── */}
