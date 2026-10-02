@@ -57,6 +57,8 @@ export interface SaleTicket {
   phone?: string | null;
   /** Fecha/hora de emisión en ISO. */
   issuedAt: string;
+  /** true en la reimpresión de una venta guardada: agrega la leyenda "REIMPRESIÓN". */
+  reprint?: boolean;
   lines: SaleTicketLine[];
   subtotal: number;
   discountPct: number;
@@ -314,7 +316,7 @@ export function renderSaleTicketHtml(ticket: SaleTicket): string {
   return `<!DOCTYPE html>
 <html lang="es-AR"><head><meta charset="utf-8"><title>Ticket</title><style>${STYLES}</style></head>
 <body>
-<header>${logo ? `<img${ticket.logoProcessed ? "" : ' class="raw"'} src="${escapeHtml(logo)}" alt="">` : ""}<div class="biz">${escapeHtml(ticket.businessName)}</div>${info}<div>${escapeHtml(formatDateTime(ticket.issuedAt))}</div></header>
+<header>${logo ? `<img${ticket.logoProcessed ? "" : ' class="raw"'} src="${escapeHtml(logo)}" alt="">` : ""}<div class="biz">${escapeHtml(ticket.businessName)}</div>${info}<div>${escapeHtml(formatDateTime(ticket.issuedAt))}</div>${ticket.reprint ? '<div class="biz">*** REIMPRESIÓN ***</div>' : ""}</header>
 <div class="sep"></div>
 <section data-block="items">${items}</section>
 <div class="sep"></div>

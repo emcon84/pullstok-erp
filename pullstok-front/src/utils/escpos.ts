@@ -238,6 +238,7 @@ export function encodeSaleTicketEscPos(ticket: SaleTicket, opts: EncodeOptions =
   for (const l of info) w.line(cut(toPrinterText(l), cols));
   const when = formatDateTime(ticket.issuedAt);
   if (when) w.line(when);
+  if (ticket.reprint) w.bold(true).line("*** REIMPRESION ***").bold(false);
 
   // Ítems: nombre + fila detalle/total, sin separadores entre ítems.
   w.align("left").line(sep);
