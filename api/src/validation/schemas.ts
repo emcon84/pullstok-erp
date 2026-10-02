@@ -18,6 +18,10 @@ export const refreshSchema = z.object({
   refreshToken: z.string().min(1, "refreshToken requerido"),
 });
 
+export const unlockBalancesSchema = z.object({
+  password: z.string().min(1, "La contraseña es requerida").max(200),
+});
+
 // ---------- Password Recovery ----------
 export const forgotPasswordSchema = z.object({
   email: z.string().email("Email inválido"),

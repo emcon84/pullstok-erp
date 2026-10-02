@@ -1,3 +1,4 @@
+import { createHmac } from "crypto";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { UserRole } from "../config/tenantContext";
 
@@ -60,6 +61,41 @@ export const verifyGuestToken = (token: string): GuestTokenPayload => {
   const payload = jwt.verify(token, getSecret()) as GuestTokenPayload;
   if (payload.role !== "GUEST") {
     throw new Error("No es un guest token");
+  }
+  return payload;
+};
+
+// ---------------------------------------------------------------------------
+// Balances-view token (customer balances summary lock)
+// ---------------------------------------------------------------------------
+// Short-lived proof that a user typed the balances password. It is signed with
+// a key DERIVED from JWT_SECRET (HMAC with a fixed label), so it can never be
+// verified as a session token (and a session token never verifies here), plus a
+// `purpose` claim as a second guard. Bound to user + organization.
+
+export const BALANCES_TOKEN_TTL_SEC = 15 * 60;
+const BALANCES_PURPOSE = "balances-view";
+
+export interface BalancesTokenPayload {
+  sub: string;
+  organizationId: string;
+  purpose: typeof BALANCES_PURPOSE;
+}
+
+const getBalancesSecret = (): string =>
+  createHmac("sha256", getSecret()).update(BALANCES_PURPOSE).digest("hex");
+
+export const generateBalancesToken = (userId: string, organizationId: string): string =>
+  jwt.sign({ organizationId, purpose: BALANCES_PURPOSE }, getBalancesSecret(), {
+    subject: userId,
+    expiresIn: BALANCES_TOKEN_TTL_SEC,
+  } as SignOptions);
+
+/** Throws on bad signature, expiry or wrong purpose. */
+export const verifyBalancesToken = (token: string): BalancesTokenPayload => {
+  const payload = jwt.verify(token, getBalancesSecret()) as BalancesTokenPayload;
+  if (payload.purpose !== BALANCES_PURPOSE) {
+    throw new Error("Not a balances token");
   }
   return payload;
 };

@@ -1,6 +1,7 @@
 import { prisma, basePrisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
 import { round2 } from "../utils/money";
+import { summarizeBalances } from "../utils/balancesSummary";
 import { sendDocument, normalizePhone } from "./whatsappService";
 import { uploadToR2 } from "../config/storage";
 import { buildAccountStatementPdf } from "./accountStatementPdf";
@@ -114,6 +115,9 @@ const getBalances = async () => {
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 };
+
+/** Company-wide totals + top 5 debtors (same semantics the panel used to compute client-side). */
+const getBalancesSummary = async () => summarizeBalances(await getBalances());
 
 /** Extracto de un cliente: saldo + movimientos (más nuevos primero). */
 const getAccount = async (customerId: string) => {
@@ -444,6 +448,7 @@ const getAccountStatementLink = async (
 
 export default {
   getBalances,
+  getBalancesSummary,
   getAccount,
   registerPayment,
   registerHistoricalCharge,

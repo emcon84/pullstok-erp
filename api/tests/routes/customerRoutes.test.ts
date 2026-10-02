@@ -34,4 +34,29 @@ describe("customerRoutes — cuenta corriente", () => {
       indexOf("get", "/:id"),
     );
   });
+
+  // Balances lock: literals BEFORE "/:id", role-gated, summary behind the token.
+  it("registers the balances lock endpoints before GET /:id", () => {
+    expect(indexOf("post", "/balances/unlock")).toBeGreaterThanOrEqual(0);
+    expect(indexOf("get", "/balances/summary")).toBeGreaterThanOrEqual(0);
+    expect(indexOf("get", "/balances/summary")).toBeLessThan(indexOf("get", "/:id"));
+  });
+
+  it("restricts unlock and summary to ADMIN/MANAGEMENT (VENDEDOR gets 403)", () => {
+    const { requireRole } = jest.requireActual("../../src/middlewares/authMiddleware");
+    const gate = requireRole("ADMIN", "MANAGEMENT");
+    const run = (role: string) => {
+      const res: any = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      const next = jest.fn();
+      gate({ user: { role } }, res, next);
+      return { res, next };
+    };
+    expect(run("VENDEDOR").res.status).toHaveBeenCalledWith(403);
+    expect(run("ADMIN").next).toHaveBeenCalled();
+    // The route stacks must actually include a handler chain longer than auth+hours+handler.
+    const layer = (m: string, path: string) =>
+      (stack.find((l) => l.route?.path === path && l.route.methods[m]) as any).route.stack;
+    expect(layer("post", "/balances/unlock").length).toBeGreaterThanOrEqual(5);
+    expect(layer("get", "/balances/summary").length).toBeGreaterThanOrEqual(5);
+  });
 });

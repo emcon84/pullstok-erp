@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import customerAccountService from "../services/customerAccountService";
+import balancesLock from "../services/balancesLockService";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
 /**
@@ -23,6 +24,15 @@ const handleError = (error: any, res: Response) => {
     case "INVALID_PAYMENT_METHOD":
     case "INVALID_CHARGE_AMOUNT":
       return res.status(400).json({ error: error.code, message: error.message });
+    // Balances lock: wrong password, too many attempts, server not configured, locked.
+    case "INVALID_BALANCES_PASSWORD":
+      return res.status(401).json({ error: error.code, message: error.message });
+    case "BALANCES_LOCKED":
+      return res.status(403).json({ error: error.code, message: error.message });
+    case "BALANCES_RATE_LIMITED":
+      return res.status(429).json({ error: error.code, message: error.message });
+    case "BALANCES_LOCK_NOT_CONFIGURED":
+      return res.status(503).json({ error: error.code, message: error.message });
     // Falló el envío por WhatsApp (Kapso) — no es culpa del payload del cliente.
     case "WHATSAPP_SEND_FAILED":
       return res.status(502).json({ error: error.code, message: error.message });
@@ -34,6 +44,27 @@ const handleError = (error: any, res: Response) => {
 const getBalances = async (_req: Request, res: Response) => {
   try {
     res.status(200).json(await customerAccountService.getBalances());
+  } catch (error: any) {
+    handleError(error, res);
+  }
+};
+
+const getBalancesSummary = async (_req: Request, res: Response) => {
+  try {
+    res.status(200).json(await customerAccountService.getBalancesSummary());
+  } catch (error: any) {
+    handleError(error, res);
+  }
+};
+
+/** Exchanges the balances password for a short-lived token. Never echoes the password. */
+const unlockBalances = (req: AuthedRequest, res: Response) => {
+  try {
+    const result = balancesLock.unlock(
+      { userId: req.user?.id ?? "", organizationId: req.user?.organizationId ?? "" },
+      req.body?.password,
+    );
+    res.status(200).json(result);
   } catch (error: any) {
     handleError(error, res);
   }
@@ -120,6 +151,8 @@ const getAccountStatementLink = async (req: Request, res: Response) => {
 
 export default {
   getBalances,
+  getBalancesSummary,
+  unlockBalances,
   getAccount,
   registerPayment,
   registerHistoricalCharge,

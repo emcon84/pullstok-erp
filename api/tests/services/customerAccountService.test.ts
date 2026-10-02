@@ -543,3 +543,41 @@ describe("customerAccountService.getAccountStatementLink", () => {
     });
   });
 });
+
+describe("customerAccountService.getBalancesSummary", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("aggregates getBalances into totals and top debtors", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([
+      { customerId: "c-1", type: "CHARGE", _sum: { amount: 300 } },
+      { customerId: "c-2", type: "CHARGE", _sum: { amount: 100 } },
+      { customerId: "c-3", type: "PAYMENT", _sum: { amount: 40 } },
+    ]);
+    p.customer.findMany.mockResolvedValue([
+      { id: "c-1", name: "Ana" },
+      { id: "c-2", name: null },
+      { id: "c-3", name: "Beto" },
+    ]);
+
+    const s = await customerAccountService.getBalancesSummary();
+
+    expect(s).toEqual({
+      totalOwed: 400,
+      totalCredit: 40,
+      net: 360,
+      debtorCount: 2,
+      creditorCount: 1,
+      topDebtors: [
+        { customerId: "c-1", name: "Ana", balance: 300, share: 0.75 },
+        { customerId: "c-2", name: "Sin nombre", balance: 100, share: 0.25 },
+      ],
+    });
+  });
+
+  it("returns zeros when there are no balances", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([]);
+    const s = await customerAccountService.getBalancesSummary();
+    expect(s.totalOwed).toBe(0);
+    expect(s.topDebtors).toEqual([]);
+  });
+});

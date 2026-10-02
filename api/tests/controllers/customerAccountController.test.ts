@@ -5,11 +5,19 @@
 import { Response } from "express";
 import controller from "../../src/controllers/customerAccountController";
 import service from "../../src/services/customerAccountService";
+import balancesLock from "../../src/services/balancesLockService";
+
+jest.mock("../../src/services/balancesLockService", () => ({
+  __esModule: true,
+  default: { unlock: jest.fn() },
+}));
+const lock = balancesLock as unknown as { unlock: jest.Mock };
 
 jest.mock("../../src/services/customerAccountService", () => ({
   __esModule: true,
   default: {
     getBalances: jest.fn(),
+    getBalancesSummary: jest.fn(),
     getAccount: jest.fn(),
     registerPayment: jest.fn(),
     registerHistoricalCharge: jest.fn(),
@@ -22,6 +30,7 @@ jest.mock("../../src/services/customerAccountService", () => ({
 
 const svc = service as unknown as {
   getBalances: jest.Mock;
+  getBalancesSummary: jest.Mock;
   getAccount: jest.Mock;
   registerPayment: jest.Mock;
   registerHistoricalCharge: jest.Mock;
@@ -198,5 +207,51 @@ describe("customerAccountController", () => {
     const res = mockRes();
     await controller.getAccountStatementLink(mockReq({ id: "c-1" }), res);
     expect(res.status).toHaveBeenCalledWith(500);
+  });
+
+  describe("balances lock", () => {
+    const authedReq = (body: any = {}) =>
+      ({ params: {}, body, user: { id: "u-1", role: "ADMIN", organizationId: "org-1" } }) as any;
+
+    it("unlockBalances: 200 with token and expiresInSec", async () => {
+      lock.unlock.mockReturnValue({ token: "tok", expiresInSec: 900 });
+      const res = mockRes();
+      await controller.unlockBalances(authedReq({ password: "pw" }), res);
+      expect(lock.unlock).toHaveBeenCalledWith({ userId: "u-1", organizationId: "org-1" }, "pw");
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ token: "tok", expiresInSec: 900 });
+    });
+
+    it.each([
+      ["INVALID_BALANCES_PASSWORD", 401],
+      ["BALANCES_RATE_LIMITED", 429],
+      ["BALANCES_LOCK_NOT_CONFIGURED", 503],
+      ["BALANCES_LOCKED", 403],
+    ])("unlockBalances: %s -> %i", async (code, status) => {
+      lock.unlock.mockImplementation(() => {
+        throw mkErr(code, "msg");
+      });
+      const res = mockRes();
+      await controller.unlockBalances(authedReq({ password: "pw" }), res);
+      expect(res.status).toHaveBeenCalledWith(status);
+      expect(res.json).toHaveBeenCalledWith({ error: code, message: "msg" });
+    });
+
+    it("unlockBalances never echoes the password back", async () => {
+      lock.unlock.mockImplementation(() => {
+        throw mkErr("INVALID_BALANCES_PASSWORD", "Contraseña incorrecta");
+      });
+      const res = mockRes();
+      await controller.unlockBalances(authedReq({ password: "hunter2" }), res);
+      expect(JSON.stringify((res.json as jest.Mock).mock.calls)).not.toContain("hunter2");
+    });
+
+    it("getBalancesSummary: 200 with the service result", async () => {
+      svc.getBalancesSummary.mockResolvedValue({ totalOwed: 10 });
+      const res = mockRes();
+      await controller.getBalancesSummary(authedReq(), res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ totalOwed: 10 });
+    });
   });
 });

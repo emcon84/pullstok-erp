@@ -1,11 +1,13 @@
 import { Router } from "express";
 import customerController from "../controllers/customerController";
 import customerAccountController from "../controllers/customerAccountController";
-import { authenticateJWT } from "../middlewares/authMiddleware";
+import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
 import { checkBusinessHours } from "../middlewares/checkBusinessHours";
+import { requireBalancesToken } from "../middlewares/requireBalancesToken";
 import { validate } from "../middlewares/validate";
 import {
   createCustomerSchema,
+  unlockBalancesSchema,
   updateCustomerSchema,
   createAccountPaymentSchema,
   createAccountChargeSchema,
@@ -25,6 +27,24 @@ router.get("/", authenticateJWT, checkBusinessHours, customerController.getCusto
 // Cuenta corriente (cuenta-corriente): "/balances" es un literal → va ANTES de
 // "/:id" para que no lo capture como id.
 router.get("/balances", authenticateJWT, checkBusinessHours, customerAccountController.getBalances);
+// Balances summary lock: literals under "/balances", BEFORE "/:id". Only owners
+// (ADMIN/MANAGEMENT); the summary additionally needs the X-Balances-Token.
+router.post(
+  "/balances/unlock",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN", "MANAGEMENT"),
+  validate(unlockBalancesSchema),
+  customerAccountController.unlockBalances,
+);
+router.get(
+  "/balances/summary",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN", "MANAGEMENT"),
+  requireBalancesToken,
+  customerAccountController.getBalancesSummary,
+);
 router.get("/:id/account", authenticateJWT, checkBusinessHours, customerAccountController.getAccount);
 router.post(
   "/:id/account/payments",
