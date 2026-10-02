@@ -81,9 +81,9 @@ describe("accountStatementPdf.buildAccountStatementPdf", () => {
     const text = extractPdfText(buffer);
 
     expect(text).toContain("Ana Perez");
-    expect(text).toContain("1500.00");
-    expect(text).toContain("265.50");
-    expect(text).toContain("TRANSFERENCIA");
+    expect(text).toContain("1.500,00");
+    expect(text).toContain("265,50");
+    expect(text).toContain("Transferencia");
     expect(text).toContain("Venta");
     expect(text).toContain("Cobranza");
   });
@@ -155,5 +155,68 @@ describe("accountStatementPdf.buildAccountStatementPdf", () => {
     });
 
     expect(buffer.subarray(0, 4).toString("ascii")).toBe("%PDF");
+  });
+
+  it("maps payment methods to readable Spanish labels", async () => {
+    const mk = (id: string, method: string) => ({
+      id,
+      type: "PAYMENT" as const,
+      amount: 1,
+      method,
+      note: null,
+      createdAt: new Date("2026-09-10T12:00:00Z"),
+      sale: null,
+    });
+    const text = extractPdfText(
+      await buildAccountStatementPdf({
+        ...baseInput,
+        movements: [mk("a", "EFECTIVO"), mk("b", "TARJETA_CREDITO"), mk("c", "TARJETA_DEBITO"), mk("d", "QR")],
+      }),
+    );
+    expect(text).toContain("Efectivo");
+    expect(text).toContain("Tarjeta de crédito");
+    expect(text).toContain("Tarjeta de débito");
+    expect(text).not.toContain("TARJETA_CREDITO");
+  });
+
+  it("shows a running balance column, computed oldest to newest, rows oldest first", async () => {
+    // Input is newest-first (as getAccount returns it).
+    const text = extractPdfText(
+      await buildAccountStatementPdf({
+        ...baseInput,
+        movements: [...baseInput.movements].reverse(),
+      }),
+    );
+    expect(text).toContain("Saldo acumulado");
+    const afterCharge = text.indexOf("1.500,00");
+    const afterPayment = text.lastIndexOf("1.234,50");
+    expect(afterCharge).toBeGreaterThan(-1);
+    expect(afterPayment).toBeGreaterThan(afterCharge);
+    // oldest first: the sale row comes before the payment row
+    expect(text.indexOf("Venta")).toBeLessThan(text.indexOf("Cobranza"));
+  });
+
+  it("renders the header band, emission date and page footer", async () => {
+    const text = extractPdfText(await buildAccountStatementPdf(baseInput));
+    expect(text).toContain("RESUMEN DE CUENTA");
+    expect(text).toContain("Emitido el");
+    expect(text).toContain("Página 1 de 1");
+  });
+
+  it("paginates long statements: repeats the table header and numbers pages", async () => {
+    const movements = Array.from({ length: 80 }, (_, i) => ({
+      id: `m-${i}`,
+      type: "CHARGE" as const,
+      amount: 10,
+      method: null,
+      note: "Deuda anterior de prueba con una nota bastante larga para forzar el salto de línea en la columna",
+      createdAt: new Date(Date.UTC(2026, 0, 1 + (i % 28))),
+      sale: null,
+    }));
+    const text = extractPdfText(await buildAccountStatementPdf({ ...baseInput, balance: 800, movements }));
+    const headers = text.split("Saldo acumulado").length - 1;
+    expect(headers).toBeGreaterThanOrEqual(2);
+    expect(text).toMatch(/Página 1 de [2-9]/);
+    expect(text).toContain("columna");
   });
 });

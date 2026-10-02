@@ -1,6 +1,7 @@
 // Genera el PDF de "Resumen de cuenta" que se manda por WhatsApp como
 // comprobante (cuenta-corriente T1). A4, membrete (logo opcional + datos
-// fiscales de Organization) + saldo + tabla de movimientos.
+// fiscales de Organization) + caja de saldo + tabla de movimientos con saldo
+// acumulado, paginada con encabezado repetido y pie "Página X de Y".
 //
 // `compress: false` a propósito: es un documento chico (una tabla de texto),
 // y dejar el content stream sin deflate permite testear el contenido con un
@@ -35,7 +36,9 @@ export interface AccountStatementInput {
   movements: AccountStatementMovement[];
 }
 
-const MONEY = (n: number) => `$ ${round2(n).toFixed(2)}`;
+// Money / dates use es-AR like the invoices (PrintInvoice): "$ 1.234,50".
+const MONEY = (n: number) =>
+  `$ ${round2(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const DATE = (d: Date | string) =>
   new Date(d).toLocaleDateString("es-AR", { timeZone: "UTC" });
@@ -46,10 +49,34 @@ const movementLabel = (m: AccountStatementMovement): string => {
   return m.sale ? "Venta" : "Deuda anterior";
 };
 
+const METHOD_LABELS: Record<string, string> = {
+  EFECTIVO: "Efectivo",
+  TARJETA_CREDITO: "Tarjeta de crédito",
+  TARJETA_DEBITO: "Tarjeta de débito",
+  TRANSFERENCIA: "Transferencia",
+  QR: "QR",
+  CUENTA_CORRIENTE: "Cuenta corriente",
+};
+const methodLabel = (method?: string | null): string =>
+  method ? (METHOD_LABELS[method] ?? method) : "-";
+
 const balanceLabel = (balance: number): string => {
   if (balance > 0) return "Saldo adeudado";
   if (balance < 0) return "Saldo a favor";
   return "Sin saldo";
+};
+
+// Visual identity of the invoices: Helvetica (Arial), black rules, #e6e6e6
+// header band. Red/green only for amounts and the balance box.
+const COLOR = {
+  ink: "#000000",
+  muted: "#555555",
+  band: "#e6e6e6",
+  zebra: "#f5f5f5",
+  debt: "#b91c1c",
+  debtBg: "#fdecec",
+  credit: "#15803d",
+  creditBg: "#e8f5ec",
 };
 
 /** Descarga el logo de `logoUrl` a Buffer. Nunca lanza: sin URL, fetch no-ok
@@ -67,13 +94,20 @@ const fetchLogo = async (logoUrl: string | null | undefined): Promise<Buffer | n
   }
 };
 
-const COLS = {
-  fecha: { x: 40, width: 75 },
-  tipo: { x: 115, width: 65 },
-  metodo: { x: 180, width: 95 },
-  monto: { x: 275, width: 80 },
-  nota: { x: 355, width: 197 },
+const MARGIN = 40;
+const CONTENT_W = 515;
+const FOOTER_Y = 842 - 30;
+const PAGE_BOTTOM = 842 - 50; // rows must end above the footer
+type Col = { x: number; width: number };
+const COLS: Record<"fecha" | "tipo" | "metodo" | "nota" | "monto" | "saldo", Col> = {
+  fecha: { x: 40, width: 58 },
+  tipo: { x: 98, width: 72 },
+  metodo: { x: 170, width: 72 },
+  nota: { x: 242, width: 133 },
+  monto: { x: 375, width: 85 },
+  saldo: { x: 460, width: 95 },
 };
+const PAD = 4;
 
 /** Arma el PDF A4 del resumen de cuenta y lo devuelve como Buffer. */
 export const buildAccountStatementPdf = async (
@@ -81,7 +115,7 @@ export const buildAccountStatementPdf = async (
 ): Promise<Buffer> => {
   const logoBuffer = await fetchLogo(input.logoUrl);
 
-  const doc = new PDFDocument({ size: "A4", margin: 40, compress: false });
+  const doc = new PDFDocument({ size: "A4", margin: MARGIN, compress: false, bufferPages: true });
   const chunks: Buffer[] = [];
   doc.on("data", (chunk: Buffer) => chunks.push(chunk));
   const done = new Promise<Buffer>((resolve, reject) => {
@@ -89,69 +123,150 @@ export const buildAccountStatementPdf = async (
     doc.on("error", reject);
   });
 
-  const { organization, customer, balance, movements } = input;
+  const { organization, customer, balance } = input;
 
-  // --- Membrete ---------------------------------------------------------
-  let y = 40;
+  // Chronological (oldest first): the running balance reads top to bottom and
+  // the last row equals the current balance. Stable for equal timestamps,
+  // using the reverse of the input order (getAccount returns newest first).
+  const ordered = input.movements
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => {
+      const diff = new Date(a.m.createdAt).getTime() - new Date(b.m.createdAt).getTime();
+      return diff !== 0 ? diff : b.i - a.i;
+    })
+    .map((x) => x.m);
+
+  // --- Membrete (issuer left, document title right) ---------------------------
+  let y = MARGIN;
   if (logoBuffer) {
     try {
-      doc.image(logoBuffer, 40, y, { fit: [80, 60] });
+      doc.image(logoBuffer, MARGIN, y, { fit: [80, 60] });
     } catch (err) {
       console.error("[accountStatementPdf] logo inválido, se omite", err);
     }
   }
-  const headerX = logoBuffer ? 135 : 40;
-  doc.font("Helvetica-Bold").fontSize(16).text(organization.name, headerX, y);
+  const headerX = logoBuffer ? 135 : MARGIN;
+  doc.fillColor(COLOR.ink).font("Helvetica-Bold").fontSize(16).text(organization.name, headerX, y, { width: 280 });
   doc.font("Helvetica").fontSize(9);
   const fiscalLine = [organization.taxId ? `CUIT: ${organization.taxId}` : null, organization.taxCondition]
     .filter(Boolean)
     .join(" — ");
-  if (fiscalLine) doc.text(fiscalLine, headerX, doc.y);
-  if (organization.address) doc.text(organization.address, headerX, doc.y);
-  if (organization.phone) doc.text(`Tel: ${organization.phone}`, headerX, doc.y);
+  if (fiscalLine) doc.text(fiscalLine, headerX, doc.y, { width: 280 });
+  if (organization.address) doc.text(organization.address, headerX, doc.y, { width: 280 });
+  if (organization.phone) doc.text(`Tel: ${organization.phone}`, headerX, doc.y, { width: 280 });
+  const leftBottom = doc.y;
 
-  y = Math.max(doc.y, y + 60) + 20;
-
-  // --- Título + saldo -----------------------------------------------------
-  doc.font("Helvetica-Bold").fontSize(13).text(`Resumen de cuenta — ${customer.name}`, 40, y);
-  doc.font("Helvetica").fontSize(9).text(`Fecha de emisión: ${DATE(new Date())}`, 40, doc.y + 4);
-
+  doc.font("Helvetica-Bold").fontSize(14).text("RESUMEN DE CUENTA", 330, y, { width: 225, align: "right" });
   doc
-    .font("Helvetica-Bold")
-    .fontSize(12)
-    .text(
-      balance === 0 ? balanceLabel(balance) : `${balanceLabel(balance)}: ${MONEY(Math.abs(balance))}`,
-      40,
-      doc.y + 10,
-    );
+    .font("Helvetica")
+    .fontSize(9)
+    .text(`Emitido el ${DATE(new Date())}`, 330, doc.y + 2, { width: 225, align: "right" });
 
-  // --- Tabla de movimientos ------------------------------------------------
-  let rowY = doc.y + 20;
-  doc.font("Helvetica-Bold").fontSize(9);
-  doc.text("Fecha", COLS.fecha.x, rowY, { width: COLS.fecha.width });
-  doc.text("Tipo", COLS.tipo.x, rowY, { width: COLS.tipo.width });
-  doc.text("Método", COLS.metodo.x, rowY, { width: COLS.metodo.width });
-  doc.text("Monto", COLS.monto.x, rowY, { width: COLS.monto.width });
-  doc.text("Nota", COLS.nota.x, rowY, { width: COLS.nota.width });
-  rowY += 14;
-  doc.moveTo(40, rowY).lineTo(555, rowY).strokeColor("#999999").stroke();
-  rowY += 6;
+  y = Math.max(leftBottom, y + 60) + 10;
+  doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y).lineWidth(1).strokeColor(COLOR.ink).stroke();
 
-  doc.font("Helvetica").fontSize(9);
-  for (const m of movements) {
-    if (rowY > doc.page.height - 60) {
-      doc.addPage();
-      rowY = 40;
-    }
-    doc.text(DATE(m.createdAt), COLS.fecha.x, rowY, { width: COLS.fecha.width });
-    doc.text(movementLabel(m), COLS.tipo.x, rowY, { width: COLS.tipo.width });
-    doc.text(m.method ?? "-", COLS.metodo.x, rowY, { width: COLS.metodo.width });
-    doc.text(round2(m.amount).toFixed(2), COLS.monto.x, rowY, { width: COLS.monto.width });
-    doc.text(m.note ?? "-", COLS.nota.x, rowY, { width: COLS.nota.width });
-    rowY += 16;
+  // --- Cliente ----------------------------------------------------------------
+  y += 10;
+  doc.fillColor(COLOR.ink).font("Helvetica-Bold").fontSize(10).text("Cliente:", MARGIN, y, { continued: true });
+  doc.font("Helvetica").text(` ${customer.name}`);
+
+  // --- Balance box ------------------------------------------------------------
+  y = doc.y + 10;
+  const accent = balance > 0 ? COLOR.debt : balance < 0 ? COLOR.credit : COLOR.ink;
+  const boxBg = balance > 0 ? COLOR.debtBg : balance < 0 ? COLOR.creditBg : COLOR.band;
+  const boxH = 50;
+  doc.lineWidth(1).rect(MARGIN, y, CONTENT_W, boxH).fillAndStroke(boxBg, accent);
+  doc.fillColor(accent).font("Helvetica-Bold").fontSize(12).text(balanceLabel(balance), MARGIN + 14, y + 18, {
+    width: 200,
+    lineBreak: false,
+  });
+  if (balance !== 0) {
+    doc.fontSize(22).text(MONEY(Math.abs(balance)), MARGIN + 220, y + 13, {
+      width: CONTENT_W - 234,
+      align: "right",
+      lineBreak: false,
+    });
   }
-  if (movements.length === 0) {
-    doc.text("Sin movimientos", COLS.fecha.x, rowY);
+
+  // --- Tabla de movimientos -----------------------------------------------------
+  const drawTableHeader = (top: number): number => {
+    const h = 20;
+    doc.lineWidth(1).rect(MARGIN, top, CONTENT_W, h).fillAndStroke(COLOR.band, COLOR.ink);
+    doc.fillColor(COLOR.ink).font("Helvetica-Bold").fontSize(9);
+    const cell = (label: string, c: Col, align: "left" | "right" = "left") =>
+      doc.text(label, c.x + PAD, top + 6, { width: c.width - PAD * 2, align, lineBreak: false });
+    cell("Fecha", COLS.fecha);
+    cell("Tipo", COLS.tipo);
+    cell("Método", COLS.metodo);
+    cell("Nota", COLS.nota);
+    cell("Monto", COLS.monto, "right");
+    cell("Saldo acumulado", COLS.saldo, "right");
+    return top + h;
+  };
+
+  let rowY = drawTableHeader(y + boxH + 16);
+  let running = 0;
+
+  ordered.forEach((m, idx) => {
+    running = round2(running + (m.type === "CHARGE" ? m.amount : -m.amount));
+    const note = m.note?.trim() || "-";
+    const noteW = COLS.nota.width - PAD * 2;
+    doc.font("Helvetica").fontSize(9);
+    const rowH = Math.max(18, doc.heightOfString(note, { width: noteW }) + 8);
+
+    if (rowY + rowH > PAGE_BOTTOM) {
+      doc.addPage();
+      rowY = drawTableHeader(MARGIN);
+    }
+    if (idx % 2 === 1) doc.rect(MARGIN, rowY, CONTENT_W, rowH).fill(COLOR.zebra);
+
+    const ty = rowY + 5;
+    const single = (txt: string, c: Col, color: string, align: "left" | "right" = "left", bold = false) =>
+      doc
+        .fillColor(color)
+        .font(bold ? "Helvetica-Bold" : "Helvetica")
+        .fontSize(9)
+        .text(txt, c.x + PAD, ty, { width: c.width - PAD * 2, align, lineBreak: false, ellipsis: true });
+    single(DATE(m.createdAt), COLS.fecha, COLOR.ink);
+    single(movementLabel(m), COLS.tipo, COLOR.ink);
+    single(methodLabel(m.method), COLS.metodo, COLOR.ink);
+    doc.fillColor(COLOR.ink).font("Helvetica").fontSize(9).text(note, COLS.nota.x + PAD, ty, { width: noteW });
+    single(MONEY(m.amount), COLS.monto, m.type === "CHARGE" ? COLOR.debt : COLOR.credit, "right", true);
+    single(MONEY(running), COLS.saldo, running < 0 ? COLOR.credit : COLOR.ink, "right");
+
+    doc
+      .moveTo(MARGIN, rowY + rowH)
+      .lineTo(MARGIN + CONTENT_W, rowY + rowH)
+      .lineWidth(0.5)
+      .strokeColor("#cccccc")
+      .stroke();
+    rowY += rowH;
+  });
+
+  if (ordered.length === 0) {
+    doc.fillColor(COLOR.muted).font("Helvetica").fontSize(9).text("Sin movimientos", MARGIN + PAD, rowY + 6);
+  }
+
+  // --- Footer on every page: emission date + page X of Y -----------------------
+  const range = doc.bufferedPageRange();
+  const emitted = DATE(new Date());
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    // Drop the bottom margin so footer text doesn't trigger an automatic new page.
+    doc.page.margins.bottom = 0;
+    doc
+      .moveTo(MARGIN, FOOTER_Y - 6)
+      .lineTo(MARGIN + CONTENT_W, FOOTER_Y - 6)
+      .lineWidth(0.5)
+      .strokeColor(COLOR.ink)
+      .stroke();
+    doc.fillColor(COLOR.muted).font("Helvetica").fontSize(8);
+    doc.text(`Emitido el ${emitted}`, MARGIN, FOOTER_Y, { width: 250, lineBreak: false });
+    doc.text(`Página ${i - range.start + 1} de ${range.count}`, MARGIN + 265, FOOTER_Y, {
+      width: 250,
+      align: "right",
+      lineBreak: false,
+    });
   }
 
   doc.end();
