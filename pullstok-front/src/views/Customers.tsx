@@ -19,7 +19,7 @@ import {
   useUpdateCustomer,
 } from "../components/hooks/useCustomer";
 import { useCustomerBalances } from "../components/hooks/useCustomerAccount";
-import { CustomerAccountDialog } from "../components/molecules/CustomerAccountDialog";
+import { CustomerAccountDrawer } from "../components/molecules/CustomerAccountDrawer";
 import { Loader } from "../components/atoms/loader";
 import { customerDisplayName } from "../utils/customerName";
 import { fetchPadron } from "../services/customerService";
@@ -492,7 +492,7 @@ export const Customers = () => {
       </GenericModal>
 
       {accountTarget && (
-        <CustomerAccountDialog
+        <CustomerAccountDrawer
           customerId={accountTarget.id}
           customerName={accountTarget.name}
           customerPhone={accountTarget.phone}

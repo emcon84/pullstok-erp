@@ -23,6 +23,8 @@ vi.mock("../components/hooks/useCustomerAccount", () => ({
   useRegisterAccountPayment: vi.fn(),
   useGetAccountStatementLink: vi.fn(),
   useCreateHistoricalCharge: vi.fn(),
+  useUpdateAccountMovement: vi.fn(),
+  useDeleteAccountMovement: vi.fn(),
 }));
 vi.mock("../components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
@@ -41,6 +43,8 @@ import {
   useRegisterAccountPayment,
   useGetAccountStatementLink,
   useCreateHistoricalCharge,
+  useUpdateAccountMovement,
+  useDeleteAccountMovement,
 } from "../components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "../components/hooks/useCashSession";
 
@@ -90,6 +94,8 @@ describe("Customers — cuenta corriente", () => {
     vi.mocked(useRegisterAccountPayment).mockReturnValue({ registerPayment: vi.fn(), loading: false } as never);
     vi.mocked(useGetAccountStatementLink).mockReturnValue({ getStatementLink: vi.fn(), loading: false } as never);
     vi.mocked(useCreateHistoricalCharge).mockReturnValue({ createCharge: vi.fn(), loading: false } as never);
+    vi.mocked(useUpdateAccountMovement).mockReturnValue({ updateMovement: vi.fn(), loading: false } as never);
+    vi.mocked(useDeleteAccountMovement).mockReturnValue({ deleteMovement: vi.fn(), loading: false } as never);
     vi.mocked(useGetCurrentCashSession).mockReturnValue({ session: null, loading: false, error: null, refetch: vi.fn() } as never);
   });
 
@@ -110,7 +116,7 @@ describe("Customers — cuenta corriente", () => {
     expect(within(cardOf("Carla Paz")).getByText("—")).toBeInTheDocument();
   });
 
-  it("opens the account dialog of the chosen customer", () => {
+  it("opens the account drawer of the chosen customer", () => {
     renderCustomers();
     expect(screen.queryByText("Cuenta corriente — Ana Gómez")).not.toBeInTheDocument();
 

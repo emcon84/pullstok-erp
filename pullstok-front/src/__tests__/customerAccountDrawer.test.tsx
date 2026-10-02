@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { toast } from "react-toastify";
 
 vi.mock("react-toastify", () => ({
@@ -15,14 +15,22 @@ vi.mock("@/components/ui/native-select", () => ({
     options,
     ariaLabel,
     id,
+    disabled,
   }: {
     value: string;
     onValueChange: (v: string) => void;
     options: { value: string; label: string }[];
     ariaLabel?: string;
     id?: string;
+    disabled?: boolean;
   }) => (
-    <select id={id} aria-label={ariaLabel} value={value} onChange={(e) => onValueChange(e.target.value)}>
+    <select
+      id={id}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      value={value}
+      onChange={(e) => onValueChange(e.target.value)}
+    >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
@@ -37,22 +45,30 @@ vi.mock("@/components/hooks/useCustomerAccount", () => ({
   useRegisterAccountPayment: vi.fn(),
   useGetAccountStatementLink: vi.fn(),
   useCreateHistoricalCharge: vi.fn(),
+  useUpdateAccountMovement: vi.fn(),
+  useDeleteAccountMovement: vi.fn(),
 }));
 vi.mock("@/components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
+}));
+vi.mock("@/components/hooks/useConfirm", () => ({
+  useConfirm: vi.fn(),
 }));
 vi.mock("@/services/saleServices", () => ({
   getSaleById: vi.fn(),
 }));
 
-import { CustomerAccountDialog } from "@/components/molecules/CustomerAccountDialog";
+import { CustomerAccountDrawer } from "@/components/molecules/CustomerAccountDrawer";
 import {
   useCustomerAccount,
   useRegisterAccountPayment,
   useGetAccountStatementLink,
   useCreateHistoricalCharge,
+  useUpdateAccountMovement,
+  useDeleteAccountMovement,
 } from "@/components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
+import { useConfirm } from "@/components/hooks/useConfirm";
 import { getSaleById } from "@/services/saleServices";
 
 const movements = [
@@ -73,9 +89,9 @@ const movements = [
   },
 ];
 
-const setAccount = (balance: number) =>
+const setAccount = (balance: number, list: unknown[] = movements) =>
   vi.mocked(useCustomerAccount).mockReturnValue({
-    account: { customer: { id: "c-1", name: "Ana Gómez" }, balance, movements },
+    account: { customer: { id: "c-1", name: "Ana Gómez" }, balance, movements: list },
     loading: false,
     error: null,
   } as never);
@@ -91,10 +107,13 @@ const setSession = (session: { id: string } | null) =>
 const registerPayment = vi.fn();
 const getStatementLink = vi.fn();
 const createCharge = vi.fn();
+const updateMovement = vi.fn();
+const deleteMovement = vi.fn();
+const confirm = vi.fn();
 
-const renderDialog = (customerPhone = "+5491122334455") =>
+const renderDrawer = (customerPhone = "+5491122334455") =>
   render(
-    <CustomerAccountDialog
+    <CustomerAccountDrawer
       customerId="c-1"
       customerName="Ana Gómez"
       customerPhone={customerPhone}
@@ -103,11 +122,20 @@ const renderDialog = (customerPhone = "+5491122334455") =>
     />,
   );
 
+const localToday = () => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+const openPayment = () => fireEvent.click(screen.getByRole("button", { name: "Cargar cobranza" }));
 const amountInput = () => screen.getByLabelText("Monto a cobrar") as HTMLInputElement;
+const paymentDate = () => screen.getByLabelText("Fecha de la cobranza") as HTMLInputElement;
 const methodSelect = () => screen.getByLabelText("Método de cobro") as HTMLSelectElement;
 const submit = () => screen.getByRole("button", { name: "Registrar cobranza" }) as HTMLButtonElement;
+const saveEdit = () => screen.getByRole("button", { name: "Guardar cambios" }) as HTMLButtonElement;
 
-describe("CustomerAccountDialog", () => {
+describe("CustomerAccountDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setAccount(1000);
@@ -124,11 +152,21 @@ describe("CustomerAccountDialog", () => {
       createCharge,
       loading: false,
     } as never);
+    vi.mocked(useUpdateAccountMovement).mockReturnValue({
+      updateMovement,
+      loading: false,
+    } as never);
+    vi.mocked(useDeleteAccountMovement).mockReturnValue({
+      deleteMovement,
+      loading: false,
+    } as never);
+    confirm.mockResolvedValue(true);
+    vi.mocked(useConfirm).mockReturnValue(confirm);
     vi.mocked(getSaleById).mockReset();
   });
 
   it("shows the customer, the current balance and the movements", () => {
-    renderDialog();
+    renderDrawer();
 
     expect(screen.getByText("Cuenta corriente — Ana Gómez")).toBeInTheDocument();
     expect(screen.getByText("Saldo adeudado")).toBeInTheDocument();
@@ -144,17 +182,57 @@ describe("CustomerAccountDialog", () => {
     expect(table.getByText("$500,00")).toBeInTheDocument();
   });
 
-  it("prefills the amount with the balance and offers only real payment methods", () => {
-    renderDialog();
+  it("renders the movements table without fixed widths or forced horizontal scroll", () => {
+    renderDrawer();
+    const table = screen.getByRole("table");
+    expect(table.className).not.toMatch(/min-w-|w-\[/);
+    expect(table.closest(".overflow-x-scroll")).toBeNull();
+  });
 
+  it("hides the payment form until 'Cargar cobranza', with an empty amount and today's date", () => {
+    renderDrawer();
+    expect(screen.queryByLabelText("Monto a cobrar")).not.toBeInTheDocument();
+
+    openPayment();
+
+    expect(amountInput().value).toBe("");
+    expect(paymentDate().value).toBe(localToday());
+    expect(paymentDate().max).toBe(localToday());
+  });
+
+  it("'Cobrar todo' fills the amount with the full balance", () => {
+    renderDrawer();
+    openPayment();
+    fireEvent.click(screen.getByRole("button", { name: "Cobrar todo" }));
     expect(amountInput().value).toBe("1000");
+  });
+
+  it("offers only real payment methods", () => {
+    renderDrawer();
+    openPayment();
+
     const options = Array.from(methodSelect().options).map((o) => o.value);
     expect(options).toEqual(["EFECTIVO", "TARJETA_CREDITO", "TARJETA_DEBITO", "TRANSFERENCIA", "QR"]);
     expect(options).not.toContain("CUENTA_CORRIENTE");
   });
 
+  it("sends a past date at local noon as ISO and omits the date for today", () => {
+    renderDrawer();
+    openPayment();
+    fireEvent.change(amountInput(), { target: { value: "100" } });
+    fireEvent.click(submit());
+    expect(registerPayment.mock.calls[0][0].input).not.toHaveProperty("date");
+
+    fireEvent.change(paymentDate(), { target: { value: "2026-09-01" } });
+    fireEvent.click(submit());
+    expect(registerPayment.mock.calls[1][0].input.date).toBe(
+      new Date("2026-09-01T12:00:00").toISOString(),
+    );
+  });
+
   it("EFECTIVO cobranza sends the open cash session id", () => {
-    renderDialog();
+    renderDrawer();
+    openPayment();
     fireEvent.change(amountInput(), { target: { value: "300" } });
     fireEvent.change(screen.getByLabelText("Nota (opcional)"), { target: { value: " Señal " } });
 
@@ -170,7 +248,9 @@ describe("CustomerAccountDialog", () => {
   });
 
   it("non-cash cobranza does not send a cash session", () => {
-    renderDialog();
+    renderDrawer();
+    openPayment();
+    fireEvent.change(amountInput(), { target: { value: "1000" } });
     fireEvent.change(methodSelect(), { target: { value: "TRANSFERENCIA" } });
 
     fireEvent.click(submit());
@@ -182,7 +262,9 @@ describe("CustomerAccountDialog", () => {
 
   it("blocks EFECTIVO without an open cash session and shows the hint", () => {
     setSession(null);
-    renderDialog();
+    renderDrawer();
+    openPayment();
+    fireEvent.change(amountInput(), { target: { value: "100" } });
 
     expect(screen.getByText("Abrí la caja para cobrar en efectivo")).toBeInTheDocument();
     expect(submit()).toBeDisabled();
@@ -196,7 +278,8 @@ describe("CustomerAccountDialog", () => {
   });
 
   it("prevents overpaying the balance client-side", () => {
-    renderDialog();
+    renderDrawer();
+    openPayment();
     fireEvent.change(amountInput(), { target: { value: "1500" } });
 
     expect(screen.getByText("El monto supera el saldo adeudado")).toBeInTheDocument();
@@ -206,46 +289,61 @@ describe("CustomerAccountDialog", () => {
   });
 
   it("disables the submit for an empty or zero amount", () => {
-    renderDialog();
-    fireEvent.change(amountInput(), { target: { value: "" } });
+    renderDrawer();
+    openPayment();
     expect(submit()).toBeDisabled();
     fireEvent.change(amountInput(), { target: { value: "0" } });
     expect(submit()).toBeDisabled();
   });
 
   it("accepts a comma as the decimal separator", () => {
-    renderDialog();
+    renderDrawer();
+    openPayment();
     fireEvent.change(amountInput(), { target: { value: "250,50" } });
     fireEvent.click(submit());
     expect(registerPayment.mock.calls[0][0].input.amount).toBe(250.5);
   });
 
-  it("toasts on success and surfaces the server message on error", () => {
-    renderDialog();
+  it("toasts on success (closing the form) and surfaces the server message on error", () => {
+    renderDrawer();
+    openPayment();
+    fireEvent.change(amountInput(), { target: { value: "100" } });
     fireEvent.click(submit());
     const [, callbacks] = registerPayment.mock.calls[0];
 
-    callbacks.onSuccess();
-    expect(toast.success).toHaveBeenCalledWith("Cobranza registrada");
-
     callbacks.onError(new Error("El monto supera el saldo adeudado ($10.00)"));
     expect(toast.error).toHaveBeenCalledWith("El monto supera el saldo adeudado ($10.00)");
+
+    callbacks.onSuccess();
+    expect(toast.success).toHaveBeenCalledWith("Cobranza registrada");
+  });
+
+  it("closes and resets the payment form after a successful cobranza", () => {
+    registerPayment.mockImplementation((_vars, opts) => opts.onSuccess());
+    renderDrawer();
+    openPayment();
+    fireEvent.change(amountInput(), { target: { value: "100" } });
+    fireEvent.click(submit());
+
+    expect(screen.queryByLabelText("Monto a cobrar")).not.toBeInTheDocument();
+    openPayment();
+    expect(amountInput().value).toBe("");
   });
 
   it("hides the form when the customer owes nothing", () => {
     setAccount(0);
-    renderDialog();
+    renderDrawer();
 
     expect(screen.getByText("Sin deuda pendiente")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Registrar cobranza" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cargar cobranza" })).not.toBeInTheDocument();
   });
 
   it("shows a credit balance as 'Saldo a favor' without a form", () => {
     setAccount(-200);
-    renderDialog();
+    renderDrawer();
 
     expect(screen.getByText("Saldo a favor")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Registrar cobranza" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cargar cobranza" })).not.toBeInTheDocument();
   });
 
   // ── T2: detalle de venta expandible ──
@@ -260,7 +358,7 @@ describe("CustomerAccountDialog", () => {
     };
 
     it("has no expand control for PAYMENT rows", () => {
-      renderDialog();
+      renderDrawer();
       expect(
         screen.queryByRole("button", { name: /ver detalle de la venta/i }),
       ).toBeInTheDocument(); // sanity: exists for the CHARGE row
@@ -270,7 +368,7 @@ describe("CustomerAccountDialog", () => {
 
     it("expands on click, fetches once, and shows the sale items", async () => {
       vi.mocked(getSaleById).mockResolvedValue(saleDetail as never);
-      renderDialog();
+      renderDrawer();
 
       const toggle = screen.getByRole("button", { name: /ver detalle de la venta/i });
       fireEvent.click(toggle);
@@ -290,7 +388,7 @@ describe("CustomerAccountDialog", () => {
 
     it("shows an error state when the fetch fails", async () => {
       vi.mocked(getSaleById).mockRejectedValue(new Error("network"));
-      renderDialog();
+      renderDrawer();
 
       fireEvent.click(screen.getByRole("button", { name: /ver detalle de la venta/i }));
 
@@ -315,13 +413,13 @@ describe("CustomerAccountDialog", () => {
     });
 
     it("disables the button and shows a hint when the customer has no phone", () => {
-      renderDialog("   ");
+      renderDrawer("   ");
       expect(sendButton()).toBeDisabled();
       expect(screen.getByText("Cargá un teléfono para enviar por WhatsApp")).toBeInTheDocument();
     });
 
     it("fetches the statement link and opens wa.me with the digits-only phone and the PDF url", () => {
-      renderDialog("+54 9 11 2233-4455");
+      renderDrawer("+54 9 11 2233-4455");
       expect(sendButton()).not.toBeDisabled();
       expect(
         screen.queryByText("Cargá un teléfono para enviar por WhatsApp"),
@@ -351,7 +449,7 @@ describe("CustomerAccountDialog", () => {
         getStatementLink,
         loading: true,
       } as never);
-      renderDialog();
+      renderDrawer();
 
       expect(sendButton()).toBeDisabled();
       fireEvent.click(sendButton());
@@ -359,7 +457,7 @@ describe("CustomerAccountDialog", () => {
     });
 
     it("surfaces the server error message on failure and never opens wa.me", () => {
-      renderDialog();
+      renderDrawer();
       fireEvent.click(sendButton());
       const [, callbacks] = getStatementLink.mock.calls[0];
 
@@ -369,18 +467,13 @@ describe("CustomerAccountDialog", () => {
     });
 
     it("never calls the old Kapso-sending endpoint from this button", () => {
-      renderDialog();
+      renderDrawer();
       fireEvent.click(sendButton());
       expect(getStatementLink).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("cargar deuda anterior", () => {
-    const localToday = () => {
-      const d = new Date();
-      const pad = (n: number) => String(n).padStart(2, "0");
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    };
     const openForm = () => fireEvent.click(screen.getByRole("button", { name: "Cargar deuda anterior" }));
     const chargeAmount = () => screen.getByLabelText("Monto de la deuda") as HTMLInputElement;
     const chargeDate = () => screen.getByLabelText("Fecha de la deuda") as HTMLInputElement;
@@ -388,7 +481,7 @@ describe("CustomerAccountDialog", () => {
     const saveCharge = () => screen.getByRole("button", { name: "Guardar deuda" }) as HTMLButtonElement;
 
     it("hides the form until the button is pressed, then defaults the date to today with max today", () => {
-      renderDialog();
+      renderDrawer();
       expect(screen.queryByLabelText("Monto de la deuda")).not.toBeInTheDocument();
 
       openForm();
@@ -400,12 +493,12 @@ describe("CustomerAccountDialog", () => {
 
     it("is available even when the customer has no debt", () => {
       setAccount(0);
-      renderDialog();
+      renderDrawer();
       expect(screen.getByRole("button", { name: "Cargar deuda anterior" })).toBeInTheDocument();
     });
 
     it("requires an amount greater than zero", () => {
-      renderDialog();
+      renderDrawer();
       openForm();
       expect(saveCharge()).toBeDisabled();
 
@@ -417,7 +510,7 @@ describe("CustomerAccountDialog", () => {
     });
 
     it("sends only the amount when the date is today and there is no note", () => {
-      renderDialog();
+      renderDrawer();
       openForm();
       fireEvent.change(chargeAmount(), { target: { value: "700" } });
       fireEvent.click(saveCharge());
@@ -427,7 +520,7 @@ describe("CustomerAccountDialog", () => {
     });
 
     it("sends a past date at local noon as ISO plus the trimmed note", () => {
-      renderDialog();
+      renderDrawer();
       openForm();
       fireEvent.change(chargeAmount(), { target: { value: "1200.50" } });
       fireEvent.change(chargeDate(), { target: { value: "2026-09-01" } });
@@ -446,7 +539,7 @@ describe("CustomerAccountDialog", () => {
 
     it("toasts success and resets and closes the form on success", () => {
       createCharge.mockImplementation((_vars, opts) => opts.onSuccess());
-      renderDialog();
+      renderDrawer();
       openForm();
       fireEvent.change(chargeAmount(), { target: { value: "700" } });
       fireEvent.click(saveCharge());
@@ -457,7 +550,7 @@ describe("CustomerAccountDialog", () => {
 
     it("toasts the server error and keeps the form open", () => {
       createCharge.mockImplementation((_vars, opts) => opts.onError(new Error("La fecha no puede ser futura")));
-      renderDialog();
+      renderDrawer();
       openForm();
       fireEvent.change(chargeAmount(), { target: { value: "700" } });
       fireEvent.click(saveCharge());
@@ -478,19 +571,169 @@ describe("CustomerAccountDialog", () => {
     };
 
     it("labels a CHARGE without sale as 'Deuda anterior' with no expand toggle", () => {
-      vi.mocked(useCustomerAccount).mockReturnValue({
-        account: { customer: { id: "c-1", name: "Ana Gómez" }, balance: 900, movements: [historical] },
-        loading: false,
-        error: null,
-      } as never);
-      renderDialog();
+      setAccount(900, [historical]);
+      renderDrawer();
 
       const table = within(screen.getByRole("table"));
       expect(table.getByText("Deuda anterior")).toBeInTheDocument();
       expect(table.getByText("Ventas viejas")).toBeInTheDocument();
       expect(table.queryByText("Venta")).not.toBeInTheDocument();
-      expect(table.queryByRole("button")).not.toBeInTheDocument();
+      expect(table.queryByRole("button", { name: /ver detalle/i })).not.toBeInTheDocument();
+    });
+  });
+
+  // ── Editar / borrar movimientos ──
+  describe("edit and delete movements", () => {
+    const historical = {
+      id: "m-h",
+      type: "CHARGE" as const,
+      amount: 900,
+      saleId: null,
+      note: "Ventas viejas",
+      createdAt: "2026-08-01T12:00:00.000Z",
+    };
+    const payment = {
+      id: "m-p",
+      type: "PAYMENT" as const,
+      amount: 287650,
+      method: "EFECTIVO" as const,
+      note: "Pago",
+      createdAt: "2026-09-28T15:00:00.000Z",
+    };
+    const sale = {
+      id: "m-s",
+      type: "CHARGE" as const,
+      amount: 1500,
+      saleId: "sale-abcdef123456",
+      createdAt: "2026-09-27T12:00:00.000Z",
+    };
+
+    it("shows edit/delete only on historical charges and payments, never on sale charges", () => {
+      setAccount(1000, [payment, sale, historical]);
+      renderDrawer();
+
+      expect(screen.getAllByRole("button", { name: /^Editar / })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /^Borrar / })).toHaveLength(2);
+      expect(screen.getByRole("button", { name: "Editar cobranza" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Editar deuda anterior" })).toBeInTheDocument();
+    });
+
+    it("edits a payment pre-filled, with a read-only method, even when the balance is zero", () => {
+      setAccount(0, [payment]);
+      renderDrawer();
+      expect(screen.queryByRole("button", { name: "Cargar cobranza" })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Editar cobranza" }));
+
+      expect(amountInput().value).toBe("287650");
+      expect(paymentDate().value).toBe(new Date(payment.createdAt).toLocaleDateString("sv-SE"));
+      expect((screen.getByLabelText("Nota (opcional)") as HTMLInputElement).value).toBe("Pago");
+      expect(methodSelect()).toBeDisabled();
+      expect(methodSelect().value).toBe("EFECTIVO");
+    });
+
+    it("saves a payment edit with amount and note, and omits the unchanged date", () => {
+      setAccount(0, [payment]);
+      renderDrawer();
+      fireEvent.click(screen.getByRole("button", { name: "Editar cobranza" }));
+      fireEvent.change(amountInput(), { target: { value: "1000" } });
+      fireEvent.click(saveEdit());
+
+      expect(updateMovement).toHaveBeenCalledWith(
+        { customerId: "c-1", movementId: "m-p", input: { amount: 1000, note: "Pago" } },
+        expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+      );
+      expect(registerPayment).not.toHaveBeenCalled();
+    });
+
+    it("sends a changed date at local noon when editing", () => {
+      setAccount(0, [payment]);
+      renderDrawer();
+      fireEvent.click(screen.getByRole("button", { name: "Editar cobranza" }));
+      fireEvent.change(paymentDate(), { target: { value: "2026-09-01" } });
+      fireEvent.click(saveEdit());
+
+      expect(updateMovement.mock.calls[0][0].input.date).toBe(
+        new Date("2026-09-01T12:00:00").toISOString(),
+      );
+    });
+
+    it("allows a payment edit up to balance plus the original amount", () => {
+      setAccount(100, [{ ...payment, amount: 500 }]);
+      renderDrawer();
+      fireEvent.click(screen.getByRole("button", { name: "Editar cobranza" }));
+
+      fireEvent.change(amountInput(), { target: { value: "600" } });
+      expect(saveEdit()).not.toBeDisabled();
+      fireEvent.change(amountInput(), { target: { value: "601" } });
+      expect(saveEdit()).toBeDisabled();
+    });
+
+    it("edits a historical charge through the debt form and closes it on success", () => {
+      updateMovement.mockImplementation((_vars, opts) => opts.onSuccess());
+      setAccount(900, [historical]);
+      renderDrawer();
+      fireEvent.click(screen.getByRole("button", { name: "Editar deuda anterior" }));
+
+      expect((screen.getByLabelText("Monto de la deuda") as HTMLInputElement).value).toBe("900");
+      expect((screen.getByLabelText("Detalle (opcional)") as HTMLInputElement).value).toBe("Ventas viejas");
+      fireEvent.change(screen.getByLabelText("Monto de la deuda"), { target: { value: "950" } });
+      fireEvent.click(saveEdit());
+
+      expect(updateMovement.mock.calls[0][0]).toEqual({
+        customerId: "c-1",
+        movementId: "m-h",
+        input: { amount: 950, note: "Ventas viejas" },
+      });
+      expect(toast.success).toHaveBeenCalledWith("Movimiento actualizado");
+      expect(screen.queryByLabelText("Monto de la deuda")).not.toBeInTheDocument();
+      expect(createCharge).not.toHaveBeenCalled();
+    });
+
+    it("surfaces the server message when the edit fails and keeps the form open", () => {
+      updateMovement.mockImplementation((_vars, opts) =>
+        opts.onError(new Error("La caja de esta cobranza ya está cerrada")),
+      );
+      setAccount(0, [payment]);
+      renderDrawer();
+      fireEvent.click(screen.getByRole("button", { name: "Editar cobranza" }));
+      fireEvent.click(saveEdit());
+
+      expect(toast.error).toHaveBeenCalledWith("La caja de esta cobranza ya está cerrada");
+      expect(amountInput().value).toBe("287650");
+    });
+
+    it("asks for confirmation before deleting and deletes on accept", async () => {
+      deleteMovement.mockImplementation((_vars, opts) => opts.onSuccess());
+      setAccount(900, [historical]);
+      renderDrawer();
+      fireEvent.click(screen.getByRole("button", { name: "Borrar deuda anterior" }));
+
+      await waitFor(() => expect(deleteMovement).toHaveBeenCalledTimes(1));
+      expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ danger: true }));
+      expect(deleteMovement.mock.calls[0][0]).toEqual({ customerId: "c-1", movementId: "m-h" });
+      expect(toast.success).toHaveBeenCalledWith("Movimiento borrado");
+    });
+
+    it("does not delete when the confirmation is rejected", async () => {
+      confirm.mockResolvedValue(false);
+      setAccount(900, [historical]);
+      renderDrawer();
+      fireEvent.click(screen.getByRole("button", { name: "Borrar deuda anterior" }));
+
+      await waitFor(() => expect(confirm).toHaveBeenCalled());
+      expect(deleteMovement).not.toHaveBeenCalled();
+    });
+
+    it("surfaces the server message when the delete fails", async () => {
+      deleteMovement.mockImplementation((_vars, opts) =>
+        opts.onError(new Error("El saldo quedaría negativo")),
+      );
+      setAccount(0, [payment]);
+      renderDrawer();
+      fireEvent.click(screen.getByRole("button", { name: "Borrar cobranza" }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith("El saldo quedaría negativo"));
     });
   });
 });
-
