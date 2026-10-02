@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, Phone, Users, Wallet, Search } from "lucide-react";
 import { toast } from "react-toastify";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,6 +20,7 @@ import {
 } from "../components/hooks/useCustomer";
 import { useCustomerBalances } from "../components/hooks/useCustomerAccount";
 import { CustomerAccountDrawer } from "../components/molecules/CustomerAccountDrawer";
+import { CustomerBalancesSummary } from "../components/molecules/CustomerBalancesSummary";
 import { Loader } from "../components/atoms/loader";
 import { customerDisplayName } from "../utils/customerName";
 import { fetchPadron } from "../services/customerService";
@@ -70,13 +71,23 @@ export const Customers = () => {
   const { submitCustomer, loadingCustomer } = useCreateCustomer();
   const { updateCustomer, loadingUpdate } = useUpdateCustomer();
   const { deleteCustomer } = useDeleteCustomer();
-  const { balances } = useCustomerBalances();
+  const { balances, loading: loadingBalances } = useCustomerBalances();
   // Cliente cuya cuenta corriente está abierta (el diálogo se monta recién ahí).
   const [accountTarget, setAccountTarget] = useState<{
     id: string;
     name: string;
     phone: string;
   } | null>(null);
+  // Company-wide debt totals are for ADMIN/MANAGEMENT only (role from localStorage,
+  // same pattern as Sales/Dashboard).
+  const canSeeBalancesSummary = useMemo(() => {
+    try {
+      const role = JSON.parse(localStorage.getItem("user") ?? "null")?.role;
+      return role === "ADMIN" || role === "MANAGEMENT";
+    } catch {
+      return false;
+    }
+  }, []);
   const balanceById = new Map(balances.map((b) => [b.customerId, b.balance]));
 
   const queryClient = useQueryClient();
@@ -307,6 +318,21 @@ export const Customers = () => {
           Agregar cliente
         </Button>
       </div>
+
+      {canSeeBalancesSummary && (
+        <CustomerBalancesSummary
+          balances={balances}
+          loading={loadingBalances}
+          onSelectCustomer={({ customerId, name }) =>
+            setAccountTarget({
+              id: customerId,
+              name,
+              phone:
+                customers?.find((c) => (c.id || c._id) === customerId)?.phone ?? "",
+            })
+          }
+        />
+      )}
 
       {customers && customers.length > 0 && (
         <div className="flex flex-col gap-2 sm:flex-row">
