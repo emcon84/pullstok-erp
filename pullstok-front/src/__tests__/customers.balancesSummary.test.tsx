@@ -26,6 +26,10 @@ vi.mock("../components/hooks/useCustomerAccount", () => ({
   useUpdateAccountMovement: vi.fn(),
   useDeleteAccountMovement: vi.fn(),
 }));
+vi.mock("../services/customerAccountService", () => ({
+  unlockBalancesView: vi.fn(),
+  getBalancesSummary: vi.fn(),
+}));
 vi.mock("../components/hooks/useCashSession", () => ({
   useGetCurrentCashSession: vi.fn(),
 }));
@@ -47,6 +51,7 @@ import {
   useDeleteAccountMovement,
 } from "../components/hooks/useCustomerAccount";
 import { useGetCurrentCashSession } from "../components/hooks/useCashSession";
+import { unlockBalancesView, getBalancesSummary } from "../services/customerAccountService";
 
 const renderCustomers = () =>
   render(
@@ -95,14 +100,24 @@ describe("Customers — balances summary panel", () => {
     vi.mocked(useCreateHistoricalCharge).mockReturnValue({ createCharge: vi.fn(), loading: false } as never);
     vi.mocked(useUpdateAccountMovement).mockReturnValue({ updateMovement: vi.fn(), loading: false } as never);
     vi.mocked(useDeleteAccountMovement).mockReturnValue({ deleteMovement: vi.fn(), loading: false } as never);
+    vi.mocked(unlockBalancesView).mockResolvedValue({ token: "bt", expiresInSec: 900 });
+    vi.mocked(getBalancesSummary).mockResolvedValue({
+      totalOwed: 1500.5,
+      totalCredit: 200,
+      net: 1300.5,
+      debtorCount: 1,
+      creditorCount: 1,
+      topDebtors: [{ customerId: "c-1", name: "Ana Gómez", balance: 1500.5, share: 1 }],
+    });
     vi.mocked(useGetCurrentCashSession).mockReturnValue({ session: null, loading: false, error: null, refetch: vi.fn() } as never);
   });
 
-  it("shows the summary panel to ADMIN", () => {
+  it("shows the summary panel to ADMIN, masked until unlocked", () => {
     localStorage.setItem("user", JSON.stringify({ role: "ADMIN" }));
     renderCustomers();
     expect(screen.getByText("Cuenta corriente — resumen")).toBeInTheDocument();
-    expect(screen.getByTestId("total-owed")).toHaveTextContent("$1.500,50");
+    expect(screen.getByTestId("total-owed")).toHaveTextContent("••••••");
+    expect(getBalancesSummary).not.toHaveBeenCalled();
   });
 
   it("shows the summary panel to MANAGEMENT", () => {
@@ -117,10 +132,13 @@ describe("Customers — balances summary panel", () => {
     expect(screen.queryByText("Cuenta corriente — resumen")).not.toBeInTheDocument();
   });
 
-  it("opens the customer account drawer when clicking a top debtor", () => {
+  it("opens the customer account drawer when clicking a top debtor after unlocking", async () => {
     localStorage.setItem("user", JSON.stringify({ role: "ADMIN" }));
     renderCustomers();
-    fireEvent.click(screen.getByTestId("top-debtor"));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Mostrar saldos" }));
+    fireEvent.change(await screen.findByLabelText("Contraseña"), { target: { value: "pw" } });
+    fireEvent.submit(screen.getByLabelText("Contraseña").closest("form")!);
+    fireEvent.click(await screen.findByTestId("top-debtor"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 });

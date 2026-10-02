@@ -9,6 +9,8 @@ import type {
   AccountPaymentInput,
   AccountPaymentResult,
   AccountStatementLink,
+  BalancesSummary,
+  BalancesUnlockResult,
   CustomerAccount,
   CustomerBalance,
 } from "../models/customerAccountModel";
@@ -38,6 +40,51 @@ export const getCustomerBalances = async (): Promise<CustomerBalance[]> => {
     return response.data;
   } catch (error) {
     throw toError(error, "Error al obtener los saldos");
+  }
+};
+
+/** Error that keeps the server domain code (e.g. BALANCES_LOCKED). */
+export class BalancesApiError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+const toBalancesError = (error: unknown, fallback: string): BalancesApiError => {
+  if (axios.isAxiosError(error)) {
+    return new BalancesApiError(
+      error.response?.data?.message || fallback,
+      error.response?.data?.error,
+    );
+  }
+  return new BalancesApiError(fallback);
+};
+
+/** Exchanges the balances password for a short-lived token (kept in memory only). */
+export const unlockBalancesView = async (password: string): Promise<BalancesUnlockResult> => {
+  try {
+    const response = await axios.post<BalancesUnlockResult>(
+      `${API_URL}/customers/balances/unlock`,
+      { password },
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    throw toBalancesError(error, "No se pudo verificar la contraseña");
+  }
+};
+
+/** Company-wide totals + top debtors; the server requires the unlock token. */
+export const getBalancesSummary = async (token: string): Promise<BalancesSummary> => {
+  try {
+    const response = await axios.get<BalancesSummary>(`${API_URL}/customers/balances/summary`, {
+      headers: { ...authHeaders(), "X-Balances-Token": token },
+    });
+    return response.data;
+  } catch (error) {
+    throw toBalancesError(error, "Error al obtener el resumen de saldos");
   }
 };
 

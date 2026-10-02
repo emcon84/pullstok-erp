@@ -25,6 +25,8 @@ import {
   createHistoricalCharge,
   updateAccountMovement,
   deleteAccountMovement,
+  unlockBalancesView,
+  getBalancesSummary,
 } from "../services/customerAccountService";
 
 const axiosError = (data: unknown) => ({ isAxiosError: true, response: { data } });
@@ -181,5 +183,37 @@ describe("customerAccountService", () => {
       axiosError({ error: "MOVEMENT_BALANCE_NEGATIVE", message: "El saldo quedaría negativo" }),
     );
     await expect(deleteAccountMovement("c-1", "m-1")).rejects.toThrow("El saldo quedaría negativo");
+  });
+
+  it("unlockBalancesView POSTs the password and returns token + expiry", async () => {
+    mockPost.mockResolvedValue({ data: { token: "bt", expiresInSec: 900 } });
+    const result = await unlockBalancesView("pw");
+    expect(mockPost).toHaveBeenCalledWith(
+      expect.stringContaining("/customers/balances/unlock"),
+      { password: "pw" },
+      { headers: { Authorization: "Bearer tok-1" } },
+    );
+    expect(result).toEqual({ token: "bt", expiresInSec: 900 });
+  });
+
+  it("unlockBalancesView surfaces the server message", async () => {
+    mockPost.mockRejectedValue(axiosError({ error: "INVALID_BALANCES_PASSWORD", message: "Contraseña incorrecta" }));
+    await expect(unlockBalancesView("x")).rejects.toThrow("Contraseña incorrecta");
+  });
+
+  it("getBalancesSummary GETs with the X-Balances-Token header", async () => {
+    const summary = { totalOwed: 1, totalCredit: 0, net: 1, debtorCount: 1, creditorCount: 0, topDebtors: [] };
+    mockGet.mockResolvedValue({ data: summary });
+    const result = await getBalancesSummary("bt");
+    expect(mockGet).toHaveBeenCalledWith(
+      expect.stringContaining("/customers/balances/summary"),
+      { headers: { Authorization: "Bearer tok-1", "X-Balances-Token": "bt" } },
+    );
+    expect(result).toEqual(summary);
+  });
+
+  it("getBalancesSummary exposes the BALANCES_LOCKED code on the error", async () => {
+    mockGet.mockRejectedValue(axiosError({ error: "BALANCES_LOCKED", message: "Los saldos están bloqueados" }));
+    await expect(getBalancesSummary("bt")).rejects.toMatchObject({ code: "BALANCES_LOCKED" });
   });
 });

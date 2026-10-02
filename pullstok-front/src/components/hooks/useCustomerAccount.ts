@@ -53,6 +53,7 @@ export const useRegisterAccountPayment = () => {
     onSuccess: (_result, { customerId }) => {
       queryClient.invalidateQueries({ queryKey: ["customer-account", customerId] });
       queryClient.invalidateQueries({ queryKey: ["customer-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["balances-summary"] });
       queryClient.invalidateQueries({ queryKey: ["cash-sessions"] });
     },
   });
@@ -76,6 +77,7 @@ export const useCreateHistoricalCharge = () => {
     onSuccess: (_result, { customerId }) => {
       queryClient.invalidateQueries({ queryKey: ["customer-account", customerId] });
       queryClient.invalidateQueries({ queryKey: ["customer-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["balances-summary"] });
     },
   });
   return {
@@ -93,6 +95,7 @@ const invalidateAccountQueries = (
 ) => {
   queryClient.invalidateQueries({ queryKey: ["customer-account", customerId] });
   queryClient.invalidateQueries({ queryKey: ["customer-balances"] });
+  queryClient.invalidateQueries({ queryKey: ["balances-summary"] });
   queryClient.invalidateQueries({ queryKey: ["cash-sessions"] });
 };
 

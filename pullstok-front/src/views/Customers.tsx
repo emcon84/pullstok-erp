@@ -71,7 +71,7 @@ export const Customers = () => {
   const { submitCustomer, loadingCustomer } = useCreateCustomer();
   const { updateCustomer, loadingUpdate } = useUpdateCustomer();
   const { deleteCustomer } = useDeleteCustomer();
-  const { balances, loading: loadingBalances } = useCustomerBalances();
+  const { balances } = useCustomerBalances();
   // Cliente cuya cuenta corriente está abierta (el diálogo se monta recién ahí).
   const [accountTarget, setAccountTarget] = useState<{
     id: string;
@@ -321,8 +321,6 @@ export const Customers = () => {
 
       {canSeeBalancesSummary && (
         <CustomerBalancesSummary
-          balances={balances}
-          loading={loadingBalances}
           onSelectCustomer={({ customerId, name }) =>
             setAccountTarget({
               id: customerId,

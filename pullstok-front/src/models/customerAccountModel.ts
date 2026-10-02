@@ -96,3 +96,27 @@ export interface AccountMovementDeleteResult {
   /** Saldo total tras el borrado. */
   balance: number;
 }
+
+export interface TopDebtor extends CustomerBalance {
+  /** Fraction (0..1) of the total debt owed by this customer. */
+  share: number;
+}
+
+/** Respuesta de GET /customers/balances/summary (needs the X-Balances-Token). */
+export interface BalancesSummary {
+  /** Sum of positive balances (money customers owe us). */
+  totalOwed: number;
+  /** Absolute sum of negative balances (credit in the customers favor). */
+  totalCredit: number;
+  /** totalOwed - totalCredit. */
+  net: number;
+  debtorCount: number;
+  creditorCount: number;
+  topDebtors: TopDebtor[];
+}
+
+/** Respuesta de POST /customers/balances/unlock. */
+export interface BalancesUnlockResult {
+  token: string;
+  expiresInSec: number;
+}
