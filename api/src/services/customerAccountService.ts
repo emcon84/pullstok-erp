@@ -32,6 +32,13 @@ export interface RegisterPaymentInput {
   method: CollectionMethod;
   cashSessionId?: string;
   note?: string;
+  date?: Date;
+}
+
+export interface UpdateMovementInput {
+  amount?: number;
+  date?: Date;
+  note?: string | null;
 }
 
 // Etiqueta para clientes sin nombre (Customer.name es opcional).
@@ -205,11 +212,120 @@ const registerPayment = async (
         method: input.method,
         cashSessionId,
         note,
+        // Without a date the schema default now() applies.
+        ...(input.date ? { createdAt: input.date } : {}),
         createdById: userId,
       },
     });
 
     return { movement, balance: round2(balance - amount) };
+  });
+};
+
+/**
+ * Loads a movement inside the transaction (org + customer scoped) and enforces
+ * the editability rules shared by update and delete: only a manual CHARGE
+ * (no sale) or a PAYMENT; a cash PAYMENT tied to a non-OPEN cash session would
+ * alter a closed cash count.
+ */
+const loadEditableMovement = async (
+  tx: any,
+  customerId: string,
+  movementId: string,
+  organizationId: string,
+) => {
+  const movement = await tx.customerAccountMovement.findFirst({
+    where: { id: movementId, customerId, organizationId },
+    include: { cashSession: { select: { status: true } } },
+  });
+  if (!movement) throw domainError("MOVEMENT_NOT_FOUND", "Movimiento no encontrado");
+
+  if (movement.type === "CHARGE" && movement.saleId) {
+    throw domainError(
+      "MOVEMENT_IMMUTABLE",
+      "Los cargos generados por una venta no se pueden modificar",
+    );
+  }
+  if (movement.method === "EFECTIVO" && movement.cashSession?.status !== "OPEN") {
+    throw domainError(
+      "CASH_SESSION_CLOSED",
+      "La cobranza en efectivo pertenece a una caja cerrada y no se puede modificar",
+    );
+  }
+  return movement;
+};
+
+const assertBalanceNotNegative = (balanceAfter: number) => {
+  if (balanceAfter < 0) {
+    throw domainError(
+      "MOVEMENT_BALANCE_NEGATIVE",
+      "El cambio dejaría el saldo del cliente en negativo",
+    );
+  }
+};
+
+/**
+ * Edits amount / date / note of a manual CHARGE or a PAYMENT (never its method).
+ * Runs with the customer locked FOR UPDATE; the resulting balance can't be < 0.
+ */
+const updateMovement = async (
+  customerId: string,
+  movementId: string,
+  input: UpdateMovementInput,
+) => {
+  const organizationId = requireOrganizationId();
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId },
+    select: { id: true },
+  });
+  if (!customer) throw domainError("CUSTOMER_NOT_FOUND", "Cliente no encontrado");
+
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "customers" WHERE "id" = ${customerId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+
+    const movement = await loadEditableMovement(tx, customerId, movementId, organizationId);
+    const balance = await computeBalance(tx as unknown as LedgerClient, customerId, organizationId);
+
+    const data: { amount?: number; createdAt?: Date; note?: string | null } = {};
+    let balanceAfter = balance;
+    if (input.amount !== undefined) {
+      const amount = round2(input.amount);
+      if (!(amount > 0)) throw domainError("INVALID_MOVEMENT_AMOUNT", "El monto debe ser mayor a 0");
+      const delta = amount - movement.amount;
+      balanceAfter = round2(balance + (movement.type === "CHARGE" ? delta : -delta));
+      data.amount = amount;
+    }
+    if (input.date !== undefined) data.createdAt = input.date;
+    if (input.note !== undefined) data.note = input.note?.trim() || null;
+    assertBalanceNotNegative(balanceAfter);
+
+    const updated = await tx.customerAccountMovement.update({ where: { id: movementId }, data });
+    return { movement: updated, balance: balanceAfter };
+  });
+};
+
+/** Hard-deletes a manual CHARGE or a PAYMENT; the resulting balance can't be < 0. */
+const deleteMovement = async (customerId: string, movementId: string, _userId?: string) => {
+  const organizationId = requireOrganizationId();
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId },
+    select: { id: true },
+  });
+  if (!customer) throw domainError("CUSTOMER_NOT_FOUND", "Cliente no encontrado");
+
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "customers" WHERE "id" = ${customerId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+
+    const movement = await loadEditableMovement(tx, customerId, movementId, organizationId);
+    const balance = await computeBalance(tx as unknown as LedgerClient, customerId, organizationId);
+
+    const balanceAfter = round2(balance + (movement.type === "CHARGE" ? -movement.amount : movement.amount));
+    assertBalanceNotNegative(balanceAfter);
+
+    await tx.customerAccountMovement.delete({ where: { id: movementId } });
+    return { deletedId: movementId, balance: balanceAfter };
   });
 };
 
@@ -339,6 +455,8 @@ export default {
   getAccount,
   registerPayment,
   registerHistoricalCharge,
+  updateMovement,
+  deleteMovement,
   sendAccountStatementWhatsapp,
   getAccountStatementLink,
 };

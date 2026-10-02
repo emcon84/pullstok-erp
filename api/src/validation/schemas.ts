@@ -502,6 +502,31 @@ export const createSaleSchema = z.object({
     .optional(),
 });
 
+const CHARGE_DATE_TOLERANCE_MS = 5 * 60 * 1000;
+
+// Optional ISO date (day or date-time), never in the future (5 min clock skew).
+const optionalPastDate = z
+  .string()
+  .optional()
+  .transform((value, ctx) => {
+    if (value === undefined) return undefined;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      ctx.addIssue({ code: "custom", message: "La fecha es inválida" });
+      return z.NEVER;
+    }
+    if (parsed.getTime() > Date.now() + CHARGE_DATE_TOLERANCE_MS) {
+      ctx.addIssue({ code: "custom", message: "La fecha no puede ser futura" });
+      return z.NEVER;
+    }
+    return parsed;
+  });
+
+const accountAmount = z.coerce
+  .number()
+  .positive("El monto debe ser mayor a 0")
+  .multipleOf(0.01, "El monto admite hasta 2 decimales");
+
 // Cobranza de cuenta corriente (cuenta-corriente): el cliente salda deuda con un
 // medio real (nunca CUENTA_CORRIENTE). EFECTIVO exige cashSessionId (la
 // cobranza suma al arqueo de esa caja); que la caja esté OPEN y que el monto no
@@ -518,6 +543,8 @@ export const createAccountPaymentSchema = z
     ),
     cashSessionId: z.string().min(1).optional(),
     note: z.string().max(500, "La nota admite hasta 500 caracteres").optional(),
+    // Optional collection date (not future); defaults to "now" in the service.
+    date: optionalPastDate,
   })
   .superRefine((data, ctx) => {
     if (data.method === "EFECTIVO" && !data.cashSessionId) {
@@ -533,34 +560,30 @@ export const createAccountPaymentSchema = z
 // anterior cargada a mano, sin venta asociada. Solo el monto es obligatorio;
 // la fecha (ISO, día o fecha-hora) no puede ser futura (tolerancia de 5 min por
 // desfase de reloj) y por defecto es "ahora"; la nota es el detalle libre.
-const CHARGE_DATE_TOLERANCE_MS = 5 * 60 * 1000;
 
 export const createAccountChargeSchema = z.object({
-  amount: z.coerce
-    .number()
-    .positive("El monto debe ser mayor a 0")
-    .multipleOf(0.01, "El monto admite hasta 2 decimales"),
-  date: z
-    .string()
-    .optional()
-    .transform((value, ctx) => {
-      if (value === undefined) return undefined;
-      const parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) {
-        ctx.addIssue({ code: "custom", message: "La fecha es inválida" });
-        return z.NEVER;
-      }
-      if (parsed.getTime() > Date.now() + CHARGE_DATE_TOLERANCE_MS) {
-        ctx.addIssue({ code: "custom", message: "La fecha no puede ser futura" });
-        return z.NEVER;
-      }
-      return parsed;
-    }),
+  amount: accountAmount,
+  date: optionalPastDate,
   note: z.preprocess(
     blankToNull,
     z.string().max(500, "La nota admite hasta 500 caracteres").nullable().optional(),
   ),
 });
+
+// Edit of a manual CHARGE or a PAYMENT: any subset of amount/date/note (the
+// payment method is NOT editable). A blank note clears it (→ null).
+export const updateAccountMovementSchema = z
+  .object({
+    amount: accountAmount.optional(),
+    date: optionalPastDate,
+    note: z.preprocess(
+      blankToNull,
+      z.string().max(500, "La nota admite hasta 500 caracteres").nullable().optional(),
+    ),
+  })
+  .refine((d) => d.amount !== undefined || d.date !== undefined || d.note !== undefined, {
+    message: "Indicá al menos un campo para modificar (monto, fecha o nota)",
+  });
 
 // ---------- Caja (sdd/caja-apertura-cierre) ----------
 // Apertura de caja. branchId/openingAmount/observations opcionales: los

@@ -9,12 +9,18 @@ import { AuthedRequest } from "../middlewares/authMiddleware";
 const handleError = (error: any, res: Response) => {
   switch (error?.code) {
     case "CUSTOMER_NOT_FOUND":
+    case "MOVEMENT_NOT_FOUND":
       return res.status(404).json({ error: error.code, message: error.message });
     // Sin caja abierta para cobrar en efectivo / sin teléfono cargado: payload
     // válido, operación bloqueada.
     case "CASH_SESSION_REQUIRED":
     case "CUSTOMER_PHONE_REQUIRED":
+    // Movement edit/delete blocked by business rules (sale-linked charge, closed cash count).
+    case "MOVEMENT_IMMUTABLE":
+    case "CASH_SESSION_CLOSED":
       return res.status(422).json({ error: error.code, message: error.message });
+    case "MOVEMENT_BALANCE_NEGATIVE":
+    case "INVALID_MOVEMENT_AMOUNT":
     case "PAYMENT_EXCEEDS_BALANCE":
     case "INVALID_PAYMENT_METHOD":
     case "INVALID_CHARGE_AMOUNT":
@@ -69,6 +75,32 @@ const registerHistoricalCharge = async (req: AuthedRequest, res: Response) => {
   }
 };
 
+const updateMovement = async (req: AuthedRequest, res: Response) => {
+  try {
+    const result = await customerAccountService.updateMovement(
+      req.params.id,
+      req.params.movementId,
+      req.body,
+    );
+    res.status(200).json(result);
+  } catch (error: any) {
+    handleError(error, res);
+  }
+};
+
+const deleteMovement = async (req: AuthedRequest, res: Response) => {
+  try {
+    const result = await customerAccountService.deleteMovement(
+      req.params.id,
+      req.params.movementId,
+      req.user?.id,
+    );
+    res.status(200).json(result);
+  } catch (error: any) {
+    handleError(error, res);
+  }
+};
+
 const sendAccountStatementWhatsapp = async (req: Request, res: Response) => {
   try {
     const result = await customerAccountService.sendAccountStatementWhatsapp(req.params.id);
@@ -93,6 +125,8 @@ export default {
   getAccount,
   registerPayment,
   registerHistoricalCharge,
+  updateMovement,
+  deleteMovement,
   sendAccountStatementWhatsapp,
   getAccountStatementLink,
 };

@@ -9,6 +9,7 @@ import {
   updateCustomerSchema,
   createAccountPaymentSchema,
   createAccountChargeSchema,
+  updateAccountMovementSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -40,6 +41,21 @@ router.post(
   checkBusinessHours,
   validate(createAccountChargeSchema),
   customerAccountController.registerHistoricalCharge,
+);
+// Edit / delete of a manual charge or a payment: literals under "/:id/account",
+// BEFORE "/:id".
+router.patch(
+  "/:id/account/movements/:movementId",
+  authenticateJWT,
+  checkBusinessHours,
+  validate(updateAccountMovementSchema),
+  customerAccountController.updateMovement,
+);
+router.delete(
+  "/:id/account/movements/:movementId",
+  authenticateJWT,
+  checkBusinessHours,
+  customerAccountController.deleteMovement,
 );
 // Comprobante de cuenta por WhatsApp (cuenta-corriente T1): literal bajo
 // "/:id/account", también va ANTES de "/:id" a secas.

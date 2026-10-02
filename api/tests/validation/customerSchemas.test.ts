@@ -9,6 +9,8 @@ import {
   updateProviderSchema,
   updateCustomerSchema,
   createAccountChargeSchema,
+  createAccountPaymentSchema,
+  updateAccountMovementSchema,
 } from "../../src/validation/schemas";
 
 describe("createCustomerSchema — todos los campos opcionales", () => {
@@ -179,5 +181,60 @@ describe("createProviderSchema / updateProviderSchema", () => {
   it("update es parcial pero no permite nombre vacío", () => {
     expect(updateProviderSchema.safeParse({ isActive: false }).success).toBe(true);
     expect(updateProviderSchema.safeParse({ name: "" }).success).toBe(false);
+  });
+});
+
+describe("createAccountPaymentSchema — fecha opcional (cuenta-corriente edición)", () => {
+  it("sin fecha deja date undefined", () => {
+    const r = createAccountPaymentSchema.safeParse({ amount: 10, method: "QR" });
+    expect(r.success).toBe(true);
+    expect(r.data!.date).toBeUndefined();
+  });
+
+  it("parsea fecha ISO (día o fecha-hora) a Date", () => {
+    const r = createAccountPaymentSchema.safeParse({ amount: 10, method: "QR", date: "2026-01-15" });
+    expect(r.data!.date).toBeInstanceOf(Date);
+  });
+
+  it("rechaza fechas inválidas o futuras, tolera 5 minutos", () => {
+    expect(createAccountPaymentSchema.safeParse({ amount: 10, method: "QR", date: "no-fecha" }).success).toBe(false);
+    const future = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+    expect(createAccountPaymentSchema.safeParse({ amount: 10, method: "QR", date: future }).success).toBe(false);
+    const nearNow = new Date(Date.now() + 60 * 1000).toISOString();
+    expect(createAccountPaymentSchema.safeParse({ amount: 10, method: "QR", date: nearNow }).success).toBe(true);
+  });
+});
+
+describe("updateAccountMovementSchema — edición de movimiento", () => {
+  it("acepta cualquier subconjunto de amount/date/note", () => {
+    expect(updateAccountMovementSchema.safeParse({ amount: 50 }).success).toBe(true);
+    expect(updateAccountMovementSchema.safeParse({ date: "2026-01-15" }).data!.date).toBeInstanceOf(Date);
+    expect(updateAccountMovementSchema.safeParse({ note: "  x " }).data!.note).toBe("x");
+  });
+
+  it("nota vacía se normaliza a null (limpia la nota)", () => {
+    expect(updateAccountMovementSchema.safeParse({ note: "  " }).data!.note).toBeNull();
+  });
+
+  it("rechaza body vacío", () => {
+    expect(updateAccountMovementSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("rechaza monto <= 0 o con más de 2 decimales", () => {
+    expect(updateAccountMovementSchema.safeParse({ amount: 0 }).success).toBe(false);
+    expect(updateAccountMovementSchema.safeParse({ amount: -1 }).success).toBe(false);
+    expect(updateAccountMovementSchema.safeParse({ amount: 1.234 }).success).toBe(false);
+  });
+
+  it("rechaza fecha futura e inválida", () => {
+    const future = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+    expect(updateAccountMovementSchema.safeParse({ date: future }).success).toBe(false);
+    expect(updateAccountMovementSchema.safeParse({ date: "x" }).success).toBe(false);
+  });
+
+  it("no admite cambiar el método (campo ignorado, no aparece en la salida)", () => {
+    const r = updateAccountMovementSchema.safeParse({ amount: 5, method: "QR" });
+    expect(r.success).toBe(true);
+    expect((r.data as any).method).toBeUndefined();
   });
 });

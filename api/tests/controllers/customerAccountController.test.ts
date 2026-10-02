@@ -13,6 +13,8 @@ jest.mock("../../src/services/customerAccountService", () => ({
     getAccount: jest.fn(),
     registerPayment: jest.fn(),
     registerHistoricalCharge: jest.fn(),
+    updateMovement: jest.fn(),
+    deleteMovement: jest.fn(),
     sendAccountStatementWhatsapp: jest.fn(),
     getAccountStatementLink: jest.fn(),
   },
@@ -23,6 +25,8 @@ const svc = service as unknown as {
   getAccount: jest.Mock;
   registerPayment: jest.Mock;
   registerHistoricalCharge: jest.Mock;
+  updateMovement: jest.Mock;
+  deleteMovement: jest.Mock;
   sendAccountStatementWhatsapp: jest.Mock;
   getAccountStatementLink: jest.Mock;
 };
@@ -101,6 +105,42 @@ describe("customerAccountController", () => {
     await controller.registerHistoricalCharge(mockReq({ id: "c-x" }, { amount: 1 }), res);
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ error: "CUSTOMER_NOT_FOUND", message: "msg" });
+  });
+
+  it("updateMovement: 200, forwards ids and body", async () => {
+    svc.updateMovement.mockResolvedValue({ movement: { id: "m-1" }, balance: 7 });
+    const res = mockRes();
+    const body = { amount: 5 };
+    await controller.updateMovement(mockReq({ id: "c-1", movementId: "m-1" }, body), res);
+    expect(svc.updateMovement).toHaveBeenCalledWith("c-1", "m-1", body);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ movement: { id: "m-1" }, balance: 7 });
+  });
+
+  it("deleteMovement: 200, forwards ids and user", async () => {
+    svc.deleteMovement.mockResolvedValue({ deletedId: "m-1", balance: 7 });
+    const res = mockRes();
+    await controller.deleteMovement(mockReq({ id: "c-1", movementId: "m-1" }), res);
+    expect(svc.deleteMovement).toHaveBeenCalledWith("c-1", "m-1", "u-1");
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ deletedId: "m-1", balance: 7 });
+  });
+
+  it.each([
+    ["CUSTOMER_NOT_FOUND", 404],
+    ["MOVEMENT_NOT_FOUND", 404],
+    ["MOVEMENT_IMMUTABLE", 422],
+    ["CASH_SESSION_CLOSED", 422],
+    ["MOVEMENT_BALANCE_NEGATIVE", 400],
+  ])("update/deleteMovement map %s → %i", async (code, status) => {
+    svc.updateMovement.mockRejectedValue(mkErr(code, "msg"));
+    svc.deleteMovement.mockRejectedValue(mkErr(code, "msg"));
+    for (const fn of [controller.updateMovement, controller.deleteMovement]) {
+      const res = mockRes();
+      await fn(mockReq({ id: "c-1", movementId: "m-1" }, {}), res);
+      expect(res.status).toHaveBeenCalledWith(status);
+      expect(res.json).toHaveBeenCalledWith({ error: code, message: "msg" });
+    }
   });
 
   it("unexpected errors → 500", async () => {
