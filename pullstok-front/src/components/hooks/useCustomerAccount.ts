@@ -1,15 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createHistoricalCharge,
+  deleteAccountMovement,
   getAccountStatementLink,
   getCustomerAccount,
   getCustomerBalances,
   registerAccountPayment,
   sendAccountStatementWhatsapp,
+  updateAccountMovement,
 } from "../../services/customerAccountService";
 import type {
   AccountChargeInput,
   AccountChargeResult,
+  AccountMovementDeleteResult,
+  AccountMovementUpdateInput,
+  AccountMovementUpdateResult,
   AccountPaymentInput,
   AccountPaymentResult,
   AccountStatementLink,
@@ -76,6 +81,54 @@ export const useCreateHistoricalCharge = () => {
   return {
     createCharge: mutation.mutate,
     createChargeAsync: mutation.mutateAsync,
+    loading: mutation.isPending,
+  };
+};
+
+/** Refresca extracto, saldos y caja: editar/borrar una cobranza en EFECTIVO
+ *  mueve el arqueo de su caja. */
+const invalidateAccountQueries = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  customerId: string,
+) => {
+  queryClient.invalidateQueries({ queryKey: ["customer-account", customerId] });
+  queryClient.invalidateQueries({ queryKey: ["customer-balances"] });
+  queryClient.invalidateQueries({ queryKey: ["cash-sessions"] });
+};
+
+/** Edita un movimiento (deuda anterior o cobranza). */
+export const useUpdateAccountMovement = () => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation<
+    AccountMovementUpdateResult,
+    Error,
+    { customerId: string; movementId: string; input: AccountMovementUpdateInput }
+  >({
+    mutationFn: ({ customerId, movementId, input }) =>
+      updateAccountMovement(customerId, movementId, input),
+    onSuccess: (_result, { customerId }) => invalidateAccountQueries(queryClient, customerId),
+  });
+  return {
+    updateMovement: mutation.mutate,
+    updateMovementAsync: mutation.mutateAsync,
+    loading: mutation.isPending,
+  };
+};
+
+/** Borra un movimiento (deuda anterior o cobranza). */
+export const useDeleteAccountMovement = () => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation<
+    AccountMovementDeleteResult,
+    Error,
+    { customerId: string; movementId: string }
+  >({
+    mutationFn: ({ customerId, movementId }) => deleteAccountMovement(customerId, movementId),
+    onSuccess: (_result, { customerId }) => invalidateAccountQueries(queryClient, customerId),
+  });
+  return {
+    deleteMovement: mutation.mutate,
+    deleteMovementAsync: mutation.mutateAsync,
     loading: mutation.isPending,
   };
 };

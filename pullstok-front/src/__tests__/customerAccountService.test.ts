@@ -1,14 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockGet, mockPost } = vi.hoisted(() => ({
+const { mockGet, mockPost, mockPatch, mockDelete } = vi.hoisted(() => ({
   mockGet: vi.fn(),
   mockPost: vi.fn(),
+  mockPatch: vi.fn(),
+  mockDelete: vi.fn(),
 }));
 
 vi.mock("axios", () => ({
   default: {
     get: mockGet,
     post: mockPost,
+    patch: mockPatch,
+    delete: mockDelete,
     isAxiosError: (e: unknown) => !!(e as { isAxiosError?: boolean })?.isAxiosError,
   },
 }));
@@ -19,6 +23,8 @@ import {
   registerAccountPayment,
   getAccountStatementLink,
   createHistoricalCharge,
+  updateAccountMovement,
+  deleteAccountMovement,
 } from "../services/customerAccountService";
 
 const axiosError = (data: unknown) => ({ isAxiosError: true, response: { data } });
@@ -125,5 +131,55 @@ describe("customerAccountService", () => {
     await expect(createHistoricalCharge("c-1", { amount: 10 })).rejects.toThrow(
       "La fecha no puede ser futura",
     );
+  });
+
+  it("registerAccountPayment forwards the optional date", async () => {
+    mockPost.mockResolvedValue({ data: { movement: { id: "m-2" }, balance: 10 } });
+    const input = { amount: 5, method: "QR" as const, date: "2026-09-01T15:00:00.000Z" };
+
+    await registerAccountPayment("c-1", input);
+
+    expect(mockPost.mock.calls[0][1]).toEqual(input);
+  });
+
+  it("updateAccountMovement PATCHes /customers/:id/account/movements/:movementId", async () => {
+    mockPatch.mockResolvedValue({ data: { movement: { id: "m-1" }, balance: 300 } });
+
+    const res = await updateAccountMovement("c-1", "m-1", { amount: 200, note: "fix" });
+
+    expect(mockPatch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/customers\/c-1\/account\/movements\/m-1$/),
+      { amount: 200, note: "fix" },
+      { headers: { Authorization: "Bearer tok-1" } },
+    );
+    expect(res).toEqual({ movement: { id: "m-1" }, balance: 300 });
+  });
+
+  it("updateAccountMovement surfaces the server message (e.g. closed cash session)", async () => {
+    mockPatch.mockRejectedValue(
+      axiosError({ error: "CASH_SESSION_CLOSED", message: "La caja ya está cerrada" }),
+    );
+    await expect(updateAccountMovement("c-1", "m-1", { amount: 1 })).rejects.toThrow(
+      "La caja ya está cerrada",
+    );
+  });
+
+  it("deleteAccountMovement DELETEs the movement and returns the new balance", async () => {
+    mockDelete.mockResolvedValue({ data: { deletedId: "m-1", balance: 900 } });
+
+    const res = await deleteAccountMovement("c-1", "m-1");
+
+    expect(mockDelete).toHaveBeenCalledWith(
+      expect.stringMatching(/\/customers\/c-1\/account\/movements\/m-1$/),
+      { headers: { Authorization: "Bearer tok-1" } },
+    );
+    expect(res).toEqual({ deletedId: "m-1", balance: 900 });
+  });
+
+  it("deleteAccountMovement surfaces the server message", async () => {
+    mockDelete.mockRejectedValue(
+      axiosError({ error: "MOVEMENT_BALANCE_NEGATIVE", message: "El saldo quedaría negativo" }),
+    );
+    await expect(deleteAccountMovement("c-1", "m-1")).rejects.toThrow("El saldo quedaría negativo");
   });
 });

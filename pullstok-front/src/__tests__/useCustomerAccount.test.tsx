@@ -9,6 +9,8 @@ vi.mock("../services/customerAccountService", () => ({
   registerAccountPayment: vi.fn(),
   getAccountStatementLink: vi.fn(),
   createHistoricalCharge: vi.fn(),
+  updateAccountMovement: vi.fn(),
+  deleteAccountMovement: vi.fn(),
 }));
 
 import {
@@ -17,6 +19,8 @@ import {
   useRegisterAccountPayment,
   useGetAccountStatementLink,
   useCreateHistoricalCharge,
+  useUpdateAccountMovement,
+  useDeleteAccountMovement,
 } from "../components/hooks/useCustomerAccount";
 import {
   getCustomerBalances,
@@ -24,6 +28,8 @@ import {
   registerAccountPayment,
   getAccountStatementLink,
   createHistoricalCharge,
+  updateAccountMovement,
+  deleteAccountMovement,
 } from "../services/customerAccountService";
 
 const mockBalances = vi.mocked(getCustomerBalances);
@@ -31,6 +37,8 @@ const mockAccount = vi.mocked(getCustomerAccount);
 const mockRegister = vi.mocked(registerAccountPayment);
 const mockStatementLink = vi.mocked(getAccountStatementLink);
 const mockCreateCharge = vi.mocked(createHistoricalCharge);
+const mockUpdateMovement = vi.mocked(updateAccountMovement);
+const mockDeleteMovement = vi.mocked(deleteAccountMovement);
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -135,5 +143,49 @@ describe("useCustomerAccount hooks", () => {
     expect(keys).toContainEqual(["customer-account", "c-1"]);
     expect(keys).toContainEqual(["customer-balances"]);
     expect(keys).not.toContainEqual(["cash-sessions"]);
+  });
+
+  const spiedWrapper = () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const keys = () => invalidate.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+    return { Wrapper, keys };
+  };
+
+  it("updating a movement refreshes the account, the balances and the cash register", async () => {
+    mockUpdateMovement.mockResolvedValue({ movement: { id: "m-1" } as never, balance: 300 });
+    const { Wrapper, keys } = spiedWrapper();
+    const { result } = renderHook(() => useUpdateAccountMovement(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.updateMovementAsync({
+        customerId: "c-1",
+        movementId: "m-1",
+        input: { amount: 200 },
+      });
+    });
+
+    expect(mockUpdateMovement).toHaveBeenCalledWith("c-1", "m-1", { amount: 200 });
+    expect(keys()).toContainEqual(["customer-account", "c-1"]);
+    expect(keys()).toContainEqual(["customer-balances"]);
+    expect(keys()).toContainEqual(["cash-sessions"]);
+  });
+
+  it("deleting a movement refreshes the account, the balances and the cash register", async () => {
+    mockDeleteMovement.mockResolvedValue({ deletedId: "m-1", balance: 900 });
+    const { Wrapper, keys } = spiedWrapper();
+    const { result } = renderHook(() => useDeleteAccountMovement(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.deleteMovementAsync({ customerId: "c-1", movementId: "m-1" });
+    });
+
+    expect(mockDeleteMovement).toHaveBeenCalledWith("c-1", "m-1");
+    expect(keys()).toContainEqual(["customer-account", "c-1"]);
+    expect(keys()).toContainEqual(["customer-balances"]);
+    expect(keys()).toContainEqual(["cash-sessions"]);
   });
 });

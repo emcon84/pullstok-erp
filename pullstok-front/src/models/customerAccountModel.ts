@@ -42,6 +42,8 @@ export interface AccountPaymentInput {
   method: PaymentMethod;
   /** Obligatorio con EFECTIVO: id de la caja OPEN. */
   cashSessionId?: string;
+  /** ISO; no futura. Sin fecha = ahora. */
+  date?: string;
   note?: string;
 }
 
@@ -72,4 +74,25 @@ export interface AccountChargeResult {
 export interface AccountStatementLink {
   url: string;
   filename: string;
+}
+
+/** Payload de PATCH /customers/:id/account/movements/:movementId (solo editables:
+ *  deuda anterior y cobranza; el método de una cobranza no se edita). */
+export interface AccountMovementUpdateInput {
+  amount?: number;
+  /** ISO; no futura. */
+  date?: string;
+  note?: string;
+}
+
+export interface AccountMovementUpdateResult {
+  movement: AccountMovement;
+  /** Saldo total tras la edición. */
+  balance: number;
+}
+
+export interface AccountMovementDeleteResult {
+  deletedId: string;
+  /** Saldo total tras el borrado. */
+  balance: number;
 }

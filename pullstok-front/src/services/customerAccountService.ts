@@ -1,6 +1,9 @@
 import axios from "axios";
 import { API_URL } from "../constants";
 import type {
+  AccountMovementDeleteResult,
+  AccountMovementUpdateInput,
+  AccountMovementUpdateResult,
   AccountChargeInput,
   AccountChargeResult,
   AccountPaymentInput,
@@ -82,6 +85,41 @@ export const createHistoricalCharge = async (
     return response.data;
   } catch (error) {
     throw toError(error, "Error al cargar la deuda anterior");
+  }
+};
+
+/** Edita un movimiento (deuda anterior o cobranza). El servidor rechaza los
+ *  inmutables, los de caja cerrada y las ediciones que dejarían saldo negativo. */
+export const updateAccountMovement = async (
+  customerId: string,
+  movementId: string,
+  input: AccountMovementUpdateInput,
+): Promise<AccountMovementUpdateResult> => {
+  try {
+    const response = await axios.patch<AccountMovementUpdateResult>(
+      `${API_URL}/customers/${customerId}/account/movements/${movementId}`,
+      input,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    throw toError(error, "Error al editar el movimiento");
+  }
+};
+
+/** Borra un movimiento (mismas reglas que la edición). */
+export const deleteAccountMovement = async (
+  customerId: string,
+  movementId: string,
+): Promise<AccountMovementDeleteResult> => {
+  try {
+    const response = await axios.delete<AccountMovementDeleteResult>(
+      `${API_URL}/customers/${customerId}/account/movements/${movementId}`,
+      { headers: authHeaders() },
+    );
+    return response.data;
+  } catch (error) {
+    throw toError(error, "Error al borrar el movimiento");
   }
 };
 
