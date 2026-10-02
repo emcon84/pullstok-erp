@@ -185,7 +185,9 @@ export function useOpenBag({ branchId }: { branchId: string }): UseOpenBagResult
         } else if (originalMessage === "LOOSE_BAG_NOT_FOUND") {
           message = "Bolsa no encontrada";
         } else {
-          message = "No se pudo abrir la bolsa";
+          // The service already throws the server's Spanish message (e.g. "Stock
+          // insuficiente de X…"): show it instead of hiding the real reason.
+          message = originalMessage || "No se pudo abrir la bolsa";
         }
 
         setError(message);
