@@ -96,6 +96,8 @@ export interface Sale {
    *  undefined en ventas legacy sin recargo. */
   surcharge?: number;
   saleDate: string;
+  /** Sucursal de la venta (null en ventas legacy org-wide). */
+  branchId?: string | null;
   createdAt?: string;
   __v?: number;
   /** Presente cuando la venta se generó procesando un pedido (1:1 Order). */

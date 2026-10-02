@@ -26,6 +26,7 @@ import { DocumentCard } from "../components/molecules/DocumentCard";
 import { useGetSales, useCreateSale, useDeleteSale } from "../components/hooks/useSales";
 import { Loader } from "../components/atoms/loader";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
+import { SaleReprintDialog } from "../components/molecules/SaleReprintDialog";
 import { useOrders } from "../components/hooks/useOrder";
 import { usePorducts } from "../components/hooks/useProducts";
 import { useCustomers, useCreateCustomer } from "../components/hooks/useCustomer";
@@ -95,6 +96,8 @@ export const SalesPage = () => {
   const [filterType, setFilterType] = useState<SaleTypeFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  // Venta cuyo ticket se está reimprimiendo (null = diálogo cerrado).
+  const [reprintSale, setReprintSale] = useState<Sale | null>(null);
 
   // Modal de facturación
   const [modal, setModal] = useState<InvoiceModalState>(INITIAL_MODAL);
@@ -362,6 +365,7 @@ export const SalesPage = () => {
                 total={sale.totalAmount}
                 onExportPDF={() => exportToPDF(buildExport(sale))}
                 onExportExcel={() => exportToExcel(buildExport(sale))}
+                onReprint={() => setReprintSale(sale)}
                 onInvoice={isInvoiced ? undefined : () => openInvoiceModal(sale)}
                 onDelete={
                   canDeleteSale && !isInvoiced
@@ -426,6 +430,8 @@ export const SalesPage = () => {
         warning="Una vez confirmada, la venta descuenta el stock y no se puede editar ni deshacer."
         onConfirm={handleConfirmSale}
       />
+
+      <SaleReprintDialog sale={reprintSale} onClose={() => setReprintSale(null)} />
 
       {/* Modal de facturación */}
       <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) closeInvoiceModal(); }}>

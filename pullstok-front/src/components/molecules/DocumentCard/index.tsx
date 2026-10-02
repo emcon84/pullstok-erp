@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Pencil, Receipt, ShoppingCart, Trash2 } from "lucide-react";
+import { Pencil, Printer, Receipt, ShoppingCart, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +34,8 @@ interface DocumentCardProps {
   onDelete?: () => void;
   onInvoice?: () => void;
   onCreateSale?: () => void;
+  /** Reimprime el ticket (solo ventas): botón con ícono de impresora. */
+  onReprint?: () => void;
   badge?: ReactNode;
 }
 
@@ -51,6 +53,7 @@ export const DocumentCard = ({
   onDelete,
   onInvoice,
   onCreateSale,
+  onReprint,
   badge,
 }: DocumentCardProps) => {
   const [showDelete, setShowDelete] = useState(false);
@@ -81,6 +84,11 @@ export const DocumentCard = ({
             <Button variant="outline" size="sm" onClick={onInvoice}>
               <Receipt className="h-4 w-4" />
               Facturar
+            </Button>
+          )}
+          {onReprint && (
+            <Button variant="outline" size="sm" aria-label="Reimprimir ticket" title="Reimprimir ticket" onClick={onReprint}>
+              <Printer className="h-4 w-4" />
             </Button>
           )}
           {onEdit && (

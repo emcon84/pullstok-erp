@@ -59,7 +59,7 @@ function toTicketItem(row: SavedRow): SaleTicketItem {
   const meta = { saleMode, productId: "productId" in row ? row.productId : undefined, loosePriceId: "loosePriceId" in row ? row.loosePriceId : undefined };
 
   // Venta libre: el total es el guardado (kg × precio/kg).
-  if (isFreeLineSaleItem({ ...meta, quantity: row.quantity })) {
+  if (isFreeLineSaleItem(meta)) {
     return {
       name: row.name,
       price: row.price,

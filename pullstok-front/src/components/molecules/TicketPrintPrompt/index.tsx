@@ -9,6 +9,10 @@ interface TicketPrintPromptProps {
   onDismiss: () => void;
   /** Opcional: abre el panel de impresión del navegador (acción explícita tras un error). */
   onUseBrowserPanel?: () => void;
+  /** Encabezado de la tarjeta. Por defecto "Venta cobrada" (con tilde verde). */
+  title?: string;
+  /** Texto del botón de descarte en reposo. Por defecto "No imprimir". */
+  dismissLabel?: string;
 }
 
 /**
@@ -16,7 +20,15 @@ interface TicketPrintPromptProps {
  * (Imprimiendo… / Impreso / Venció / Error). Pensada para el celular: botones
  * grandes y colores del tema (claro/oscuro).
  */
-export function TicketPrintPrompt({ state, onPrint, onChoose, onDismiss, onUseBrowserPanel }: TicketPrintPromptProps) {
+export function TicketPrintPrompt({
+  state,
+  onPrint,
+  onChoose,
+  onDismiss,
+  onUseBrowserPanel,
+  title,
+  dismissLabel = "No imprimir",
+}: TicketPrintPromptProps) {
   const { phase, message, printers } = state;
   const working = phase === "sending" || phase === "pending";
   const failed = phase === "expired" || phase === "error";
@@ -27,8 +39,8 @@ export function TicketPrintPrompt({ state, onPrint, onChoose, onDismiss, onUseBr
       className="space-y-3 rounded-xl border border-primary/40 bg-card p-4 text-card-foreground shadow-sm"
     >
       <p className="flex items-center gap-2 text-base font-semibold">
-        <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-        Venta cobrada
+        {!title && <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
+        {title ?? "Venta cobrada"}
       </p>
 
       {phase === "idle" && (
@@ -38,7 +50,7 @@ export function TicketPrintPrompt({ state, onPrint, onChoose, onDismiss, onUseBr
             Imprimir ticket
           </Button>
           <Button variant="outline" className="h-14 text-base" onClick={onDismiss}>
-            No imprimir
+            {dismissLabel}
           </Button>
         </div>
       )}
