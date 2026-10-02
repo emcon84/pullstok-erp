@@ -89,7 +89,7 @@ export const createHistoricalCharge = async (
 };
 
 /** Edita un movimiento (deuda anterior o cobranza). El servidor rechaza los
- *  inmutables, los de caja cerrada y las ediciones que dejarían saldo negativo. */
+ *  inmutables y los de caja cerrada. */
 export const updateAccountMovement = async (
   customerId: string,
   movementId: string,

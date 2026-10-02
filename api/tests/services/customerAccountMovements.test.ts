@@ -143,19 +143,18 @@ describe("customerAccountService.updateMovement / deleteMovement", () => {
     expect(r.balance).toBe(240);
   });
 
-  it("rejects raising a PAYMENT so the balance goes negative", async () => {
-    setup(payment, 200);
-    await expect(customerAccountService.updateMovement("c-1", "m-2", { amount: 400 })).rejects.toMatchObject({
-      code: "MOVEMENT_BALANCE_NEGATIVE",
-    });
-    expect(tx.customerAccountMovement.updateMany).not.toHaveBeenCalled();
+  it("raising a PAYMENT beyond the balance leaves credit (negative balance)", async () => {
+    setup(payment, 200); // payment 100 → 200 + 100 - 400 = -100
+    const r = await customerAccountService.updateMovement("c-1", "m-2", { amount: 400 });
+    expect(tx.customerAccountMovement.updateMany).toHaveBeenCalledTimes(1);
+    expect(r.balance).toBe(-100);
   });
 
-  it("rejects lowering a CHARGE below what was already paid", async () => {
-    setup(charge, 200);
-    await expect(customerAccountService.updateMovement("c-1", "m-1", { amount: 50 })).rejects.toMatchObject({
-      code: "MOVEMENT_BALANCE_NEGATIVE",
-    });
+  it("lowering a CHARGE below what was already paid leaves credit", async () => {
+    setup(charge, 200); // charge 300 → 200 - 300 + 50 = -50
+    const r = await customerAccountService.updateMovement("c-1", "m-1", { amount: 50 });
+    expect(tx.customerAccountMovement.updateMany).toHaveBeenCalledTimes(1);
+    expect(r.balance).toBe(-50);
   });
 
   it("CHARGE linked to a sale is immutable (edit and delete)", async () => {
@@ -221,11 +220,10 @@ describe("customerAccountService.updateMovement / deleteMovement", () => {
     expect(r.balance).toBe(0);
   });
 
-  it("refuses to delete a CHARGE that would leave a negative balance", async () => {
-    setup(charge, 200);
-    await expect(customerAccountService.deleteMovement("c-1", "m-1")).rejects.toMatchObject({
-      code: "MOVEMENT_BALANCE_NEGATIVE",
-    });
-    expect(tx.customerAccountMovement.deleteMany).not.toHaveBeenCalled();
+  it("deleting a CHARGE that leaves a negative balance is allowed (credit)", async () => {
+    setup(charge, 200); // 200 - 300 = -100
+    const r = await customerAccountService.deleteMovement("c-1", "m-1");
+    expect(tx.customerAccountMovement.deleteMany).toHaveBeenCalledTimes(1);
+    expect(r.balance).toBe(-100);
   });
 });

@@ -231,21 +231,38 @@ describe("customerAccountService.registerPayment", () => {
     expect(result.balance).toBe(0);
   });
 
-  it("overpayment → PAYMENT_EXCEEDS_BALANCE, nothing created", async () => {
-    await expect(
-      customerAccountService.registerPayment("c-1", { amount: 200.01, method: "QR" }, "u-1"),
-    ).rejects.toMatchObject({
-      code: "PAYMENT_EXCEEDS_BALANCE",
-      message: expect.stringContaining("saldo"),
-    });
-    expect(tx.customerAccountMovement.create).not.toHaveBeenCalled();
+  it("overpayment is allowed: the excess becomes credit (negative balance)", async () => {
+    const result = await customerAccountService.registerPayment(
+      "c-1",
+      { amount: 200.01, method: "QR" },
+      "u-1",
+    );
+    expect(result.balance).toBe(-0.01);
+    expect(tx.customerAccountMovement.create).toHaveBeenCalledTimes(1);
   });
 
-  it("customer with no debt cannot receive a payment", async () => {
+  it("customer with no debt can receive an advance payment (credit)", async () => {
     tx.customerAccountMovement.groupBy.mockResolvedValue([]);
-    await expect(
-      customerAccountService.registerPayment("c-1", { amount: 1, method: "QR" }, "u-1"),
-    ).rejects.toMatchObject({ code: "PAYMENT_EXCEEDS_BALANCE" });
+    const result = await customerAccountService.registerPayment(
+      "c-1",
+      { amount: 80, method: "QR" },
+      "u-1",
+    );
+    expect(result.balance).toBe(-80);
+    expect(tx.customerAccountMovement.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("customer already in credit can add more credit", async () => {
+    tx.customerAccountMovement.groupBy.mockResolvedValue([
+      { type: "CHARGE", _sum: { amount: 100 } },
+      { type: "PAYMENT", _sum: { amount: 150 } },
+    ]);
+    const result = await customerAccountService.registerPayment(
+      "c-1",
+      { amount: 25, method: "TRANSFERENCIA" },
+      "u-1",
+    );
+    expect(result.balance).toBe(-75);
   });
 
   it("unknown / other-org customer → CUSTOMER_NOT_FOUND (no transaction)", async () => {

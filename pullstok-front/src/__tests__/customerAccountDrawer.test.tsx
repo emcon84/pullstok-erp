@@ -277,15 +277,22 @@ describe("CustomerAccountDrawer", () => {
     expect(submit()).not.toBeDisabled();
   });
 
-  it("prevents overpaying the balance client-side", () => {
-    renderDrawer();
+  it("allows paying more than the balance and hints the excess as saldo a favor", () => {
+    renderDrawer(); // balance 1000
     openPayment();
     fireEvent.change(amountInput(), { target: { value: "1500" } });
 
-    expect(screen.getByText("El monto supera el saldo adeudado")).toBeInTheDocument();
-    expect(submit()).toBeDisabled();
+    expect(screen.getByText("Quedarán $500,00 como saldo a favor")).toBeInTheDocument();
+    expect(submit()).not.toBeDisabled();
     fireEvent.click(submit());
-    expect(registerPayment).not.toHaveBeenCalled();
+    expect(registerPayment.mock.calls[0][0].input.amount).toBe(1500);
+  });
+
+  it("shows no excess hint when the amount does not exceed the balance", () => {
+    renderDrawer();
+    openPayment();
+    fireEvent.change(amountInput(), { target: { value: "1000" } });
+    expect(screen.queryByText(/como saldo a favor/)).not.toBeInTheDocument();
   });
 
   it("disables the submit for an empty or zero amount", () => {
@@ -330,20 +337,91 @@ describe("CustomerAccountDrawer", () => {
     expect(amountInput().value).toBe("");
   });
 
-  it("hides the form when the customer owes nothing", () => {
+  it("keeps both forms available when the customer owes nothing, without 'Cobrar todo'", () => {
     setAccount(0);
     renderDrawer();
 
-    expect(screen.getByText("Sin deuda pendiente")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cargar cobranza" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Sin deuda pendiente")).not.toBeInTheDocument();
+    openPayment();
+    expect(screen.queryByRole("button", { name: "Cobrar todo" })).not.toBeInTheDocument();
+    fireEvent.change(amountInput(), { target: { value: "300" } });
+    expect(screen.getByText("Quedarán $300,00 como saldo a favor")).toBeInTheDocument();
+    expect(submit()).not.toBeDisabled();
   });
 
-  it("shows a credit balance as 'Saldo a favor' without a form", () => {
+  it("shows a credit balance as 'Saldo a favor' and still offers both forms", () => {
     setAccount(-200);
     renderDrawer();
 
-    expect(screen.getByText("Saldo a favor")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cargar cobranza" })).not.toBeInTheDocument();
+    expect(screen.getByText("Saldo a favor", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cargar cobranza" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cargar saldo a favor" })).toBeInTheDocument();
+    openPayment();
+    expect(screen.queryByRole("button", { name: "Cobrar todo" })).not.toBeInTheDocument();
+    fireEvent.change(amountInput(), { target: { value: "50" } });
+    expect(screen.getByText("Quedarán $50,00 como saldo a favor")).toBeInTheDocument();
+  });
+
+  describe("cargar saldo a favor (advance)", () => {
+    const openCredit = () => fireEvent.click(screen.getByRole("button", { name: "Cargar saldo a favor" }));
+    const creditAmount = () => screen.getByLabelText("Monto del saldo a favor") as HTMLInputElement;
+    const creditSubmit = () => screen.getByRole("button", { name: "Registrar saldo a favor" }) as HTMLButtonElement;
+
+    it("is always visible, even with debt", () => {
+      renderDrawer();
+      expect(screen.getByRole("button", { name: "Cargar saldo a favor" })).toBeInTheDocument();
+    });
+
+    it("registers a PAYMENT with the default note 'Saldo a favor'", () => {
+      renderDrawer();
+      openCredit();
+      expect(screen.queryByRole("button", { name: "Cobrar todo" })).not.toBeInTheDocument();
+      fireEvent.change(creditAmount(), { target: { value: "700" } });
+      fireEvent.click(creditSubmit());
+
+      expect(registerPayment).toHaveBeenCalledWith(
+        {
+          customerId: "c-1",
+          input: { amount: 700, method: "EFECTIVO", cashSessionId: "cs-1", note: "Saldo a favor" },
+        },
+        expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+      );
+    });
+
+    it("keeps a custom note and supports other methods without cash session", () => {
+      renderDrawer();
+      openCredit();
+      fireEvent.change(creditAmount(), { target: { value: "100" } });
+      fireEvent.change(methodSelect(), { target: { value: "TRANSFERENCIA" } });
+      fireEvent.change(screen.getByLabelText("Nota (opcional)"), { target: { value: "Seña" } });
+      fireEvent.click(creditSubmit());
+
+      expect(registerPayment.mock.calls[0][0].input).toEqual({
+        amount: 100,
+        method: "TRANSFERENCIA",
+        note: "Seña",
+      });
+    });
+
+    it("blocks EFECTIVO without an open cash session", () => {
+      setSession(null);
+      renderDrawer();
+      openCredit();
+      fireEvent.change(creditAmount(), { target: { value: "100" } });
+      expect(screen.getByText("Abrí la caja para cobrar en efectivo")).toBeInTheDocument();
+      expect(creditSubmit()).toBeDisabled();
+    });
+
+    it("shows no excess hint (the whole amount is credit) and toasts on success", () => {
+      registerPayment.mockImplementation((_vars, opts) => opts.onSuccess());
+      renderDrawer();
+      openCredit();
+      fireEvent.change(creditAmount(), { target: { value: "700" } });
+      expect(screen.queryByText(/Quedarán/)).not.toBeInTheDocument();
+      fireEvent.click(creditSubmit());
+      expect(toast.success).toHaveBeenCalledWith("Saldo a favor cargado");
+      expect(screen.queryByLabelText("Monto del saldo a favor")).not.toBeInTheDocument();
+    });
   });
 
   // ── T2: detalle de venta expandible ──
@@ -682,7 +760,6 @@ describe("CustomerAccountDrawer", () => {
     it("edits a payment pre-filled, with a read-only method, even when the balance is zero", () => {
       setAccount(0, [payment]);
       renderDrawer();
-      expect(screen.queryByRole("button", { name: "Cargar cobranza" })).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: "Editar cobranza" }));
 
@@ -691,6 +768,16 @@ describe("CustomerAccountDrawer", () => {
       expect((screen.getByLabelText("Nota (opcional)") as HTMLInputElement).value).toBe("Pago");
       expect(methodSelect()).toBeDisabled();
       expect(methodSelect().value).toBe("EFECTIVO");
+    });
+
+    it("editing a payment is not capped at balance + original amount", () => {
+      setAccount(0, [payment]);
+      renderDrawer();
+      fireEvent.click(screen.getByRole("button", { name: "Editar cobranza" }));
+      fireEvent.change(amountInput(), { target: { value: "999999" } });
+      expect(saveEdit()).not.toBeDisabled();
+      fireEvent.click(saveEdit());
+      expect(updateMovement.mock.calls[0][0].input.amount).toBe(999999);
     });
 
     it("saves a payment edit with amount and note, and omits the unchanged date", () => {
@@ -717,17 +804,6 @@ describe("CustomerAccountDrawer", () => {
       expect(updateMovement.mock.calls[0][0].input.date).toBe(
         new Date("2026-09-01T12:00:00").toISOString(),
       );
-    });
-
-    it("allows a payment edit up to balance plus the original amount", () => {
-      setAccount(100, [{ ...payment, amount: 500 }]);
-      renderDrawer();
-      fireEvent.click(screen.getByRole("button", { name: "Editar cobranza" }));
-
-      fireEvent.change(amountInput(), { target: { value: "600" } });
-      expect(saveEdit()).not.toBeDisabled();
-      fireEvent.change(amountInput(), { target: { value: "601" } });
-      expect(saveEdit()).toBeDisabled();
     });
 
     it("edits a historical charge through the debt form and closes it on success", () => {
