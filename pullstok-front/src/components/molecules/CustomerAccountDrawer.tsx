@@ -1,6 +1,6 @@
 import { Fragment, useState } from "react";
 import { toast } from "react-toastify";
-import { ChevronDown, ChevronRight, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Pencil, Printer, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -380,6 +380,19 @@ export const CustomerAccountDrawer = ({
     });
   };
 
+  // ── Imprimir / descargar PDF: mismo link que WhatsApp, pero sin exigir teléfono ──
+  const handlePrintStatement = () => {
+    if (gettingStatementLink) return;
+    getStatementLink(customerId, {
+      onSuccess: ({ url }) => {
+        window.open(url, "_blank", "noopener,noreferrer");
+      },
+      onError: (error: Error) => {
+        toast.error(error.message || "Error al generar el resumen de cuenta");
+      },
+    });
+  };
+
   const balanceLabel = balance > 0 ? "Saldo adeudado" : balance < 0 ? "Saldo a favor" : "Saldo";
   const balanceTone =
     balance > 0
@@ -407,21 +420,39 @@ export const CustomerAccountDrawer = ({
           </div>
 
           <div className="space-y-1">
-            <Button
-              variant="outline"
-              className="w-full"
-              disabled={!hasPhone || gettingStatementLink}
-              onClick={handleSendStatement}
-            >
-              {gettingStatementLink ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Abriendo WhatsApp…
-                </>
-              ) : (
-                "Enviar por WhatsApp"
-              )}
-            </Button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button
+                variant="outline"
+                disabled={!hasPhone || gettingStatementLink}
+                onClick={handleSendStatement}
+              >
+                {gettingStatementLink ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Abriendo WhatsApp…
+                  </>
+                ) : (
+                  "Enviar por WhatsApp"
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                disabled={gettingStatementLink}
+                onClick={handlePrintStatement}
+              >
+                {gettingStatementLink ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generando PDF…
+                  </>
+                ) : (
+                  <>
+                    <Printer className="h-4 w-4" />
+                    Imprimir / descargar PDF
+                  </>
+                )}
+              </Button>
+            </div>
             {!hasPhone && (
               <p className="text-xs text-muted-foreground">
                 Cargá un teléfono para enviar por WhatsApp

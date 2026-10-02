@@ -473,6 +473,67 @@ describe("CustomerAccountDrawer", () => {
     });
   });
 
+  // ── T4b: imprimir / descargar el PDF (no requiere teléfono) ──
+  describe("print / download statement", () => {
+    const printButton = () =>
+      screen.getByRole("button", { name: /imprimir \/ descargar pdf|generando pdf/i });
+    let openSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => Window | null>>;
+
+    beforeEach(() => {
+      openSpy = vi.fn().mockReturnValue(null);
+      vi.stubGlobal("open", openSpy);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("is enabled even when the customer has no phone", () => {
+      renderDrawer("   ");
+      expect(printButton()).not.toBeDisabled();
+    });
+
+    it("fetches the statement link and opens the PDF url in a new tab with noopener", () => {
+      renderDrawer("");
+      fireEvent.click(printButton());
+      expect(getStatementLink).toHaveBeenCalledWith(
+        "c-1",
+        expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+      );
+
+      const [, callbacks] = getStatementLink.mock.calls[0];
+      callbacks.onSuccess({ url: "https://r2.example.com/estado-cuenta-ana.pdf", filename: "f.pdf" });
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://r2.example.com/estado-cuenta-ana.pdf",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    });
+
+    it("shows a loading state while pending and does not double-fire", () => {
+      vi.mocked(useGetAccountStatementLink).mockReturnValue({
+        getStatementLink,
+        loading: true,
+      } as never);
+      renderDrawer();
+
+      expect(printButton()).toBeDisabled();
+      fireEvent.click(printButton());
+      expect(getStatementLink).not.toHaveBeenCalled();
+    });
+
+    it("surfaces the server error message and never opens a tab", () => {
+      renderDrawer();
+      fireEvent.click(printButton());
+      const [, callbacks] = getStatementLink.mock.calls[0];
+
+      callbacks.onError(new Error("Cliente no encontrado"));
+      expect(toast.error).toHaveBeenCalledWith("Cliente no encontrado");
+      expect(openSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe("cargar deuda anterior", () => {
     const openForm = () => fireEvent.click(screen.getByRole("button", { name: "Cargar deuda anterior" }));
     const chargeAmount = () => screen.getByLabelText("Monto de la deuda") as HTMLInputElement;
