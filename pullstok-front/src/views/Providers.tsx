@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { GenericModal } from "../components/molecules/GenericModal";
 import { Loader } from "../components/atoms/loader";
+import { groupByLetter, OTHER_GROUP } from "../utils/groupByLetter";
 import {
   useProviders,
   useCreateProvider,
@@ -163,6 +164,8 @@ export const Providers = () => {
     return [p.name, p.code, p.taxId].some((v) => (v ?? "").toLowerCase().includes(term));
   });
 
+  const letterGroups = groupByLetter(visible);
+
   if (loadingProvider) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -243,52 +246,92 @@ export const Providers = () => {
           Ningún proveedor coincide con la búsqueda.
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((p) => (
-            <Card key={p.id} className="gap-0 p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{p.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {[p.code, p.taxId].filter(Boolean).join(" · ") || "Sin código ni CUIT"}
-                  </p>
-                  {(p.locality || p.province) && (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {[p.locality, p.province].filter(Boolean).join(", ")}
-                    </p>
-                  )}
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {p.classification && <Badge variant="outline">{p.classification}</Badge>}
-                    {p.isActive === false && <Badge variant="secondary">Inactivo</Badge>}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    aria-label={`Editar ${p.name}`}
-                    onClick={() => openEdit(p)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    aria-label={`${p.isActive === false ? "Activar" : "Desactivar"} ${p.name}`}
-                    onClick={() => toggleActive(p)}
-                  >
-                    <Power className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="mt-4 flex items-center gap-2 border-t pt-3 text-sm text-muted-foreground">
-                <Phone className="h-3.5 w-3.5" />
-                {p.phone || "Sin teléfono"}
-              </div>
-            </Card>
-          ))}
+        <div className="space-y-4">
+          <nav className="flex flex-wrap gap-1" aria-label="Saltar a letra">
+            {letterGroups.map(({ letter }) => (
+              <a
+                key={letter}
+                href={"#letra-" + (letter === OTHER_GROUP ? "otros" : letter)}
+                className="flex h-7 min-w-7 items-center justify-center rounded-md border px-2 text-xs font-medium hover:bg-accent"
+              >
+                {letter}
+              </a>
+            ))}
+          </nav>
+          <Card className="gap-0 divide-y overflow-hidden p-0">
+            {letterGroups.map(({ letter, items }) => (
+              <section
+                key={letter}
+                id={"letra-" + (letter === OTHER_GROUP ? "otros" : letter)}
+                aria-label={"Proveedores con " + letter}
+                className="scroll-mt-4"
+              >
+                <h2 className="bg-muted/50 px-4 py-1.5 text-sm font-semibold text-muted-foreground">
+                  {letter}
+                </h2>
+                <ul className="divide-y">
+                  {items.map((p) => (
+                    <li
+                      key={p.id}
+                      className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">
+                          {p.name}
+                          {p.classification && (
+                            <Badge variant="outline" className="ml-2">
+                              {p.classification}
+                            </Badge>
+                          )}
+                          {p.isActive === false && (
+                            <Badge variant="secondary" className="ml-2">
+                              Inactivo
+                            </Badge>
+                          )}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[
+                            p.code,
+                            p.taxId,
+                            [p.locality, p.province].filter(Boolean).join(", "),
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "Sin código ni CUIT"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground sm:w-40">
+                        <Phone className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{p.phone || "Sin teléfono"}</span>
+                      </div>
+                      <div className="truncate text-sm text-muted-foreground sm:w-48">
+                        {p.accountingRef || "—"}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label={`Editar ${p.name}`}
+                          onClick={() => openEdit(p)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label={`${p.isActive === false ? "Activar" : "Desactivar"} ${p.name}`}
+                          onClick={() => toggleActive(p)}
+                        >
+                          <Power className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </Card>
         </div>
       )}
 
