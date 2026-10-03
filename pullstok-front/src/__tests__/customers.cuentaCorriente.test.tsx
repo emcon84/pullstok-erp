@@ -55,7 +55,7 @@ const renderCustomers = () =>
     </QueryClientProvider>,
   );
 
-const cardOf = (name: string) => screen.getByText(name).closest("[data-slot=card]") as HTMLElement;
+const cardOf = (name: string) => screen.getByText(name).closest("li") as HTMLElement;
 
 describe("Customers — cuenta corriente", () => {
   beforeEach(() => {
@@ -102,8 +102,15 @@ describe("Customers — cuenta corriente", () => {
   it("shows the debt of a debtor customer as 'Debe'", () => {
     renderCustomers();
     const card = within(cardOf("Ana Gómez"));
-    expect(card.getByText("Saldo")).toBeInTheDocument();
     expect(card.getByText("Debe $1.500,50")).toBeInTheDocument();
+  });
+
+  it("lists customers as rows grouped under their initial letter", () => {
+    renderCustomers();
+    expect(screen.getByRole("region", { name: "Clientes con A" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Clientes con B" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Clientes con C" })).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
   });
 
   it("shows a credit balance as 'A favor'", () => {

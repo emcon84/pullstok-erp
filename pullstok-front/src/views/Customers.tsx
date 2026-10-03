@@ -23,6 +23,7 @@ import { CustomerAccountDrawer } from "../components/molecules/CustomerAccountDr
 import { CustomerBalancesSummary } from "../components/molecules/CustomerBalancesSummary";
 import { Loader } from "../components/atoms/loader";
 import { customerDisplayName } from "../utils/customerName";
+import { groupByLetter } from "../utils/groupByLetter";
 import { fetchPadron } from "../services/customerService";
 import {
   AlertDialog,
@@ -286,6 +287,8 @@ export const Customers = () => {
     );
   });
 
+  const letterGroups = groupByLetter(visibleCustomers);
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -375,93 +378,133 @@ export const Customers = () => {
           </p>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {visibleCustomers.length === 0 && (
-            <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
+        <div className="space-y-4">
+          {visibleCustomers.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
               Ningún cliente coincide con la búsqueda.
             </p>
-          )}
-          {visibleCustomers.map((customer) => {
-            const customerId = customer.id || customer._id || "";
-            const balance = balanceById.get(customerId) ?? 0;
-            return (
-              <Card key={customerId} className="gap-0 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent font-semibold uppercase text-accent-foreground">
-                      {customerDisplayName(customer)[0]}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{customerDisplayName(customer)}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {[customer.code, customer.email].filter(Boolean).join(" · ")}
-                      </p>
-                      {(customer.locality || customer.province || customer.zone) && (
-                        <p className="truncate text-xs text-muted-foreground">
-                          {[customer.locality, customer.province].filter(Boolean).join(", ")}
-                          {customer.zone ? ` · Zona ${customer.zone}` : ""}
-                        </p>
-                      )}
-                      {customer.isActive === false && (
-                        <Badge variant="secondary" className="mt-1">Inactivo</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleEditCustomer(customerId)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => askDeleteCustomer(customerId, customerDisplayName(customer))}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center gap-2 border-t pt-3 text-sm text-muted-foreground">
-                  <Phone className="h-3.5 w-3.5" />
-                  {customer.phone || "Sin teléfono"}
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2 text-sm">
-                  <span className="text-muted-foreground">Saldo</span>
-                  {balance > 0 ? (
-                    <span className="font-medium tabular-nums text-destructive">
-                      Debe {money(balance)}
-                    </span>
-                  ) : balance < 0 ? (
-                    <span className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                      A favor {money(Math.abs(balance))}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 w-full"
-                  onClick={() =>
-                    setAccountTarget({
-                      id: customerId,
-                      name: customerDisplayName(customer),
-                      phone: customer.phone ?? "",
-                    })
-                  }
-                >
-                  <Wallet className="h-4 w-4" />
-                  Cuenta corriente
-                </Button>
+          ) : (
+            <>
+              <nav className="flex flex-wrap gap-1" aria-label="Saltar a letra">
+                {letterGroups.map(({ letter }) => (
+                  <a
+                    key={letter}
+                    href={"#letra-" + (letter === "#" ? "otros" : letter)}
+                    className="flex h-7 min-w-7 items-center justify-center rounded-md border px-2 text-xs font-medium hover:bg-accent"
+                  >
+                    {letter}
+                  </a>
+                ))}
+              </nav>
+              <Card className="gap-0 divide-y overflow-hidden p-0">
+                {letterGroups.map(({ letter, items }) => (
+                  <section
+                    key={letter}
+                    id={"letra-" + (letter === "#" ? "otros" : letter)}
+                    aria-label={"Clientes con " + letter}
+                    className="scroll-mt-4"
+                  >
+                    <h2 className="bg-muted/50 px-4 py-1.5 text-sm font-semibold text-muted-foreground">
+                      {letter}
+                    </h2>
+                    <ul className="divide-y">
+                      {items.map((customer) => {
+                        const customerId = customer.id || customer._id || "";
+                        const balance = balanceById.get(customerId) ?? 0;
+                        return (
+                          <li
+                            key={customerId}
+                            className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium">
+                                {customerDisplayName(customer)}
+                                {customer.isActive === false && (
+                                  <Badge variant="secondary" className="ml-2">
+                                    Inactivo
+                                  </Badge>
+                                )}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {[
+                                  customer.code,
+                                  customer.email,
+                                  [customer.locality, customer.province]
+                                    .filter(Boolean)
+                                    .join(", "),
+                                  customer.zone ? "Zona " + customer.zone : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground sm:w-40">
+                              <Phone className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">
+                                {customer.phone || "Sin teléfono"}
+                              </span>
+                            </div>
+                            <div className="text-sm sm:w-40 sm:text-right">
+                              {balance > 0 ? (
+                                <span className="font-medium tabular-nums text-destructive">
+                                  Debe {money(balance)}
+                                </span>
+                              ) : balance < 0 ? (
+                                <span className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                                  A favor {money(Math.abs(balance))}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setAccountTarget({
+                                    id: customerId,
+                                    name: customerDisplayName(customer),
+                                    phone: customer.phone ?? "",
+                                  })
+                                }
+                              >
+                                <Wallet className="h-4 w-4" />
+                                Cuenta corriente
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                aria-label="Editar cliente"
+                                onClick={() => handleEditCustomer(customerId)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                aria-label="Eliminar cliente"
+                                onClick={() =>
+                                  askDeleteCustomer(
+                                    customerId,
+                                    customerDisplayName(customer),
+                                  )
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ))}
               </Card>
-            );
-          })}
+            </>
+          )}
         </div>
       )}
 
