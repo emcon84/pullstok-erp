@@ -15,8 +15,8 @@ import {
 import type { Plan } from "@prisma/client";
 
 describe("MODULE_REGISTRY", () => {
-  it("expone 14 módulos (sin `ajustes`)", () => {
-    expect(MODULE_REGISTRY).toHaveLength(14);
+  it("expone 15 módulos (sin `ajustes`)", () => {
+    expect(MODULE_REGISTRY).toHaveLength(15);
     const keys = MODULE_REGISTRY.map((m) => m.key);
     expect(keys).not.toContain("ajustes");
   });
@@ -25,7 +25,7 @@ describe("MODULE_REGISTRY", () => {
     const keys = MODULE_REGISTRY.map((m) => m.key);
     // moduleKeys de navItems.ts: suelto (6 ítems sueltos), facturacion,
     // branding, pricing, bot.
-    ["stock", "ventas", "clientes", "proveedores", "suelto", "presupuestos", "pedidos",
+    ["stock", "ventas", "clientes", "proveedores", "contabilidad", "suelto", "presupuestos", "pedidos",
       "remitos", "reportes", "tienda", "facturacion", "pricing", "branding",
       "bot"].forEach((k) => expect(keys).toContain(k));
   });

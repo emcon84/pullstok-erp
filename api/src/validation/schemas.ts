@@ -291,6 +291,21 @@ export const createProviderSchema = z.object({
 });
 export const updateProviderSchema = createProviderSchema.partial();
 
+// ---------- Plan de cuentas ----------
+// El tipo es opcional: con cuenta madre se hereda de ella (lo resuelve el
+// controller con accountRules). shortCode vacío se normaliza a null.
+const accountTypeEnum = z.enum(["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]);
+export const createAccountSchema = z.object({
+  code: z.string().trim().min(1, "El código es requerido"),
+  shortCode: optionalText,
+  name: z.string().trim().min(1, "El nombre es requerido"),
+  type: accountTypeEnum.optional(),
+  parentId: z.preprocess(blankToNull, z.string().nullable().optional()),
+  isPostable: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+});
+export const updateAccountSchema = createAccountSchema.partial();
+
 // ---------- Ventas ----------
 // saleMode (sdd/venta-alimento-suelto B-08): opcional en el payload —
 // ausente = legado BOLSA_CERRADA. superRefine aplica las reglas por modo:

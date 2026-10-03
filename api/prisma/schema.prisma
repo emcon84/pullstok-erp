@@ -109,6 +109,7 @@ model Organization {
   users                 User[]
   products              Product[]
   providers             Provider[]
+  accounts              Account[]
   priceKgTypes          PriceKgType[]
   priceKgBrands         PriceKgBrand[]
   priceKgPrices         PriceKgPrice[]
@@ -349,6 +350,41 @@ model Provider {
   @@unique([organizationId, code])
   @@index([organizationId])
   @@map("providers")
+}
+
+// Plan de cuentas contable (módulo "contabilidad"). Árbol por organización vía
+// parentId; solo las cuentas imputables (isPostable, hojas) recibirán asientos.
+// `code` es la referencia jerárquica en texto libre (el sistema legado GFLOW usa
+// 12 dígitos) y `shortCode` el código corto legado. Tenant-scoped (TENANT_MODELS).
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+model Account {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  code           String
+  shortCode      String?
+  name           String
+  type           AccountType
+  parentId       String?
+  parent         Account?     @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children       Account[]    @relation("AccountHierarchy")
+  isPostable     Boolean      @default(false)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, shortCode])
+  @@index([organizationId])
+  @@index([parentId])
+  @@map("accounts")
 }
 
 // Especie a la que aplica un tipo/marca de "Precios por kilo" (sdd/price-kg-plan).

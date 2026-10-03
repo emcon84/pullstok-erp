@@ -7,7 +7,7 @@ import {
 } from "../constants/adminWorkspace";
 import { MODULE_REGISTRY } from "../constants/planLimits";
 
-const ALL = ["stock", "clientes", "proveedores", "facturacion", "branding"];
+const ALL = ["stock", "clientes", "proveedores", "contabilidad", "facturacion", "branding"];
 const keysOf = (areas: ReturnType<typeof filterAdminWorkspace>) =>
   areas.flatMap((a) => a.items.map((i) => i.key));
 
@@ -27,12 +27,15 @@ describe("ADMIN_WORKSPACE_AREAS (config)", () => {
     }
   });
 
-  it("un ítem disponible siempre tiene ruta; la contabilidad no está disponible", () => {
+  it("un ítem disponible siempre tiene ruta; solo Plan de cuentas está disponible en contabilidad", () => {
     for (const item of ADMIN_WORKSPACE_AREAS.flatMap((a) => a.items)) {
       if (item.available) expect(item.route).toBeTruthy();
     }
     const conta = ADMIN_WORKSPACE_AREAS.find((a) => a.key === "contabilidad")!;
-    expect(conta.items.every((i) => !isItemAvailable(i))).toBe(true);
+    expect(conta.items.filter(isItemAvailable).map((i) => i.key)).toEqual(["plan-cuentas"]);
+    const plan = conta.items.find((i) => i.key === "plan-cuentas")!;
+    expect(plan.route).toBe("/contabilidad/plan-de-cuentas");
+    expect(plan.moduleKey).toBe("contabilidad");
   });
 });
 
@@ -76,13 +79,14 @@ describe("buildAdminNavGroups (sidebar)", () => {
       "Inicio",
       "Comercial",
       "Tesorería",
+      "Contabilidad",
       "Configuración",
     ]);
     const labels = groups.flatMap((g) => g.items.map((i) => i.label));
     expect(labels).not.toContain("Compras");
     expect(labels).not.toContain("Bancos");
     expect(flatTo(groups)).toEqual(
-      expect.arrayContaining(["/Ventas", "/Clientes", "/Proveedores", "/stock", "/caja", "/usuarios", "/ajustes/modulos"]),
+      expect.arrayContaining(["/Ventas", "/Clientes", "/Proveedores", "/stock", "/caja", "/contabilidad/plan-de-cuentas", "/usuarios", "/ajustes/modulos"]),
     );
   });
 

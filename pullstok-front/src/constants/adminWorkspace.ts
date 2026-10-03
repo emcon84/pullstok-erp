@@ -184,7 +184,9 @@ export const ADMIN_WORKSPACE_AREAS: AdminWorkspaceArea[] = [
         label: "Plan de cuentas",
         description: "Estructura de cuentas contables",
         icon: ListTree,
-        available: false,
+        route: "/contabilidad/plan-de-cuentas",
+        moduleKey: "contabilidad",
+        available: true,
       },
       {
         key: "libros",

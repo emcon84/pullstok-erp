@@ -29,7 +29,7 @@ const renderHome = () =>
 
 beforeEach(() => {
   localStorage.setItem("user", JSON.stringify({ role: "ADMIN" }));
-  setModules(["stock", "clientes", "proveedores", "facturacion"]);
+  setModules(["stock", "clientes", "proveedores", "contabilidad", "facturacion"]);
 });
 
 describe("AdminHome", () => {
@@ -45,11 +45,15 @@ describe("AdminHome", () => {
     expect(screen.getByRole("link", { name: /Clientes/ })).toHaveAttribute("href", "/Clientes");
     expect(screen.getByRole("link", { name: /Proveedores/ })).toHaveAttribute("href", "/Proveedores");
     expect(screen.getByRole("link", { name: /Stock/ })).toHaveAttribute("href", "/stock");
+    expect(screen.getByRole("link", { name: /Plan de cuentas/ })).toHaveAttribute(
+      "href",
+      "/contabilidad/plan-de-cuentas",
+    );
   });
 
   it("los no disponibles se ven deshabilitados con 'Próximamente' y sin link", () => {
     renderHome();
-    expect(screen.getAllByText("Próximamente").length).toBeGreaterThanOrEqual(9);
+    expect(screen.getAllByText("Próximamente").length).toBeGreaterThanOrEqual(8);
     const bancos = screen.getByText("Bancos").closest("[data-slot='card']") as HTMLElement;
     expect(bancos).toHaveAttribute("aria-disabled", "true");
     expect(within(bancos).getByText("Próximamente")).toBeInTheDocument();

@@ -37,6 +37,7 @@ export const ROLE_VISIBLE_PATHS: Record<string, Role[]> = {
   "/caja": ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"],
   "/Clientes": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/Proveedores": ["ADMIN", "MANAGEMENT"], // módulo proveedores (gated por módulo)
+  "/contabilidad/plan-de-cuentas": ["ADMIN", "MANAGEMENT"], // módulo contabilidad (gated por módulo)
   "/presupuestos": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/pedidos": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/categorias": ["ADMIN", "MANAGEMENT"],

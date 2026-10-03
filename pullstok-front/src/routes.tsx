@@ -60,6 +60,9 @@ const Customers = lazy(() =>
 const Providers = lazy(() =>
   import("./views/Providers").then((m) => ({ default: m.Providers })),
 );
+const ChartOfAccounts = lazy(() =>
+  import("./views/ChartOfAccounts").then((m) => ({ default: m.ChartOfAccounts })),
+);
 const Categories = lazy(() =>
   import("./views/Categories").then((m) => ({ default: m.Categories })),
 );
@@ -318,6 +321,7 @@ const AppRoutes = () => (
         <Route path="/caja" element={<CashSessionPage />} />
         <Route path="/Clientes" element={<Customers />} />
         <Route path="/Proveedores" element={<Providers />} />
+        <Route path="/contabilidad/plan-de-cuentas" element={<ChartOfAccounts />} />
         <Route path="/categorias" element={<Categories />} />
         <Route path="/carga-manual" element={<ManualProducts />} />
         <Route path="/tienda" element={<Tienda />} />

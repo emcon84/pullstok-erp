@@ -24,6 +24,7 @@ export const MODULE_REGISTRY: ModuleRegistryEntry[] = [
   { key: "ventas", label: "Ventas", minPlan: "BASICO" },
   { key: "clientes", label: "Clientes", minPlan: "BASICO" },
   { key: "proveedores", label: "Proveedores", minPlan: "BASICO" },
+  { key: "contabilidad", label: "Contabilidad", minPlan: "BASICO" },
   { key: "suelto", label: "Venta por kilo", minPlan: "BASICO" },
   { key: "presupuestos", label: "Presupuestos", minPlan: "PRO" },
   { key: "pedidos", label: "Pedidos", minPlan: "PRO" },
