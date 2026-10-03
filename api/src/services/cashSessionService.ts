@@ -200,11 +200,13 @@ const getCurrent = async (
     where.branchId = branchId;               // gestión con sucursal u operativo con sucursal
   } else if (isOperative(role)) {
     where.branchId = await resolveOperativeBranch(userId); // operativo sin branchId → asignación
-  } else {
-    where.cashierId = userId;                // gestión sin sucursal → su propia (edge)
   }
+  // Gestión sin sucursal → cualquier caja OPEN de la organización (el tenant
+  // scope lo inyecta la extensión), sin importar quién la abrió. Si hubiera
+  // varias sucursales abiertas, la más reciente.
   return prisma.cashSession.findFirst({
     where,
+    orderBy: { openedAt: "desc" },
     include: { payments: true },
   });
 };

@@ -377,6 +377,17 @@ describe("cashSessionService.getCurrent / getOne / list", () => {
     expect(result!.branchId).toBe("b-9");
   });
 
+  it("getCurrent without branchId for admin returns the org's open session, whoever opened it", async () => {
+    mockedPrisma.cashSession.findFirst.mockResolvedValue({ ...openSession, cashierId: "u-vendedor" });
+
+    const result = await cashSessionService.getCurrent("u-admin", "ADMIN");
+
+    const where = mockedPrisma.cashSession.findFirst.mock.calls[0][0].where;
+    expect(where).toEqual({ status: "OPEN" });
+    expect(where.cashierId).toBeUndefined();
+    expect(result!.cashierId).toBe("u-vendedor");
+  });
+
   it("R4: getOne returns the session for the owner cashier", async () => {
     mockedPrisma.cashSession.findFirst.mockResolvedValue({ ...openSession });
 
