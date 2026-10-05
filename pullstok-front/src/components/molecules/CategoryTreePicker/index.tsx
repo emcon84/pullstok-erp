@@ -10,6 +10,8 @@ interface CategoryTreePickerProps {
   onChange: (categoryId: string) => void;
   /** Nombres de categorías RAÍZ a ocultar (ej. "Carga manual" al promover). */
   excludeRootNames?: string[];
+  /** Solo lectura: las filas no seleccionan (ej. producto con presentaciones). */
+  disabled?: boolean;
 }
 
 const TreePickerRow = ({
@@ -18,6 +20,7 @@ const TreePickerRow = ({
   selectedId,
   onSelect,
   forceExpanded,
+  disabled,
 }: {
   node: TreeNode;
   depth: number;
@@ -26,6 +29,7 @@ const TreePickerRow = ({
   /** Con búsqueda activa, cada rama filtrada arranca abierta (no hace falta
    *  clickear para llegar al match) — el toggle manual sigue funcionando. */
   forceExpanded: boolean;
+  disabled?: boolean;
 }) => {
   const [expanded, setExpanded] = useState(false);
   const isLeaf = node.children.length === 0;
@@ -35,10 +39,11 @@ const TreePickerRow = ({
   return (
     <div>
       <button
-        className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent ${
+        className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 ${
           isSelected ? "bg-primary/10 text-primary font-medium" : ""
         }`}
         style={{ paddingLeft: `${depth * 1.2 + 0.5}rem` }}
+        disabled={disabled}
         onClick={() => {
           if (!isLeaf) setExpanded(!expanded);
           onSelect(node.id); // Select leaf or parent
@@ -64,6 +69,7 @@ const TreePickerRow = ({
               selectedId={selectedId}
               onSelect={onSelect}
               forceExpanded={forceExpanded}
+              disabled={disabled}
             />
           ))}
         </div>
@@ -76,6 +82,7 @@ export const CategoryTreePicker = ({
   value,
   onChange,
   excludeRootNames,
+  disabled,
 }: CategoryTreePickerProps) => {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,6 +144,7 @@ export const CategoryTreePicker = ({
               selectedId={value}
               onSelect={onChange}
               forceExpanded={searchActive}
+              disabled={disabled}
             />
           ))
         )}

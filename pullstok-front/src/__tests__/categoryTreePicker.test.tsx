@@ -102,3 +102,26 @@ describe("CategoryTreePicker — buscador", () => {
     expect(screen.getByText(/sin resultados/i)).toBeInTheDocument();
   });
 });
+
+describe("CategoryTreePicker — disabled", () => {
+  beforeEach(() => {
+    vi.spyOn(onboardingService, "getCategories").mockResolvedValue(CATS as never);
+  });
+
+  it("ignores selection clicks while disabled", async () => {
+    const onChange = vi.fn();
+    render(<CategoryTreePicker value={null} onChange={onChange} disabled />);
+    await waitFor(() => expect(screen.getByText("BEBEDEROS")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("BEBEDEROS"));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText("BEBEDEROS").closest("button")).toBeDisabled();
+  });
+
+  it("still selects when enabled (control case)", async () => {
+    const onChange = vi.fn();
+    render(<CategoryTreePicker value={null} onChange={onChange} />);
+    await waitFor(() => expect(screen.getByText("BEBEDEROS")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("BEBEDEROS"));
+    expect(onChange).toHaveBeenCalledWith("r2");
+  });
+});

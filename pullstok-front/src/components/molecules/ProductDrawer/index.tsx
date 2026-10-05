@@ -29,7 +29,12 @@ import { canEditBranchStock } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
 import { API_URL } from "@/constants";
 import { roundBolsaPrice } from "@/lib/money";
-import type { DataItem } from "@/types";
+import { isFarmaciaProduct } from "@/components/hooks/vendorCatalogHelpers";
+import { presentationErrorMessage } from "@/components/hooks/usePresentationsEditor";
+import { PresentationsSectionContainer } from "@/components/organisms/PresentationsSection/PresentationsSectionContainer";
+import type { DataItem, ProductPresentation } from "@/types";
+import { formatStockLevels } from "@/components/hooks/presentationHelpers";
+import { LevelStockInput } from "@/components/molecules/LevelStockInput";
 
 interface ProductDrawerProps {
   open: boolean;
@@ -88,6 +93,13 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
   // priceKgSuelto is read-only (derived server-side from price/weightKg/factor).
   // ¿El negocio trabaja este producto? (filtro "solo lo que trabajo").
   const [carried, setCarried] = useState(true);
+  // sdd/product-presentations: ¿el producto maneja presentaciones? Bloquea el
+  // cambio de categoría (el server responde PRESENTATIONS_CATEGORY_LOCKED).
+  const [hasPresentations, setHasPresentations] = useState(false);
+  // Presentaciones ACTIVAS vigentes (el `product` del padre puede quedar viejo
+  // tras habilitar/deshabilitar desde la sección).
+  const [presentations, setPresentations] = useState<ProductPresentation[]>([]);
+  const stockPresentations = hasPresentations ? presentations : [];
 
   // Stock por sucursal (edit mode): self-contained response, no GET /branches.
   const productId = isEdit ? (product?._id || product?.id) : undefined;
@@ -121,8 +133,9 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
     }
   }, [stock]);
 
-  const handleSaveBranchStock = async (branchId: string) => {
-    const quantity = parseInt(branchDrafts[branchId] ?? "0", 10);
+  // `baseQuantity` (en unidad base) lo manda el editor por niveles de presentaciones.
+  const handleSaveBranchStock = async (branchId: string, baseQuantity?: number) => {
+    const quantity = baseQuantity ?? parseInt(branchDrafts[branchId] ?? "0", 10);
     if (Number.isNaN(quantity) || quantity < 0) {
       toast.error("La cantidad debe ser un número mayor o igual a 0");
       return;
@@ -192,6 +205,8 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         setWeightKg(product.weightKg != null ? String(product.weightKg) : "");
         setUnitsPerBox(product.unitsPerBox != null ? String(product.unitsPerBox) : "");
         setCarried(product.carried !== false); // default true si no viene
+        setHasPresentations(isEdit && product.hasPresentations === true);
+        setPresentations(isEdit ? (product.presentations ?? []) : []);
         // Pre-select variants if available
         if (product.variantAssignments) {
           const pre: Record<string, string> = {};
@@ -215,6 +230,8 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
         setWeightKg("");
         setUnitsPerBox("");
         setCarried(true);
+        setHasPresentations(false);
+        setPresentations([]);
         setVariants([]);
         setVariantSelections({});
       }
@@ -288,7 +305,13 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
       queryClient.invalidateQueries({ queryKey: ["products"] });
       onClose();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Error al guardar";
+      const code = (error as { code?: string } | null)?.code;
+      const message =
+        code === "PRESENTATIONS_CATEGORY_LOCKED"
+          ? presentationErrorMessage(code)
+          : error instanceof Error
+            ? error.message
+            : "Error al guardar";
       toast.error(message);
     }
     setSaving(false);
@@ -321,7 +344,12 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
           {/* Categoría — tree picker */}
           <div className="space-y-1.5">
             <Label>Categoría</Label>
-            <CategoryTreePicker value={categoryId} onChange={setCategoryId} />
+            <CategoryTreePicker value={categoryId} onChange={setCategoryId} disabled={hasPresentations} />
+            {hasPresentations && (
+              <p className="text-[11px] text-muted-foreground">
+                La categoría no se puede cambiar mientras tenga presentaciones. Deshabilitalas primero.
+              </p>
+            )}
           </div>
 
           {/* Proveedor — solo lectura (sdd/alican-wholesale-price-list/providers):
@@ -406,6 +434,18 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
           </div>
           )}
 
+          {/* ── Presentaciones (sdd/product-presentations): solo FARMACIA y producto existente ── */}
+          {!readOnly && isEdit && product && isFarmaciaProduct(product) && (
+            <PresentationsSectionContainer
+              key={product._id || product.id}
+              product={product}
+              onEnabledChange={(enabled, list) => {
+                setHasPresentations(enabled);
+                setPresentations(list);
+              }}
+            />
+          )}
+
           {/* priceKgSuelto — read-only, derived (A-02). Shown in both edit/readOnly. */}
           {isEdit && product && (product.priceKgSuelto != null) && (
             <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3">
@@ -436,10 +476,21 @@ export const ProductDrawer = ({ open, onClose, product, onCreated, readOnly }: P
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{branch.branchName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {branch.quantity} en stock{branch.isHeadquarters ? " · Casa central" : ""}
+                        {stockPresentations.length > 0
+                          ? formatStockLevels(branch.quantity, stockPresentations)
+                          : branch.quantity}{" "}
+                        en stock{branch.isHeadquarters ? " · Casa central" : ""}
                       </p>
                     </div>
-                    {!readOnly && canEditBranch(branch) ? (
+                    {!readOnly && canEditBranch(branch) && stockPresentations.length > 0 ? (
+                      <LevelStockInput
+                        label={branch.branchName}
+                        quantity={branch.quantity}
+                        presentations={stockPresentations}
+                        saving={savingBranch === branch.branchId}
+                        onSave={(baseQty) => handleSaveBranchStock(branch.branchId, baseQty)}
+                      />
+                    ) : !readOnly && canEditBranch(branch) ? (
                       <div className="flex shrink-0 items-center gap-2">
                         <Input
                           type="number"
