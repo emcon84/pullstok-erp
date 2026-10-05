@@ -587,6 +587,8 @@ export const createAccountChargeSchema = z.object({
     blankToNull,
     z.string().max(500, "La nota admite hasta 500 caracteres").nullable().optional(),
   ),
+  // Deuda ya saldada: se asienta la compra con un pago equivalente (saldo intacto).
+  alreadyPaid: z.boolean().optional(),
 });
 
 // Edit of a manual CHARGE or a PAYMENT: any subset of amount/date/note (the

@@ -51,6 +51,7 @@ export interface RegisterHistoricalChargeInput {
   amount: number;
   date?: Date;
   note?: string | null;
+  alreadyPaid?: boolean;
 }
 
 const domainError = (code: string, message: string) => {
@@ -348,19 +349,46 @@ const registerHistoricalCharge = async (
   });
   if (!customer) throw domainError("CUSTOMER_NOT_FOUND", "Cliente no encontrado");
 
-  const movement = await prisma.customerAccountMovement.create({
-    data: {
-      organizationId,
-      customerId,
-      type: "CHARGE",
-      amount,
-      saleId: null,
-      note: input.note?.trim() || null,
-      // Sin fecha → se omite y rige el default now() del schema.
-      createdAt: input.date,
-      createdById: userId,
-    },
-  });
+  const note = input.note?.trim() || null;
+  const chargeData = {
+    organizationId,
+    customerId,
+    type: "CHARGE" as const,
+    amount,
+    saleId: null,
+    note,
+    // Sin fecha → se omite y rige el default now() del schema.
+    createdAt: input.date,
+    createdById: userId,
+  };
+
+  // Ya pagada: la compra queda asentada con un PAYMENT equivalente, sin medio ni
+  // caja (no toca el arqueo) y el saldo del cliente no cambia.
+  if (input.alreadyPaid) {
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "customers" WHERE "id" = ${customerId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+
+      const movement = await tx.customerAccountMovement.create({ data: chargeData });
+      await tx.customerAccountMovement.create({
+        data: {
+          organizationId,
+          customerId,
+          type: "PAYMENT",
+          amount,
+          method: null,
+          cashSessionId: null,
+          note,
+          createdAt: input.date,
+          createdById: userId,
+        },
+      });
+
+      const balance = await computeBalance(tx as unknown as LedgerClient, customerId, organizationId);
+      return { movement, balance };
+    });
+  }
+
+  const movement = await prisma.customerAccountMovement.create({ data: chargeData });
 
   const balance = await computeBalance(prisma, customerId, organizationId);
   return { movement, balance };

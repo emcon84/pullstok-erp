@@ -377,6 +377,65 @@ describe("customerAccountService.registerHistoricalCharge", () => {
     expect(data.saleId).toBeNull();
   });
 
+  describe("alreadyPaid", () => {
+    let tx: ReturnType<typeof makeTx>;
+    beforeEach(() => {
+      tx = makeTx();
+      p.$transaction.mockImplementation((cb: any) => cb(tx));
+      tx.customerAccountMovement.groupBy.mockResolvedValue(sums(300, 100)); // saldo 200
+      tx.customerAccountMovement.create.mockImplementation(async ({ data }: any) => ({
+        id: `m-${data.type}`,
+        ...data,
+      }));
+    });
+
+    it("creates the CHARGE plus a PAYMENT of the same amount/date/note with no method or cash session; balance unchanged", async () => {
+      const date = new Date("2025-06-01T00:00:00Z");
+      const result = await customerAccountService.registerHistoricalCharge(
+        "c-1",
+        { amount: 800, date, note: " compra vieja ", alreadyPaid: true },
+        "u-1",
+      );
+
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+      const calls = tx.customerAccountMovement.create.mock.calls.map((c: any) => c[0].data);
+      expect(calls).toEqual([
+        {
+          organizationId: "org-1",
+          customerId: "c-1",
+          type: "CHARGE",
+          amount: 800,
+          saleId: null,
+          note: "compra vieja",
+          createdAt: date,
+          createdById: "u-1",
+        },
+        {
+          organizationId: "org-1",
+          customerId: "c-1",
+          type: "PAYMENT",
+          amount: 800,
+          method: null,
+          cashSessionId: null,
+          note: "compra vieja",
+          createdAt: date,
+          createdById: "u-1",
+        },
+      ]);
+      expect(result.balance).toBe(200);
+      expect(result.movement).toMatchObject({ type: "CHARGE", amount: 800 });
+      expect(p.customerAccountMovement.create).not.toHaveBeenCalled();
+    });
+
+    it("alreadyPaid false/undefined keeps the plain single-CHARGE path (no transaction)", async () => {
+      p.customerAccountMovement.create.mockResolvedValue({ id: "m-1" });
+      p.customerAccountMovement.groupBy.mockResolvedValue(sums(10, null));
+      await customerAccountService.registerHistoricalCharge("c-1", { amount: 10, alreadyPaid: false });
+      expect(p.$transaction).not.toHaveBeenCalled();
+      expect(p.customerAccountMovement.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("unknown / other-org customer → CUSTOMER_NOT_FOUND, nothing is written", async () => {
     p.customer.findFirst.mockResolvedValue(null);
     await expect(

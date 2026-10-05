@@ -102,6 +102,15 @@ describe("createAccountChargeSchema — cargo histórico (T2)", () => {
     expect(createAccountChargeSchema.safeParse({ amount: 10, date: future }).success).toBe(false);
   });
 
+  it("acepta alreadyPaid booleano y lo deja undefined por defecto", () => {
+    const paid = createAccountChargeSchema.safeParse({ amount: 10, alreadyPaid: true });
+    expect(paid.success).toBe(true);
+    expect(paid.data!.alreadyPaid).toBe(true);
+    const none = createAccountChargeSchema.safeParse({ amount: 10 });
+    expect(none.data!.alreadyPaid).toBeUndefined();
+    expect(createAccountChargeSchema.safeParse({ amount: 10, alreadyPaid: "yes" }).success).toBe(false);
+  });
+
   it("recorta la nota y normaliza vacío a null", () => {
     const a = createAccountChargeSchema.safeParse({ amount: 10, note: "  ventas 2025 " });
     expect(a.data!.note).toBe("ventas 2025");
