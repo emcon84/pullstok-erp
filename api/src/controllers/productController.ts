@@ -19,6 +19,7 @@ import { parseScaleBarcode } from "../utils/scaleBarcode";
 import { formatInternalBarcode, nextInternalBarcodeSeq } from "../utils/internalBarcode";
 import { requireOrganizationId } from "../config/tenantContext";
 import { formatServerTiming } from "../utils/serverTiming";
+import { isFarmaciaCategoryName } from "../utils/presentations";
 import { PLAN_LIMITS } from "../config/planLimits";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
@@ -948,8 +949,24 @@ const updateProduct = async (req: Request, res: Response) => {
     if (data.categoryId !== undefined) {
       const existing = await prisma.product.findFirst({
         where: { id: req.params.id },
-        select: { categoryId: true },
+        select: { categoryId: true, hasPresentations: true },
       });
+      // sdd/product-presentations: un producto con presentaciones es solo de
+      // FARMACIA; no puede salir de esa categoría (ni quedar sin ella).
+      if (existing && existing.hasPresentations && existing.categoryId !== data.categoryId) {
+        const target = data.categoryId
+          ? await prisma.category.findFirst({
+              where: { id: data.categoryId },
+              select: { name: true },
+            })
+          : null;
+        if (!isFarmaciaCategoryName(target?.name)) {
+          return res.status(409).json({
+            message: "Un producto con presentaciones debe permanecer en la categoría FARMACIA",
+            code: "PRESENTATIONS_CATEGORY_LOCKED",
+          });
+        }
+      }
       if (existing && existing.categoryId !== data.categoryId) {
         // Validate the incoming options against the NEW category BEFORE
         // deleting anything: re-inserting options from another category would

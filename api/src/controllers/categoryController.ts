@@ -1,5 +1,6 @@
 import { Response } from "express";
 import CategoryService from "../services/categoryService";
+import { PresentationError } from "../utils/presentations";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
 /** ADMIN: alta masiva de categorías para SU organización (paso 2 del wizard). */
@@ -67,6 +68,9 @@ export const updateCategory = async (req: AuthedRequest, res: Response) => {
     }
     res.status(200).json(category);
   } catch (error: any) {
+    if (error instanceof PresentationError) {
+      return res.status(error.status).json({ message: error.message, code: error.code });
+    }
     res.status(400).json({ message: error.message });
   }
 };
@@ -80,6 +84,9 @@ export const deleteCategory = async (req: AuthedRequest, res: Response) => {
     }
     res.status(200).json({ ok: true });
   } catch (error: any) {
+    if (error instanceof PresentationError) {
+      return res.status(error.status).json({ message: error.message, code: error.code });
+    }
     res.status(400).json({ message: error.message });
   }
 };

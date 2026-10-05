@@ -1,5 +1,22 @@
 import { prisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
+import { PresentationError, isFarmaciaCategoryName } from "../utils/presentations";
+
+// sdd/product-presentations: la categoría FARMACIA es la que habilita las
+// presentaciones; mientras algún producto de ella las use, no se renombra ni borra.
+const assertNoPresentationsIn = async (categoryId: string) => {
+  const locked = await prisma.product.findFirst({
+    where: { categoryId, hasPresentations: true },
+    select: { id: true },
+  });
+  if (locked) {
+    throw new PresentationError(
+      "PRESENTATIONS_CATEGORY_LOCKED",
+      "La categoría tiene productos con presentaciones habilitadas",
+      409,
+    );
+  }
+};
 
 class CategoryService {
   /**
@@ -178,6 +195,17 @@ class CategoryService {
       }
     }
 
+    if (data.name !== undefined) {
+      const current = await prisma.category.findFirst({ where: { id }, select: { name: true } });
+      if (
+        current &&
+        isFarmaciaCategoryName(current.name) &&
+        !isFarmaciaCategoryName(data.name)
+      ) {
+        await assertNoPresentationsIn(id);
+      }
+    }
+
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
     if (data.parentId !== undefined) updateData.parentId = data.parentId;
@@ -209,6 +237,7 @@ class CategoryService {
    * variantDefs → options → productVariant.
    */
   static async remove(id: string) {
+    await assertNoPresentationsIn(id);
     // Null out products referencing this category
     await prisma.product.updateMany({
       where: { categoryId: id },
