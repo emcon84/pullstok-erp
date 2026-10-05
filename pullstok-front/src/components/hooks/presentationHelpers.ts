@@ -181,3 +181,60 @@ export const findLegacyBlisterPrice = (
   const match = catalog.find((p) => (p.name ?? "").trim().toLowerCase() === wanted);
   return match ? { name: (match.name as string).trim(), price: Number(match.price) } : null;
 };
+
+// ── POS helpers (sdd/product-presentations WU4) ──
+
+type PosPresentation = {
+  id: string;
+  name: string;
+  factor: number;
+  price: number;
+  wholesalePrice: number | null;
+  sortOrder: number;
+};
+
+/** Presentations the POS can sell: price 0 means "pendiente" and is hidden. */
+export const sellablePresentations = <T extends { price: number }>(
+  list: T[] | undefined,
+): T[] => (list ?? []).filter(isSellablePresentation);
+
+/** Largest factor first; ties and all-factor-0 sets fall back to sortOrder. */
+export const defaultPresentationId = (list: PosPresentation[]): string | null => {
+  const sorted = [...list].sort((a, b) => b.factor - a.factor || a.sortOrder - b.sortOrder);
+  return sorted[0]?.id ?? null;
+};
+
+const pluralize = (word: string): string => {
+  const w = word.trim().toLowerCase();
+  return /[aeiou]$/.test(w) ? `${w}s` : `${w}es`;
+};
+
+/** e.g. "10 pastillas" (factor over the base unit name); empty for the base or factor 0. */
+export const presentationContentHint = (
+  presentation: { factor: number },
+  list: { name: string; factor: number }[],
+): string => {
+  if (presentation.factor < 2) return "";
+  const base = list.find((x) => x.factor === 1);
+  return base ? `${presentation.factor} ${pluralize(base.name)}` : "";
+};
+
+/** Max presentations of this kind the base stock covers (factor 0 = uncapped). */
+export const presentationStockCap = (
+  presentation: { factor: number },
+  baseStock: number,
+): number =>
+  presentation.factor < 1
+    ? Number.MAX_SAFE_INTEGER
+    : Math.floor(Math.max(0, baseStock) / presentation.factor);
+
+/** Known base stock shorter than one presentation (unknown stock or factor 0 never disables). */
+export const isPresentationDisabled = (
+  presentation: { factor: number },
+  baseStock: number | null | undefined,
+): boolean =>
+  baseStock != null && presentation.factor >= 1 && baseStock < presentation.factor;
+
+/** "Ibuprofeno (Blister)" — display name of a presentation line. */
+export const presentationLineName = (name: string, presentationName: string): string =>
+  `${name} (${presentationName})`;
