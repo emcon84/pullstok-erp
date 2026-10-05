@@ -358,6 +358,8 @@ const saleProductObject = z.object({
   quantity: z.coerce.number().positive("La cantidad debe ser mayor a 0"),
   price: z.coerce.number().nonnegative(),
   category: z.string().optional(),
+  // sdd/product-presentations: presentación elegida (cantidad entera >= 1).
+  presentationId: z.string().min(1).optional(),
   saleMode: z
     .enum(
       ["BOLSA_CERRADA", "POR_PESO", "POR_MONTO", "POR_UNIDAD", "POR_UNIDAD_BLISTER"],
@@ -411,6 +413,13 @@ const saleProductRefined = saleProductObject.superRefine((item, ctx) => {
       });
     }
     return;
+  }
+  if (item.presentationId && !Number.isInteger(item.quantity)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["quantity"],
+      message: "La cantidad de una presentación debe ser un entero mayor o igual a 1",
+    });
   }
   const mode = item.saleMode ?? "BOLSA_CERRADA";
   if (mode === "BOLSA_CERRADA" || mode === "POR_UNIDAD" || mode === "POR_UNIDAD_BLISTER") {
