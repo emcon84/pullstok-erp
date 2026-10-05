@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Minus, Plus, ShoppingCart } from "lucide-react";
+import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
+import { PresentationPicker } from "@/components/molecules/PresentationPicker";
 import { useVendorCart } from "@/components/hooks/useVendorCart";
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
@@ -98,6 +100,19 @@ export const ScannerSellPanel = ({
           onUseBrowserPanel={() => void ticketPrint.printInBrowser(pendingTicket)}
           onChoose={ticketPrint.choose}
           onDismiss={closeTicketPrompt}
+        />
+      )}
+
+      {sell.picker && (
+        <PresentationPicker
+          product={sell.picker.product}
+          sellsWholesale={me?.sellsWholesale ?? false}
+          stock={sell.picker.product.isManual ? null : sell.picker.stock}
+          onConfirm={(p) => {
+            const result = sell.confirmPresentation(p);
+            if (!result.ok) toast.error(result.message);
+          }}
+          onCancel={sell.cancelPicker}
         />
       )}
 
