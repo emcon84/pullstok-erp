@@ -6,6 +6,7 @@ import type { VendorCartItem } from "./useVendorCart";
 import type { CartItem } from "../../models/salesModel";
 import type { CreateOrder } from "../../models/orderModel";
 import type { PaymentInput } from "../../models/cashSessionModel";
+import { saleErrorMessage } from "../../utils/saleErrors";
 import { buildSaleTicket, type SaleTicket, type TicketCompany } from "../../utils/saleTicket";
 
 interface UseVendorCheckoutParams {
@@ -115,6 +116,14 @@ export function useVendorCheckout({
             i.saleMode === "POR_UNIDAD_BLISTER" ? i.piecesPerBlister ?? undefined : undefined,
           // Venta libre: sin producto ni celda; el total tipeado viaja exacto.
           ...(i.isFreeLine ? { freeLine: true, lineTotal: i.lineTotal } : {}),
+          // sdd/product-presentations: el server resuelve precio y factor por id.
+          ...(i.presentationId
+            ? {
+                presentationId: i.presentationId,
+                presentationName: i.presentationName,
+                presentationFactor: i.presentationFactor,
+              }
+            : {}),
         }));
         await sendSale({ cart, payments, cashSessionId, discountPct, surchargePct, customerId });
         clearCart();
@@ -122,7 +131,7 @@ export function useVendorCheckout({
         setCartOpen?.(false);
         toast.success("Pedido confirmado y vendido");
       } catch (err: any) {
-        toast.error(err?.message || "Error al confirmar el pedido");
+        toast.error(saleErrorMessage(err, "Error al confirmar el pedido"));
       } finally {
         setConfirming(false);
       }
@@ -141,6 +150,11 @@ export function useVendorCheckout({
     // producto, así que se vende directo (no se puede dejar pendiente).
     if (cartItems.some((i) => i.isFreeLine)) {
       toast.error("Las líneas de venta libre no se pueden guardar en un pedido: vendelas directo");
+      return;
+    }
+    // El pedido guardado no guarda la presentación: se vende directo.
+    if (cartItems.some((i) => i.presentationId)) {
+      toast.error("Las presentaciones no se pueden guardar en un pedido: vendelas directo");
       return;
     }
     const orderPayload: CreateOrder = {

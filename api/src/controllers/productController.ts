@@ -19,6 +19,11 @@ import { parseScaleBarcode } from "../utils/scaleBarcode";
 import { formatInternalBarcode, nextInternalBarcodeSeq } from "../utils/internalBarcode";
 import { requireOrganizationId } from "../config/tenantContext";
 import { formatServerTiming } from "../utils/serverTiming";
+import {
+  isFarmaciaCategoryName,
+  activePresentationsInclude,
+  mapPresentation,
+} from "../utils/presentations";
 import { PLAN_LIMITS } from "../config/planLimits";
 import { AuthedRequest } from "../middlewares/authMiddleware";
 
@@ -631,6 +636,8 @@ const getProducts = async (req: Request, res: Response) => {
           },
         },
       },
+      // sdd/product-presentations: presentaciones activas (factor desc).
+      presentations: activePresentationsInclude(requireOrganizationId()),
       ...(branchId
         ? {
             stocks: {
@@ -647,9 +654,12 @@ const getProducts = async (req: Request, res: Response) => {
     // y el `perUnitPrice` DERIVADO (round2(price/unitsPerBox)) on-the-fly — nunca
     // persistido. `null` cuando el producto no es vendible por unidad.
     const mapProduct = (p: any) => {
-      const { priceListEntries, unitsPerBox, ...rest } = p;
+      const { priceListEntries, unitsPerBox, presentations, ...rest } = p;
       return {
         ...rest,
+        ...(Array.isArray(presentations)
+          ? { presentations: presentations.map(mapPresentation) }
+          : {}),
         unitsPerBox: unitsPerBox ?? null,
         perUnitPrice: isUnitSellable(unitsPerBox)
           ? computePerUnitPrice(Number(p.price), unitsPerBox)
@@ -948,8 +958,24 @@ const updateProduct = async (req: Request, res: Response) => {
     if (data.categoryId !== undefined) {
       const existing = await prisma.product.findFirst({
         where: { id: req.params.id },
-        select: { categoryId: true },
+        select: { categoryId: true, hasPresentations: true },
       });
+      // sdd/product-presentations: un producto con presentaciones es solo de
+      // FARMACIA; no puede salir de esa categoría (ni quedar sin ella).
+      if (existing && existing.hasPresentations && existing.categoryId !== data.categoryId) {
+        const target = data.categoryId
+          ? await prisma.category.findFirst({
+              where: { id: data.categoryId },
+              select: { name: true },
+            })
+          : null;
+        if (!isFarmaciaCategoryName(target?.name)) {
+          return res.status(409).json({
+            message: "Un producto con presentaciones debe permanecer en la categoría FARMACIA",
+            code: "PRESENTATIONS_CATEGORY_LOCKED",
+          });
+        }
+      }
       if (existing && existing.categoryId !== data.categoryId) {
         // Validate the incoming options against the NEW category BEFORE
         // deleting anything: re-inserting options from another category would
@@ -1039,6 +1065,19 @@ const updateProduct = async (req: Request, res: Response) => {
 const publishProduct = async (req: Request, res: Response) => {
   try {
     const { publishedToStore } = req.body as { publishedToStore: boolean };
+    // Los productos con presentaciones solo se venden en el POS: no se publican.
+    if (publishedToStore) {
+      const current = await prisma.product.findFirst({
+        where: { id: req.params.id },
+        select: { hasPresentations: true },
+      });
+      if (current?.hasPresentations) {
+        return res.status(400).json({
+          message: "Los productos con presentaciones no se pueden publicar en la tienda",
+          code: "PRESENTATION_NOT_SUPPORTED",
+        });
+      }
+    }
     // Un producto manual (carga a mano del POS) no se puede publicar en la
     // tienda: al publicar se excluye (count 0 → 404). Despublicar siempre pasa.
     const result = await prisma.product.updateMany({
@@ -1191,7 +1230,7 @@ export const getProductByCode = async (req: Request, res: Response) => {
  */
 // Selección Prisma reusada por getOfflineSnapshot (bulk) y
 // getOfflineProductSnapshot (individual) — misma forma "liviana" de producto.
-const OFFLINE_SNAPSHOT_PRODUCT_SELECT = {
+const offlineSnapshotProductSelect = (organizationId: string) => ({
   id: true,
   name: true,
   code: true,
@@ -1214,7 +1253,10 @@ const OFFLINE_SNAPSHOT_PRODUCT_SELECT = {
       },
     },
   },
-} as const;
+  // sdd/product-presentations: presentaciones activas (factor desc).
+  hasPresentations: true,
+  presentations: activePresentationsInclude(organizationId),
+}) as const;
 
 type OfflineSnapshotProduct = {
   id: string;
@@ -1235,10 +1277,12 @@ type OfflineSnapshotProduct = {
       variant: { id: string; name: string };
     };
   }[];
+  hasPresentations?: boolean;
+  presentations?: any[];
 };
 
 /**
- * Mapea un producto (forma OFFLINE_SNAPSHOT_PRODUCT_SELECT) a la forma
+ * Mapea un producto (forma offlineSnapshotProductSelect) a la forma
  * "offline" (OfflineProduct del front): resuelve `priceKgLista` con
  * findCellForProduct contra la planilla de precios por kilo. Extraído de
  * getOfflineSnapshot para reusarlo también en getOfflineProductSnapshot
@@ -1276,6 +1320,8 @@ const mapProductToOfflineSnapshot = (
       variantId: va.option.variantId,
       optionId: va.option.id,
     })),
+    hasPresentations: product.hasPresentations ?? false,
+    presentations: (product.presentations ?? []).map(mapPresentation),
   };
 };
 
@@ -1302,7 +1348,7 @@ export const getOfflineSnapshot = async (req: Request, res: Response) => {
       }),
       prisma.product.findMany({
         where: { organizationId },
-        select: OFFLINE_SNAPSHOT_PRODUCT_SELECT,
+        select: offlineSnapshotProductSelect(organizationId),
       }),
     ]);
 
@@ -1333,7 +1379,7 @@ export const getOfflineProductSnapshot = async (req: Request, res: Response) => 
     const { id } = req.params;
     const product = await prisma.product.findFirst({
       where: { id },
-      select: OFFLINE_SNAPSHOT_PRODUCT_SELECT,
+      select: offlineSnapshotProductSelect(requireOrganizationId()),
     });
     if (!product) {
       return res.status(404).json({ message: "Producto no encontrado" });
@@ -1436,10 +1482,15 @@ export const getProductByScan = async (req: Request, res: Response) => {
       include: {
         category: { select: { id: true, name: true } },
         variantAssignments: { include: { option: { include: { variant: true } } } },
+        // sdd/product-presentations: presentaciones activas (factor desc).
+        presentations: activePresentationsInclude(organizationId),
       },
     });
     if (!product) return res.status(404).json({ message: "Producto no encontrado" });
-    return res.status(200).json({ product, isScale: false });
+    return res.status(200).json({
+      product: { ...product, presentations: (product.presentations ?? []).map(mapPresentation) },
+      isScale: false,
+    });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -2181,6 +2232,8 @@ export const updateBranchStock = async (req: AuthedRequest, res: Response) => {
         .json({ message: "No tenés permiso para editar el stock de esta sucursal." });
     }
 
+    // Productos con presentaciones: `quantity` se interpreta en UNIDAD BASE
+    // (sin conversión server-side); el front convierte desde la presentación.
     // Upsert manual (updateMany count 0 → create): la fila de stock nace
     // on-first-write (sucursal sin fila previa queda en el valor indicado).
     const updated = await prisma.productStock.updateMany({

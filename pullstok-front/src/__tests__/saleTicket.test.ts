@@ -680,3 +680,16 @@ describe("printSaleTicket", () => {
     }
   });
 });
+
+describe("buildSaleTicket presentation labels", () => {
+  it("appends presentationName once (cart names already carry the suffix)", () => {
+    const t = buildSaleTicket({
+      issuedAt: new Date(2026, 8, 24),
+      items: [
+        { name: "Ibuprofeno", price: 150, quantity: 1, presentationName: "Blister" },
+        { name: "Ibuprofeno (Caja)", price: 900, quantity: 1, presentationName: "Caja" },
+      ],
+    });
+    expect(t.lines.map((l) => l.label)).toEqual(["Ibuprofeno (Blister)", "Ibuprofeno (Caja)"]);
+  });
+});

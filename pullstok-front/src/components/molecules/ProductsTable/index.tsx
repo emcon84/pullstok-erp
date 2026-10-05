@@ -47,7 +47,7 @@ import { API_URL } from "../../../constants";
 import { DataItem } from "../../../types";
 import {
   unitStock,
-  stockUnitLabel,
+  stockBadgeLabel,
 } from "../../hooks/vendorCatalogHelpers";
 
 // Selector de filas por página (dashboard del admin): 10/20/50.
@@ -475,7 +475,7 @@ export const ProductsTable = memo(function ProductsTable({ products, onEdit, onD
                                 : "border-emerald-300 bg-emerald-50 text-emerald-700",
                           )}
                         >
-                          {qty <= 0 ? "Sin stock" : `${qty} ${stockUnitLabel(p)}`}
+                          {qty <= 0 ? "Sin stock" : stockBadgeLabel(p, qty)}
                         </Badge>
                         <div className="flex gap-0.5 shrink-0">
                           <Button
@@ -558,7 +558,7 @@ export const ProductsTable = memo(function ProductsTable({ products, onEdit, onD
                           : "border-emerald-300 bg-emerald-50 text-emerald-700",
                     )}
                   >
-                    {qty <= 0 ? "Sin stock" : `${qty} ${stockUnitLabel(p)}`}
+                    {qty <= 0 ? "Sin stock" : stockBadgeLabel(p, qty)}
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden text-right font-medium tabular-nums sm:table-cell">

@@ -58,6 +58,8 @@ export const useCreateSale = () => {
             // sdd/venta-pastillas-sueltas-blister: conteo ad-hoc de la línea
             // POR_UNIDAD_BLISTER; el server lo exige (saleProductSchema, T1).
             piecesPerBlister: item.piecesPerBlister ?? undefined,
+            // sdd/product-presentations: el server resuelve precio y factor por id.
+            ...(item.presentationId ? { presentationId: item.presentationId } : {}),
           };
         }),
         payments,

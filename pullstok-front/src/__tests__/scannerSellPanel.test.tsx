@@ -186,4 +186,24 @@ describe("ScannerSellPanel", () => {
       expect.objectContaining({ branchId: "b1" }),
     );
   });
+
+  it("opens the presentation picker for a product with presentations and adds the chosen line", async () => {
+    const { scan } = renderPanel();
+    mockGetProductStock.mockResolvedValue({
+      productId: "p1",
+      branches: [{ branchId: "b1", branchName: "Sucursal 1", quantity: 25, isHeadquarters: false, canEdit: true }],
+    });
+    await scan({
+      hasPresentations: true,
+      presentations: [
+        { id: "b", name: "Blister", factor: 10, price: 150, wholesalePrice: null, sortOrder: 0 },
+        { id: "p", name: "Pastilla", factor: 1, price: 0, wholesalePrice: null, sortOrder: 1 },
+      ],
+    });
+    expect(screen.queryByText(/Agregado:/)).toBeNull();
+    expect(screen.getAllByRole("option")).toHaveLength(1); // price-0 presentation hidden
+    fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+    expect(screen.getByText(/Agregado: Collar de Cuero \(Blister\) ×1/)).toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
 });

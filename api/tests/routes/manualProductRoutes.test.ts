@@ -58,3 +58,34 @@ describe("productRoutes — endpoints de producto manual", () => {
     }
   });
 });
+
+describe("productRoutes — presentaciones", () => {
+  type RouteLayer = { route?: { path: string; methods: Record<string, boolean>; stack: { handle: Function }[] } };
+  const layers = (productRoutes as unknown as { stack: RouteLayer[] }).stack;
+  const handlers = (method: string, path: string) =>
+    layers.find((l) => l.route?.path === path && l.route.methods[method])?.route?.stack.map((s) => s.handle);
+
+  // Orden: authenticateJWT, checkBusinessHours, requireRole, validate, controller.
+  it.each([
+    ["put", "/:id/presentations", 5],
+    ["post", "/:id/presentations/enable", 5],
+    ["post", "/:id/presentations/disable", 4],
+  ])("%s %s exige ADMIN/MANAGEMENT (VENDEDOR/CASHIER -> 403)", (method, path, len) => {
+    const hs = handlers(method, path);
+    expect(hs).toHaveLength(len);
+    const roleGuard = hs![2] as (req: any, res: any, next: () => void) => unknown;
+    const run = (role: string) => {
+      const res: any = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      const next = jest.fn();
+      roleGuard({ user: { role } }, res, next);
+      return { res, next };
+    };
+    expect(run("ADMIN").next).toHaveBeenCalled();
+    expect(run("MANAGEMENT").next).toHaveBeenCalled();
+    for (const role of ["VENDEDOR", "CASHIER"]) {
+      const { res, next } = run(role);
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(403);
+    }
+  });
+});

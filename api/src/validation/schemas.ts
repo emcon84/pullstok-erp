@@ -210,6 +210,31 @@ export const updateProductSchema = createProductSchema.partial().extend({
   unitsPerBox: z.coerce.number().int("unitsPerBox debe ser un entero").nonnegative("unitsPerBox no puede ser negativo").nullable().optional(),
 });
 
+// ---------- Presentaciones (sdd/product-presentations) ----------
+// hasPresentations NO se acepta en create/update de producto (z.object descarta
+// claves desconocidas): solo cambia con los endpoints enable/disable.
+export const presentationInputSchema = z.object({
+  id: z.string().min(1).optional(),
+  name: z.string().trim().min(1, "El nombre es requerido"),
+  sortOrder: z.number().int("sortOrder debe ser un entero"),
+  factor: z.number().int("El factor debe ser un entero").min(0, "El factor debe ser >= 0"),
+  price: z.number().nonnegative("El precio no puede ser negativo"),
+  wholesalePrice: z.number().nonnegative("El precio mayorista no puede ser negativo").nullable(),
+  isActive: z.boolean(),
+});
+
+// PUT /products/:id/presentations — reemplazo total del set.
+export const replacePresentationsSchema = z.object({
+  presentations: z.array(presentationInputSchema).min(1, "Se requiere al menos una presentación"),
+});
+
+// POST /products/:id/presentations/enable. stockCountedIn = NOMBRE de la
+// presentación en la que se contaba el stock hasta ahora (el stock actual se
+// multiplica por su factor). Ausente → la de mayor factor.
+export const enablePresentationsSchema = replacePresentationsSchema.extend({
+  stockCountedIn: z.string().trim().min(1).optional(),
+});
+
 // Toggle dedicado "Publicar en tienda" (WS4 — UI de Tienda/listado de
 // productos). Separado de updateProductSchema porque es una acción de un
 // solo campo, no una edición general del producto.
@@ -333,6 +358,8 @@ const saleProductObject = z.object({
   quantity: z.coerce.number().positive("La cantidad debe ser mayor a 0"),
   price: z.coerce.number().nonnegative(),
   category: z.string().optional(),
+  // sdd/product-presentations: presentación elegida (cantidad entera >= 1).
+  presentationId: z.string().min(1).optional(),
   saleMode: z
     .enum(
       ["BOLSA_CERRADA", "POR_PESO", "POR_MONTO", "POR_UNIDAD", "POR_UNIDAD_BLISTER"],
@@ -386,6 +413,13 @@ const saleProductRefined = saleProductObject.superRefine((item, ctx) => {
       });
     }
     return;
+  }
+  if (item.presentationId && !Number.isInteger(item.quantity)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["quantity"],
+      message: "La cantidad de una presentación debe ser un entero mayor o igual a 1",
+    });
   }
   const mode = item.saleMode ?? "BOLSA_CERRADA";
   if (mode === "BOLSA_CERRADA" || mode === "POR_UNIDAD" || mode === "POR_UNIDAD_BLISTER") {

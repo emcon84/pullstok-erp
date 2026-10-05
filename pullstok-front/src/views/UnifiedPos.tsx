@@ -39,7 +39,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import type { DataItem } from "@/types";
+import type { DataItem, ProductPresentation } from "@/types";
+import { PresentationPicker } from "@/components/molecules/PresentationPicker";
+import { exceedsPresentationStock } from "@/components/hooks/presentationHelpers";
 
 type Tab = "unidad" | "suelto";
 
@@ -61,6 +63,10 @@ interface ScannedProduct {
   priceKgSuelto?: number | null;
   unitsPerBox?: number | null;
   wholesalePrice?: number | string | null;
+  // sdd/product-presentations
+  hasPresentations?: boolean;
+  presentations?: ProductPresentation[];
+  isManual?: boolean;
 }
 
 interface UnifiedPosProps {
@@ -283,6 +289,12 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           // — es el "chiche" de escanear 3 veces la misma bolsa y que quede
           // cantidad 3, en vez de tener que tocar el stepper a mano.
           const newProduct = data.product;
+          // sdd/product-presentations: con presentaciones se elige en el picker
+          // (la línea se suma de a 1 por escaneo; mismo id repetido incrementa).
+          if (newProduct.hasPresentations) {
+            setPresentationProduct((cur) => cur ?? newProduct);
+            return;
+          }
           const prevId = scanProduct ? scanProduct._id || scanProduct.id : null;
           const newId = newProduct._id || newProduct.id;
           if (scanProduct && prevId && prevId === newId) {
@@ -301,6 +313,58 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
       }
     },
     [cart, branchId, scanProduct],
+  );
+
+  // Producto escaneado con presentaciones, pendiente de elegir en el picker.
+  const [presentationProduct, setPresentationProduct] = useState<ScannedProduct | null>(null);
+
+  const handleConfirmPresentation = useCallback(
+    (presentation: ProductPresentation) => {
+      const p = presentationProduct;
+      if (!p) return;
+      const pid = (p._id || p.id) as string;
+      const stock = Number(p.quantity ?? 0);
+      const existing = cart.items.find(
+        (i) =>
+          i.productId === pid &&
+          (i.saleMode ?? "BOLSA_CERRADA") === "BOLSA_CERRADA" &&
+          i.presentationId === presentation.id,
+      );
+      if (exceedsPresentationStock(presentation, existing?.quantity ?? 0, 1, stock, !!p.isManual)) {
+        toast.error("No hay más stock disponible");
+        return;
+      }
+      setPresentationProduct(null);
+      if (existing) {
+        cart.updateQuantity(pid, existing.quantity + 1, "BOLSA_CERRADA", undefined, presentation.id);
+      } else {
+        cart.addToCart(
+          {
+            _id: pid,
+            id: p.id,
+            name: p.name,
+            price: p.price ?? 0,
+            quantity: 0,
+            category: p.category?.name ?? "",
+            image: p.image ?? undefined,
+            code: p.code ?? "",
+            isManual: p.isManual,
+          },
+          1,
+          branchId,
+          stock,
+          "BOLSA_CERRADA",
+          undefined,
+          undefined,
+          undefined,
+          sellsWholesale,
+          undefined,
+          presentation,
+        );
+      }
+      toast.success(`${p.name} (${presentation.name}) agregado`);
+    },
+    [presentationProduct, cart, branchId, sellsWholesale],
   );
 
   // ── Modal de confirmación de bolsa cerrada escaneada ──
@@ -584,6 +648,16 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         className="lg:sticky lg:top-4 lg:max-h-[calc(100vh_-_2rem)]"
       />
     </div>
+
+    {presentationProduct && (
+      <PresentationPicker
+        product={presentationProduct as unknown as DataItem}
+        sellsWholesale={sellsWholesale}
+        stock={presentationProduct.isManual ? null : Number(presentationProduct.quantity ?? 0)}
+        onConfirm={handleConfirmPresentation}
+        onCancel={() => setPresentationProduct(null)}
+      />
+    )}
 
     {/* ── Modal de confirmación de bolsa cerrada escaneada ── */}
     <Dialog open={!!scanProduct} onOpenChange={(open) => !open && handleCancelScan()}>

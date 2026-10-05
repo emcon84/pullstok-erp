@@ -3,6 +3,8 @@ import { prisma } from "../config/db";
 import getNextSequenceValue from "../services/secuenceService";
 import { requireOrganizationId } from "../config/tenantContext";
 import { emitOrdersChanged } from "../realtime/socket";
+import { assertNoPresentationProducts } from "../services/presentationGuards";
+import { PresentationError } from "../utils/presentations";
 
 // Notifica a los clientes del comercio que la lista de pedidos cambió. Envuelto
 // en try/catch: un fallo del socket NUNCA debe romper la operación HTTP.
@@ -82,6 +84,9 @@ const createOrder = async (req: Request, res: Response) => {
           }))
         : products;
 
+    // Los productos con presentaciones solo se venden en el POS.
+    await assertNoPresentationProducts(orderProducts.map((p) => p.productId));
+
     // Numeración por tipo: el pedido tiene su serie (PED-) y el remito la suya (REM-).
     const orderSeq = await getNextSequenceValue(organizationId, "order");
     const orderNumber = `PED-${orderSeq.toString().padStart(4, "0")}`;
@@ -127,6 +132,9 @@ const createOrder = async (req: Request, res: Response) => {
     notifyOrdersChanged();
     res.status(201).json(newOrder);
   } catch (error: any) {
+    if (error instanceof PresentationError) {
+      return res.status(error.status).json({ message: error.message, code: error.code });
+    }
     console.error(error);
     res.status(400).json({ message: error.message });
   }

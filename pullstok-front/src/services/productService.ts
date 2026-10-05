@@ -435,7 +435,11 @@ export const updateProduct = async (product: DataItem) => {
   } catch (error) {
     if (axios.isAxiosError(error)) {
       // Error específico de Axios
-      throw new Error(error.response?.data?.message || "update product failed");
+      // Keep the stable server code (e.g. PRESENTATIONS_CATEGORY_LOCKED) for the UI.
+      throw Object.assign(
+        new Error(error.response?.data?.message || "update product failed"),
+        { code: error.response?.data?.code as string | undefined },
+      );
     } else {
       // Error general
       throw new Error("An unknown error occurred");

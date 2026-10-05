@@ -215,6 +215,6 @@ describe("storeController — excluye productos manuales (isManual)", () => {
     await storeController.getProductById(mockRequest({ id: "prod-1" }), mockResponse());
 
     const where = mockedPrisma.product.findFirst.mock.calls[0][0].where;
-    expect(where).toEqual({ id: "prod-1", publishedToStore: true, isManual: false });
+    expect(where).toEqual({ id: "prod-1", publishedToStore: true, isManual: false, hasPresentations: false });
   });
 });

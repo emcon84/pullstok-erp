@@ -138,4 +138,16 @@ describe("marca REIMPRESIÓN en los renderers", () => {
     expect(text(encodeSaleTicketEscPos(t))).toContain("REIMPRESION");
     expect(text(encodeSaleTicketEscPos({ ...t, reprint: false }))).not.toContain("REIMPRESION");
   });
+
+  it("presentation lines are labelled with the presentationName snapshot", () => {
+    const t = saleToTicket(
+      baseSale({
+        totalAmount: 300,
+        items: [
+          { name: "Ibuprofeno", quantity: 2, price: 150, category: "", saleMode: "BOLSA_CERRADA", productId: "p1", presentationName: "Blister" },
+        ],
+      }),
+    );
+    expect(t.lines[0]).toEqual({ label: "Ibuprofeno (Blister)", detail: "2 x $150", total: 300 });
+  });
 });

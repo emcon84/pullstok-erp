@@ -7,7 +7,7 @@ describe("TENANT_MODELS", () => {
   const src = readFileSync(join(__dirname, "../../src/config/db.ts"), "utf8");
   const block = src.slice(src.indexOf("const TENANT_MODELS"), src.indexOf("]);"));
 
-  it.each(["Printer", "PrintAgent", "PrintJob"])("includes %s", (model) => {
+  it.each(["Printer", "PrintAgent", "PrintJob", "ProductPresentation"])("includes %s", (model) => {
     expect(block).toContain(`"${model}"`);
   });
 });

@@ -87,5 +87,6 @@ function toTicketItem(row: SavedRow): SaleTicketItem {
     price: row.price,
     quantity: row.quantity,
     saleMode,
+    presentationName: "presentationName" in row ? (row.presentationName ?? undefined) : undefined,
   };
 }

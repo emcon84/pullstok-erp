@@ -229,4 +229,48 @@ describe("VendorCatalogTab — pastillas sueltas desde el buscador (FARMACIA)", 
 
     expect(cart.addToCart).toHaveBeenCalledTimes(1);
   });
+
+  describe("productos con presentaciones", () => {
+    const blister = { id: "b", name: "Blister", factor: 10, price: 150, wholesalePrice: null, sortOrder: 0 };
+    const withPresentations: DataItem = {
+      ...farmacia,
+      hasPresentations: true,
+      presentations: [blister],
+    };
+
+    it("confirmar la fila abre el picker (no el diálogo de pastillas sueltas)", () => {
+      renderTab([withPresentations]);
+      act(() => latest().onCommitRow());
+      expect(screen.getByRole("listbox")).toBeInTheDocument();
+      expect(screen.queryByRole("switch", { name: /vender pastillas sueltas/i })).toBeNull();
+    });
+
+    it("elegir una presentación agrega la línea con la cantidad de la fila", () => {
+      const { cart } = renderTab([withPresentations]);
+      act(() => latest().onCommitRow());
+      fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+      expect(cart.addToCart).toHaveBeenCalledTimes(1);
+      const args = cart.addToCart.mock.calls[0];
+      expect(args[1]).toBe(1);
+      expect(args[4]).toBe("BOLSA_CERRADA");
+      expect(args[10]).toMatchObject({ id: "b" });
+    });
+
+    it("no bloquea por stock 0 (el picker decide) y respeta el stock en unidades base", () => {
+      const noStock = { ...withPresentations, stocks: [{ quantity: 0 }] } as DataItem;
+      renderTab([noStock]);
+      act(() => latest().onCommitRow());
+      expect(screen.getByRole("option", { name: /Blister/ })).toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("bloquea cuando la línea del carrito ya consume el stock base", () => {
+      const { cart } = renderTab(
+        [{ ...withPresentations, stocks: [{ quantity: 20 }] } as DataItem],
+        [{ productId: "p-farmacia", saleMode: "BOLSA_CERRADA", presentationId: "b", quantity: 2 }],
+      );
+      act(() => latest().onCommitRow());
+      fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+      expect(cart.addToCart).not.toHaveBeenCalled();
+    });
+  });
 });

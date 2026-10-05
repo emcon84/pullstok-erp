@@ -50,3 +50,26 @@ cd /var/www/pullstok && pnpm --dir api exec ts-node api/prisma/scripts/rollback-
   server-authoritative sale recompute.
 - If a mis-parse slips through, roll back with the rollback script — do not reverse
   the Prisma `ALTER TYPE ADD VALUE` by hand (not drop-able in a Prisma migration).
+
+## Merge de duplicados Blister (`merge-blister-duplicates.sql`)
+
+One-off SQL for `sdd/product-presentations`. Merges every FARMACIA pair
+"X" + "X (Blister)" (same organization) into one product "X" with the
+presentations Caja (factor 0, price of X), Blister (factor 0, price of
+"X (Blister)") and Pastilla (base, factor 1, price 0 = hidden in POS until
+priced). Sale/order/quotation history of the duplicate is re-pointed to X and
+the duplicate is deleted. Stock is **not** converted.
+
+**When**: after deploy (migrations `product_presentations` and
+`presentation_factor_zero` must be applied by `prisma migrate deploy`).
+**Where**: VPS only (no local Postgres).
+
+```bash
+psql "$DATABASE_URL" -f api/prisma/scripts/merge-blister-duplicates.sql
+```
+
+The script opens `BEGIN;` and ends **without** committing. Review the preview
+and the summary (`merged_pairs = presentations_created / 3`,
+`remaining_duplicates = 0`), then type `COMMIT;` (or `ROLLBACK;`) in the same
+psql session. Ambiguous names and products already using presentations are
+skipped, so it is safe to re-run.

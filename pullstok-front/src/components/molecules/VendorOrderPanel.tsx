@@ -106,11 +106,17 @@ export const VendorOrderPanel = ({
     (lineKey: string, delta: 1 | -1) => {
       const item = cart.items.find(
         (i) =>
-          `${i.productId}::${i.saleMode ?? "BOLSA_CERRADA"}::${i.loosePriceId ?? "bolsa"}` ===
+          `${i.productId}::${i.saleMode ?? "BOLSA_CERRADA"}::${i.loosePriceId ?? "bolsa"}${i.presentationId ? `::${i.presentationId}` : ""}` ===
           lineKey,
       );
       if (!item) return;
-      cart.updateQuantity(item.productId, stepQty(item, delta), item.saleMode, item.loosePriceId);
+      cart.updateQuantity(
+        item.productId,
+        stepQty(item, delta),
+        item.saleMode,
+        item.loosePriceId,
+        item.presentationId,
+      );
     },
     [cart.items, cart.updateQuantity],
   );
@@ -200,7 +206,7 @@ export const VendorOrderPanel = ({
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
             {cart.items.map((item) => (
               <CartItemRow
-                key={`${item.productId}-${item.saleMode ?? "BOLSA_CERRADA"}-${item.loosePriceId ?? "bolsa"}`}
+                key={`${item.productId}-${item.saleMode ?? "BOLSA_CERRADA"}-${item.loosePriceId ?? "bolsa"}-${item.presentationId ?? "-"}`}
                 item={item}
                 onUpdateQty={(qty) =>
                   cart.updateQuantity(
@@ -208,6 +214,7 @@ export const VendorOrderPanel = ({
                     qty,
                     item.saleMode,
                     item.loosePriceId,
+                    item.presentationId,
                   )
                 }
                 onRemove={() =>
@@ -215,6 +222,7 @@ export const VendorOrderPanel = ({
                     item.productId,
                     item.saleMode,
                     item.loosePriceId,
+                    item.presentationId,
                   )
                 }
               />
