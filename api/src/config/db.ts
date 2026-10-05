@@ -27,6 +27,10 @@ const TENANT_MODELS = new Set([
   // updateMany (nunca findUnique/update).
   "ReviewQueueEntry",
   "ProductStock",
+  // Presentaciones de venta del producto (sdd/product-presentations). Mismo
+  // patrón multi-tenant: findFirst / updateMany / deleteMany (nunca
+  // findUnique/update/delete singulares).
+  "ProductPresentation",
   // Stock de alimento suelto por línea de la planilla (PriceKgPrice) y sucursal
   // (sdd/loose-lines-stock). Mismo patrón multi-tenant: findFirst / updateMany
   // (nunca findUnique/upsert) → scope org automático anti-fuga.

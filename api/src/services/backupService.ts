@@ -39,6 +39,8 @@ const TABLE_DUMP_ORDER = [
   "CategoryVariantOption",
   // Level 5: depend on Product + CategoryVariantOption
   "ProductVariant",
+  // Level 5b: depend on Product (sdd/product-presentations)
+  "ProductPresentation",
   // Level 6: depend on Customer
   "Order",
   "Quotation",
@@ -68,6 +70,7 @@ const modelNameToDbTable: Record<string, string> = {
   Counter: "counters",
   CategoryVariantDefinition: "category_variant_definitions",
   Product: "products",
+  ProductPresentation: "product_presentations",
   CategoryVariantOption: "category_variant_options",
   ProductVariant: "product_variants",
   Order: "orders",

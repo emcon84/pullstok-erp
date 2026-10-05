@@ -207,6 +207,47 @@ describe("backupService", () => {
     expect(msgQuery).toContain('"conversationId"');
   });
 
+  it("dumps product_presentations scoped by organizationId, after products and before sale_items", async () => {
+    const selectCalls: string[] = [];
+    mockQueryRawUnsafe.mockImplementation((sql: string, ..._args: any[]) => {
+      if (typeof sql === "string" && sql.trim().toUpperCase().startsWith("SELECT")) {
+        selectCalls.push(sql);
+        return Promise.resolve([]);
+      }
+      return Promise.resolve(undefined);
+    });
+
+    await backupOrganization(orgId, slug, date);
+
+    const idx = (t: string) => selectCalls.findIndex((q) => q.includes(`"${t}"`));
+    expect(idx("product_presentations")).toBeGreaterThan(-1);
+    expect(selectCalls[idx("product_presentations")]).toContain('"organizationId" = $1');
+    expect(idx("product_presentations")).toBeGreaterThan(idx("products"));
+    expect(idx("product_presentations")).toBeLessThan(idx("sale_items"));
+  });
+
+  it("includes the SaleItem presentation snapshot columns in the dump", async () => {
+    mockQueryRawUnsafe.mockImplementation((sql: string) => {
+      if (typeof sql === "string" && sql.includes('"sale_items"')) {
+        return Promise.resolve([
+          { id: "si1", presentationId: "pp1", presentationName: "Caja", presentationFactor: 10 },
+        ]);
+      }
+      if (typeof sql === "string" && sql.trim().toUpperCase().startsWith("SELECT"))
+        return Promise.resolve([]);
+      return Promise.resolve(undefined);
+    });
+
+    await backupOrganization(orgId, slug, date);
+
+    const dump = mockGzipWrite.mock.calls
+      .filter((c: any[]) => Buffer.isBuffer(c[0]))
+      .map((c: any[]) => c[0].toString())
+      .join("");
+    expect(dump).toContain('"presentationId", "presentationName", "presentationFactor"');
+    expect(dump).toContain("'pp1', 'Caja', 10");
+  });
+
   // --- Error handling ---
 
   it("rolls back transaction on error and propagates error", async () => {
