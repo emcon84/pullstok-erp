@@ -2,12 +2,17 @@ import { Request, Response } from "express";
 import { prisma } from "../config/db";
 import getNextSequenceValue from "../services/secuenceService";
 import { requireOrganizationId } from "../config/tenantContext";
+import { assertNoPresentationProducts } from "../services/presentationGuards";
+import { PresentationError } from "../utils/presentations";
 
 // Crear una nueva cotización
 const createQuotation = async (req: Request, res: Response) => {
   try {
     const organizationId = requireOrganizationId();
     const { customer, products, totalAmount, validUntil } = req.body;
+
+    // Los productos con presentaciones solo se venden en el POS.
+    await assertNoPresentationProducts(products.map((p: any) => p.product));
 
     // Numeración por tipo: presupuesto (PRE-) y su remito asociado (REM-).
     const quotationSeq = await getNextSequenceValue(organizationId, "quotation");
@@ -51,6 +56,9 @@ const createQuotation = async (req: Request, res: Response) => {
 
     res.status(201).json(newQuotation);
   } catch (error: any) {
+    if (error instanceof PresentationError) {
+      return res.status(error.status).json({ message: error.message, code: error.code });
+    }
     res.status(400).json({ message: error.message });
   }
 };

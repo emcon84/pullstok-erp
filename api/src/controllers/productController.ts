@@ -1065,6 +1065,19 @@ const updateProduct = async (req: Request, res: Response) => {
 const publishProduct = async (req: Request, res: Response) => {
   try {
     const { publishedToStore } = req.body as { publishedToStore: boolean };
+    // Los productos con presentaciones solo se venden en el POS: no se publican.
+    if (publishedToStore) {
+      const current = await prisma.product.findFirst({
+        where: { id: req.params.id },
+        select: { hasPresentations: true },
+      });
+      if (current?.hasPresentations) {
+        return res.status(400).json({
+          message: "Los productos con presentaciones no se pueden publicar en la tienda",
+          code: "PRESENTATION_NOT_SUPPORTED",
+        });
+      }
+    }
     // Un producto manual (carga a mano del POS) no se puede publicar en la
     // tienda: al publicar se excluye (count 0 → 404). Despublicar siempre pasa.
     const result = await prisma.product.updateMany({
@@ -2219,6 +2232,8 @@ export const updateBranchStock = async (req: AuthedRequest, res: Response) => {
         .json({ message: "No tenés permiso para editar el stock de esta sucursal." });
     }
 
+    // Productos con presentaciones: `quantity` se interpreta en UNIDAD BASE
+    // (sin conversión server-side); el front convierte desde la presentación.
     // Upsert manual (updateMany count 0 → create): la fila de stock nace
     // on-first-write (sucursal sin fila previa queda en el valor indicado).
     const updated = await prisma.productStock.updateMany({
