@@ -4,6 +4,7 @@ import { prisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
 import { calculateInvoiceTotals, InvoiceLineInput } from "../services/invoiceCalc";
 import { AuthedRequest } from "../middlewares/authMiddleware";
+import { PresentationError } from "../utils/presentations";
 
 // Include estándar de Invoice (mismo shape que invoiceController).
 const invoiceInclude = {
@@ -19,6 +20,10 @@ const createSale = async (req: AuthedRequest, res: Response) => {
         const sale = await SaleService.createSale({ products, orderId, payments, cashSessionId, customerId, discountPct, surchargePct }, req.user!.id, req.user!.role);
         res.status(201).json(sale);
     } catch (error: any) {
+        // Presentaciones (sdd/product-presentations): status + code propios.
+        if (error instanceof PresentationError) {
+            return res.status(error.status).json({ message: error.message, code: error.code });
+        }
         // 422 para errores de dominio del flujo suelto (B-06 amendment /
         // B-08 / loose-lines-stock): el payload es válido pero la operación no
         // se puede materializar (producto sin línea en la planilla, requiere

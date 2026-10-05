@@ -129,3 +129,33 @@ export const validatePresentationSet = (
     );
   }
 };
+
+/** Include Prisma de las presentaciones ACTIVAS (factor desc), filtro explícito por org. */
+export const activePresentationsInclude = (organizationId: string) =>
+  ({
+    where: { organizationId, isActive: true },
+    orderBy: { factor: "desc" as const },
+    select: {
+      id: true,
+      name: true,
+      factor: true,
+      price: true,
+      wholesalePrice: true,
+      sortOrder: true,
+    },
+  }) as const;
+
+const toNumber = (v: { toString(): string } | number): number => Number(v.toString());
+
+/** Forma pública de una presentación: precios como number, mayorista null si no hay. */
+export const mapPresentation = (p: any) => ({
+  id: p.id as string,
+  name: p.name as string,
+  factor: p.factor as number,
+  price: toNumber(p.price),
+  wholesalePrice:
+    p.wholesalePrice === null || p.wholesalePrice === undefined
+      ? null
+      : toNumber(p.wholesalePrice),
+  sortOrder: p.sortOrder as number,
+});

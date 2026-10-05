@@ -1593,3 +1593,27 @@ describe("createSaleSchema — venta libre (freeLine)", () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe("createSaleSchema — presentationId (sdd/product-presentations)", () => {
+  const line = { productId: "p-1", quantity: 2, price: 100, presentationId: "pr-1" };
+
+  it("keeps presentationId and accepts an integer quantity", () => {
+    const r = createSaleSchema.safeParse({ products: [line] });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.products[0].presentationId).toBe("pr-1");
+  });
+
+  it("rejects fractional quantity and quantity < 1 with a presentation", () => {
+    expect(
+      createSaleSchema.safeParse({ products: [{ ...line, saleMode: "POR_PESO", quantity: 1.5 }] }).success,
+    ).toBe(false);
+    expect(createSaleSchema.safeParse({ products: [{ ...line, quantity: 0 }] }).success).toBe(false);
+  });
+
+  it("a line without presentationId is unaffected", () => {
+    const { presentationId, ...legacy } = line;
+    const r = createSaleSchema.safeParse({ products: [legacy] });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.products[0].presentationId).toBeUndefined();
+  });
+});
