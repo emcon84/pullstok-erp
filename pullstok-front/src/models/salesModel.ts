@@ -28,6 +28,10 @@ export interface CartItem {
    *  productId/loosePriceId. `lineTotal` es el monto autoritativo de la línea. */
   freeLine?: boolean;
   lineTotal?: number;
+  /** sdd/product-presentations: presentation sold on this line (snapshot). */
+  presentationId?: string;
+  presentationName?: string;
+  presentationFactor?: number;
 }
 
 export interface SaleRequest {
@@ -44,6 +48,9 @@ export interface SaleRequest {
     loosePriceId?: string;
     looseName?: string;
     piecesPerBlister?: number;
+    presentationId?: string;
+    presentationName?: string;
+    presentationFactor?: number;
   }[];
   orderId?: string;
   /** Desglose de medios de pago (R6/R7): la suma debe igualar el total. */

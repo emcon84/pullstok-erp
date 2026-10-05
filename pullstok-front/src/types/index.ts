@@ -3,6 +3,17 @@ export interface Column {
   title: string;
 }
 
+/** Product presentation (sdd/product-presentations): a sellable pack size.
+ *  `factor` = base units per presentation (base = factor 1); prices are manual. */
+export interface ProductPresentation {
+  id: string;
+  name: string;
+  factor: number;
+  price: number;
+  wholesalePrice: number | null;
+  sortOrder: number;
+}
+
 export interface DataItem {
   [key: string]: any;
   id?: string;
@@ -47,6 +58,10 @@ export interface DataItem {
   // backend (nunca almacenado). Ambos opcionales: null = no elegible.
   unitsPerBox?: number | null;
   perUnitPrice?: number | null;
+  // sdd/product-presentations: when true, stock is stored in BASE units and
+  // `presentations` lists the ACTIVE presentations (factor desc).
+  hasPresentations?: boolean;
+  presentations?: ProductPresentation[];
 }
 
 type ValidationRule =
