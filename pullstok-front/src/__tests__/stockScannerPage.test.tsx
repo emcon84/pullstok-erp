@@ -166,6 +166,31 @@ describe("StockScannerPage — stock por sucursal (spec F2)", () => {
     );
   });
 
+  it("defaults the ADMIN selector to the headquarters even when it is not the first branch", async () => {
+    setLoggedUser("ADMIN");
+    mockStockWithBranchStock(mockUpdateBranchStock);
+    mockUseBranches.mockReturnValue({
+      branches: [
+        { id: "b1", name: "Sucursal 1", isActive: true, createdAt: "" },
+        { id: "hq", name: "Casa Central", isActive: true, isHeadquarters: true, createdAt: "" },
+      ],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderScanner();
+    await loadProduct();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Aumentar stock" }));
+
+    await waitFor(() =>
+      expect(mockUpdateBranchStock).toHaveBeenCalledWith({
+        branchId: "hq",
+        quantity: 13,
+      }),
+    );
+  });
+
   it("never sends the global quantity PUT: editing a non-HQ branch updates only that branch", async () => {
     setLoggedUser("VENDEDOR", ["b1"]);
     mockStockWithBranchStock(mockUpdateBranchStock);

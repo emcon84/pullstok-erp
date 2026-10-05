@@ -159,10 +159,11 @@ export const StockScannerPage = () => {
 
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
 
-  // Default the admin selector to the first branch once loaded.
+  // Default the admin selector to the headquarters (first branch as fallback).
   useEffect(() => {
     if (isAdminSelector && allBranches.length > 0 && !selectedBranchId) {
-      setSelectedBranchId(allBranches[0].id);
+      const hq = allBranches.find((b) => b.isHeadquarters);
+      setSelectedBranchId((hq ?? allBranches[0]).id);
     }
   }, [isAdminSelector, allBranches, selectedBranchId]);
 

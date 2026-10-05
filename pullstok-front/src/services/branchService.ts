@@ -7,6 +7,8 @@ export interface BranchData {
   address?: string | null;
   phone?: string | null;
   isActive: boolean;
+  // Casa central (exactamente una por organización).
+  isHeadquarters?: boolean;
   // Punto de venta fiscal de la sucursal (sdd/sucursales-pv-facturacion).
   puntoVenta?: number | null;
   createdAt: string;
