@@ -1,3 +1,5 @@
+import type { ProductPresentation } from "../types";
+
 export interface ProductsProps {
   _id?: string;
   id?: string;
@@ -8,6 +10,9 @@ export interface ProductsProps {
   categoryId?: string;
   category?: string;
   quantity: number | string;
+  // sdd/product-presentations: stock en unidad base + presentaciones ACTIVAS.
+  hasPresentations?: boolean;
+  presentations?: ProductPresentation[];
 }
 
 export interface ProductID {

@@ -1,5 +1,6 @@
 import type { DataItem } from "../../types";
 import type { SaleMode } from "./useVendorCart";
+import { formatStockLevels } from "./presentationHelpers";
 
 // ── Helpers compartidos del catálogo de vendor ──
 
@@ -118,6 +119,8 @@ export const branchQty = (p: DataItem) =>
  */
 export const unitStock = (p: DataItem): number => {
   const branchQtyVal = p.stocks?.[0]?.quantity;
+  // sdd/product-presentations: el stock ya está en unidad base, sin conversión.
+  if (p.hasPresentations === true && branchQtyVal == null) return Number(p.quantity) || 0;
   // ProductStock (unidades) es autoritativo: si existe un valor (incluso 0) se
   // usa sin conversión.
   if (branchQtyVal != null) return Number(branchQtyVal);
@@ -134,6 +137,13 @@ export const stockUnitLabel = (_p: DataItem): string => {
   void _p;
   return "u.";
 };
+
+/** Badge de stock: desglose por presentación ("2 Caja · 3 Unidad") para productos
+ *  con presentaciones; si no, "{qty} u.". `qty` ya viene en unidad base. */
+export const stockBadgeLabel = (p: DataItem, qty: number): string =>
+  p.hasPresentations === true && (p.presentations?.length ?? 0) > 0
+    ? formatStockLevels(qty, p.presentations ?? [])
+    : `${qty} ${stockUnitLabel(p)}`;
 
 // Clave de sessionStorage para restaurar el filtro del listado al volver del
 // scanner (la vista se desmonta al navegar a /scanner y el filtro es local).

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { API_URL } from "../../../constants";
 import { ProductsProps } from "../../../models/productsModel";
+import { formatStockLevels } from "@/components/hooks/presentationHelpers";
 
 interface SelectedProduct {
   product: ProductsProps;
@@ -185,7 +186,9 @@ export const ProductSelector = ({
                     </p>
                     <p className="text-xs text-muted-foreground">
                       ${Number(product.price).toLocaleString("es-AR")} · Stock{" "}
-                      {qty}
+                      {product.hasPresentations && product.presentations?.length
+                        ? formatStockLevels(qty, product.presentations)
+                        : qty}
                     </p>
                   </div>
                 </button>
