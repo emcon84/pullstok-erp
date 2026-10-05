@@ -120,9 +120,27 @@ describe("usePresentationsEditor — save", () => {
     expect(result.current.error).toBe(presentationErrorMessage("PRESENTATION_NAME_DUPLICATE"));
   });
 
+  it("accepts factor 0 on a non-base row (pendiente) and sends it", async () => {
+    vi.mocked(replacePresentations).mockResolvedValue([]);
+    const { result } = setup();
+    act(() => result.current.updateRow(result.current.rows[0].key, { factor: "0" }));
+    await act(async () => { await result.current.save(); });
+    expect(replacePresentations).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(replacePresentations).mock.calls[0][1][0]).toMatchObject({ id: "p-box", factor: 0 });
+  });
+
+  it("a new row starts pending (factor 0, price 0)", () => {
+    const { result } = setup();
+    act(() => result.current.addRow());
+    expect(result.current.rows[2]).toMatchObject({ factor: "0", price: "0" });
+  });
+
   it("blocks an invalid factor, an empty name and a missing price client-side", async () => {
     const { result } = setup();
     const key = result.current.rows[0].key;
+    act(() => result.current.updateRow(key, { factor: "-3" }));
+    await act(async () => { await result.current.save(); });
+    expect(result.current.error).toBe(presentationErrorMessage("PRESENTATION_FACTOR_INVALID"));
     act(() => result.current.updateRow(key, { factor: "2.5" }));
     await act(async () => { await result.current.save(); });
     expect(result.current.error).toBe(presentationErrorMessage("PRESENTATION_FACTOR_INVALID"));

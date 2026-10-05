@@ -100,7 +100,7 @@ export const EnablePresentationsDialog = ({
         <DialogHeader>
           <DialogTitle>Habilitar presentaciones</DialogTitle>
           <DialogDescription>
-            Indicá cuántas unidades trae cada presentación y cargá el precio de cada una.
+            Indicá cuántas unidades trae cada presentación (0 si todavía no lo sabés) y cargá el precio de cada una.
             Los precios no se calculan: se usan tal cual los escribas.
           </DialogDescription>
         </DialogHeader>
@@ -112,7 +112,7 @@ export const EnablePresentationsDialog = ({
               aria-label="Blisters por caja"
               type="number"
               inputMode="numeric"
-              min="1"
+              min="0"
               step="1"
               value={blistersPerBox}
               onChange={(e) => setBlistersPerBox(e.target.value)}
@@ -124,7 +124,7 @@ export const EnablePresentationsDialog = ({
               aria-label="Pastillas por blister"
               type="number"
               inputMode="numeric"
-              min="1"
+              min="0"
               step="1"
               value={pillsPerBlister}
               onChange={(e) => setPillsPerBlister(e.target.value)}
@@ -155,7 +155,7 @@ export const EnablePresentationsDialog = ({
               />
               <span>
                 {name}
-                {factorOf[name] ? (
+                {factorOf[name] !== undefined ? (
                   <span className="text-muted-foreground"> (x{factorOf[name]})</span>
                 ) : null}
               </span>
@@ -163,9 +163,11 @@ export const EnablePresentationsDialog = ({
           ))}
         </fieldset>
 
-        {countedFactor && (
+        {countedFactor !== undefined && (
           <p className="rounded-md bg-muted/50 p-2 text-sm">
-            {`Stock actual ${currentStock} → ${currentStock * countedFactor} unidades base`}
+            {countedFactor === 0
+              ? `Stock actual ${currentStock} → ${currentStock} unidades base (sin conversión)`
+              : `Stock actual ${currentStock} → ${currentStock * countedFactor} unidades base`}
           </p>
         )}
 

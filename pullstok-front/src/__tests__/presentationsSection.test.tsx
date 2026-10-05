@@ -46,6 +46,29 @@ describe("PresentationsSection", () => {
     expect(screen.getByLabelText("Precio mayorista de presentación 2")).toHaveValue(null);
   });
 
+  it("flags rows with factor 0 or price 0 as Pendiente, and only those", () => {
+    const { unmount } = render(
+      <PresentationsSection
+        enabled
+        rows={[
+          { key: "a", id: "a", name: "Caja", factor: "0", price: "1000", wholesalePrice: "" },
+          { key: "b", id: "b", name: "Blister", factor: "10", price: "0", wholesalePrice: "" },
+          { key: "c", id: "c", name: "Pastilla", factor: "1", price: "30", wholesalePrice: "", base: true },
+        ]}
+        error={null}
+        busy={false}
+        isBase={(r) => r.base === true}
+        {...handlers()}
+      />,
+    );
+    expect(screen.getAllByText("Pendiente")).toHaveLength(2);
+    expect(screen.getByText("Pendiente: falta el factor")).toBeInTheDocument();
+    expect(screen.getByText("Pendiente: falta el precio")).toBeInTheDocument();
+    unmount();
+    renderSection();
+    expect(screen.queryByText("Pendiente")).not.toBeInTheDocument();
+  });
+
   it("locks the base row: factor disabled and no remove button", () => {
     renderSection();
     expect(screen.getByLabelText("Factor de presentación 2")).toBeDisabled();
@@ -141,6 +164,18 @@ describe("EnablePresentationsDialog — quick setup", () => {
     expect(screen.getByText("Stock actual 3 → 3 unidades base")).toBeInTheDocument();
   });
 
+  it("accepts 0 counts (pendiente) and previews 'sin conversión' when the counted factor is 0", () => {
+    const { onConfirm } = renderDialog();
+    type("Blisters por caja", "0");
+    type("Pastillas por blister", "10");
+    type("Precio de Caja", "0");
+    type("Precio de Blister", "250");
+    expect(screen.getByText("Stock actual 3 → 3 unidades base (sin conversión)")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm.mock.calls[0][0].map((p: { factor: number }) => p.factor)).toEqual([0, 10, 1]);
+  });
+
   it("prefills the Pastilla price from the product price and leaves Blister empty without a legacy match", () => {
     renderDialog();
     expect(screen.getByLabelText("Precio de Pastilla")).toHaveValue(30);
@@ -172,7 +207,7 @@ describe("EnablePresentationsDialog — quick setup", () => {
 
   it("does not confirm invalid counts: shows an alert instead", () => {
     const { onConfirm } = renderDialog();
-    type("Blisters por caja", "0");
+    type("Blisters por caja", "-1");
     type("Pastillas por blister", "10");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
     expect(onConfirm).not.toHaveBeenCalled();

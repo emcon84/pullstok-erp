@@ -23,8 +23,9 @@ export class PresentationError extends Error {
   }
 }
 
+/** Active presentations usable for stock math: factor < 1 means "pendiente" and is skipped. */
 const activeByFactorDesc = <T extends PresentationLike>(list: T[]): T[] =>
-  list.filter((p) => p.isActive !== false).sort((a, b) => b.factor - a.factor);
+  list.filter((p) => p.isActive !== false && p.factor >= 1).sort((a, b) => b.factor - a.factor);
 
 /** Greedy split of base stock per active presentation (factor desc). */
 export const toStockLevels = (
@@ -64,15 +65,15 @@ export const levelsToBaseUnits = (
     return total + (Number.isFinite(n) && n > 0 ? Math.floor(n) * p.factor : 0);
   }, 0);
 
-/** One active factor-1 presentation, integer factors >= 1, unique names. */
+/** One active factor-1 presentation, integer factors >= 0 (0 = pendiente), unique names. */
 export const validatePresentationSet = (
   list: Required<PresentationLike>[],
 ): void => {
   for (const p of list) {
-    if (!Number.isInteger(p.factor) || p.factor < 1) {
+    if (!Number.isInteger(p.factor) || p.factor < 0) {
       throw new PresentationError(
         "PRESENTATION_FACTOR_INVALID",
-        `El factor de "${p.name}" debe ser un entero mayor o igual a 1`,
+        `El factor de "${p.name}" debe ser un entero mayor o igual a 0`,
       );
     }
   }
@@ -96,6 +97,9 @@ export const validatePresentationSet = (
   }
 };
 
+/** A presentation can be sold only once it has a price (price 0 = pendiente). */
+export const isSellablePresentation = (p: { price: number }): boolean => p.price > 0;
+
 /** Wholesale sellers get wholesalePrice when set, otherwise the retail price. */
 export const resolvePresentationPrice = (
   presentation: { price: number; wholesalePrice?: number | null },
@@ -105,14 +109,15 @@ export const resolvePresentationPrice = (
     ? presentation.wholesalePrice
     : presentation.price;
 
-const isPositiveInt = (s: string): boolean => /^\d+$/.test(s.trim()) && Number(s) >= 1;
+/** Non-negative integer: 0 is accepted (missing data, factor 0 = pendiente). */
+const isCount = (s: string): boolean => /^\d+$/.test(s.trim());
 
 /** Factors of the pharmacy quick setup, or null while the counts are invalid. */
 export const quickSetupFactors = (
   blistersPerBox: string,
   pillsPerBlister: string,
 ): { box: number; blister: number; pill: 1 } | null => {
-  if (!isPositiveInt(blistersPerBox) || !isPositiveInt(pillsPerBlister)) return null;
+  if (!isCount(blistersPerBox) || !isCount(pillsPerBlister)) return null;
   const pills = Number(pillsPerBlister);
   return { box: Number(blistersPerBox) * pills, blister: pills, pill: 1 };
 };
@@ -139,7 +144,7 @@ export const buildQuickSetup = (input: QuickSetupInput): QuickSetupPresentation[
   if (!factors) {
     throw new PresentationError(
       "PRESENTATION_FACTOR_INVALID",
-      "Blisters por caja y pastillas por blister deben ser números enteros mayores o iguales a 1",
+      "Blisters por caja y pastillas por blister deben ser números enteros (0 si todavía no se sabe)",
     );
   }
   const price = (raw: string): number => {

@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +51,9 @@ export const PresentationsSection = ({
       {rows.map((row, i) => {
         const n = i + 1;
         const base = isBase(row);
+        // 0 = missing data: factor 0 / price 0 are stored but not sellable yet.
+        const pendingFactor = row.factor.trim() !== "" && Number(row.factor) === 0;
+        const pendingPrice = row.price.trim() !== "" && Number(row.price) === 0;
         return (
           <div key={row.key} className="space-y-2 rounded-md border bg-muted/20 p-2">
             <div className="grid grid-cols-2 gap-2">
@@ -90,9 +94,16 @@ export const PresentationsSection = ({
               />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground">
-                {base ? "Unidad base (factor fijo en 1)" : ""}
-              </span>
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                {base && <span>Unidad base (factor fijo en 1)</span>}
+                {(pendingFactor || pendingPrice) && (
+                  <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
+                    Pendiente
+                  </Badge>
+                )}
+                {pendingFactor && <span>Pendiente: falta el factor</span>}
+                {pendingPrice && <span>Pendiente: falta el precio</span>}
+              </div>
               <div className="flex gap-1">
                 <Button
                   type="button"

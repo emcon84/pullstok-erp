@@ -33,7 +33,7 @@ const MESSAGES: Record<string, string> = {
     "No se pueden deshabilitar las presentaciones mientras haya stock. Poné el stock en 0 en todas las sucursales y volvé a intentar",
   PRESENTATION_BASE_REQUIRED: "Debe haber exactamente una presentación base con factor 1",
   PRESENTATION_BASE_LOCKED: "La presentación base no se puede quitar ni cambiar de factor",
-  PRESENTATION_FACTOR_INVALID: "El factor de cada presentación debe ser un entero mayor o igual a 1",
+  PRESENTATION_FACTOR_INVALID: "El factor de cada presentación debe ser un entero mayor o igual a 0 (0 = pendiente)",
   PRESENTATION_NAME_DUPLICATE: "Hay nombres de presentación repetidos",
   PRESENTATION_NAME_REQUIRED: "Cada presentación necesita un nombre",
   PRESENTATION_PRICE_INVALID: "Cada presentación necesita un precio válido (0 o más)",
@@ -123,7 +123,7 @@ export const usePresentationsEditor = ({ productId, presentations, basePrice, on
   }, [signature]);
 
   const addRow = useCallback(() => {
-    setRows((prev) => [...prev, { key: nextKey(), name: "", factor: "", price: "", wholesalePrice: "" }]);
+    setRows((prev) => [...prev, { key: nextKey(), name: "", factor: "0", price: "0", wholesalePrice: "" }]);
   }, []);
 
   const removeRow = useCallback((key: string) => {

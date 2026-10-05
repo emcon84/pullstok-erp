@@ -8,6 +8,7 @@ import {
   resolvePresentationPrice,
   buildQuickSetup,
   findLegacyBlisterPrice,
+  isSellablePresentation,
 } from "@/components/hooks/presentationHelpers";
 
 const codeOf = (fn: () => unknown) => {
@@ -63,6 +64,34 @@ describe("toStockLevels", () => {
   });
 });
 
+describe("stock levels with pending (factor 0) presentations", () => {
+  const withPending = [
+    { name: "Caja", factor: 0, isActive: true },
+    { name: "Blister", factor: 10, isActive: true },
+    { name: "Unidad", factor: 1, isActive: true },
+  ];
+  it("skips factor < 1 without dividing by zero", () => {
+    expect(toStockLevels(25, withPending)).toEqual([
+      { name: "Blister", count: 2 },
+      { name: "Unidad", count: 5 },
+    ]);
+    expect(formatStockLevels(25, withPending)).toBe("2 Blister · 5 Unidad");
+  });
+  it("the zero-total fallback shows the base level, never a pending one", () => {
+    expect(toStockLevels(0, withPending)).toEqual([{ name: "Unidad", count: 0 }]);
+  });
+  it("levelsToBaseUnits ignores pending presentations", () => {
+    expect(levelsToBaseUnits({ Caja: 5, Blister: 1, Unidad: 2 }, withPending)).toBe(12);
+  });
+});
+
+describe("isSellablePresentation", () => {
+  it("is true only for a price above zero", () => {
+    expect(isSellablePresentation({ price: 120 })).toBe(true);
+    expect(isSellablePresentation({ price: 0 })).toBe(false);
+  });
+});
+
 describe("formatStockLevels", () => {
   it("joins levels keeping the configured names", () => {
     expect(formatStockLevels(235, set)).toBe("2 Caja · 3 Blister · 5 Unidad");
@@ -110,9 +139,17 @@ describe("validatePresentationSet", () => {
     ).toBe("PRESENTATION_BASE_REQUIRED");
   });
 
-  it("rejects non-integer or < 1 factors", () => {
-    expect(codeOf(() => validatePresentationSet([ok[1], { name: "X", factor: 0, isActive: true }]))).toBe("PRESENTATION_FACTOR_INVALID");
+  it("rejects non-integer or negative factors", () => {
+    expect(codeOf(() => validatePresentationSet([ok[1], { name: "X", factor: -1, isActive: true }]))).toBe("PRESENTATION_FACTOR_INVALID");
     expect(codeOf(() => validatePresentationSet([ok[1], { name: "X", factor: 2.5, isActive: true }]))).toBe("PRESENTATION_FACTOR_INVALID");
+  });
+
+  it("accepts factor 0 (pendiente) on a non-base presentation", () => {
+    expect(() => validatePresentationSet([ok[1], { name: "Caja", factor: 0, isActive: true }])).not.toThrow();
+  });
+
+  it("factor 0 does not count as the base: a set with only factor 0 + factor 10 still needs a base", () => {
+    expect(codeOf(() => validatePresentationSet([ok[0], { name: "Blister", factor: 0, isActive: true }]))).toBe("PRESENTATION_BASE_REQUIRED");
   });
 
   it("rejects duplicate names (case-insensitive, trimmed)", () => {
@@ -159,8 +196,15 @@ describe("buildQuickSetup", () => {
     expect(b.map((p) => p.price)).toEqual([2000, 250, 30]); // factors changed, prices did not
   });
 
-  it("rejects non-integer or < 1 counts", () => {
-    expect(codeOf(() => buildQuickSetup({ blistersPerBox: "0", pillsPerBlister: "10", prices }))).toBe("PRESENTATION_FACTOR_INVALID");
+  it("accepts 0 counts: missing data yields factor 0 (pendiente)", () => {
+    const a = buildQuickSetup({ blistersPerBox: "0", pillsPerBlister: "10", prices });
+    expect(a.map((p) => p.factor)).toEqual([0, 10, 1]);
+    const b = buildQuickSetup({ blistersPerBox: "4", pillsPerBlister: "0", prices });
+    expect(b.map((p) => p.factor)).toEqual([0, 0, 1]);
+  });
+
+  it("rejects non-integer or negative counts", () => {
+    expect(codeOf(() => buildQuickSetup({ blistersPerBox: "-1", pillsPerBlister: "10", prices }))).toBe("PRESENTATION_FACTOR_INVALID");
     expect(codeOf(() => buildQuickSetup({ blistersPerBox: "2", pillsPerBlister: "2.5", prices }))).toBe("PRESENTATION_FACTOR_INVALID");
     expect(codeOf(() => buildQuickSetup({ blistersPerBox: "", pillsPerBlister: "10", prices }))).toBe("PRESENTATION_FACTOR_INVALID");
   });
