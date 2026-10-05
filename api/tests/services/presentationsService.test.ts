@@ -102,6 +102,23 @@ describe("enablePresentations", () => {
     await failsWith(enablePresentations("p-1", { presentations: [box, unit], stockCountedIn: "Pallet" }), 400, "PRESENTATION_COUNTED_IN_INVALID");
   });
 
+  it("deletes leftover (inactive) rows before re-creating a reused-name set", async () => {
+    tx.product.findFirst.mockResolvedValue({
+      ...farmacia,
+      presentations: [
+        { id: "old-unit", name: "Unidad", factor: 1, isActive: false },
+        { id: "old-box", name: "Caja", factor: 10, isActive: false },
+      ],
+    });
+    await enablePresentations("p-1", { presentations: [box, unit] });
+    expect(tx.productPresentation.deleteMany).toHaveBeenCalledWith({
+      where: { productId: "p-1", organizationId: "org-1" },
+    });
+    expect(tx.productPresentation.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.productPresentation.create.mock.invocationCallOrder[0],
+    );
+  });
+
   it("409 when already enabled", async () => {
     tx.product.findFirst.mockResolvedValue(enabled);
     await failsWith(enablePresentations("p-1", { presentations: [box, unit] }), 409, "PRESENTATIONS_ALREADY_ENABLED");
@@ -129,6 +146,48 @@ describe("replacePresentations", () => {
     expect(tx.productPresentation.deleteMany).toHaveBeenCalledWith({
       where: { productId: "p-1", organizationId: "org-1", id: { notIn: ["pr-unit"] } },
     });
+  });
+
+  it("deletes removed rows BEFORE updating kept ones (reusing a removed name)", async () => {
+    tx.product.findFirst.mockResolvedValue({
+      ...enabled,
+      presentations: [...enabled.presentations, { id: "pr-old", name: "Blister", factor: 5, isActive: true }],
+    });
+    await replacePresentations("p-1", {
+      presentations: [
+        { ...unit, id: "pr-unit" },
+        { ...box, id: "pr-box", name: "Blister" },
+      ],
+    });
+    const del = tx.productPresentation.deleteMany.mock.invocationCallOrder[0];
+    for (const o of tx.productPresentation.updateMany.mock.invocationCallOrder) {
+      expect(del).toBeLessThan(o);
+    }
+  });
+
+  it("swaps two names safely via a temporary unique name", async () => {
+    tx.product.findFirst.mockResolvedValue({
+      ...enabled,
+      presentations: [
+        { id: "pr-unit", name: "Unidad", factor: 1, isActive: true },
+        { id: "pr-a", name: "A", factor: 5, isActive: true },
+        { id: "pr-b", name: "B", factor: 10, isActive: true },
+      ],
+    });
+    await replacePresentations("p-1", {
+      presentations: [
+        { ...unit, id: "pr-unit" },
+        { ...input({ name: "B", factor: 5 }), id: "pr-a" },
+        { ...input({ name: "A", factor: 10 }), id: "pr-b" },
+      ],
+    });
+    const calls = tx.productPresentation.updateMany.mock.calls.map((c: any) => c[0]);
+    const names = calls.map((c: any) => c.data.name);
+    const lastTmp = Math.max(...names.map((n: string, i: number) => (n.startsWith("__tmp__") ? i : -1)));
+    const firstFinal = names.findIndex((n: string) => n === "A" || n === "B");
+    expect(lastTmp).toBeGreaterThanOrEqual(0);
+    expect(lastTmp).toBeLessThan(firstFinal);
+    expect(names.filter((n: string) => n.startsWith("__tmp__"))).toEqual(["__tmp__pr-a", "__tmp__pr-b"]);
   });
 
   it("409 PRESENTATIONS_NOT_ENABLED on a product without presentations", async () => {

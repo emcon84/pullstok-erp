@@ -101,10 +101,25 @@ export const replacePresentations = (
       );
     }
 
-    const keepIds: string[] = [];
+    // Orden seguro frente a unique(productId,name): primero se borran las
+    // quitadas, luego los renombres de las que quedan van en dos fases.
+    const keepIds = list.filter((p) => p.id).map((p) => p.id as string);
+    await tx.productPresentation.deleteMany({
+      where: { productId, organizationId: orgId, id: { notIn: keepIds } },
+    });
+    const currentName = new Map<string, string>(
+      product.presentations.map((p: any) => [p.id, p.name]),
+    );
+    for (const p of list) {
+      if (p.id && currentName.get(p.id) !== p.name.trim()) {
+        await tx.productPresentation.updateMany({
+          where: { id: p.id, productId, organizationId: orgId },
+          data: { name: `__tmp__${p.id}` },
+        });
+      }
+    }
     for (const p of list) {
       if (p.id) {
-        keepIds.push(p.id);
         await tx.productPresentation.updateMany({
           where: { id: p.id, productId, organizationId: orgId },
           data: {
@@ -118,9 +133,6 @@ export const replacePresentations = (
         });
       }
     }
-    await tx.productPresentation.deleteMany({
-      where: { productId, organizationId: orgId, id: { notIn: keepIds } },
-    });
     for (const p of list) {
       if (!p.id) await createRow(tx, orgId, productId, p);
     }
@@ -164,6 +176,9 @@ export const enablePresentations = (
       factor = Math.max(...list.map((p) => p.factor));
     }
 
+    // Restos inactivos de un disable previo: se borran (los snapshots de
+    // SaleItem guardan el historial; presentationId es onDelete SetNull).
+    await tx.productPresentation.deleteMany({ where: { productId, organizationId: orgId } });
     for (const p of list) await createRow(tx, orgId, productId, p);
 
     const productData: Record<string, unknown> = { hasPresentations: true };
