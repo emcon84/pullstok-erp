@@ -100,8 +100,8 @@ interface Options {
   presentations: ProductPresentation[];
   /** Product price: seeds the base draft when enabling. */
   basePrice: number;
-  /** Called after a successful save/enable/disable so the caller can refetch. */
-  onChanged?: () => void;
+  /** Called after a successful save/enable/disable with the resulting ACTIVE list. */
+  onChanged?: (presentations: ProductPresentation[]) => void;
 }
 
 export const usePresentationsEditor = ({ productId, presentations, basePrice, onChanged }: Options) => {
@@ -153,12 +153,14 @@ export const usePresentationsEditor = ({ productId, presentations, basePrice, on
   }, []);
 
   const run = useCallback(
-    async (action: () => Promise<unknown>) => {
+    async (action: () => Promise<ProductPresentation[]>) => {
       setError(null);
       setBusy(true);
       try {
-        await action();
-        onChanged?.();
+        const result = await action();
+        // Re-seed with the server rows so later saves carry the real ids.
+        setRows(initialRows(result, basePrice));
+        onChanged?.(result);
         return true;
       } catch (e) {
         const err = e as { code?: string; message?: string };
@@ -168,7 +170,7 @@ export const usePresentationsEditor = ({ productId, presentations, basePrice, on
         setBusy(false);
       }
     },
-    [onChanged],
+    [onChanged, basePrice],
   );
 
   const save = useCallback(

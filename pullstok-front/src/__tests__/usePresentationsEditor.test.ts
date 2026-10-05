@@ -150,37 +150,54 @@ describe("usePresentationsEditor — save", () => {
 });
 
 describe("usePresentationsEditor — enable / disable", () => {
-  const quick = [
-    { name: "Caja", sortOrder: 0, factor: 40, price: 2000, wholesalePrice: null, isActive: true },
-    { name: "Blister", sortOrder: 1, factor: 10, price: 250, wholesalePrice: null, isActive: true },
-    { name: "Pastilla", sortOrder: 2, factor: 1, price: 30, wholesalePrice: null, isActive: true },
-  ];
+  it("enable sends the rows without ids plus stockCountedIn", async () => {
+    vi.mocked(enablePresentations).mockResolvedValue([]);
+    const { result, onChanged } = setup([]);
+    act(() => result.current.addRow());
+    act(() =>
+      result.current.updateRow(result.current.rows[1].key, { name: "Caja", factor: "10", price: "1000" }),
+    );
+    await act(async () => { await result.current.enable("Caja"); });
+    expect(enablePresentations).toHaveBeenCalledWith(
+      "p1",
+      [
+        { name: "Unidad", sortOrder: 0, factor: 1, price: 120, wholesalePrice: null, isActive: true },
+        { name: "Caja", sortOrder: 1, factor: 10, price: 1000, wholesalePrice: null, isActive: true },
+      ],
+      "Caja",
+    );
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
 
-  it("enable sends the given set plus stockCountedIn, then re-seeds rows with server ids", async () => {
-    const created = quick.map((q, i) => ({ id: `s${i}`, name: q.name, factor: q.factor, price: q.price, wholesalePrice: null, sortOrder: i }));
+  it("re-seeds the rows with the server ids after enable so a later save keeps the base", async () => {
+    const created = [
+      { id: "s-box", name: "Caja", factor: 10, price: 1000, wholesalePrice: null, sortOrder: 0 },
+      { id: "s-unit", name: "Unidad", factor: 1, price: 120, wholesalePrice: null, sortOrder: 1 },
+    ];
     vi.mocked(enablePresentations).mockResolvedValue(created);
     vi.mocked(replacePresentations).mockResolvedValue(created);
     const { result, onChanged } = setup([]);
-    await act(async () => { await result.current.enable(quick, "Caja"); });
-    expect(enablePresentations).toHaveBeenCalledWith("p1", quick, "Caja");
+    act(() => result.current.addRow());
+    act(() =>
+      result.current.updateRow(result.current.rows[1].key, { name: "Caja", factor: "10", price: "1000" }),
+    );
+    await act(async () => { await result.current.enable("Caja"); });
     expect(onChanged).toHaveBeenCalledWith(created);
-    expect(result.current.rows.map((r) => r.id)).toEqual(["s0", "s1", "s2"]);
+    expect(result.current.rows.map((r) => r.id)).toEqual(["s-box", "s-unit"]);
     await act(async () => { await result.current.save(); });
-    expect(vi.mocked(replacePresentations).mock.calls[0][1].map((r) => r.id)).toEqual(["s0", "s1", "s2"]);
+    const sent = vi.mocked(replacePresentations).mock.calls[0][1];
+    expect(sent.map((r) => r.id)).toEqual(["s-box", "s-unit"]);
   });
 
-  it("enable validates the set first (a missing base is not sent)", async () => {
+  it("enable validates first (no second presentation is fine, duplicate is not)", async () => {
     const { result } = setup([]);
-    await act(async () => { await result.current.enable(quick.slice(0, 2), "Caja"); });
+    act(() => result.current.addRow());
+    act(() =>
+      result.current.updateRow(result.current.rows[1].key, { name: "unidad", factor: "10", price: "5" }),
+    );
+    await act(async () => { await result.current.enable(); });
     expect(enablePresentations).not.toHaveBeenCalled();
-    expect(result.current.error).toBe(presentationErrorMessage("PRESENTATION_BASE_REQUIRED"));
-  });
-
-  it("enable maps a server error code", async () => {
-    vi.mocked(enablePresentations).mockRejectedValue(new PresentationsApiError("x", "PRESENTATIONS_FARMACIA_ONLY", 400));
-    const { result } = setup([]);
-    await act(async () => { await result.current.enable(quick, "Caja"); });
-    expect(result.current.error).toBe(presentationErrorMessage("PRESENTATIONS_FARMACIA_ONLY"));
+    expect(result.current.error).toBe(presentationErrorMessage("PRESENTATION_NAME_DUPLICATE"));
   });
 
   it("disable calls the API and notifies; a 409 surfaces the stock message", async () => {
