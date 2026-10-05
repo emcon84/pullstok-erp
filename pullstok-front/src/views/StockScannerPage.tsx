@@ -17,7 +17,7 @@ import { useBranches } from "@/components/hooks/useBranches";
 import { unitStock } from "@/components/hooks/vendorCatalogHelpers";
 import { resolveScannerBranchMode } from "@/constants/rolePermissions";
 import type { Role } from "@/constants/rolePermissions";
-import type { DataItem } from "@/types";
+import type { DataItem, ProductPresentation } from "@/types";
 import { formatCurrency } from "@/utils/statsHelpers";
 import {
   ensureOfflineCatalog,
@@ -49,6 +49,8 @@ interface Product {
   priceKgLista?: number; // Precio por kg de la LISTA de suelto (PriceKgPrice)
   category: { name: string } | null; categoryId?: string;
   variantAssignments?: { option: { id: string; value: string; variantId?: string; variant: { name: string } } }[];
+  hasPresentations?: boolean;
+  presentations?: ProductPresentation[];
 }
 
 /** Mapea un producto del catálogo offline al shape que usa el scanner. */
@@ -74,6 +76,8 @@ function mapOfflineProduct(p: OfflineProduct): Product {
         variant: { name: v.variantName },
       },
     })),
+    hasPresentations: p.hasPresentations ?? false,
+    presentations: p.presentations ?? [],
   };
 }
 

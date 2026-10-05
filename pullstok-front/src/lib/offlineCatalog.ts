@@ -12,6 +12,7 @@
  */
 
 import { API_URL } from "../constants";
+import type { ProductPresentation } from "../types";
 
 export interface OfflineVariant {
   value: string;
@@ -33,6 +34,9 @@ export interface OfflineProduct {
   categoryId: string | null;
   categoryName: string | null;
   variants: OfflineVariant[];
+  // sdd/product-presentations: presentaciones activas (caja / blister / pastilla).
+  hasPresentations?: boolean;
+  presentations?: ProductPresentation[];
 }
 
 const DB_NAME = "pullstok-offline-v1";
