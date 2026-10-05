@@ -7,6 +7,7 @@ import { Request, Response } from "express";
 import salesController from "../../src/controllers/salesController";
 import SaleService from "../../src/services/salesService";
 import { prisma } from "../../src/config/db";
+import { PresentationError } from "../../src/utils/presentations";
 
 jest.mock("../../src/services/salesService", () => ({
   createSale: jest.fn(),
@@ -94,6 +95,19 @@ describe("salesController.createSale", () => {
       "u-1",
       "CASHIER",
     );
+  });
+
+  it("maps PresentationError to its status with {message, code}", async () => {
+    service.createSale.mockRejectedValue(
+      new PresentationError("USE_PRESENTATION", "Se vende por presentación"),
+    );
+    const res = mockResponse();
+    await salesController.createSale(mockRequest({ products: [] }), res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Se vende por presentación",
+      code: "USE_PRESENTATION",
+    });
   });
 
   it("maps CUSTOMER_NOT_FOUND to 404", async () => {

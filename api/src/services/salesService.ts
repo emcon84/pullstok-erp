@@ -5,6 +5,7 @@ import { saleConfirmedEmail } from "./mailTemplates";
 import { emitOrdersChanged } from "../realtime/socket";
 import { round2 } from "../utils/money";
 import { computePerUnitPrice } from "../utils/unitsPerBox";
+import { PresentationError, resolvePresentationLine } from "../utils/presentations";
 import { resolveCellForProduct, looseLineName, CellWithNames } from "./looseSaleService";
 
 /** Categoría con la que se persisten las líneas de venta libre (SaleItem.category es obligatoria). */
@@ -21,6 +22,9 @@ interface IProductSale {
   quantity: number;
   category?: string;
   price: number;
+  // sdd/product-presentations: presentación elegida (el server resuelve
+  // precio y factor; stock = quantity × factor en unidad base).
+  presentationId?: string;
   // Modo de venta del renglón (sdd/venta-alimento-suelto B-08): ausente =
   // legacy BOLSA_CERRADA (el schema lo normaliza con .default()).
   // POR_UNIDAD (sdd/venta-por-unidad-multpack): línea de un multi-pack vendida
@@ -176,6 +180,9 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       price: number;
       saleMode: "BOLSA_CERRADA" | "POR_PESO" | "POR_MONTO" | "POR_UNIDAD" | "POR_UNIDAD_BLISTER";
       piecesPerBlister: number | null;
+      presentationId?: string;
+      presentationName?: string;
+      presentationFactor?: number;
     }[] = [];
 
     for (const item of saleRequest.products) {
@@ -227,11 +234,38 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       const product = item.productId
         ? await tx.product.findFirst({
             where: { id: item.productId, organizationId },
-            include: { category: true },
+            include: {
+              category: true,
+              presentations: { where: { organizationId } },
+            },
           })
         : null;
       if (item.productId && !product) {
         throw new Error(`Producto ${item.productId} no encontrado`);
+      }
+
+      // ── Presentaciones (sdd/product-presentations) ──
+      // Producto con presentaciones: la línea DEBE traer presentationId; el
+      // precio y el factor los resuelve el server (se ignora price/cajaMultiplier).
+      let presentationLine: ReturnType<typeof resolvePresentationLine> | null = null;
+      if (item.presentationId && !product) {
+        throw new PresentationError(
+          "PRESENTATION_NOT_ALLOWED",
+          "La presentación requiere un producto",
+        );
+      }
+      if (product && (product.hasPresentations || item.presentationId)) {
+        if (product.hasPresentations && saleMode !== "BOLSA_CERRADA") {
+          throw new PresentationError(
+            "USE_PRESENTATION",
+            `El producto "${product.name}" se vende por presentación`,
+          );
+        }
+        presentationLine = resolvePresentationLine(
+          product as any,
+          item.presentationId,
+          sellerSellsWholesale,
+        );
       }
 
       // ── Resolución de celda + gate de sucursal (modos sueltos) ──
@@ -296,6 +330,7 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       ) {
         linePrice = Number(product.wholesalePrice);
       }
+      if (presentationLine) linePrice = presentationLine.price; // server-authoritative
       if (saleMode === "POR_MONTO") {
         // C-05: el precio unitario es el de la CELDA de la planilla (viene en
         // el payload como price). Fallback al priceKgSuelto almacenado o al
@@ -397,8 +432,10 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
       // mismo precedente aceptado con POUCH).
       const cajaMultiplier =
         product?.unitsPerBox && product.unitsPerBox > 1 ? product.unitsPerBox : 1;
-      const stockUnits =
-        saleMode === "BOLSA_CERRADA"
+      // Con presentación: unidades base = cantidad × factor (ignora cajaMultiplier).
+      const stockUnits = presentationLine
+        ? lineQuantity * presentationLine.factor
+        : saleMode === "BOLSA_CERRADA"
           ? lineQuantity * cajaMultiplier
           : saleMode === "POR_UNIDAD_BLISTER"
           ? 1
@@ -506,6 +543,13 @@ const createSale = async (saleRequest: ISaleRequest, userId?: string, role?: str
         saleMode,
         piecesPerBlister:
           saleMode === "POR_UNIDAD_BLISTER" ? item.piecesPerBlister ?? null : null,
+        ...(presentationLine
+          ? {
+              presentationId: presentationLine.presentationId,
+              presentationName: presentationLine.name,
+              presentationFactor: presentationLine.factor,
+            }
+          : {}),
       });
       totalAmount += lineTotal;
     }
@@ -764,6 +808,10 @@ export const deleteSale = async (id: string) => {
       : [];
     const manualIds = new Set(manualRows.map((p) => p.id));
 
+    // Líneas con presentación: el stock está en unidad base → qty × factor.
+    const restoreQty = (item: { quantity: number; presentationFactor?: number | null }) =>
+      item.presentationFactor != null ? item.quantity * item.presentationFactor : item.quantity;
+
     if (sale.branchId) {
       // Venta scoped a sucursal → reponer el pool correcto por renglón:
       // sueltos (loosePriceId) → LooseStock (kg de la celda); bolsas →
@@ -785,7 +833,7 @@ export const deleteSale = async (id: string) => {
               branchId: sale.branchId,
               organizationId: sale.organizationId,
             },
-            data: { quantity: { increment: item.quantity } },
+            data: { quantity: { increment: restoreQty(item) } },
           });
         }
       }
@@ -798,7 +846,7 @@ export const deleteSale = async (id: string) => {
               id: item.productId,
               organizationId: sale.organizationId,
             },
-            data: { quantity: { increment: item.quantity } },
+            data: { quantity: { increment: restoreQty(item) } },
           });
         }
       }
