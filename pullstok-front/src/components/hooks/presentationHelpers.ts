@@ -238,3 +238,14 @@ export const isPresentationDisabled = (
 /** "Ibuprofeno (Blister)" — display name of a presentation line. */
 export const presentationLineName = (name: string, presentationName: string): string =>
   `${name} (${presentationName})`;
+
+/** True when adding `addQty` to `currentQty` would need more base units than the
+ *  known stock. Factor 0 ("pendiente") and manual products are never capped. */
+export const exceedsPresentationStock = (
+  presentation: { factor: number },
+  currentQty: number,
+  addQty: number,
+  baseStock: number,
+  isManual = false,
+): boolean =>
+  !isManual && presentation.factor >= 1 && (currentQty + addQty) * presentation.factor > baseStock;

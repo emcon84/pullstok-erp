@@ -13,6 +13,8 @@ import {
   LooseBlisterDialog,
   type LooseBlisterResult,
 } from "@/components/molecules/LooseBlisterDialog";
+import { PresentationPicker } from "@/components/molecules/PresentationPicker";
+import { exceedsPresentationStock } from "@/components/hooks/presentationHelpers";
 import { getMe } from "@/services/onboardingService";
 import { useVendorCatalog } from "@/components/hooks/useVendorCatalog";
 import { useVendorRowsKeyboard } from "@/components/hooks/useVendorRowsKeyboard";
@@ -27,7 +29,7 @@ import {
   type StoredFilter,
 } from "@/components/hooks/vendorCatalogHelpers";
 import { parseDecimal, formatBolsaQty } from "@/components/hooks/vendorRowHelpers";
-import type { DataItem } from "@/types";
+import type { DataItem, ProductPresentation } from "@/types";
 
 type VendorCart = ReturnType<typeof useVendorCart>;
 
@@ -99,7 +101,7 @@ export const VendorCatalogTab = ({
         const product = catalog.items.find(
           (p) => (p._id || p.id) === it.productId,
         );
-        if (!product) continue;
+        if (!product || it.presentationId) continue; // líneas de presentación: otra identidad
         const currentMode = saleModeForProduct(product, unitMode);
         if ((it.saleMode ?? "BOLSA_CERRADA") !== currentMode) continue;
         const s = String(formatBolsaQty(it.quantity));
@@ -213,11 +215,48 @@ export const VendorCatalogTab = ({
     [modeFor, itemFor, cart, keyOf, branchId, sellsWholesale],
   );
 
+  // Producto con presentaciones pendiente de elegir (picker). qty = cantidad de la fila.
+  const [presentationTarget, setPresentationTarget] = useState<{ product: DataItem; qty: number } | null>(null);
+
+  const confirmPresentation = useCallback(
+    (presentation: ProductPresentation) => {
+      const target = presentationTarget;
+      if (!target) return;
+      const p = target.product;
+      const existing = cart.items.find(
+        (i) =>
+          i.productId === keyOf(p) &&
+          (i.saleMode ?? "BOLSA_CERRADA") === "BOLSA_CERRADA" &&
+          i.presentationId === presentation.id,
+      );
+      if (
+        exceedsPresentationStock(presentation, existing?.quantity ?? 0, target.qty, branchQty(p), !!p.isManual)
+      ) {
+        toast.error("No hay más stock disponible");
+        return;
+      }
+      setPresentationTarget(null);
+      cart.addToCart(
+        p, target.qty, branchId, branchQty(p), "BOLSA_CERRADA",
+        undefined, undefined, undefined, sellsWholesale, undefined, presentation,
+      );
+      toast.success(`"${p.name} (${presentation.name})" agregado al pedido`);
+    },
+    [presentationTarget, cart, keyOf, branchId, sellsWholesale],
+  );
+
   const commit = useCallback(
     (index: number) => {
       const p = catalog.items[index];
       if (!p) return;
       const stock = branchQty(p);
+      // sdd/product-presentations: el picker elige la presentación y deshabilita
+      // las que no alcanzan por stock (en unidades base), así que no se corta acá.
+      if (p.hasPresentations) {
+        const cur = parseDecimal(qtyByKey[keyOf(p)] ?? "1");
+        setPresentationTarget({ product: p, qty: Number.isNaN(cur) ? 1 : Math.max(1, Math.round(cur)) });
+        return;
+      }
       // Los manuales tienen quantity 0 pero se venden igual (sin stock en el server).
       if (stock <= 0 && !p.isManual) {
         toast.error("Producto sin stock");
@@ -285,7 +324,7 @@ export const VendorCatalogTab = ({
 
   const enabled = useCallback((index: number) => {
     const p = catalog.items[index];
-    return !!p && (!!p.isManual || branchQty(p) > 0);
+    return !!p && (!!p.isManual || !!p.hasPresentations || branchQty(p) > 0);
   }, [catalog.items]);
 
   // Memoizado para no perder el memo de ProductTable en cada tecla del
@@ -499,6 +538,16 @@ export const VendorCatalogTab = ({
         )}
         <div ref={catalog.sentinelRef} className="h-1" aria-hidden="true" />
       </div>
+
+      {presentationTarget && (
+        <PresentationPicker
+          product={presentationTarget.product}
+          sellsWholesale={sellsWholesale}
+          stock={presentationTarget.product.isManual ? null : branchQty(presentationTarget.product)}
+          onConfirm={confirmPresentation}
+          onCancel={() => setPresentationTarget(null)}
+        />
+      )}
 
       {/* ── Diálogo de pastillas sueltas (solo productos FARMACIA) ── */}
       {looseTarget && (
