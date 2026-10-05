@@ -31,6 +31,7 @@ export type SaleTicketItem = Pick<VendorCartItem, "name" | "price" | "quantity">
       | "piecesPerBlister"
       | "isFreeLine"
       | "lineTotal"
+      | "presentationName"
     >
   >;
 
@@ -175,6 +176,13 @@ export function resolveTicketCompany(src: {
 
 // ── Modelo ──
 
+/** "Ibuprofeno" + "Blister" → "Ibuprofeno (Blister)"; idempotent when already suffixed. */
+function withPresentation(name: string, presentationName?: string | null): string {
+  if (!presentationName) return name;
+  const suffix = `(${presentationName})`;
+  return name.endsWith(suffix) ? name : `${name} ${suffix}`;
+}
+
 function buildLine(item: SaleTicketItem): SaleTicketLine {
   // Venta libre: el detalle es el peso ("350 g") y el total es el tipeado.
   if (item.isFreeLine) {
@@ -186,7 +194,7 @@ function buildLine(item: SaleTicketItem): SaleTicketLine {
   }
   const mode = item.saleMode ?? "BOLSA_CERRADA";
   const isLoose = mode === "POR_PESO" || mode === "POR_MONTO";
-  const label = isLoose ? item.looseName || item.name : item.name;
+  const label = isLoose ? item.looseName || item.name : withPresentation(item.name, item.presentationName);
   // Precio unitario efectivo: en multipack por unidad el del renglón puede ser
   // el de caja; se usa perUnitPrice (mismo criterio que el payload de la venta).
   const unit = mode === "POR_UNIDAD" ? (item.perUnitPrice ?? item.price) : item.price;

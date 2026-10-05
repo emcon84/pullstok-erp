@@ -87,6 +87,10 @@ export interface Sale {
     saleMode?: SaleMode;
     /** Id de la celda PriceKgPrice cuando el renglón es venta suelta. */
     loosePriceId?: string;
+    /** sdd/product-presentations: snapshot de la presentación vendida. */
+    presentationId?: string | null;
+    presentationName?: string | null;
+    presentationFactor?: number | null;
   }[];
   products?: {
     id?: string;
