@@ -135,7 +135,7 @@ export const CartItemRow = ({ item, onUpdateQty, onRemove }: CartItemRowProps) =
 
   return (
     <div
-      data-line-key={`${item.productId}::${item.saleMode ?? "BOLSA_CERRADA"}::${item.loosePriceId ?? "bolsa"}`}
+      data-line-key={`${item.productId}::${item.saleMode ?? "BOLSA_CERRADA"}::${item.loosePriceId ?? "bolsa"}${item.presentationId ? `::${item.presentationId}` : ""}`}
       className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"
     >
       <div className="flex-1 min-w-0">

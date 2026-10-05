@@ -33,8 +33,14 @@ interface VendorCartHandlers {
     quantity: number,
     saleMode?: SaleMode,
     loosePriceId?: string,
+    presentationId?: string,
   ) => void;
-  remove: (productId: string, saleMode?: SaleMode, loosePriceId?: string) => void;
+  remove: (
+    productId: string,
+    saleMode?: SaleMode,
+    loosePriceId?: string,
+    presentationId?: string,
+  ) => void;
   clearCart: () => void;
   saveOrder: () => void;
   confirmSale: (payments?: PaymentInput[], cashSessionId?: string, discountPct?: number) => void;
@@ -102,7 +108,7 @@ export const VendorCartSheet = ({
             <div className="flex-1 overflow-auto -mx-6 px-6 space-y-3 mt-4 mb-2">
               {cart.items.map((item) => (
                 <CartItemRow
-                  key={`${item.productId}-${item.saleMode ?? "BOLSA_CERRADA"}-${item.loosePriceId ?? "bolsa"}`}
+                  key={`${item.productId}-${item.saleMode ?? "BOLSA_CERRADA"}-${item.loosePriceId ?? "bolsa"}-${item.presentationId ?? "-"}`}
                   item={item}
                   onUpdateQty={(qty) =>
                     handlers.updateQty(
@@ -110,10 +116,16 @@ export const VendorCartSheet = ({
                       qty,
                       item.saleMode,
                       item.loosePriceId,
+                      item.presentationId,
                     )
                   }
                   onRemove={() =>
-                    handlers.remove(item.productId, item.saleMode, item.loosePriceId)
+                    handlers.remove(
+                      item.productId,
+                      item.saleMode,
+                      item.loosePriceId,
+                      item.presentationId,
+                    )
                   }
                 />
               ))}

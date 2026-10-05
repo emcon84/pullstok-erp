@@ -1,5 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
-import type { DataItem } from "../../types";
+import type { DataItem, ProductPresentation } from "../../types";
+import {
+  presentationLineName,
+  presentationStockCap,
+  resolvePresentationPrice,
+} from "./presentationHelpers";
 import { unitPrice, effectivePrice, computePerUnitPrice } from "./vendorCatalogHelpers";
 import { round2 } from "@/lib/money";
 import { gramsToKg } from "@/lib/freeLine";
@@ -51,6 +56,11 @@ export interface VendorCartItem {
    *  autoritativo de la línea (price = lineTotal / quantity es solo derivado). */
   isFreeLine?: boolean;
   lineTotal?: number;
+  /** sdd/product-presentations: presentación vendida (snapshot). `name` ya trae
+   *  el sufijo "(Blister)"; `stock` es el tope en presentaciones (stock base ÷ factor). */
+  presentationId?: string;
+  presentationName?: string;
+  presentationFactor?: number;
 }
 
 /** Datos tipeados de una línea de venta libre (gramos y total en $). */
@@ -127,6 +137,10 @@ export function useVendorCart() {
       // blister, cargado ad-hoc por el vendedor (no viene de
       // product.unitsPerBox). Solo se usa cuando mode === "POR_UNIDAD_BLISTER".
       piecesPerBlister?: number,
+      // sdd/product-presentations: presentación elegida (producto con
+      // presentaciones). `stock` llega en unidades BASE; la línea guarda el tope
+      // en presentaciones. Precio = el de la presentación (mayorista si aplica).
+      presentation?: ProductPresentation,
     ) => {
       setItems((prev) => {
         const pid = product._id || product.id;
@@ -141,17 +155,39 @@ export function useVendorCart() {
           i.productId === pid &&
           (i.saleMode ?? "BOLSA_CERRADA") === mode &&
           (i.loosePriceId ?? null) === (loosePriceId ?? null) &&
-          (i.piecesPerBlister ?? null) === (piecesPerBlister ?? null);
+          (i.piecesPerBlister ?? null) === (piecesPerBlister ?? null) &&
+          (i.presentationId ?? null) === (presentation?.id ?? null);
         const qty = normalizeQty(mode, quantity);
         // Una cantidad suelta que redondea a 0 no crea (ni suma a) ninguna línea.
         if (isLooseMode(mode) && qty <= 0) return prev;
+        const lineStock = presentation ? presentationStockCap(presentation, stock) : stock;
         const existing = prev.find(matches);
         if (existing) {
           return prev.map((i) =>
             matches(i)
-              ? { ...i, quantity: normalizeQty(mode, i.quantity + qty), stock }
+              ? { ...i, quantity: normalizeQty(mode, i.quantity + qty), stock: lineStock }
               : i,
           );
+        }
+        if (presentation) {
+          return [
+            ...prev,
+            {
+              productId: pid!,
+              name: presentationLineName(product.name, presentation.name),
+              code: product.code || "",
+              image: product.image,
+              price: resolvePresentationPrice(presentation, !!sellsWholesale),
+              stock: lineStock,
+              quantity: Math.max(1, Math.round(qty)),
+              branchId,
+              saleMode: "BOLSA_CERRADA" as const,
+              presentationId: presentation.id,
+              presentationName: presentation.name,
+              presentationFactor: presentation.factor,
+              ...(product.isManual ? { isManual: true } : {}),
+            },
+          ];
         }
         return [
           ...prev,
@@ -217,6 +253,7 @@ export function useVendorCart() {
       quantity: number,
       saleMode?: SaleMode,
       loosePriceId?: string,
+      presentationId?: string,
     ) => {
       setItems((prev) => {
         const mode = saleMode ?? "BOLSA_CERRADA";
@@ -224,7 +261,8 @@ export function useVendorCart() {
           !i.isFreeLine && // la venta libre es inmutable (solo se quita)
           i.productId === productId &&
           (i.saleMode ?? "BOLSA_CERRADA") === mode &&
-          (i.loosePriceId ?? null) === (loosePriceId ?? null);
+          (i.loosePriceId ?? null) === (loosePriceId ?? null) &&
+          (i.presentationId ?? null) === (presentationId ?? null);
         const qty = normalizeQty(mode, quantity);
         return qty <= 0
           ? prev.filter((i) => !matches(i))
@@ -235,7 +273,12 @@ export function useVendorCart() {
   );
 
   const removeFromCart = useCallback(
-    (productId: string, saleMode?: SaleMode, loosePriceId?: string) => {
+    (
+      productId: string,
+      saleMode?: SaleMode,
+      loosePriceId?: string,
+      presentationId?: string,
+    ) => {
       const mode = saleMode ?? "BOLSA_CERRADA";
       setItems((prev) =>
         prev.filter(
@@ -243,7 +286,8 @@ export function useVendorCart() {
             !(
               i.productId === productId &&
               (i.saleMode ?? "BOLSA_CERRADA") === mode &&
-              (i.loosePriceId ?? null) === (loosePriceId ?? null)
+              (i.loosePriceId ?? null) === (loosePriceId ?? null) &&
+              (i.presentationId ?? null) === (presentationId ?? null)
             ),
         ),
       );
