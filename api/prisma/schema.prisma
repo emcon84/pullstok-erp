@@ -110,6 +110,7 @@ model Organization {
   products              Product[]
   providers             Provider[]
   accounts              Account[]
+  productPresentations  ProductPresentation[]
   priceKgTypes          PriceKgType[]
   priceKgBrands         PriceKgBrand[]
   priceKgPrices         PriceKgPrice[]
@@ -619,6 +620,10 @@ model Product {
   providerId         String?
   provider           Provider?          @relation(fields: [providerId], references: [id], onDelete: SetNull)
   reviewQueueEntries ReviewQueueEntry[]
+  // sdd/product-presentations: true = el stock se guarda en la unidad base de
+  // la presentación (factor 1) y se vende por presentación. Solo FARMACIA.
+  hasPresentations   Boolean            @default(false)
+  presentations      ProductPresentation[]
 
   @@index([organizationId])
   @@index([categoryId])
@@ -649,6 +654,32 @@ model ProductStock {
   @@unique([productId, branchId])
   @@index([branchId])
   @@map("product_stocks")
+}
+
+// Presentaciones de venta de un producto (sdd/product-presentations): caja,
+// blister, unidad... `factor` = unidades base por presentación (la base tiene
+// factor 1). El stock se guarda SIEMPRE en unidad base. Tenant-scoped y en
+// TENANT_MODELS (db.ts); dentro de $transaction el orgId se pasa explícito.
+// El CHECK (factor >= 1) vive en la migración (Prisma no lo modela).
+model ProductPresentation {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name           String
+  sortOrder      Int          @default(0)
+  factor         Int
+  price          Float
+  wholesalePrice Decimal?     @db.Decimal(12, 2)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  saleItems      SaleItem[]
+
+  @@unique([productId, name])
+  @@index([organizationId, productId])
+  @@map("product_presentations")
 }
 
 // Stock de alimento SUELTO por línea de la planilla (celda PriceKgPrice) y por
@@ -906,6 +937,13 @@ model SaleItem {
   // unitsPerBox): el vendedor lo carga en el momento de la venta. Solo
   // presente en renglones POR_UNIDAD_BLISTER; null en el resto (auditoría).
   piecesPerBlister Int?
+  // sdd/product-presentations: presentación vendida + snapshot de nombre y
+  // factor (auditoría). onDelete SetNull: borrar la presentación no borra el
+  // histórico. null en ventas legacy / productos sin presentaciones.
+  presentationId     String?
+  presentation       ProductPresentation? @relation(fields: [presentationId], references: [id], onDelete: SetNull)
+  presentationName   String?
+  presentationFactor Int?
 
   @@map("sale_items")
 }

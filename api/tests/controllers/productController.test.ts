@@ -173,3 +173,50 @@ describe('productController.updateProduct', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 });
+
+describe('productController.updateProduct — presentations category lock', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const lockedBody = {
+    message: 'Un producto con presentaciones debe permanecer en la categoría FARMACIA',
+    code: 'PRESENTATIONS_CATEGORY_LOCKED',
+  };
+
+  it('409 when a product with presentations moves to a non-FARMACIA category', async () => {
+    mockedPrisma.product.findFirst.mockResolvedValue({ categoryId: 'cat-farm', hasPresentations: true });
+    mockedPrisma.category.findFirst.mockResolvedValue({ name: 'Balanceados' });
+    const res = mockResponse();
+    await productController.updateProduct(mockParamsRequest({ categoryId: 'cat-otra' }, 'prod-1'), res);
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(lockedBody);
+    expect(mockedPrisma.product.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('409 when clearing the category (null)', async () => {
+    mockedPrisma.product.findFirst.mockResolvedValue({ categoryId: 'cat-farm', hasPresentations: true });
+    const res = mockResponse();
+    await productController.updateProduct(mockParamsRequest({ categoryId: null }, 'prod-1'), res);
+    expect(res.status).toHaveBeenCalledWith(409);
+  });
+
+  it('allows moving to another FARMACIA-named category', async () => {
+    mockedPrisma.product.findFirst
+      .mockResolvedValueOnce({ categoryId: 'cat-a', hasPresentations: true })
+      .mockResolvedValueOnce({ id: 'prod-1' });
+    mockedPrisma.category.findFirst.mockResolvedValue({ name: ' farmacia ' });
+    mockedPrisma.product.updateMany.mockResolvedValue({ count: 1 });
+    const res = mockResponse();
+    await productController.updateProduct(mockParamsRequest({ categoryId: 'cat-b' }, 'prod-1'), res);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('does not lock products without presentations', async () => {
+    mockedPrisma.product.findFirst
+      .mockResolvedValueOnce({ categoryId: 'cat-a', hasPresentations: false })
+      .mockResolvedValueOnce({ id: 'prod-1' });
+    mockedPrisma.product.updateMany.mockResolvedValue({ count: 1 });
+    const res = mockResponse();
+    await productController.updateProduct(mockParamsRequest({ categoryId: 'cat-b' }, 'prod-1'), res);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+});

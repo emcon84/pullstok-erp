@@ -7,6 +7,7 @@ import productController, {
   getOfflineSnapshot,
   getOfflineProductSnapshot,
 } from "../controllers/productController";
+import presentationsController from "../controllers/presentationsController";
 import manualProductController from "../controllers/manualProductController";
 import providerPriceListController from "../controllers/providerPriceListController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
@@ -29,6 +30,8 @@ import {
   bulkPublishSchema,
   createManualProductSchema,
   promoteManualProductSchema,
+  replacePresentationsSchema,
+  enablePresentationsSchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -167,6 +170,31 @@ router.patch(
   productController.publishProduct,
 );
 router.delete("/:id", authenticateJWT, checkBusinessHours, requireRole("ADMIN", "MANAGEMENT"), productController.deleteProduct);
+
+// Presentaciones de venta (sdd/product-presentations) — ADMIN/MANAGEMENT.
+router.put(
+  "/:id/presentations",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN", "MANAGEMENT"),
+  validate(replacePresentationsSchema),
+  presentationsController.replace,
+);
+router.post(
+  "/:id/presentations/enable",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN", "MANAGEMENT"),
+  validate(enablePresentationsSchema),
+  presentationsController.enable,
+);
+router.post(
+  "/:id/presentations/disable",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN", "MANAGEMENT"),
+  presentationsController.disable,
+);
 
 // Snapshot "offline" de UN producto puntual (misma forma que /offline-snapshot
 // bulk de arriba) — lo usa el catálogo local del front para parchear un
