@@ -676,6 +676,40 @@ describe("CustomerAccountDrawer", () => {
       });
     });
 
+    it("offers an unchecked 'Ya pagada' checkbox and does not send alreadyPaid by default", () => {
+      renderDrawer();
+      openForm();
+      expect(screen.getByLabelText("Ya pagada")).not.toBeChecked();
+      fireEvent.change(chargeAmount(), { target: { value: "700" } });
+      fireEvent.click(saveCharge());
+
+      expect(createCharge.mock.calls[0][0]).toEqual({ customerId: "c-1", input: { amount: 700 } });
+    });
+
+    it("sends alreadyPaid and toasts accordingly when 'Ya pagada' is checked", () => {
+      createCharge.mockImplementation((_vars, opts) => opts.onSuccess());
+      renderDrawer();
+      openForm();
+      fireEvent.change(chargeAmount(), { target: { value: "700" } });
+      fireEvent.click(screen.getByLabelText("Ya pagada"));
+      fireEvent.click(saveCharge());
+
+      expect(createCharge.mock.calls[0][0]).toEqual({
+        customerId: "c-1",
+        input: { amount: 700, alreadyPaid: true },
+      });
+      expect(toast.success).toHaveBeenCalledWith("Deuda anterior cargada como pagada");
+    });
+
+    it("resets 'Ya pagada' when the form is cancelled", () => {
+      renderDrawer();
+      openForm();
+      fireEvent.click(screen.getByLabelText("Ya pagada"));
+      fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+      openForm();
+      expect(screen.getByLabelText("Ya pagada")).not.toBeChecked();
+    });
+
     it("toasts success and resets and closes the form on success", () => {
       createCharge.mockImplementation((_vars, opts) => opts.onSuccess());
       renderDrawer();
@@ -814,6 +848,7 @@ describe("CustomerAccountDrawer", () => {
 
       expect((screen.getByLabelText("Monto de la deuda") as HTMLInputElement).value).toBe("900");
       expect((screen.getByLabelText("Detalle (opcional)") as HTMLInputElement).value).toBe("Ventas viejas");
+      expect(screen.queryByLabelText("Ya pagada")).not.toBeInTheDocument();
       fireEvent.change(screen.getByLabelText("Monto de la deuda"), { target: { value: "950" } });
       fireEvent.click(saveEdit());
 

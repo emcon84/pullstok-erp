@@ -61,6 +61,8 @@ export interface AccountChargeInput {
   date?: string;
   /** Detalle libre (máx. 500). */
   note?: string;
+  /** Deuda ya saldada: se asienta con un pago equivalente y el saldo no cambia. */
+  alreadyPaid?: boolean;
 }
 
 export interface AccountChargeResult {

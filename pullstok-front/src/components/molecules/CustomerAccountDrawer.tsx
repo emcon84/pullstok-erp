@@ -2,6 +2,7 @@ import { Fragment, useState } from "react";
 import { toast } from "react-toastify";
 import { ChevronDown, ChevronRight, Loader2, Pencil, Printer, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -236,6 +237,7 @@ export const CustomerAccountDrawer = ({
   const [chargeAmountStr, setChargeAmountStr] = useState("");
   const [chargeDate, setChargeDate] = useState(todayStr);
   const [chargeNote, setChargeNote] = useState("");
+  const [chargeAlreadyPaid, setChargeAlreadyPaid] = useState(false);
   const chargeAmount = round2(parseAmt(chargeAmountStr));
   const canSubmitCharge =
     chargeAmount > 0 &&
@@ -248,6 +250,7 @@ export const CustomerAccountDrawer = ({
     setChargeAmountStr("");
     setChargeDate(toLocalDateInput(new Date()));
     setChargeNote("");
+    setChargeAlreadyPaid(false);
     setEditingCharge(null);
     setChargeOpen(false);
   };
@@ -293,11 +296,14 @@ export const CustomerAccountDrawer = ({
           amount: chargeAmount,
           ...dateToSend(chargeDate),
           ...(chargeNote.trim() ? { note: chargeNote.trim() } : {}),
+          ...(chargeAlreadyPaid ? { alreadyPaid: true } : {}),
         },
       },
       {
         onSuccess: () => {
-          toast.success("Deuda anterior cargada");
+          toast.success(
+            chargeAlreadyPaid ? "Deuda anterior cargada como pagada" : "Deuda anterior cargada",
+          );
           resetChargeForm();
         },
         onError: (error: Error) => {
@@ -617,6 +623,18 @@ export const CustomerAccountDrawer = ({
                   onChange={(e) => setChargeNote(e.target.value)}
                 />
               </div>
+              {!editingCharge && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="account-charge-paid"
+                    checked={chargeAlreadyPaid}
+                    onCheckedChange={(c) => setChargeAlreadyPaid(c === true)}
+                  />
+                  <Label htmlFor="account-charge-paid" className="font-normal">
+                    Ya pagada
+                  </Label>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={resetChargeForm}>
                   Cancelar
