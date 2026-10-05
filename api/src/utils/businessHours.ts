@@ -38,6 +38,7 @@ export const resolveLocalTime = (now: Date, timezone: string) => {
  * Devuelve si `now` está dentro del horario comercial de la org.
  * Cada día puede tener 1..N turnos (slots); está abierto si cae dentro de
  * CUALQUIER turno. Inclusive start / exclusive end por slot.
+ * Ningún día habilitado → sin restricción (permitido siempre).
  * Día deshabilitado o ausente → bloqueado. Día habilitado sin slots → bloqueado.
  */
 export const isWithinBusinessHours = (
@@ -45,6 +46,11 @@ export const isWithinBusinessHours = (
   timezone: string,
   days: DaySetting[],
 ): { allowed: boolean } => {
+  // Ningún día habilitado = horario no configurado → sin restricción.
+  if (!days.some((d) => d.enabled)) {
+    return { allowed: true };
+  }
+
   const { weekday, minutesOfDay } = resolveLocalTime(now, timezone);
   const day = days.find((d) => d.day === weekday);
   if (!day?.enabled || !day.slots || day.slots.length === 0) {

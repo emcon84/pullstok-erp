@@ -86,9 +86,17 @@ describe("isWithinBusinessHours", () => {
 
   it("bloquea un día deshabilitado aunque la hora esté en rango", () => {
     const now = new Date("2026-08-06T15:00:00.000Z"); // 12:00 jueves
-    const days = DAYS({ 4: { enabled: false } });
+    // Otro día habilitado: si no hay ninguno, no hay restricción.
+    const days = DAYS({ 4: { enabled: false }, 1: { enabled: true } });
 
     expect(isWithinBusinessHours(now, TZ_AR, days).allowed).toBe(false);
+  });
+
+  it("permite siempre cuando ningún día está habilitado (sin restricción)", () => {
+    const now = new Date("2026-08-06T15:00:00.000Z"); // jueves
+    const days = DAYS();
+
+    expect(isWithinBusinessHours(now, TZ_AR, days).allowed).toBe(true);
   });
 
   it("bloquea si el día no tiene entrada en la config", () => {

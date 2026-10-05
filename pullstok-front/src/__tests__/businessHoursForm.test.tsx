@@ -71,14 +71,12 @@ describe("BusinessHoursForm — validación local", () => {
     expect(screen.getAllByRole("switch")).toHaveLength(7);
   });
 
-  it("bloquea el submit cuando ningún día está habilitado (>=1 enabled)", () => {
+  it("permite guardar cuando ningún día está habilitado (sin restricción)", () => {
     const { onSave } = renderForm();
     fireEvent.click(screen.getByRole("button", { name: "Guardar horario" }));
 
-    expect(
-      screen.getByText(/Habilitá al menos un día/),
-    ).toBeInTheDocument();
-    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Habilitá al menos un día/)).not.toBeInTheDocument();
+    expect(onSave).toHaveBeenCalledTimes(1);
   });
 
   it("bloquea el submit cuando open >= close en un día habilitado", () => {
@@ -102,16 +100,18 @@ describe("BusinessHoursForm — validación local", () => {
   });
 
   it("limpia el error previo cuando el segundo submit ya es válido", () => {
-    const { onSave } = renderForm();
+    const { onSave } = renderForm(
+      withEnabled(1, { slots: [{ open: "19:00", close: "09:00" }] }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Guardar horario" }));
-    expect(screen.getByText(/Habilitá al menos un día/)).toBeInTheDocument();
+    expect(screen.getByText(/La apertura debe ser anterior al cierre/)).toBeInTheDocument();
 
-    // Habilitamos Lunes con horario válido y reintentamos.
+    // Deshabilitamos Lunes (queda sin restricción) y reintentamos.
     const switches = screen.getAllByRole("switch");
     fireEvent.click(switches[1]);
     fireEvent.click(screen.getByRole("button", { name: "Guardar horario" }));
 
-    expect(screen.queryByText(/Habilitá al menos un día/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/La apertura debe ser anterior al cierre/)).not.toBeInTheDocument();
     expect(onSave).toHaveBeenCalledTimes(1);
   });
 

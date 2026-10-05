@@ -175,14 +175,11 @@ export const BusinessHoursForm = ({
     );
   };
 
-  // Validación local ESTRICTA, espejo de la Zod del server (REQ-2): al menos
-  // un día habilitado; cada día habilitado con >= 1 turno; y en cada turno
-  // open < close (string compare zero-padded, "09:00" < "19:00" es correcto).
-  // Se ejecuta ANTES de tocar el server — un submit inválido nunca llega a PUT.
+  // Validación local ESTRICTA, espejo de la Zod del server (REQ-2): cada día
+  // habilitado con >= 1 turno; y en cada turno open < close (string compare
+  // zero-padded, "09:00" < "19:00" es correcto). Ningún día habilitado es
+  // válido (sin restricción de horario). Se ejecuta ANTES de tocar el server.
   const validate = (): string | null => {
-    if (!days.some((d) => d.enabled)) {
-      return "Habilitá al menos un día para poder guardar.";
-    }
     for (const d of days) {
       if (!d.enabled) continue;
       if (!d.slots.length) {

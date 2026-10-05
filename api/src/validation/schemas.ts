@@ -1340,13 +1340,6 @@ export const updateBusinessHoursSchema = z
         return;
       }
     }
-    if (!data.days.some((d) => d.enabled)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["days"],
-        message: "Debe haber al menos un día habilitado",
-      });
-    }
   });
 
 // ---------- Import de planillas de precios Alican (sdd/alican-wholesale-price-list) ----------

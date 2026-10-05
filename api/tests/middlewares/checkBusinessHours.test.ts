@@ -125,6 +125,8 @@ describe("checkBusinessHours", () => {
       days: [
         // Jueves (day 4) deshabilitado — aunque sea de 00:00 a 23:59.
         { day: 4, enabled: false, slots: [{ open: "00:00", close: "23:59" }] },
+        // Otro día habilitado: si no hay ninguno, no hay restricción.
+        { day: 1, enabled: true, slots: [{ open: "09:00", close: "19:00" }] },
       ],
     });
     const req = mockRequest("VENDEDOR");
