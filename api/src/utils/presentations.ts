@@ -62,6 +62,13 @@ export const resolvePresentationLine = (
   if (!found.isActive) {
     throw new PresentationError("PRESENTATION_INACTIVE", "La presentación está inactiva");
   }
+  // Precio 0 = "pendiente de precio": no se puede vender.
+  if (!found.price || found.price <= 0) {
+    throw new PresentationError(
+      "PRESENTATION_NOT_SELLABLE",
+      "La presentación no tiene precio definido",
+    );
+  }
   const wholesale =
     found.wholesalePrice === null || found.wholesalePrice === undefined
       ? null
@@ -79,8 +86,9 @@ export const toStockLevels = (
   baseQty: number,
   presentations: Pick<PresentationLike, "name" | "factor" | "isActive">[],
 ): { name: string; count: number }[] => {
+  // factor 0 = "pendiente": sin contenido definido, no entra en el desglose.
   const active = presentations
-    .filter((p) => p.isActive)
+    .filter((p) => p.isActive && p.factor >= 1)
     .sort((a, b) => b.factor - a.factor);
   let rest = Math.max(0, Math.floor(baseQty));
   const levels: { name: string; count: number }[] = [];
@@ -98,15 +106,15 @@ export const toStockLevels = (
 export const isFarmaciaCategoryName = (name: string | null | undefined): boolean =>
   typeof name === "string" && name.trim().toUpperCase() === "FARMACIA";
 
-/** Un set válido: 1 única activa con factor 1, factores enteros >= 1, nombres únicos. */
+/** Un set válido: 1 única activa con factor 1, factores enteros >= 0 (0 = pendiente), nombres únicos. */
 export const validatePresentationSet = (
   list: Pick<PresentationLike, "name" | "factor" | "isActive">[],
 ): void => {
   for (const p of list) {
-    if (!Number.isInteger(p.factor) || p.factor < 1) {
+    if (!Number.isInteger(p.factor) || p.factor < 0) {
       throw new PresentationError(
         "PRESENTATION_FACTOR_INVALID",
-        `El factor de "${p.name}" debe ser un entero >= 1`,
+        `El factor de "${p.name}" debe ser un entero >= 0`,
       );
     }
   }

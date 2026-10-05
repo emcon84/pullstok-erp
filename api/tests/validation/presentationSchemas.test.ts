@@ -17,7 +17,7 @@ describe("presentationInputSchema", () => {
 
   it.each([
     ["empty name", { name: "   " }],
-    ["factor 0", { factor: 0 }],
+    ["negative factor", { factor: -1 }],
     ["fractional factor", { factor: 1.5 }],
     ["negative price", { price: -1 }],
     ["negative wholesale", { wholesalePrice: -1 }],

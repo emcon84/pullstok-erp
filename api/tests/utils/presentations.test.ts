@@ -56,6 +56,16 @@ describe("resolvePresentationLine", () => {
     expect(codeOf(() => resolvePresentationLine(product, "other", false))).toBe("PRESENTATION_NOT_FOUND");
   });
 
+  it("PRESENTATION_NOT_SELLABLE when the price is 0", () => {
+    const p = { hasPresentations: true, presentations: [{ ...unit, id: "p-zero", price: 0, wholesalePrice: null }] };
+    expect(codeOf(() => resolvePresentationLine(p, "p-zero", false))).toBe("PRESENTATION_NOT_SELLABLE");
+  });
+
+  it("factor 0 with a positive price is sellable", () => {
+    const p = { hasPresentations: true, presentations: [{ ...box, factor: 0 }] };
+    expect(resolvePresentationLine(p, "p-box", false)).toMatchObject({ factor: 0, price: 1000 });
+  });
+
   it("PRESENTATION_INACTIVE when the presentation is disabled", () => {
     const p = { hasPresentations: true, presentations: [{ ...box, isActive: false }, unit] };
     expect(codeOf(() => resolvePresentationLine(p, "p-box", false))).toBe("PRESENTATION_INACTIVE");
@@ -86,6 +96,15 @@ describe("toStockLevels", () => {
 
   it("shows the base level when total is 0", () => {
     expect(toStockLevels(0, set)).toEqual([{ name: "Unidad", count: 0 }]);
+  });
+
+  it("skips factor 0 (pending) presentations", () => {
+    const s = [
+      { name: "Caja", factor: 0, isActive: true },
+      { name: "Blister", factor: 0, isActive: true },
+      { name: "Pastilla", factor: 1, isActive: true },
+    ];
+    expect(toStockLevels(7, s)).toEqual([{ name: "Pastilla", count: 7 }]);
   });
 
   it("ignores inactive presentations", () => {
@@ -123,9 +142,19 @@ describe("validatePresentationSet", () => {
     ).toBe("PRESENTATION_BASE_REQUIRED");
   });
 
-  it("rejects non-integer or < 1 factors", () => {
-    expect(codeOf(() => validatePresentationSet([ok[1], { name: "X", factor: 0, isActive: true }]))).toBe("PRESENTATION_FACTOR_INVALID");
+  it("rejects non-integer or negative factors", () => {
+    expect(codeOf(() => validatePresentationSet([ok[1], { name: "X", factor: -1, isActive: true }]))).toBe("PRESENTATION_FACTOR_INVALID");
     expect(codeOf(() => validatePresentationSet([ok[1], { name: "X", factor: 2.5, isActive: true }]))).toBe("PRESENTATION_FACTOR_INVALID");
+  });
+
+  it("accepts factor 0 (pending) next to the active base", () => {
+    expect(() => validatePresentationSet([ok[1], { name: "Blister", factor: 0, isActive: true }])).not.toThrow();
+  });
+
+  it("factor 0 never counts as the base", () => {
+    expect(
+      codeOf(() => validatePresentationSet([{ name: "Blister", factor: 0, isActive: true }])),
+    ).toBe("PRESENTATION_BASE_REQUIRED");
   });
 
   it("rejects duplicate names (case-insensitive, trimmed)", () => {

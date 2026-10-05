@@ -217,7 +217,7 @@ export const presentationInputSchema = z.object({
   id: z.string().min(1).optional(),
   name: z.string().trim().min(1, "El nombre es requerido"),
   sortOrder: z.number().int("sortOrder debe ser un entero"),
-  factor: z.number().int("El factor debe ser un entero").min(1, "El factor debe ser >= 1"),
+  factor: z.number().int("El factor debe ser un entero").min(0, "El factor debe ser >= 0"),
   price: z.number().nonnegative("El precio no puede ser negativo"),
   wholesalePrice: z.number().nonnegative("El precio mayorista no puede ser negativo").nullable(),
   isActive: z.boolean(),

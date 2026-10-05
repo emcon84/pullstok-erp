@@ -660,7 +660,7 @@ model ProductStock {
 // blister, unidad... `factor` = unidades base por presentación (la base tiene
 // factor 1). El stock se guarda SIEMPRE en unidad base. Tenant-scoped y en
 // TENANT_MODELS (db.ts); dentro de $transaction el orgId se pasa explícito.
-// El CHECK (factor >= 1) vive en la migración (Prisma no lo modela).
+// El CHECK (factor >= 0; 0 = pendiente) vive en la migración (Prisma no lo modela).
 model ProductPresentation {
   id             String       @id @default(uuid())
   organizationId String

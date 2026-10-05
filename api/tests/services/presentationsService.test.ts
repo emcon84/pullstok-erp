@@ -98,6 +98,22 @@ describe("enablePresentations", () => {
     });
   });
 
+  it("does not convert stock when the largest factor is 0 (all non-base pending)", async () => {
+    const pending = input({ name: "Blister", factor: 0 });
+    await enablePresentations("p-1", { presentations: [pending, unit] });
+    expect(tx.productStock.updateMany).not.toHaveBeenCalled();
+    expect(tx.product.updateMany).toHaveBeenCalledWith({
+      where: { id: "p-1", organizationId: "org-1" },
+      data: { hasPresentations: true },
+    });
+  });
+
+  it("does not convert stock when stockCountedIn has factor 0", async () => {
+    const pending = input({ name: "Blister", factor: 0 });
+    await enablePresentations("p-1", { presentations: [pending, unit], stockCountedIn: "Blister" });
+    expect(tx.productStock.updateMany).not.toHaveBeenCalled();
+  });
+
   it("400 when stockCountedIn is not in the set", async () => {
     await failsWith(enablePresentations("p-1", { presentations: [box, unit], stockCountedIn: "Pallet" }), 400, "PRESENTATION_COUNTED_IN_INVALID");
   });

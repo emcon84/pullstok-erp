@@ -47,6 +47,8 @@ const makeTx = () => ({
 const presentations = [
   { id: "pr-unit", name: "Unidad", factor: 1, price: 100, wholesalePrice: 80, isActive: true },
   { id: "pr-box", name: "Caja", factor: 10, price: 900, wholesalePrice: 700, isActive: true },
+  { id: "pr-zero", name: "Pastilla", factor: 1, price: 0, wholesalePrice: null, isActive: true },
+  { id: "pr-pending", name: "Blister", factor: 0, price: 300, wholesalePrice: null, isActive: true },
   { id: "pr-off", name: "Pallet", factor: 100, price: 8000, wholesalePrice: null, isActive: false },
 ];
 const pharmaProduct = {
@@ -161,6 +163,25 @@ describe("createSale with presentations", () => {
       expect(tx.productStock.updateMany).not.toHaveBeenCalled();
     },
   );
+
+  it("rejects a presentation with price 0 → 400 PRESENTATION_NOT_SELLABLE", async () => {
+    const tx = setup(pharmaProduct);
+    await expect(
+      SaleService.createSale({ products: [line({ presentationId: "pr-zero" })] }, "u-1", "VENDEDOR"),
+    ).rejects.toMatchObject({ code: "PRESENTATION_NOT_SELLABLE", status: 400 });
+    expect(tx.sale.create).not.toHaveBeenCalled();
+  });
+
+  it("factor 0 is sellable and deducts 0 base units (stock check passes)", async () => {
+    const tx = setup(pharmaProduct);
+    tx.productStock.findFirst.mockResolvedValue({ id: "ps-1", quantity: 0 });
+    await SaleService.createSale({ products: [line({ presentationId: "pr-pending", quantity: 3 })] }, "u-1", "VENDEDOR");
+    const data = tx.sale.create.mock.calls[0][0].data;
+    expect(data.totalAmount).toBe(900);
+    expect(data.items.create[0]).toMatchObject({ presentationFactor: 0, presentationName: "Blister" });
+    const decs = tx.productStock.updateMany.mock.calls.map((c: any) => c[0].data.quantity?.decrement);
+    expect(decs.every((d: number | undefined) => d === undefined || d === 0)).toBe(true);
+  });
 
   it("insufficient stock in base units rejects the sale", async () => {
     const tx = setup(pharmaProduct);
