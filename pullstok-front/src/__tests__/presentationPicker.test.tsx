@@ -140,6 +140,22 @@ describe("PresentationPicker", () => {
       expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ id: "c" }), 2);
     });
 
+    it("multiplies each option price by the quantity and keeps the unit price visible", () => {
+      setup({ withQuantity: true, sellsWholesale: true });
+      fireEvent.change(screen.getByLabelText("Cantidad"), { target: { value: "3" } });
+      const blister = screen.getByRole("option", { name: /Blister/ });
+      expect(blister).toHaveTextContent("$450");
+      expect(blister).toHaveTextContent("$150 c/u");
+      expect(screen.getByRole("option", { name: /Caja/ })).toHaveTextContent("$2.100");
+    });
+
+    it("shows the plain price with quantity 1", () => {
+      setup({ withQuantity: true });
+      const blister = screen.getByRole("option", { name: /Blister/ });
+      expect(blister).toHaveTextContent("$150");
+      expect(blister).not.toHaveTextContent("c/u");
+    });
+
     it("caps the quantity by the base stock of the active presentation", () => {
       // 25 base units: Caja (100) is disabled, so Blister (10) is active → at most 2
       setup({ withQuantity: true, stock: 25 });

@@ -130,6 +130,8 @@ export const PresentationPicker = ({
           {options.map((p) => {
             const isDisabled = disabled(p);
             const hint = presentationContentHint(p, all);
+            const unitPrice = resolvePresentationPrice(p, sellsWholesale);
+            const lineQty = withQuantity ? Math.max(1, qty) : 1;
             return (
               <div
                 key={p.id}
@@ -147,9 +149,14 @@ export const PresentationPicker = ({
                   {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
                   {isDisabled && <p className="text-xs text-destructive">Sin stock suficiente</p>}
                 </div>
-                <span className="text-lg font-bold tabular-nums">
-                  {money(resolvePresentationPrice(p, sellsWholesale))}
-                </span>
+                <div className="text-right">
+                  <span className="text-lg font-bold tabular-nums">
+                    {money(unitPrice * lineQty)}
+                  </span>
+                  {lineQty > 1 && (
+                    <p className="text-xs text-muted-foreground tabular-nums">{money(unitPrice)} c/u</p>
+                  )}
+                </div>
               </div>
             );
           })}
