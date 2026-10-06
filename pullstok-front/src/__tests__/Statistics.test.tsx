@@ -13,6 +13,9 @@ vi.mock("@/components/hooks/useOrder", () => ({
 vi.mock("@/components/hooks/useReceipt", () => ({
   useGetReceipts: vi.fn(),
 }));
+vi.mock("@/components/hooks/useCustomerAccount", () => ({
+  useAccountCollections: vi.fn(() => ({ collections: null, loading: false, error: null })),
+}));
 vi.mock("@/components/molecules/StatsChart", () => ({
   StatsChart: () => <div data-testid="stats-chart" />,
 }));

@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_URL } from "../constants";
 import type {
+  AccountCollections,
   AccountMovementDeleteResult,
   AccountMovementUpdateInput,
   AccountMovementUpdateResult,
@@ -40,6 +41,22 @@ export const getCustomerBalances = async (): Promise<CustomerBalance[]> => {
     return response.data;
   } catch (error) {
     throw toError(error, "Error al obtener los saldos");
+  }
+};
+
+/**
+ * Cobros de cuenta corriente en [from, to) agrupados por medio de pago
+ * (solo ADMIN/MANAGEMENT; alimenta Estadísticas → Ventas).
+ */
+export const getAccountCollections = async (from: Date, to: Date): Promise<AccountCollections> => {
+  try {
+    const response = await axios.get<AccountCollections>(`${API_URL}/customers/account-collections`, {
+      headers: authHeaders(),
+      params: { from: from.toISOString(), to: to.toISOString() },
+    });
+    return response.data;
+  } catch (error) {
+    throw toError(error, "Error al obtener los cobros de cuenta corriente");
   }
 };
 

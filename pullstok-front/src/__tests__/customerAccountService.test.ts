@@ -27,6 +27,7 @@ import {
   deleteAccountMovement,
   unlockBalancesView,
   getBalancesSummary,
+  getAccountCollections,
 } from "../services/customerAccountService";
 
 const axiosError = (data: unknown) => ({ isAxiosError: true, response: { data } });
@@ -215,5 +216,31 @@ describe("customerAccountService", () => {
   it("getBalancesSummary exposes the BALANCES_LOCKED code on the error", async () => {
     mockGet.mockRejectedValue(axiosError({ error: "BALANCES_LOCKED", message: "Los saldos están bloqueados" }));
     await expect(getBalancesSummary("bt")).rejects.toMatchObject({ code: "BALANCES_LOCKED" });
+  });
+
+  it("getAccountCollections GETs /customers/account-collections with ISO from/to", async () => {
+    const payload = { total: 300, count: 2, byMethod: [{ method: "EFECTIVO", count: 2, amount: 300 }] };
+    mockGet.mockResolvedValue({ data: payload });
+    const from = new Date("2026-10-01T03:00:00.000Z");
+    const to = new Date("2026-10-02T03:00:00.000Z");
+
+    const res = await getAccountCollections(from, to);
+
+    expect(mockGet).toHaveBeenCalledWith(
+      expect.stringMatching(/\/customers\/account-collections$/),
+      {
+        headers: { Authorization: "Bearer tok-1" },
+        params: { from: "2026-10-01T03:00:00.000Z", to: "2026-10-02T03:00:00.000Z" },
+      },
+    );
+    expect(res).toEqual(payload);
+  });
+
+  it("getAccountCollections surfaces the server message or a fallback", async () => {
+    const d = new Date();
+    mockGet.mockRejectedValueOnce(axiosError({ message: "Parámetros inválidos" }));
+    await expect(getAccountCollections(d, d)).rejects.toThrow("Parámetros inválidos");
+    mockGet.mockRejectedValueOnce(new Error("net"));
+    await expect(getAccountCollections(d, d)).rejects.toThrow("Error al obtener los cobros de cuenta corriente");
   });
 });

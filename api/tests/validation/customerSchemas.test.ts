@@ -11,6 +11,7 @@ import {
   createAccountChargeSchema,
   createAccountPaymentSchema,
   updateAccountMovementSchema,
+  accountCollectionsQuerySchema,
 } from "../../src/validation/schemas";
 
 describe("createCustomerSchema — todos los campos opcionales", () => {
@@ -245,5 +246,41 @@ describe("updateAccountMovementSchema — edición de movimiento", () => {
     const r = updateAccountMovementSchema.safeParse({ amount: 5, method: "QR" });
     expect(r.success).toBe(true);
     expect((r.data as any).method).toBeUndefined();
+  });
+});
+
+describe("accountCollectionsQuerySchema", () => {
+  const from = "2026-10-01T03:00:00.000Z";
+  const to = "2026-10-02T03:00:00.000Z";
+
+  it("parses ISO datetimes into Date objects", () => {
+    const r = accountCollectionsQuerySchema.safeParse({ from, to });
+    expect(r.success).toBe(true);
+    expect(r.data!.from).toEqual(new Date(from));
+    expect(r.data!.to).toEqual(new Date(to));
+  });
+
+  it("accepts offset datetimes and from === to", () => {
+    expect(
+      accountCollectionsQuerySchema.safeParse({
+        from: "2026-10-01T00:00:00-03:00",
+        to: "2026-10-01T00:00:00-03:00",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects missing from or to", () => {
+    expect(accountCollectionsQuerySchema.safeParse({ from }).success).toBe(false);
+    expect(accountCollectionsQuerySchema.safeParse({ to }).success).toBe(false);
+    expect(accountCollectionsQuerySchema.safeParse({}).success).toBe(false);
+  });
+
+  it("rejects non-ISO values", () => {
+    expect(accountCollectionsQuerySchema.safeParse({ from: "hoy", to }).success).toBe(false);
+    expect(accountCollectionsQuerySchema.safeParse({ from, to: "2026-13-45" }).success).toBe(false);
+  });
+
+  it("rejects from > to", () => {
+    expect(accountCollectionsQuerySchema.safeParse({ from: to, to: from }).success).toBe(false);
   });
 });

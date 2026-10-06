@@ -35,6 +35,7 @@ import { useGetSales } from "../components/hooks/useSales";
 import { useGetBudgets } from "../components/hooks/useBudget";
 import { useOrders } from "../components/hooks/useOrder";
 import { useGetReceipts } from "../components/hooks/useReceipt";
+import { useAccountCollections } from "../components/hooks/useCustomerAccount";
 import { Loader } from "../components/atoms/loader";
 import { PAYMENT_METHOD_LABELS } from "../models/cashSessionModel";
 
@@ -127,6 +128,21 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
       products: aggregateTopProducts(filtered),
     };
   }, [data, type, period, selectedDay]);
+
+  // Cobros de cuenta corriente (solo ventas): mismo período que el resto del
+  // dashboard; el servidor usa [from, to) → el fin inclusivo de getDateRange
+  // (23:59:59.999 / ahora) se pasa +1 ms para que ambos rangos coincidan.
+  const collectionsRange = useMemo(() => {
+    const { start, end } = getDateRange(period, period === "daily" ? selectedDay : undefined);
+    return { from: start, to: new Date(end.getTime() + 1) };
+  }, [period, selectedDay]);
+  const { collections } = useAccountCollections(
+    collectionsRange.from,
+    collectionsRange.to,
+    type === "sales",
+  );
+  const collectionRows = type === "sales" ? (collections?.byMethod ?? []) : [];
+  const totalCollections = collectionRows.reduce((sum, r) => sum + r.amount, 0);
 
   const totalPayments = paymentBreakdown.reduce((sum, r) => sum + r.amount, 0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -265,6 +281,51 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
                 </TableRow>
               </TableFooter>
             )}
+          </Table>
+        </Card>
+      )}
+
+      {collectionRows.length > 0 && (
+        <Card className="gap-0 overflow-hidden p-0">
+          <div className="border-b p-4">
+            <h3 className="font-semibold">
+              Cobros de cuenta corriente
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                plata cobrada a clientes con deuda
+              </span>
+            </h3>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Medio de pago</TableHead>
+                <TableHead className="text-right">Cant.</TableHead>
+                <TableHead className="text-right">Monto</TableHead>
+                <TableHead className="text-right">Distribución</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {collectionRows.map((r) => (
+                <TableRow key={r.method}>
+                  <TableCell className="font-medium">{paymentLabel(r.method)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.count}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(r.amount)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {totalCollections > 0 ? `${((r.amount / totalCollections) * 100).toFixed(1)}%` : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TableCell className="font-semibold">Total</TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">
+                  {collectionRows.reduce((s, r) => s + r.count, 0)}
+                </TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(totalCollections)}</TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">100%</TableCell>
+              </TableRow>
+            </TableFooter>
           </Table>
         </Card>
       )}

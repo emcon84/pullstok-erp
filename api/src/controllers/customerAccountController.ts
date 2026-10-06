@@ -57,6 +57,16 @@ const getBalancesSummary = async (_req: Request, res: Response) => {
   }
 };
 
+/** Cobros de cuenta corriente por medio de pago en un rango (query validada por validateQuery). */
+const getAccountCollections = async (req: Request, res: Response) => {
+  try {
+    const { from, to } = req.query as unknown as { from: Date; to: Date };
+    res.status(200).json(await customerAccountService.getAccountCollections(from, to));
+  } catch (error: any) {
+    handleError(error, res);
+  }
+};
+
 /** Exchanges the balances password for a short-lived token. Never echoes the password. */
 const unlockBalances = (req: AuthedRequest, res: Response) => {
   try {
@@ -152,6 +162,7 @@ const getAccountStatementLink = async (req: Request, res: Response) => {
 export default {
   getBalances,
   getBalancesSummary,
+  getAccountCollections,
   unlockBalances,
   getAccount,
   registerPayment,

@@ -1590,3 +1590,13 @@ export const agentJobResultSchema = z.object({
   status: z.enum(["PRINTED", "ERROR"]),
   errorMessage: z.string().max(500).optional(),
 });
+
+// Query de cobros de cuenta corriente: rango ISO [from, to) ya convertido a Date.
+const isoDateQuery = z.string().datetime({ offset: true }).transform((v) => new Date(v));
+export const accountCollectionsQuerySchema = z
+  .object({ from: isoDateQuery, to: isoDateQuery })
+  .strip()
+  .refine((q) => !(q.from instanceof Date && q.to instanceof Date) || q.from.getTime() <= q.to.getTime(), {
+    message: "from debe ser anterior o igual a to",
+    path: ["from"],
+  });

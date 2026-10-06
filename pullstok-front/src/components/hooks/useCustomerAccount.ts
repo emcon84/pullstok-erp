@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createHistoricalCharge,
+  getAccountCollections,
   deleteAccountMovement,
   getAccountStatementLink,
   getCustomerAccount,
@@ -10,6 +11,7 @@ import {
   updateAccountMovement,
 } from "../../services/customerAccountService";
 import type {
+  AccountCollections,
   AccountChargeInput,
   AccountChargeResult,
   AccountMovementDeleteResult,
@@ -29,6 +31,17 @@ export const useCustomerBalances = () => {
     queryFn: getCustomerBalances,
   });
   return { balances: data ?? [], loading: isLoading, error };
+};
+
+/** Cobros de cuenta corriente por medio de pago en [from, to); conserva el dato previo al cambiar el rango. */
+export const useAccountCollections = (from: Date, to: Date, enabled = true) => {
+  const { data, error, isLoading } = useQuery<AccountCollections, Error>({
+    queryKey: ["account-collections", from.toISOString(), to.toISOString()],
+    queryFn: () => getAccountCollections(from, to),
+    enabled,
+    placeholderData: (prev) => prev,
+  });
+  return { collections: data ?? null, loading: isLoading, error };
 };
 
 /** Extracto de un cliente (deshabilitado sin id). */

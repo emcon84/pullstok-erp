@@ -6,6 +6,7 @@ import React from "react";
 vi.mock("../services/customerAccountService", () => ({
   getCustomerBalances: vi.fn(),
   getCustomerAccount: vi.fn(),
+  getAccountCollections: vi.fn(),
   registerAccountPayment: vi.fn(),
   getAccountStatementLink: vi.fn(),
   createHistoricalCharge: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock("../services/customerAccountService", () => ({
 import {
   useCustomerBalances,
   useCustomerAccount,
+  useAccountCollections,
   useRegisterAccountPayment,
   useGetAccountStatementLink,
   useCreateHistoricalCharge,
@@ -25,6 +27,7 @@ import {
 import {
   getCustomerBalances,
   getCustomerAccount,
+  getAccountCollections,
   registerAccountPayment,
   getAccountStatementLink,
   createHistoricalCharge,
@@ -34,6 +37,7 @@ import {
 
 const mockBalances = vi.mocked(getCustomerBalances);
 const mockAccount = vi.mocked(getCustomerAccount);
+const mockCollections = vi.mocked(getAccountCollections);
 const mockRegister = vi.mocked(registerAccountPayment);
 const mockStatementLink = vi.mocked(getAccountStatementLink);
 const mockCreateCharge = vi.mocked(createHistoricalCharge);
@@ -187,5 +191,45 @@ describe("useCustomerAccount hooks", () => {
     expect(keys()).toContainEqual(["customer-account", "c-1"]);
     expect(keys()).toContainEqual(["customer-balances"]);
     expect(keys()).toContainEqual(["cash-sessions"]);
+  });
+});
+
+describe("useAccountCollections", () => {
+  const from = new Date("2026-10-01T03:00:00.000Z");
+  const to = new Date("2026-10-02T03:00:00.000Z");
+  const payload = { total: 300, count: 2, byMethod: [{ method: "EFECTIVO", count: 2, amount: 300 }] };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCollections.mockResolvedValue(payload);
+  });
+
+  it("loads the collections for the range", async () => {
+    const { result } = renderHook(() => useAccountCollections(from, to, true), { wrapper });
+    await waitFor(() => expect(result.current.collections).toEqual(payload));
+    expect(mockCollections).toHaveBeenCalledWith(from, to);
+  });
+
+  it("does not fetch when disabled", () => {
+    const { result } = renderHook(() => useAccountCollections(from, to, false), { wrapper });
+    expect(mockCollections).not.toHaveBeenCalled();
+    expect(result.current.collections).toBeNull();
+  });
+
+  it("keeps the previous data while the range changes", async () => {
+    let resolveNext: (v: typeof payload) => void = () => {};
+    const { result, rerender } = renderHook(
+      ({ f, t }: { f: Date; t: Date }) => useAccountCollections(f, t, true),
+      { wrapper, initialProps: { f: from, t: to } },
+    );
+    await waitFor(() => expect(result.current.collections).toEqual(payload));
+
+    mockCollections.mockReturnValueOnce(new Promise((r) => { resolveNext = r; }));
+    rerender({ f: new Date("2026-10-02T03:00:00.000Z"), t: new Date("2026-10-03T03:00:00.000Z") });
+    expect(result.current.collections).toEqual(payload);
+    await act(async () => {
+      resolveNext({ total: 0, count: 0, byMethod: [] });
+    });
+    await waitFor(() => expect(result.current.collections?.count).toBe(0));
   });
 });

@@ -122,3 +122,18 @@ export interface BalancesUnlockResult {
   token: string;
   expiresInSec: number;
 }
+
+export interface AccountCollectionMethod {
+  /** Payment method key (EFECTIVO, TRANSFERENCIA...; SIN_METODO if missing). */
+  method: string;
+  count: number;
+  amount: number;
+}
+
+/** Respuesta de GET /customers/account-collections (cobros por medio de pago). */
+export interface AccountCollections {
+  total: number;
+  count: number;
+  /** Sorted by amount desc. */
+  byMethod: AccountCollectionMethod[];
+}

@@ -18,6 +18,7 @@ jest.mock("../../src/services/customerAccountService", () => ({
   default: {
     getBalances: jest.fn(),
     getBalancesSummary: jest.fn(),
+    getAccountCollections: jest.fn(),
     getAccount: jest.fn(),
     registerPayment: jest.fn(),
     registerHistoricalCharge: jest.fn(),
@@ -31,6 +32,7 @@ jest.mock("../../src/services/customerAccountService", () => ({
 const svc = service as unknown as {
   getBalances: jest.Mock;
   getBalancesSummary: jest.Mock;
+  getAccountCollections: jest.Mock;
   getAccount: jest.Mock;
   registerPayment: jest.Mock;
   registerHistoricalCharge: jest.Mock;
@@ -65,6 +67,24 @@ describe("customerAccountController", () => {
     await controller.getBalances(mockReq(), res);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith([{ customerId: "c-1", name: "Ana", balance: 10 }]);
+  });
+
+  it("getAccountCollections: passes the parsed from/to and returns 200", async () => {
+    const from = new Date("2026-10-01T03:00:00.000Z");
+    const to = new Date("2026-10-02T03:00:00.000Z");
+    svc.getAccountCollections.mockResolvedValue({ total: 5, count: 1, byMethod: [] });
+    const res = mockRes();
+    await controller.getAccountCollections({ query: { from, to } } as any, res);
+    expect(svc.getAccountCollections).toHaveBeenCalledWith(from, to);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ total: 5, count: 1, byMethod: [] });
+  });
+
+  it("getAccountCollections: unexpected error → 500", async () => {
+    svc.getAccountCollections.mockRejectedValue(new Error("boom"));
+    const res = mockRes();
+    await controller.getAccountCollections({ query: { from: new Date(), to: new Date() } } as any, res);
+    expect(res.status).toHaveBeenCalledWith(500);
   });
 
   it("getAccount: passes the id param; CUSTOMER_NOT_FOUND → 404", async () => {

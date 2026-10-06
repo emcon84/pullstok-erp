@@ -22,6 +22,16 @@ describe("customerRoutes — cuenta corriente", () => {
     expect(indexOf("get", "/balances")).toBeLessThan(indexOf("get", "/:id"));
   });
 
+  it("GET /account-collections goes before GET /:id and is gated + query-validated", () => {
+    expect(indexOf("get", "/account-collections")).toBeGreaterThanOrEqual(0);
+    expect(indexOf("get", "/account-collections")).toBeLessThan(indexOf("get", "/:id"));
+    const route = (stack.find(
+      (l) => l.route?.path === "/account-collections" && l.route.methods["get"],
+    ) as any).route.stack;
+    // authenticateJWT + checkBusinessHours + requireRole + validateQuery + handler
+    expect(route.length).toBe(5);
+  });
+
   it("POST /:id/account/statement/whatsapp goes before GET /:id", () => {
     expect(indexOf("post", "/:id/account/statement/whatsapp")).toBeLessThan(
       indexOf("get", "/:id"),

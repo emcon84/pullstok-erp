@@ -4,7 +4,7 @@ import customerAccountController from "../controllers/customerAccountController"
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
 import { checkBusinessHours } from "../middlewares/checkBusinessHours";
 import { requireBalancesToken } from "../middlewares/requireBalancesToken";
-import { validate } from "../middlewares/validate";
+import { validate, validateQuery } from "../middlewares/validate";
 import {
   createCustomerSchema,
   unlockBalancesSchema,
@@ -12,6 +12,7 @@ import {
   createAccountPaymentSchema,
   createAccountChargeSchema,
   updateAccountMovementSchema,
+  accountCollectionsQuerySchema,
 } from "../validation/schemas";
 
 const router = Router();
@@ -44,6 +45,16 @@ router.get(
   requireRole("ADMIN", "MANAGEMENT"),
   requireBalancesToken,
   customerAccountController.getBalancesSummary,
+);
+// Cobros de cuenta corriente por medio de pago (dashboard de ventas): literal
+// de un segmento → ANTES de "/:id". Solo dueños (ADMIN/MANAGEMENT).
+router.get(
+  "/account-collections",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN", "MANAGEMENT"),
+  validateQuery(accountCollectionsQuerySchema),
+  customerAccountController.getAccountCollections,
 );
 router.get("/:id/account", authenticateJWT, checkBusinessHours, customerAccountController.getAccount);
 router.post(

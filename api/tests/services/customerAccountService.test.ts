@@ -640,3 +640,49 @@ describe("customerAccountService.getBalancesSummary", () => {
     expect(s.topDebtors).toEqual([]);
   });
 });
+
+describe("getAccountCollections", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const from = new Date("2026-10-01T03:00:00.000Z");
+  const to = new Date("2026-10-02T03:00:00.000Z");
+
+  it("groups PAYMENT movements by method with totals, sorted by amount desc", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([
+      { method: "QR", _sum: { amount: 100.005 }, _count: { _all: 1 } },
+      { method: "EFECTIVO", _sum: { amount: 700 }, _count: { _all: 3 } },
+      { method: "TRANSFERENCIA", _sum: { amount: 200.5 }, _count: { _all: 2 } },
+    ]);
+    const r = await customerAccountService.getAccountCollections(from, to);
+    expect(r.byMethod.map((m) => m.method)).toEqual(["EFECTIVO", "TRANSFERENCIA", "QR"]);
+    expect(r.byMethod[0]).toEqual({ method: "EFECTIVO", count: 3, amount: 700 });
+    expect(r.count).toBe(6);
+    expect(r.total).toBe(1000.51);
+  });
+
+  it("returns zeros for an empty range", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([]);
+    const r = await customerAccountService.getAccountCollections(from, to);
+    expect(r).toEqual({ total: 0, count: 0, byMethod: [] });
+  });
+
+  it("filters PAYMENT with createdAt >= from and < to", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([]);
+    await customerAccountService.getAccountCollections(from, to);
+    const args = p.customerAccountMovement.groupBy.mock.calls[0][0];
+    expect(args.by).toEqual(["method"]);
+    expect(args.where).toEqual({
+      organizationId: "org-1",
+      type: "PAYMENT",
+      createdAt: { gte: from, lt: to },
+    });
+  });
+
+  it("buckets a null method under SIN_METODO", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([
+      { method: null, _sum: { amount: 50 }, _count: { _all: 1 } },
+    ]);
+    const r = await customerAccountService.getAccountCollections(from, to);
+    expect(r.byMethod).toEqual([{ method: "SIN_METODO", count: 1, amount: 50 }]);
+  });
+});

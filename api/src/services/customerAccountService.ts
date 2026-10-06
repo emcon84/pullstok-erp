@@ -120,6 +120,35 @@ const getBalances = async () => {
 /** Company-wide totals + top 5 debtors (same semantics the panel used to compute client-side). */
 const getBalancesSummary = async () => summarizeBalances(await getBalances());
 
+/**
+ * Cobros de cuenta corriente en un rango (createdAt >= from y < to), agregados
+ * por medio de pago. Org-wide: el scope de organización lo pone la extensión.
+ */
+const getAccountCollections = async (from: Date, to: Date) => {
+  const organizationId = requireOrganizationId();
+
+  const rows = await prisma.customerAccountMovement.groupBy({
+    by: ["method"],
+    where: { organizationId, type: "PAYMENT", createdAt: { gte: from, lt: to } },
+    _sum: { amount: true },
+    _count: { _all: true },
+  });
+
+  const byMethod = rows
+    .map((r) => ({
+      method: (r.method ?? "SIN_METODO") as string,
+      count: r._count?._all ?? 0,
+      amount: round2(r._sum?.amount ?? 0),
+    }))
+    .sort((a, b) => b.amount - a.amount);
+
+  return {
+    total: round2(byMethod.reduce((acc, m) => acc + m.amount, 0)),
+    count: byMethod.reduce((acc, m) => acc + m.count, 0),
+    byMethod,
+  };
+};
+
 /** Extracto de un cliente: saldo + movimientos (más nuevos primero). */
 const getAccount = async (customerId: string) => {
   const organizationId = requireOrganizationId();
@@ -477,6 +506,7 @@ const getAccountStatementLink = async (
 export default {
   getBalances,
   getBalancesSummary,
+  getAccountCollections,
   getAccount,
   registerPayment,
   registerHistoricalCharge,
