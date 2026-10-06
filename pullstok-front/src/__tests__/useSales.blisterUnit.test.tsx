@@ -57,3 +57,53 @@ describe("useCreateSale — payload de línea de pastillas sueltas de blister", 
     expect(saleRequest.products[0].productId).toBe("p-blister");
   });
 });
+
+// Un pedido trae el producto con `category` populada ({ id, name }); el server
+// exige string (products.N.category) y rechazaba la venta con 400.
+describe("useCreateSale — category del producto", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedCreateSale.mockResolvedValue();
+  });
+
+  const lineWithCategory = (category: unknown, id = "p-1"): CartItem => ({
+    product: {
+      _id: id,
+      id,
+      name: "PEDIGREE LATA",
+      price: 1000,
+      quantity: 10,
+      description: "",
+      category,
+    } as unknown as CartItem["product"],
+    quantity: 1,
+    totalPrice: 1000,
+  });
+
+  const sentCategories = async (cart: CartItem[]) => {
+    const { result } = renderHook(() => useCreateSale(), { wrapper });
+    act(() => {
+      result.current.createSale({ cart });
+    });
+    await waitFor(() => expect(mockedCreateSale).toHaveBeenCalled());
+    return mockedCreateSale.mock.calls[0][0].products.map((p) => p.category);
+  };
+
+  it("sends the category name when the product carries a populated category object", async () => {
+    expect(await sentCategories([lineWithCategory({ id: "c1", name: "Alimento húmedo" })])).toEqual([
+      "Alimento húmedo",
+    ]);
+  });
+
+  it("keeps a string category and falls back to empty when missing or malformed", async () => {
+    expect(
+      await sentCategories([
+        lineWithCategory("FARMACIA", "a"),
+        lineWithCategory(undefined, "b"),
+        lineWithCategory(null, "c"),
+        lineWithCategory({ id: "c2" }, "d"),
+      ]),
+    ).toEqual(["FARMACIA", "", "", ""]);
+  });
+});
+

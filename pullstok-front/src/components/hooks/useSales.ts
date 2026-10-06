@@ -3,6 +3,14 @@ import { createSale, deleteSale, getSales } from "../../services/saleServices";
 import { CartItem, Sale, SaleMode } from "../../models/salesModel";
 import { PaymentInput } from "../../models/cashSessionModel";
 
+/** El server exige `category` como string. Un producto que viene de un pedido
+ *  trae la categoría populada ({ id, name }): se manda su nombre. */
+const categoryName = (category: unknown): string => {
+  if (typeof category === "string") return category;
+  const name = (category as { name?: unknown } | null | undefined)?.name;
+  return typeof name === "string" ? name : "";
+};
+
 export const useCreateSale = () => {
   const queryClient = useQueryClient();
 
@@ -38,7 +46,7 @@ export const useCreateSale = () => {
               quantity: item.quantity.toString(),
               name: item.product.name,
               price: item.product.price.toString(),
-              category: item.product.category ?? "",
+              category: categoryName(item.product.category),
               saleMode,
               // sdd/venta-pastillas-sueltas-blister: no aplica a líneas
               // sueltas por celda, pero se reenvía igual por si el caller
@@ -53,7 +61,7 @@ export const useCreateSale = () => {
             name: item.product.name,
             price: item.product.price.toString(),
             description: item.product.description || "",
-            category: item.product.category || "",
+            category: categoryName(item.product.category),
             saleMode,
             // sdd/venta-pastillas-sueltas-blister: conteo ad-hoc de la línea
             // POR_UNIDAD_BLISTER; el server lo exige (saleProductSchema, T1).
