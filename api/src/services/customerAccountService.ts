@@ -124,15 +124,36 @@ const getBalancesSummary = async () => summarizeBalances(await getBalances());
  * Cobros de cuenta corriente en un rango (createdAt >= from y < to), agregados
  * por medio de pago. Org-wide: el scope de organización lo pone la extensión.
  */
+const COLLECTIONS_ITEMS_CAP = 500;
+
 const getAccountCollections = async (from: Date, to: Date) => {
   const organizationId = requireOrganizationId();
+  const where = { organizationId, type: "PAYMENT" as const, createdAt: { gte: from, lt: to } };
 
-  const rows = await prisma.customerAccountMovement.groupBy({
-    by: ["method"],
-    where: { organizationId, type: "PAYMENT", createdAt: { gte: from, lt: to } },
-    _sum: { amount: true },
-    _count: { _all: true },
-  });
+  // Los agregados salen del groupBy completo; el detalle va acotado (+1 para detectar el corte).
+  const [rows, detail] = await Promise.all([
+    prisma.customerAccountMovement.groupBy({
+      by: ["method"],
+      where,
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+    prisma.customerAccountMovement.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: COLLECTIONS_ITEMS_CAP + 1,
+      include: { customer: { select: { id: true, name: true } } },
+    }),
+  ]);
+
+  const items = detail.slice(0, COLLECTIONS_ITEMS_CAP).map((m) => ({
+    id: m.id,
+    createdAt: m.createdAt.toISOString(),
+    customerId: m.customerId,
+    customerName: m.customer?.name?.trim() || null,
+    method: (m.method ?? "SIN_METODO") as string,
+    amount: round2(m.amount ?? 0),
+  }));
 
   const byMethod = rows
     .map((r) => ({
@@ -146,6 +167,8 @@ const getAccountCollections = async (from: Date, to: Date) => {
     total: round2(byMethod.reduce((acc, m) => acc + m.amount, 0)),
     count: byMethod.reduce((acc, m) => acc + m.count, 0),
     byMethod,
+    items,
+    truncated: detail.length > COLLECTIONS_ITEMS_CAP,
   };
 };
 

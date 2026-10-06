@@ -37,6 +37,7 @@ import { useOrders } from "../components/hooks/useOrder";
 import { useGetReceipts } from "../components/hooks/useReceipt";
 import { useAccountCollections } from "../components/hooks/useCustomerAccount";
 import { Loader } from "../components/atoms/loader";
+import { customerDisplayName } from "../utils/customerName";
 import { PAYMENT_METHOD_LABELS } from "../models/cashSessionModel";
 
 type StatType = "sales" | "budgets" | "orders" | "receipts";
@@ -60,6 +61,14 @@ const dateToInputValue = (date: Date): string => {
 const inputValueToLocalDate = (value: string): Date => {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
+};
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** dd/mm HH:mm en hora local (es-AR no rellena el mes con cero, por eso a mano). */
+const formatCollectionDate = (iso: string) => {
+  const d = new Date(iso);
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 
 export const Statistics = ({ type, onBack }: StatisticsProps) => {
@@ -142,6 +151,7 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
     type === "sales",
   );
   const collectionRows = type === "sales" ? (collections?.byMethod ?? []) : [];
+  const collectionItems = type === "sales" ? (collections?.items ?? []) : [];
   const totalCollections = collectionRows.reduce((sum, r) => sum + r.amount, 0);
 
   const totalPayments = paymentBreakdown.reduce((sum, r) => sum + r.amount, 0);
@@ -327,6 +337,40 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
               </TableRow>
             </TableFooter>
           </Table>
+          {collectionItems.length > 0 && (
+            <div className="border-t">
+              <p className="px-4 pt-4 pb-2 text-sm text-muted-foreground">Detalle de cobros</p>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Medio de pago</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {collectionItems.map((it) => (
+                    <TableRow key={it.id}>
+                      <TableCell className="whitespace-nowrap tabular-nums">
+                        {formatCollectionDate(it.createdAt)}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {customerDisplayName({ name: it.customerName })}
+                      </TableCell>
+                      <TableCell>{paymentLabel(it.method)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(it.amount)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {collections?.truncated && (
+                <p className="px-4 py-3 text-xs text-muted-foreground">
+                  Mostrando los 500 cobros más recientes. El resumen de arriba incluye todos.
+                </p>
+              )}
+            </div>
+          )}
         </Card>
       )}
 

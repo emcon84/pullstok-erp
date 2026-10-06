@@ -130,10 +130,25 @@ export interface AccountCollectionMethod {
   amount: number;
 }
 
+export interface AccountCollectionItem {
+  id: string;
+  /** ISO string. */
+  createdAt: string;
+  customerId: string;
+  customerName: string | null;
+  /** Payment method key (SIN_METODO if missing). */
+  method: string;
+  amount: number;
+}
+
 /** Respuesta de GET /customers/account-collections (cobros por medio de pago). */
 export interface AccountCollections {
   total: number;
   count: number;
   /** Sorted by amount desc. */
   byMethod: AccountCollectionMethod[];
+  /** Newest first, capped at 500. */
+  items: AccountCollectionItem[];
+  /** True when there were more than 500 collections in the range. */
+  truncated: boolean;
 }

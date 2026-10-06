@@ -219,7 +219,7 @@ describe("customerAccountService", () => {
   });
 
   it("getAccountCollections GETs /customers/account-collections with ISO from/to", async () => {
-    const payload = { total: 300, count: 2, byMethod: [{ method: "EFECTIVO", count: 2, amount: 300 }] };
+    const payload = { total: 300, count: 2, byMethod: [{ method: "EFECTIVO", count: 2, amount: 300 }], items: [], truncated: false };
     mockGet.mockResolvedValue({ data: payload });
     const from = new Date("2026-10-01T03:00:00.000Z");
     const to = new Date("2026-10-02T03:00:00.000Z");

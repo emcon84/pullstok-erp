@@ -42,9 +42,28 @@ const collectionsData = {
     { method: "EFECTIVO", count: 2, amount: 500 },
     { method: "TRANSFERENCIA", count: 1, amount: 300 },
   ],
+  items: [
+    {
+      id: "m1",
+      createdAt: new Date(2026, 8, 25, 9, 5).toISOString(),
+      customerId: "c1",
+      customerName: "María Pérez",
+      method: "EFECTIVO",
+      amount: 300,
+    },
+    {
+      id: "m2",
+      createdAt: new Date(2026, 8, 24, 18, 30).toISOString(),
+      customerId: "c2",
+      customerName: null,
+      method: "TRANSFERENCIA",
+      amount: 300,
+    },
+  ] as Array<Record<string, unknown>>,
+  truncated: false,
 };
 
-const setCollections = (collections: typeof collectionsData | null) =>
+const setCollections = (collections: Record<string, unknown> | null) =>
   mockCollections.mockReturnValue({ collections, loading: false, error: null } as never);
 
 const cardOf = (title: string) =>
@@ -71,8 +90,9 @@ describe("Statistics — cobros de cuenta corriente", () => {
 
     expect(screen.getByText("plata cobrada a clientes con deuda")).toBeInTheDocument();
     const card = cardOf("Cobros de cuenta corriente");
-    expect(within(card).getByText("Efectivo")).toBeInTheDocument();
-    expect(within(card).getByText("Transferencia")).toBeInTheDocument();
+    const summary = card.querySelector("table") as HTMLElement;
+    expect(within(summary).getByText("Efectivo")).toBeInTheDocument();
+    expect(within(summary).getByText("Transferencia")).toBeInTheDocument();
     const footerRow = within(card).getByText("Total").closest("tr")!;
     expect(within(footerRow).getByText("3")).toBeInTheDocument();
     expect(footerRow.textContent).toContain("800");
@@ -88,7 +108,7 @@ describe("Statistics — cobros de cuenta corriente", () => {
   });
 
   it("hides the section when there are no collections", () => {
-    setCollections({ total: 0, count: 0, byMethod: [] });
+    setCollections({ total: 0, count: 0, byMethod: [], items: [], truncated: false });
     render(<Statistics type="sales" onBack={vi.fn()} />);
     expect(screen.queryByText("Cobros de cuenta corriente")).not.toBeInTheDocument();
   });
@@ -124,5 +144,53 @@ describe("Statistics — cobros de cuenta corriente", () => {
     expect(enabled).toBe(true);
     expect(from).toEqual(new Date(2026, 8, 25, 0, 0, 0, 0));
     expect(to).toEqual(new Date(2026, 8, 26, 0, 0, 0, 0));
+  });
+
+  describe("detalle de cobros", () => {
+    const detailTable = () =>
+      within(cardOf("Cobros de cuenta corriente")).getByText("Detalle de cobros")
+        .parentElement as HTMLElement;
+
+    it("renders date, customer, method and amount per collection", () => {
+      setCollections(collectionsData);
+      render(<Statistics type="sales" onBack={vi.fn()} />);
+      const detail = detailTable();
+      expect(within(detail).getByText("Fecha")).toBeInTheDocument();
+      expect(within(detail).getByText("Cliente")).toBeInTheDocument();
+      expect(within(detail).getByText("25/09 09:05")).toBeInTheDocument();
+      expect(within(detail).getByText("24/09 18:30")).toBeInTheDocument();
+      expect(within(detail).getByText("María Pérez")).toBeInTheDocument();
+      expect(within(detail).getByText("Efectivo")).toBeInTheDocument();
+      expect(within(detail).getByText("Transferencia")).toBeInTheDocument();
+    });
+
+    it("falls back to 'Sin nombre' when the customer has no name", () => {
+      setCollections(collectionsData);
+      render(<Statistics type="sales" onBack={vi.fn()} />);
+      expect(within(detailTable()).getByText("Sin nombre")).toBeInTheDocument();
+    });
+
+    it("shows the truncation note only when truncated", () => {
+      const note = "Mostrando los 500 cobros más recientes. El resumen de arriba incluye todos.";
+      setCollections(collectionsData);
+      const { unmount } = render(<Statistics type="sales" onBack={vi.fn()} />);
+      expect(screen.queryByText(note)).not.toBeInTheDocument();
+      unmount();
+      setCollections({ ...collectionsData, truncated: true });
+      render(<Statistics type="sales" onBack={vi.fn()} />);
+      expect(screen.getByText(note)).toBeInTheDocument();
+    });
+
+    it("hides the detail when items is empty and tolerates a missing items field", () => {
+      setCollections({ ...collectionsData, items: [] });
+      const { unmount } = render(<Statistics type="sales" onBack={vi.fn()} />);
+      expect(screen.queryByText("Detalle de cobros")).not.toBeInTheDocument();
+      unmount();
+      const { items: _omit, truncated: _t, ...legacy } = collectionsData;
+      setCollections(legacy);
+      render(<Statistics type="sales" onBack={vi.fn()} />);
+      expect(screen.queryByText("Detalle de cobros")).not.toBeInTheDocument();
+      expect(screen.getByText("Cobros de cuenta corriente")).toBeInTheDocument();
+    });
   });
 });

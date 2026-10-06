@@ -197,7 +197,7 @@ describe("useCustomerAccount hooks", () => {
 describe("useAccountCollections", () => {
   const from = new Date("2026-10-01T03:00:00.000Z");
   const to = new Date("2026-10-02T03:00:00.000Z");
-  const payload = { total: 300, count: 2, byMethod: [{ method: "EFECTIVO", count: 2, amount: 300 }] };
+  const payload = { total: 300, count: 2, byMethod: [{ method: "EFECTIVO", count: 2, amount: 300 }], items: [], truncated: false };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -228,7 +228,7 @@ describe("useAccountCollections", () => {
     rerender({ f: new Date("2026-10-02T03:00:00.000Z"), t: new Date("2026-10-03T03:00:00.000Z") });
     expect(result.current.collections).toEqual(payload);
     await act(async () => {
-      resolveNext({ total: 0, count: 0, byMethod: [] });
+      resolveNext({ total: 0, count: 0, byMethod: [], items: [], truncated: false });
     });
     await waitFor(() => expect(result.current.collections?.count).toBe(0));
   });

@@ -642,7 +642,20 @@ describe("customerAccountService.getBalancesSummary", () => {
 });
 
 describe("getAccountCollections", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    p.customerAccountMovement.findMany.mockResolvedValue([]);
+  });
+
+  const movement = (i: number, over: Record<string, unknown> = {}) => ({
+    id: `m${i}`,
+    createdAt: new Date(`2026-10-01T12:${String(i % 60).padStart(2, "0")}:00.000Z`),
+    customerId: `c${i}`,
+    method: "EFECTIVO",
+    amount: 10.004,
+    customer: { id: `c${i}`, name: `  Cliente ${i} ` },
+    ...over,
+  });
 
   const from = new Date("2026-10-01T03:00:00.000Z");
   const to = new Date("2026-10-02T03:00:00.000Z");
@@ -663,7 +676,7 @@ describe("getAccountCollections", () => {
   it("returns zeros for an empty range", async () => {
     p.customerAccountMovement.groupBy.mockResolvedValue([]);
     const r = await customerAccountService.getAccountCollections(from, to);
-    expect(r).toEqual({ total: 0, count: 0, byMethod: [] });
+    expect(r).toEqual({ total: 0, count: 0, byMethod: [], items: [], truncated: false });
   });
 
   it("filters PAYMENT with createdAt >= from and < to", async () => {
@@ -684,5 +697,72 @@ describe("getAccountCollections", () => {
     ]);
     const r = await customerAccountService.getAccountCollections(from, to);
     expect(r.byMethod).toEqual([{ method: "SIN_METODO", count: 1, amount: 50 }]);
+  });
+
+  it("maps items with customer name, ISO date, rounded amount and SIN_METODO fallback", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([]);
+    p.customerAccountMovement.findMany.mockResolvedValue([
+      movement(1),
+      movement(2, { method: null, customer: { id: "c2", name: null } }),
+    ]);
+    const r = await customerAccountService.getAccountCollections(from, to);
+    expect(r.items).toEqual([
+      {
+        id: "m1",
+        createdAt: "2026-10-01T12:01:00.000Z",
+        customerId: "c1",
+        customerName: "Cliente 1",
+        method: "EFECTIVO",
+        amount: 10,
+      },
+      {
+        id: "m2",
+        createdAt: "2026-10-01T12:02:00.000Z",
+        customerId: "c2",
+        customerName: null,
+        method: "SIN_METODO",
+        amount: 10,
+      },
+    ]);
+    expect(r.truncated).toBe(false);
+  });
+
+  it("queries items with same where, newest first, take 501 and customer select", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([]);
+    await customerAccountService.getAccountCollections(from, to);
+    const args = p.customerAccountMovement.findMany.mock.calls[0][0];
+    expect(args.where).toEqual({
+      organizationId: "org-1",
+      type: "PAYMENT",
+      createdAt: { gte: from, lt: to },
+    });
+    expect(args.orderBy).toEqual({ createdAt: "desc" });
+    expect(args.take).toBe(501);
+    expect(args.include).toEqual({ customer: { select: { id: true, name: true } } });
+  });
+
+  it("truncates to 500 items and flags truncated only when 501 rows come back", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([
+      { method: "EFECTIVO", _sum: { amount: 9999 }, _count: { _all: 777 } },
+    ]);
+    p.customerAccountMovement.findMany.mockResolvedValue(
+      Array.from({ length: 501 }, (_, i) => movement(i)),
+    );
+    const r = await customerAccountService.getAccountCollections(from, to);
+    expect(r.items).toHaveLength(500);
+    expect(r.truncated).toBe(true);
+    // totals come from the groupBy, never from the cap
+    expect(r.count).toBe(777);
+    expect(r.total).toBe(9999);
+  });
+
+  it("is not truncated with exactly 500 rows", async () => {
+    p.customerAccountMovement.groupBy.mockResolvedValue([]);
+    p.customerAccountMovement.findMany.mockResolvedValue(
+      Array.from({ length: 500 }, (_, i) => movement(i)),
+    );
+    const r = await customerAccountService.getAccountCollections(from, to);
+    expect(r.items).toHaveLength(500);
+    expect(r.truncated).toBe(false);
   });
 });
