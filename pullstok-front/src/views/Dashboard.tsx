@@ -555,7 +555,6 @@ export const Dashboard = () => {
       <SalesDrawer
         isOpen={isModalSalesOpen}
         onClose={closeModalSales}
-        products={products}
         orders={orders}
         title="Nueva Venta"
         requireCustomer={false}

@@ -35,6 +35,12 @@ interface ProductSelectorProps {
   onSearch?: (term: string) => void | Promise<void>;
   /** Estado de la búsqueda server-side (muestra un spinner en la lista). */
   searchLoading?: boolean;
+  /** Hay más páginas en el servidor (solo aplica con `onSearch`). */
+  hasMore?: boolean;
+  /** Pide la siguiente página; se muestra como botón "Ver más resultados". */
+  onLoadMore?: () => void;
+  /** La siguiente página se está cargando (deshabilita el botón). */
+  loadingMore?: boolean;
 }
 
 const imgSrc = (image?: string) =>
@@ -51,6 +57,9 @@ export const ProductSelector = ({
   onConfirm,
   onSearch,
   searchLoading = false,
+  hasMore = false,
+  onLoadMore,
+  loadingMore = false,
 }: ProductSelectorProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -63,6 +72,12 @@ export const ProductSelector = ({
     const t = setTimeout(() => setDebounced(searchTerm), 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
+
+  // Al cerrar (incluso con Esc) se limpia el input, así coincide con el término
+  // que el padre resetea al cerrar.
+  useEffect(() => {
+    if (!open) setSearchTerm("");
+  }, [open]);
 
   // Búsqueda server-side: cuando hay onSearch y el término debounced cambia,
   // se re-fetchea sobre el catálogo completo. Sin onSearch no se dispara nada.
@@ -174,6 +189,8 @@ export const ProductSelector = ({
                       <img
                         src={src}
                         alt={product.name}
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -226,6 +243,26 @@ export const ProductSelector = ({
               </div>
             );
           })}
+          {onSearch && hasMore && onLoadMore && (
+            <div className="flex justify-center p-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onLoadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando...
+                  </>
+                ) : (
+                  "Ver más resultados"
+                )}
+              </Button>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="flex-row items-center justify-between border-t p-4 sm:justify-between">

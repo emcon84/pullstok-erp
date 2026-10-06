@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PaymentSection } from "../PaymentSection";
 import { usePayments } from "../../hooks/usePayments";
+import { useInfiniteProducts } from "../../hooks/useProducts";
 import { ProductSelector } from "../ProductSelector";
 import { DocTable } from "../DocTable";
 import { ProductsProps } from "../../../models/productsModel";
@@ -43,7 +44,6 @@ type Mode = "products" | "order" | "budget";
 interface SalesDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  products: ProductsProps[];
   customers?: Customer[];
   orders?: Order[];
   budgets?: Budget[];
@@ -73,7 +73,6 @@ interface SalesDrawerProps {
 export const SalesDrawer: React.FC<SalesDrawerProps> = ({
   isOpen,
   onClose,
-  products,
   customers,
   orders,
   budgets,
@@ -95,6 +94,28 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
   const [selectedOrder, setSelectedOrder] = useState("");
   const [selectedBudget, setSelectedBudget] = useState("");
   const [isProductSelectorOpen, setIsProductSelectorOpen] = useState(false);
+
+  // Búsqueda de productos SERVER-SIDE (paginada): solo consulta mientras el
+  // selector está abierto, así abrir una pantalla no baja el catálogo completo.
+  const [productTerm, setProductTerm] = useState("");
+  const {
+    items: productItems,
+    isLoadingInitial,
+    isFetchingNextPage,
+    hasNextPage,
+    loadMore,
+  } = useInfiniteProducts(
+    undefined,
+    productTerm || undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    isProductSelectorOpen,
+  );
+  useEffect(() => {
+    if (!isProductSelectorOpen) setProductTerm("");
+  }, [isProductSelectorOpen]);
 
   // ── Descuento porcentual a nivel venta (sdd/venta-descuento) ──
   // El admin/vendedor ingresa un % (0..100); el descuento en $ se materializa
@@ -544,7 +565,12 @@ export const SalesDrawer: React.FC<SalesDrawerProps> = ({
       <ProductSelector
         open={isProductSelectorOpen}
         onOpenChange={setIsProductSelectorOpen}
-        products={products}
+        products={productItems as unknown as ProductsProps[]}
+        onSearch={setProductTerm}
+        searchLoading={isLoadingInitial}
+        hasMore={hasNextPage}
+        onLoadMore={loadMore}
+        loadingMore={isFetchingNextPage}
         onConfirm={handleProductsSelected}
       />
 

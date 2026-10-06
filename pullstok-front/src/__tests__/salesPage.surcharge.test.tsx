@@ -13,7 +13,6 @@ vi.mock("@/components/hooks/useSales", () => ({
   useDeleteSale: vi.fn(),
 }));
 vi.mock("@/components/hooks/useOrder", () => ({ useOrders: vi.fn() }));
-vi.mock("@/components/hooks/useProducts", () => ({ usePorducts: vi.fn() }));
 vi.mock("@/components/hooks/useCustomer", () => ({
   useCustomers: vi.fn(),
   useCreateCustomer: vi.fn(),
@@ -37,7 +36,6 @@ vi.mock("@/components/molecules/SalesDrawer", () => ({
 import { SalesPage } from "@/views/Sales";
 import { useGetSales, useCreateSale, useDeleteSale } from "@/components/hooks/useSales";
 import { useOrders } from "@/components/hooks/useOrder";
-import { usePorducts } from "@/components/hooks/useProducts";
 import { useCustomers, useCreateCustomer } from "@/components/hooks/useCustomer";
 import { useCreateInvoiceFromSale } from "@/components/hooks/useInvoices";
 
@@ -54,7 +52,6 @@ describe("Sales page — credit card surcharge", () => {
     vi.mocked(useCreateSale).mockReturnValue({ createSale } as never);
     vi.mocked(useDeleteSale).mockReturnValue({ deleteSale: vi.fn() } as never);
     vi.mocked(useOrders).mockReturnValue({ orders: [] } as never);
-    vi.mocked(usePorducts).mockReturnValue({ products: [] } as never);
     vi.mocked(useCustomers).mockReturnValue({ customers: [] } as never);
     vi.mocked(useCreateCustomer).mockReturnValue({
       submitCustomerAsync: vi.fn(),

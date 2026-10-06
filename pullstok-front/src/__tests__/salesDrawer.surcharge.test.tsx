@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CartItem } from "@/models/salesModel";
 
 vi.mock("react-toastify", () => ({
@@ -36,6 +37,9 @@ vi.mock("@/components/molecules/ProductSelector", () => ({
 
 import { SalesDrawer } from "@/components/molecules/SalesDrawer";
 
+// SalesDrawer owns its (idle until opened) product search → needs a QueryClient.
+const queryClient = new QueryClient();
+
 const PCT_LABEL = "Recargo tarjeta (%)";
 
 const cart: CartItem[] = [
@@ -49,16 +53,17 @@ const cart: CartItem[] = [
 
 function drawer(onConfirm = vi.fn(), isOpen = true) {
   return (
+    <QueryClientProvider client={queryClient}>
     <SalesDrawer
       isOpen={isOpen}
       onClose={vi.fn()}
-      products={[]}
       title="Nueva venta"
       editing
       initialCart={cart}
       cashSessionId="cs-1"
       onConfirm={onConfirm}
     />
+    </QueryClientProvider>
   );
 }
 

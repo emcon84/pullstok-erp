@@ -14,7 +14,6 @@ import {
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { ProductsProps } from "../models/productsModel";
 import { Budget } from "../models/budgetModel";
-import { usePorducts } from "../components/hooks/useProducts";
 import { useCustomers } from "../components/hooks/useCustomer";
 import { Pagination } from "../components/molecules/pagination";
 import { DocumentCard } from "../components/molecules/DocumentCard";
@@ -40,7 +39,6 @@ export const Quotations = () => {
   const { updateBudget } = useUpdateBudget();
   const { deleteBudget } = useDeleteBudget();
   const { customers } = useCustomers();
-  const { products, getProducts } = usePorducts();
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -109,7 +107,6 @@ export const Quotations = () => {
       validUntil: "2024-12-31",
     });
     toast.success("Presupuesto creado con éxito");
-    getProducts();
     setIsOpen(false);
   };
 
@@ -257,7 +254,6 @@ export const Quotations = () => {
       <SalesDrawer
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        products={products}
         customers={customers}
         title={editingBudgetId ? "Editar Presupuesto" : "Crear Presupuesto"}
         requireCustomer={true}

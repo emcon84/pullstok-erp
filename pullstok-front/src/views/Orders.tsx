@@ -34,7 +34,6 @@ import { useGetBudgetByID, useGetBudgets } from "../components/hooks/useBudget";
 import { Order } from "../models/orderModel";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { useCustomers } from "../components/hooks/useCustomer";
-import { usePorducts } from "../components/hooks/useProducts";
 import { useCreateSale } from "../components/hooks/useSales";
 import {
   useWhatsappDrafts,
@@ -136,7 +135,6 @@ export const Orders: React.FC = () => {
   const { orders, loading, error } = useOrders();
   const { budgets } = useGetBudgets();
   const { customers } = useCustomers();
-  const { products } = usePorducts();
   const { submitOrder: createOrder } = useCreateOrder();
   const { updateOrder } = useUpdateOrder();
   const { deleteOrder } = useDeleteOrder();
@@ -532,7 +530,6 @@ export const Orders: React.FC = () => {
       <SalesDrawer
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        products={products || []}
         customers={customers}
         budgets={budgets}
         title={
@@ -566,7 +563,6 @@ export const Orders: React.FC = () => {
       <SalesDrawer
         isOpen={saleDrawerOpen}
         onClose={() => setSaleDrawerOpen(false)}
-        products={products || []}
         title="Crear Venta desde Pedido"
         editing
         initialCart={saleInitialCart}

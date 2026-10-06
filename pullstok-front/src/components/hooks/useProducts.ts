@@ -108,6 +108,8 @@ export const useInfiniteProducts = (
   title?: string,
   priceListType?: "SECO" | "WET",
   carriedOnly?: boolean,
+  /** When false the query stays idle (no fetch), e.g. while a modal is closed. */
+  enabled = true,
 ) => {
   const queryKey = [
     "products",
@@ -147,6 +149,7 @@ export const useInfiniteProducts = (
       ),
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
     initialPageParam: 1,
+    enabled,
     placeholderData: (prev) => prev, // keep previous pages while searching
   });
 

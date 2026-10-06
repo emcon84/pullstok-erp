@@ -18,7 +18,6 @@ vi.mock("@/components/hooks/useBudget", () => ({
   useGetBudgets: vi.fn(),
 }));
 vi.mock("@/components/hooks/useCustomer", () => ({ useCustomers: vi.fn() }));
-vi.mock("@/components/hooks/useProducts", () => ({ usePorducts: vi.fn() }));
 vi.mock("@/components/hooks/useSales", () => ({ useCreateSale: vi.fn() }));
 vi.mock("@/components/hooks/useWhatsappOrders", () => ({
   useWhatsappDrafts: vi.fn(),
@@ -47,7 +46,6 @@ import {
 } from "@/components/hooks/useOrder";
 import { useGetBudgetByID, useGetBudgets } from "@/components/hooks/useBudget";
 import { useCustomers } from "@/components/hooks/useCustomer";
-import { usePorducts } from "@/components/hooks/useProducts";
 import { useCreateSale } from "@/components/hooks/useSales";
 import {
   useWhatsappDrafts,
@@ -71,7 +69,6 @@ describe("Orders page — credit card surcharge on order → sale", () => {
     vi.mocked(useGetBudgets).mockReturnValue({ budgets: [] } as never);
     vi.mocked(useGetBudgetByID).mockReturnValue({} as never);
     vi.mocked(useCustomers).mockReturnValue({ customers: [] } as never);
-    vi.mocked(usePorducts).mockReturnValue({ products: [] } as never);
     vi.mocked(useCreateSale).mockReturnValue({ createSale } as never);
     vi.mocked(useWhatsappDrafts).mockReturnValue({ drafts: [] } as never);
     vi.mocked(useApproveDraft).mockReturnValue({ approve: vi.fn() } as never);

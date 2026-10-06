@@ -28,7 +28,6 @@ import { Loader } from "../components/atoms/loader";
 import { SalesDrawer } from "../components/molecules/SalesDrawer";
 import { SaleReprintDialog } from "../components/molecules/SaleReprintDialog";
 import { useOrders } from "../components/hooks/useOrder";
-import { usePorducts } from "../components/hooks/useProducts";
 import { useCustomers, useCreateCustomer } from "../components/hooks/useCustomer";
 import { useCreateInvoiceFromSale } from "../components/hooks/useInvoices";
 import { toast } from "react-toastify";
@@ -83,7 +82,6 @@ export const SalesPage = () => {
   const navigate = useNavigate();
   const { sales, loading, error } = useGetSales();
   const { orders } = useOrders();
-  const { products } = usePorducts();
   const { createSale } = useCreateSale();
   const { deleteSale } = useDeleteSale();
   const { customers } = useCustomers();
@@ -423,7 +421,6 @@ export const SalesPage = () => {
       <SalesDrawer
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        products={products || []}
         orders={orders || []}
         title="Crear Venta"
         allowOrderSelection={true}
