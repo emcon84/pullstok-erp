@@ -111,15 +111,16 @@ export const useInfiniteProducts = (
   /** When false the query stays idle (no fetch), e.g. while a modal is closed. */
   enabled = true,
 ) => {
+  // La clave lleva un OBJETO marcador (kind: "infinite"): `useProducts` (array
+  // plano) y esta consulta (páginas) guardan formas de dato distintas; si
+  // compartieran clave (p. ej. ambas sin filtros → ["products"]) el observer
+  // leería el array como { pages } y rompería. El prefijo ["products"] se
+  // conserva para que `invalidateQueries({ queryKey: ["products"] })` siga
+  // refrescando ambas.
   const queryKey = [
     "products",
-    branchId,
-    search,
-    category,
-    title,
-    priceListType,
-    carriedOnly,
-  ].filter(Boolean);
+    { kind: "infinite", branchId, search, category, title, priceListType, carriedOnly },
+  ];
 
   const {
     data,

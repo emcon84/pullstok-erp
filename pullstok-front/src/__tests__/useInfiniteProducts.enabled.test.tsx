@@ -83,3 +83,41 @@ describe("useInfiniteProducts — enabled flag", () => {
     expect(mockProducts).toHaveBeenCalledTimes(1);
   });
 });
+
+// Regresión: SalesDrawer (useInfiniteProducts sin filtros) y el Dashboard
+// (useProducts sin filtros) compartían la clave ["products"]; el observer
+// infinito leía el array plano del cache como {pages} y rompía con
+// "Cannot read properties of undefined (reading 'length')".
+describe("useInfiniteProducts — no comparte cache con useProducts", () => {
+  it("does not crash when useProducts already cached a plain array under the same filters", async () => {
+    const { useProducts } = await import("@/components/hooks/useProducts");
+    mockProducts.mockImplementation(((
+      _branch?: string,
+      _search?: string,
+      _category?: string,
+      page?: unknown,
+    ) =>
+      page === undefined
+        ? Promise.resolve([{ _id: "p1", name: "A", quantity: 1 }])
+        : Promise.resolve({
+            items: [{ _id: "p1", name: "A", quantity: 1 }],
+            total: 1,
+            page: 1,
+            pageSize: 30,
+            hasMore: false,
+          })) as never);
+
+    const client = makeClient();
+    const { result } = renderHook(
+      () => ({
+        plain: useProducts(),
+        infinite: useInfiniteProducts(undefined, undefined, undefined, undefined, undefined, undefined, true),
+      }),
+      { wrapper: wrapperFor(client) },
+    );
+
+    await waitFor(() => expect(result.current.plain.products).toHaveLength(1));
+    await waitFor(() => expect(result.current.infinite.items).toHaveLength(1));
+    expect(result.current.infinite.hasNextPage).toBe(false);
+  });
+});
