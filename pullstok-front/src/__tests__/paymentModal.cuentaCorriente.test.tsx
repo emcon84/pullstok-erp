@@ -38,6 +38,38 @@ vi.mock("@/components/ui/native-select", () => ({
   ),
 }));
 
+// The customer picker is a Popover-based SearchableSelect (its search/filter has
+// its own suite, paymentModal.customerSearch). Here a plain <select> keeps the
+// selection behavior deterministic.
+vi.mock("@/components/ui/searchable-select", () => ({
+  SearchableSelect: ({
+    value,
+    onValueChange,
+    options,
+    placeholder,
+    ariaLabel,
+  }: {
+    value: string;
+    onValueChange: (v: string) => void;
+    options: { value: string; label: string }[];
+    placeholder?: string;
+    ariaLabel?: string;
+  }) => (
+    <select
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(e) => onValueChange(e.target.value)}
+    >
+      {placeholder && <option value="">{placeholder}</option>}
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  ),
+}));
+
 vi.mock("@/components/hooks/useCustomer", () => ({
   useCustomers: vi.fn(),
 }));

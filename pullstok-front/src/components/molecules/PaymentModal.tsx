@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { round2 } from "@/lib/money";
 import { clampSurchargePct, computeSurcharge } from "@/lib/surcharge";
@@ -39,7 +40,7 @@ interface PaymentModalProps {
 
 type PayRow = { method: PaymentMethod; amount: string };
 
-/** Selector del cliente de la venta a cuenta corriente. Vive en su propio
+/** Selector (con buscador) del cliente de la venta a cuenta corriente. Vive en su propio
  *  componente para que la lista de clientes solo se pida (useCustomers) cuando
  *  hay una fila CUENTA_CORRIENTE. */
 const AccountCustomerPicker = ({
@@ -62,12 +63,14 @@ const AccountCustomerPicker = ({
   return (
     <div className="space-y-1 text-left">
       <Label htmlFor="payment-account-customer">Cliente (cuenta corriente)</Label>
-      <NativeSelect
+      <SearchableSelect
         id="payment-account-customer"
         ariaLabel="Cliente (cuenta corriente)"
         value={value}
         onValueChange={onChange}
         placeholder="Seleccioná un cliente"
+        searchPlaceholder="Buscar cliente…"
+        emptyMessage="Sin clientes que coincidan"
         options={options}
       />
     </div>
