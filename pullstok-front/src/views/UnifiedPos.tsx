@@ -319,7 +319,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   const [presentationProduct, setPresentationProduct] = useState<ScannedProduct | null>(null);
 
   const handleConfirmPresentation = useCallback(
-    (presentation: ProductPresentation) => {
+    (presentation: ProductPresentation, quantity = 1) => {
       const p = presentationProduct;
       if (!p) return;
       const pid = (p._id || p.id) as string;
@@ -330,13 +330,13 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           (i.saleMode ?? "BOLSA_CERRADA") === "BOLSA_CERRADA" &&
           i.presentationId === presentation.id,
       );
-      if (exceedsPresentationStock(presentation, existing?.quantity ?? 0, 1, stock, !!p.isManual)) {
+      if (exceedsPresentationStock(presentation, existing?.quantity ?? 0, quantity, stock, !!p.isManual)) {
         toast.error("No hay más stock disponible");
         return;
       }
       setPresentationProduct(null);
       if (existing) {
-        cart.updateQuantity(pid, existing.quantity + 1, "BOLSA_CERRADA", undefined, presentation.id);
+        cart.updateQuantity(pid, existing.quantity + quantity, "BOLSA_CERRADA", undefined, presentation.id);
       } else {
         cart.addToCart(
           {
@@ -350,7 +350,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             code: p.code ?? "",
             isManual: p.isManual,
           },
-          1,
+          quantity,
           branchId,
           stock,
           "BOLSA_CERRADA",
@@ -654,6 +654,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         product={presentationProduct as unknown as DataItem}
         sellsWholesale={sellsWholesale}
         stock={presentationProduct.isManual ? null : Number(presentationProduct.quantity ?? 0)}
+        withQuantity
         onConfirm={handleConfirmPresentation}
         onCancel={() => setPresentationProduct(null)}
       />

@@ -115,6 +115,39 @@ describe("UnifiedPos scan with presentations", () => {
     expect(cart.updateQuantity).toHaveBeenCalledWith("p1", 2, "BOLSA_CERRADA", undefined, "b");
   });
 
+  it("adds several presentations at once from the picker quantity", async () => {
+    mockFetch(withPresentations);
+    const cart = renderPos();
+    scanCode("BLST00001");
+    fireEvent.change(await screen.findByLabelText("Cantidad"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+    expect(cart.addToCart).toHaveBeenCalledTimes(1);
+    expect(cart.addToCart.mock.calls[0][1]).toBe(2);
+  });
+
+  it("adds the picked quantity on top of an existing line", async () => {
+    mockFetch({ ...withPresentations, quantity: 50 });
+    const cart = renderPos({
+      items: [{ productId: "p1", saleMode: "BOLSA_CERRADA", presentationId: "b", quantity: 1 }],
+    });
+    scanCode("BLST00001");
+    fireEvent.change(await screen.findByLabelText("Cantidad"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+    expect(cart.updateQuantity).toHaveBeenCalledWith("p1", 3, "BOLSA_CERRADA", undefined, "b");
+  });
+
+  it("blocks when the picked quantity exceeds the base-unit stock", async () => {
+    mockFetch({ ...withPresentations, quantity: 25 });
+    const cart = renderPos({
+      items: [{ productId: "p1", saleMode: "BOLSA_CERRADA", presentationId: "b", quantity: 1 }],
+    });
+    scanCode("BLST00001");
+    fireEvent.change(await screen.findByLabelText("Cantidad"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+    expect(cart.updateQuantity).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalled();
+  });
+
   it("FARMACIA without presentations keeps the loose-blister modal", async () => {
     mockFetch({ ...withPresentations, hasPresentations: false, presentations: [] });
     renderPos();

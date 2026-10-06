@@ -107,4 +107,44 @@ describe("PresentationPicker", () => {
     setup({ stock: 125 });
     expect(screen.getByText(/1 Caja · 2 Blister/)).toBeInTheDocument();
   });
+
+  describe("with quantity", () => {
+    it("has no quantity input unless enabled", () => {
+      setup();
+      expect(screen.queryByLabelText("Cantidad")).toBeNull();
+    });
+
+    it("confirms with quantity 1 by default", () => {
+      const { onConfirm } = setup({ withQuantity: true });
+      fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+      expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }), 1);
+    });
+
+    it("confirms the typed quantity", () => {
+      const { onConfirm } = setup({ withQuantity: true });
+      fireEvent.change(screen.getByLabelText("Cantidad"), { target: { value: "3" } });
+      fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+      expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }), 3);
+    });
+
+    it("steps with + and − buttons, never below 1", () => {
+      const { onConfirm } = setup({ withQuantity: true });
+      fireEvent.click(screen.getByRole("button", { name: "Más" }));
+      fireEvent.click(screen.getByRole("button", { name: "Más" }));
+      fireEvent.click(screen.getByRole("button", { name: "Menos" }));
+      fireEvent.click(screen.getByRole("button", { name: "Menos" }));
+      fireEvent.click(screen.getByRole("button", { name: "Menos" }));
+      expect(screen.getByLabelText("Cantidad")).toHaveValue("1");
+      fireEvent.click(screen.getByRole("button", { name: "Más" }));
+      fireEvent.keyDown(screen.getByRole("listbox"), { key: "Enter" });
+      expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ id: "c" }), 2);
+    });
+
+    it("caps the quantity by the base stock of the active presentation", () => {
+      // 25 base units: Caja (100) is disabled, so Blister (10) is active → at most 2
+      setup({ withQuantity: true, stock: 25 });
+      fireEvent.change(screen.getByLabelText("Cantidad"), { target: { value: "9" } });
+      expect(screen.getByLabelText("Cantidad")).toHaveValue("2");
+    });
+  });
 });

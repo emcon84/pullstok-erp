@@ -1,10 +1,15 @@
 import { useMemo, useRef, useState } from "react";
+import { Minus, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   defaultPresentationId,
   formatStockLevels,
   isPresentationDisabled,
   presentationContentHint,
+  presentationStockCap,
   resolvePresentationPrice,
   sellablePresentations,
 } from "@/components/hooks/presentationHelpers";
@@ -15,9 +20,14 @@ interface PresentationPickerProps {
   sellsWholesale: boolean;
   /** Branch stock in BASE units; null/undefined = unknown (no option is disabled). */
   stock?: number | null;
-  onConfirm: (presentation: ProductPresentation) => void;
+  /** Quantity is passed only when `withQuantity` is on. */
+  onConfirm: (presentation: ProductPresentation, quantity?: number) => void;
   onCancel: () => void;
+  /** Shows a quantity stepper so several units go in with one confirmation. */
+  withQuantity?: boolean;
 }
+
+const MAX_QTY = 999;
 
 const money = (n: number) => `$${Math.round(n).toLocaleString("es-AR")}`;
 
@@ -32,6 +42,7 @@ export const PresentationPicker = ({
   stock,
   onConfirm,
   onCancel,
+  withQuantity = false,
 }: PresentationPickerProps) => {
   const all = product.presentations ?? [];
   const options = useMemo(() => sellablePresentations(all), [all]);
@@ -45,6 +56,16 @@ export const PresentationPicker = ({
   });
   const listRef = useRef<HTMLDivElement>(null);
 
+  // Quantity of the active presentation, capped by what the known base stock covers.
+  const [rawQty, setRawQty] = useState(1);
+  const active = options.find((o) => o.id === activeId);
+  const maxQty = Math.max(
+    1,
+    Math.min(MAX_QTY, active && stock != null ? presentationStockCap(active, stock) : MAX_QTY),
+  );
+  const qty = Math.min(Math.max(rawQty, 0), maxQty);
+  const stepQty = (delta: 1 | -1) => setRawQty(Math.min(maxQty, Math.max(1, qty + delta)));
+
   const move = (delta: 1 | -1) => {
     const enabled = options.filter((o) => !disabled(o));
     if (enabled.length === 0) return;
@@ -54,7 +75,9 @@ export const PresentationPicker = ({
   };
 
   const confirm = (p: ProductPresentation | undefined) => {
-    if (p && !disabled(p)) onConfirm(p);
+    if (!p || disabled(p)) return;
+    if (withQuantity) onConfirm(p, Math.max(1, Math.min(qty, maxQty)));
+    else onConfirm(p);
   };
 
   const levels = stock != null ? formatStockLevels(stock, all) : "";
@@ -90,6 +113,12 @@ export const PresentationPicker = ({
             } else if (e.key === "Enter") {
               e.preventDefault();
               confirm(options.find((o) => o.id === activeId));
+            } else if (withQuantity && (e.key === "+" || e.key === "=")) {
+              e.preventDefault();
+              stepQty(1);
+            } else if (withQuantity && e.key === "-") {
+              e.preventDefault();
+              stepQty(-1);
             }
           }}
         >
@@ -125,6 +154,58 @@ export const PresentationPicker = ({
             );
           })}
         </div>
+
+        {withQuantity && (
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-muted p-3">
+            <Label htmlFor="presentation-qty-input" className="text-sm font-medium">
+              Cantidad
+            </Label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                aria-label="Menos"
+                disabled={qty <= 1}
+                onClick={() => stepQty(-1)}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Input
+                id="presentation-qty-input"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={3}
+                value={qty || ""}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, "").slice(0, 3);
+                  setRawQty(digits === "" ? 0 : Math.min(parseInt(digits, 10), maxQty));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    confirm(active);
+                  }
+                }}
+                className="h-9 w-16 shrink-0 text-center tabular-nums"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                aria-label="Más"
+                disabled={qty >= maxQty}
+                onClick={() => stepQty(1)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {levels && <p className="text-xs text-muted-foreground">Stock: {levels}</p>}
       </DialogContent>
