@@ -156,6 +156,24 @@ describe("PresentationPicker", () => {
       expect(blister).not.toHaveTextContent("c/u");
     });
 
+    it("adds 1 to the quantity on every scan tick, not on mount", () => {
+      const onConfirm = vi.fn();
+      const props = { product, sellsWholesale: false, withQuantity: true, onConfirm, onCancel: vi.fn() };
+      const { rerender } = render(<PresentationPicker {...props} scanTick={0} />);
+      expect(screen.getByLabelText("Cantidad")).toHaveValue("1");
+      rerender(<PresentationPicker {...props} scanTick={1} />);
+      expect(screen.getByLabelText("Cantidad")).toHaveValue("2");
+      rerender(<PresentationPicker {...props} scanTick={2} />);
+      expect(screen.getByLabelText("Cantidad")).toHaveValue("3");
+    });
+
+    it("scan ticks respect the stock cap", () => {
+      const props = { product, sellsWholesale: false, withQuantity: true, stock: 25, onConfirm: vi.fn(), onCancel: vi.fn() };
+      const { rerender } = render(<PresentationPicker {...props} scanTick={0} />);
+      for (const t of [1, 2, 3]) rerender(<PresentationPicker {...props} scanTick={t} />);
+      expect(screen.getByLabelText("Cantidad")).toHaveValue("2");
+    });
+
     it("caps the quantity by the base stock of the active presentation", () => {
       // 25 base units: Caja (100) is disabled, so Blister (10) is active → at most 2
       setup({ withQuantity: true, stock: 25 });

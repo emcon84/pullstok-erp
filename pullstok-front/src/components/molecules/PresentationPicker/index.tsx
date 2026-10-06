@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,8 @@ interface PresentationPickerProps {
   onCancel: () => void;
   /** Shows a quantity stepper so several units go in with one confirmation. */
   withQuantity?: boolean;
+  /** Bump to add 1 to the quantity (the same product was scanned again while open). */
+  scanTick?: number;
 }
 
 const MAX_QTY = 999;
@@ -43,6 +45,7 @@ export const PresentationPicker = ({
   onConfirm,
   onCancel,
   withQuantity = false,
+  scanTick = 0,
 }: PresentationPickerProps) => {
   const all = product.presentations ?? [];
   const options = useMemo(() => sellablePresentations(all), [all]);
@@ -65,6 +68,14 @@ export const PresentationPicker = ({
   );
   const qty = Math.min(Math.max(rawQty, 0), maxQty);
   const stepQty = (delta: 1 | -1) => setRawQty(Math.min(maxQty, Math.max(1, qty + delta)));
+
+  // Each re-scan of the same product counts as one more unit (not on mount).
+  const lastTick = useRef(scanTick);
+  useEffect(() => {
+    if (scanTick === lastTick.current) return;
+    lastTick.current = scanTick;
+    if (withQuantity) setRawQty(Math.min(maxQty, Math.max(1, qty) + 1));
+  }, [scanTick, withQuantity, maxQty, qty]);
 
   const move = (delta: 1 | -1) => {
     const enabled = options.filter((o) => !disabled(o));

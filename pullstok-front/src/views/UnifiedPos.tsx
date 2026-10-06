@@ -94,6 +94,10 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // el operador pueda tipear la cantidad (ej. pouches/latas x3) y confirmar
   // con Enter, sin soltar el teclado.
   const [scanQty, setScanQty] = useState(1);
+  // handleScan corre en closures viejas (listener global): lee el producto del
+  // picker por ref; el tick avisa al picker que se re-escaneó el mismo producto.
+  const presentationProductRef = useRef<ScannedProduct | null>(null);
+  const [presentationScanTick, setPresentationScanTick] = useState(0);
 
   // sdd/venta-pastillas-sueltas-blister — switch "Vender pastillas sueltas"
   // del modal de escaneo (SOLO categoría FARMACIA). `piecesPerBlister` es el
@@ -292,7 +296,12 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           // sdd/product-presentations: con presentaciones se elige en el picker
           // (la línea se suma de a 1 por escaneo; mismo id repetido incrementa).
           if (newProduct.hasPresentations) {
-            setPresentationProduct((cur) => cur ?? newProduct);
+            const cur = presentationProductRef.current;
+            if (!cur) setPresentationProduct(newProduct);
+            // Same product scanned again with the picker open: +1 to its quantity.
+            else if ((cur._id || cur.id) === (newProduct._id || newProduct.id)) {
+              setPresentationScanTick((t) => t + 1);
+            }
             return;
           }
           const prevId = scanProduct ? scanProduct._id || scanProduct.id : null;
@@ -317,6 +326,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
 
   // Producto escaneado con presentaciones, pendiente de elegir en el picker.
   const [presentationProduct, setPresentationProduct] = useState<ScannedProduct | null>(null);
+  presentationProductRef.current = presentationProduct;
 
   const handleConfirmPresentation = useCallback(
     (presentation: ProductPresentation, quantity = 1) => {
@@ -655,6 +665,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
         sellsWholesale={sellsWholesale}
         stock={presentationProduct.isManual ? null : Number(presentationProduct.quantity ?? 0)}
         withQuantity
+        scanTick={presentationScanTick}
         onConfirm={handleConfirmPresentation}
         onCancel={() => setPresentationProduct(null)}
       />

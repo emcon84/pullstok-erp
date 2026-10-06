@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -146,6 +146,20 @@ describe("UnifiedPos scan with presentations", () => {
     fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
     expect(cart.updateQuantity).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalled();
+  });
+
+  it("scanning the same product again while the picker is open adds 1 to the quantity", async () => {
+    mockFetch({ ...withPresentations, quantity: 100 });
+    const cart = renderPos();
+    scanCode("BLST00001");
+    expect(await screen.findByLabelText("Cantidad")).toHaveValue("1");
+    scanCode("BLST00001");
+    await waitFor(() => expect(screen.getByLabelText("Cantidad")).toHaveValue("2"));
+    scanCode("BLST00001");
+    await waitFor(() => expect(screen.getByLabelText("Cantidad")).toHaveValue("3"));
+    fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+    expect(cart.addToCart).toHaveBeenCalledTimes(1);
+    expect(cart.addToCart.mock.calls[0][1]).toBe(3);
   });
 
   it("FARMACIA without presentations keeps the loose-blister modal", async () => {
