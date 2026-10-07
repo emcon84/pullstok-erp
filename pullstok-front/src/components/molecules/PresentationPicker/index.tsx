@@ -25,6 +25,8 @@ interface PresentationPickerProps {
   onCancel: () => void;
   /** Shows a quantity stepper so several units go in with one confirmation. */
   withQuantity?: boolean;
+  /** Starting quantity of the stepper (default 1), e.g. the one typed in the search row. */
+  initialQty?: number;
   /** Bump to add 1 to the quantity (the same product was scanned again while open). */
   scanTick?: number;
 }
@@ -45,6 +47,7 @@ export const PresentationPicker = ({
   onConfirm,
   onCancel,
   withQuantity = false,
+  initialQty = 1,
   scanTick = 0,
 }: PresentationPickerProps) => {
   const all = product.presentations ?? [];
@@ -60,7 +63,7 @@ export const PresentationPicker = ({
   const listRef = useRef<HTMLDivElement>(null);
 
   // Quantity of the active presentation, capped by what the known base stock covers.
-  const [rawQty, setRawQty] = useState(1);
+  const [rawQty, setRawQty] = useState(Math.max(1, initialQty));
   const active = options.find((o) => o.id === activeId);
   const maxQty = Math.max(
     1,

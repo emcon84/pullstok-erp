@@ -256,6 +256,19 @@ describe("VendorCatalogTab — pastillas sueltas desde el buscador (FARMACIA)", 
       expect(args[10]).toMatchObject({ id: "b" });
     });
 
+    it("el picker del buscador trae el stepper de cantidad y agrega la cantidad elegida", () => {
+      const { cart } = renderTab([{ ...withPresentations, stocks: [{ quantity: 100 }] } as DataItem]);
+      act(() => latest().onCommitRow());
+
+      fireEvent.change(screen.getByLabelText("Cantidad"), { target: { value: "3" } });
+      fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+
+      expect(cart.addToCart).toHaveBeenCalledTimes(1);
+      const args = cart.addToCart.mock.calls[0];
+      expect(args[1]).toBe(3);
+      expect(args[10]).toMatchObject({ id: "b" });
+    });
+
     it("no bloquea por stock 0 (el picker decide) y respeta el stock en unidades base", () => {
       const noStock = { ...withPresentations, stocks: [{ quantity: 0 }] } as DataItem;
       renderTab([noStock]);

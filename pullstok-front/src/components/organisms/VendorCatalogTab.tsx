@@ -219,10 +219,11 @@ export const VendorCatalogTab = ({
   const [presentationTarget, setPresentationTarget] = useState<{ product: DataItem; qty: number } | null>(null);
 
   const confirmPresentation = useCallback(
-    (presentation: ProductPresentation) => {
+    (presentation: ProductPresentation, pickedQty?: number) => {
       const target = presentationTarget;
       if (!target) return;
       const p = target.product;
+      const qty = pickedQty ?? target.qty;
       const existing = cart.items.find(
         (i) =>
           i.productId === keyOf(p) &&
@@ -230,14 +231,14 @@ export const VendorCatalogTab = ({
           i.presentationId === presentation.id,
       );
       if (
-        exceedsPresentationStock(presentation, existing?.quantity ?? 0, target.qty, branchQty(p), !!p.isManual)
+        exceedsPresentationStock(presentation, existing?.quantity ?? 0, qty, branchQty(p), !!p.isManual)
       ) {
         toast.error("No hay más stock disponible");
         return;
       }
       setPresentationTarget(null);
       cart.addToCart(
-        p, target.qty, branchId, branchQty(p), "BOLSA_CERRADA",
+        p, qty, branchId, branchQty(p), "BOLSA_CERRADA",
         undefined, undefined, undefined, sellsWholesale, undefined, presentation,
       );
       toast.success(`"${p.name} (${presentation.name})" agregado al pedido`);
@@ -544,6 +545,8 @@ export const VendorCatalogTab = ({
           product={presentationTarget.product}
           sellsWholesale={sellsWholesale}
           stock={presentationTarget.product.isManual ? null : branchQty(presentationTarget.product)}
+          withQuantity
+          initialQty={presentationTarget.qty}
           onConfirm={confirmPresentation}
           onCancel={() => setPresentationTarget(null)}
         />

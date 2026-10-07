@@ -120,6 +120,13 @@ describe("PresentationPicker", () => {
       expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }), 1);
     });
 
+    it("starts at initialQty (e.g. the quantity typed in the search row)", () => {
+      const { onConfirm } = setup({ withQuantity: true, initialQty: 4 });
+      expect(screen.getByLabelText("Cantidad")).toHaveValue("4");
+      fireEvent.click(screen.getByRole("option", { name: /Blister/ }));
+      expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }), 4);
+    });
+
     it("confirms the typed quantity", () => {
       const { onConfirm } = setup({ withQuantity: true });
       fireEvent.change(screen.getByLabelText("Cantidad"), { target: { value: "3" } });
