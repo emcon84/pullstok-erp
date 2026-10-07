@@ -623,7 +623,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
 
         {/* ── Pestaña activa. En desktop la columna queda fija y es la LISTA la
              que scrollea internamente (buscador/filtros fijos arriba) ── */}
-        <div className="min-h-0 lg:flex-1 lg:flex lg:flex-col lg:pr-1">
+        <div className="min-h-0 rounded-xl p-1 transition-shadow focus-within:ring-4 focus-within:ring-inset focus-within:ring-primary/40 lg:flex-1 lg:flex lg:flex-col">
           {tab === "unidad" ? (
             <VendorCatalogTab
               branchId={branchId}

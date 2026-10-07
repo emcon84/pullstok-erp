@@ -160,7 +160,7 @@ export const VendorOrderPanel = ({
     <aside
       ref={asideRef}
       className={
-        "flex flex-col rounded-xl border bg-background shadow-sm " +
+        "flex flex-col rounded-xl border bg-background shadow-sm transition-shadow focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/40 " +
         (className ?? "")
       }
       aria-label="Tu pedido"

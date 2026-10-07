@@ -145,6 +145,18 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+  /* Keyboard navigation: a loud, consistent focus frame on every control.
+     :focus-visible only fires for keyboard focus, so mouse clicks stay clean. */
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  [role="tab"]:focus-visible,
+  [role="menuitem"]:focus-visible,
+  [role="option"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+  }
 }
 
 /* Comprobantes fiscales (PrintInvoice): tamaño A4 exacto con margen
