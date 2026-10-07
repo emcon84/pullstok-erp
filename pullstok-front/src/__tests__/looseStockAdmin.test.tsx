@@ -62,6 +62,32 @@ async function openBagDialog() {
   fireEvent.click(await screen.findByRole("button", { name: /abrir bolsa/i }));
 }
 
+describe("LooseStockAdmin — lista la planilla completa", () => {
+  it("shows a plan cell that has no stock row yet with 0 kg", async () => {
+    mockUseBranches.mockReturnValue({
+      branches: [{ id: "b1", name: "Sucursal 1", isActive: true, createdAt: "" }],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mockListLooseStocks.mockResolvedValue({ items: [] });
+    mockGetPriceKgPlan.mockResolvedValue([
+      { id: "c9", brandId: "br1", typeId: "t1", species: "PERRO", priceKg: 4200 },
+    ]);
+    mockListPriceKgTypes.mockResolvedValue([
+      { id: "t1", name: "Adulto" } as never,
+    ]);
+    mockListPriceKgBrands.mockResolvedValue([
+      { id: "br1", name: "Marca Nueva" } as never,
+    ]);
+
+    renderAdmin();
+
+    expect(await screen.findByText("Marca Nueva · Adulto")).toBeInTheDocument();
+    expect(screen.getByText("0,00 kg")).toBeInTheDocument();
+  });
+});
+
 describe("LooseStockAdmin — buscador de bolsa vía catálogo offline (T5)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

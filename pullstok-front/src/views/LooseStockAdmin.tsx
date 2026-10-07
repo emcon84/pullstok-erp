@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { PackageOpen, Save, Scale, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,9 +31,10 @@ import {
   openBag,
   type LooseStockLine,
 } from "@/services/looseStock";
-import { getPriceKgPlan } from "@/services/priceKgPlan";
-import { listPriceKgTypes } from "@/services/priceKgTypes";
-import { listPriceKgBrands } from "@/services/priceKgBrands";
+import { getPriceKgPlan, type PriceKgPrice } from "@/services/priceKgPlan";
+import { listPriceKgTypes, type PriceKgType } from "@/services/priceKgTypes";
+import { listPriceKgBrands, type PriceKgBrand } from "@/services/priceKgBrands";
+import { buildLooseStockRows } from "@/utils/looseStockRows";
 import { ensureOfflineCatalog, searchProducts } from "@/lib/offlineCatalog";
 import type { OfflineProduct } from "@/lib/offlineCatalog";
 
@@ -58,6 +59,9 @@ export const LooseStockAdmin = () => {
   const { branches, loading: loadingBranches } = useBranches();
   const [selectedBranchId, setSelectedBranchId] = useState("");
   const [lines, setLines] = useState<LooseStockLine[]>([]);
+  const [plan, setPlan] = useState<PriceKgPrice[]>([]);
+  const [planTypes, setPlanTypes] = useState<PriceKgType[]>([]);
+  const [planBrands, setPlanBrands] = useState<PriceKgBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -102,6 +106,33 @@ export const LooseStockAdmin = () => {
   useEffect(() => {
     load(selectedBranchId);
   }, [selectedBranchId, load]);
+
+  // La planilla completa: así las líneas nuevas (sin fila de stock todavía)
+  // también se listan, con 0 kg, y se les puede cargar stock.
+  useEffect(() => {
+    Promise.all([getPriceKgPlan(), listPriceKgTypes(), listPriceKgBrands()])
+      .then(([p, t, b]) => {
+        setPlan(p);
+        setPlanTypes(t);
+        setPlanBrands(b);
+      })
+      .catch(() => {
+        // Sin planilla se muestran solo las líneas con stock, como antes.
+      });
+  }, []);
+
+  const rows = useMemo(
+    () =>
+      buildLooseStockRows({
+        plan,
+        brands: planBrands,
+        types: planTypes,
+        lines,
+        branchId: selectedBranchId,
+        branchName: branches.find((b) => b.id === selectedBranchId)?.name ?? "",
+      }),
+    [plan, planBrands, planTypes, lines, selectedBranchId, branches],
+  );
 
   const handleSave = async (line: LooseStockLine) => {
     // La sucursal de la línea si no hay filtro; si hay filtro, la seleccionada.
@@ -296,7 +327,7 @@ export const LooseStockAdmin = () => {
             <div className="flex justify-center py-12">
               <Loader />
             </div>
-          ) : lines.length === 0 ? (
+          ) : rows.length === 0 ? (
             <div className="rounded-lg border bg-muted/30 py-12 text-center">
               <Scale className="h-8 w-8 mx-auto text-muted-foreground" />
               <p className="mt-2 text-sm text-muted-foreground">
@@ -319,7 +350,7 @@ export const LooseStockAdmin = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lines.map((line) => (
+                  {rows.map((line) => (
                     <TableRow key={`${line.priceKgPriceId}-${line.branchId}`}>
                       <TableCell className="font-medium">
                         {line.lineName ?? "—"}
