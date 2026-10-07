@@ -40,7 +40,7 @@ vi.mock("@/lib/offlineCatalog", () => ({
 
 import { LooseStockAdmin } from "@/views/LooseStockAdmin";
 import { useBranches } from "@/components/hooks/useBranches";
-import { listLooseStocks } from "@/services/looseStock";
+import { listLooseStocks, setLooseStock } from "@/services/looseStock";
 import { getPriceKgPlan } from "@/services/priceKgPlan";
 import { listPriceKgTypes } from "@/services/priceKgTypes";
 import { listPriceKgBrands } from "@/services/priceKgBrands";
@@ -85,6 +85,62 @@ describe("LooseStockAdmin — lista la planilla completa", () => {
 
     expect(await screen.findByText("Marca Nueva · Adulto")).toBeInTheDocument();
     expect(screen.getByText("0,00 kg")).toBeInTheDocument();
+  });
+});
+
+describe("LooseStockAdmin — sucursal por fila", () => {
+  it("lets you pick a branch on a new line from the all-branches view and saves stock there", async () => {
+    // Touch media query → NativeSelect renders a plain <select> we can drive.
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = ((q: string) => ({
+      matches: q.includes("coarse"),
+      media: q,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })) as never;
+
+    mockUseBranches.mockReturnValue({
+      branches: [
+        { id: "b1", name: "Sucursal 1", isActive: true, createdAt: "" },
+        { id: "b2", name: "Sucursal 2", isActive: true, createdAt: "" },
+      ],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mockListLooseStocks.mockResolvedValue({ items: [] });
+    mockGetPriceKgPlan.mockResolvedValue([
+      { id: "c1", brandId: "br1", typeId: "t1", species: "PERRO", priceKg: 4200 },
+    ]);
+    mockListPriceKgTypes.mockResolvedValue([{ id: "t1", name: "Adulto" } as never]);
+    mockListPriceKgBrands.mockResolvedValue([{ id: "br1", name: "Nueva" } as never]);
+    vi.mocked(setLooseStock).mockResolvedValue({
+      lineId: "c1",
+      branchId: "b2",
+      quantity: 7,
+    });
+
+    try {
+      renderAdmin();
+      await screen.findByText("Nueva · Adulto");
+
+      fireEvent.change(screen.getByLabelText("Sucursal de Nueva · Adulto"), {
+        target: { value: "b2" },
+      });
+      fireEvent.change(screen.getByLabelText("Ajustar kg de Nueva · Adulto"), {
+        target: { value: "7" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
+
+      await waitFor(() =>
+        expect(setLooseStock).toHaveBeenCalledWith("c1", {
+          branchId: "b2",
+          quantity: 7,
+        }),
+      );
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
   });
 });
 

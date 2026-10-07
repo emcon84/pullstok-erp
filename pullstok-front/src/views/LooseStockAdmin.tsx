@@ -63,6 +63,9 @@ export const LooseStockAdmin = () => {
   const [selectedBranchId, setSelectedBranchId] = useState("");
   const [lines, setLines] = useState<LooseStockLine[]>([]);
   const [listSearch, setListSearch] = useState("");
+  // Sucursal elegida por fila para las líneas nuevas (sin fila de stock) en la
+  // vista "Todas", donde la fila no trae sucursal.
+  const [rowBranches, setRowBranches] = useState<Record<string, string>>({});
   const [plan, setPlan] = useState<PriceKgPrice[]>([]);
   const [planTypes, setPlanTypes] = useState<PriceKgType[]>([]);
   const [planBrands, setPlanBrands] = useState<PriceKgBrand[]>([]);
@@ -145,7 +148,8 @@ export const LooseStockAdmin = () => {
 
   const handleSave = async (line: LooseStockLine) => {
     // La sucursal de la línea si no hay filtro; si hay filtro, la seleccionada.
-    const branchId = selectedBranchId || line.branchId;
+    const branchId =
+      selectedBranchId || line.branchId || rowBranches[line.priceKgPriceId];
     if (!branchId) {
       toast.error("Seleccioná una sucursal para ajustar el stock");
       return;
@@ -380,7 +384,23 @@ export const LooseStockAdmin = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {line.branchName ?? "—"}
+                        {line.branchId ? (
+                          (line.branchName ?? "—")
+                        ) : (
+                          <NativeSelect
+                            ariaLabel={`Sucursal de ${line.lineName ?? "la línea"}`}
+                            value={rowBranches[line.priceKgPriceId] ?? ""}
+                            onValueChange={(v) =>
+                              setRowBranches((prev) => ({
+                                ...prev,
+                                [line.priceKgPriceId]: v,
+                              }))
+                            }
+                            options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                            placeholder="Elegí sucursal"
+                            className="h-8 w-40"
+                          />
+                        )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {line.priceKg
@@ -409,6 +429,7 @@ export const LooseStockAdmin = () => {
                           <Button
                             size="sm"
                             variant="outline"
+                            aria-label="Guardar"
                             disabled={savingId === line.priceKgPriceId}
                             onClick={() => handleSave(line)}
                           >
