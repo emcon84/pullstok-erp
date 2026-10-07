@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { useSettledValue } from "../components/hooks/useSettledValue";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload, ShoppingCart, X, Printer, Barcode } from "lucide-react";
 import {
   FaShoppingCart,
@@ -25,6 +26,7 @@ import { PrintProductList } from "../components/molecules/PrintProductList";
 import { ProductDrawer } from "../components/molecules/ProductDrawer";
 import { QuickPriceModal } from "../components/molecules/QuickPriceModal";
 import { ScannedProductDialog } from "../components/molecules/ScannedProductDialog";
+import { AssignBarcodeDialog } from "../components/molecules/AssignBarcodeDialog";
 import { useScanCapture } from "../components/hooks/useScanCapture";
 import { API_URL } from "@/constants";
 import { SecoBarcodesReportDialog } from "../components/molecules/SecoBarcodesReportDialog";
@@ -121,6 +123,9 @@ export const Dashboard = () => {
   // muestra aunque el usuario tenga una sola sucursal, así que ahí sí captura.
   const showsPos = branchMode.kind === "single" && !isAdminMode;
   const [scannedProduct, setScannedProduct] = useState<DataItem | null>(null);
+  // Código escaneado que ningún producto tiene (404): abre "Vincular código".
+  const [unmatchedBarcode, setUnmatchedBarcode] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const handleScan = useCallback(async (barcode: string) => {
     try {
       const token = localStorage.getItem("token") || "";
@@ -129,7 +134,7 @@ export const Dashboard = () => {
         { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } },
       );
       if (res.status === 404) {
-        toast.error("Producto no encontrado para ese código");
+        setUnmatchedBarcode(barcode);
         return;
       }
       if (!res.ok) {
@@ -156,7 +161,8 @@ export const Dashboard = () => {
       !quickPriceProduct &&
       !isModalSalesOpen &&
       !isModalUploadOpen &&
-      !secoReportOpen,
+      !secoReportOpen &&
+      !unmatchedBarcode,
     onScan: handleScan,
   });
 
@@ -544,6 +550,16 @@ export const Dashboard = () => {
         open={!!scannedProduct}
         onClose={() => setScannedProduct(null)}
         onEdit={editScannedProduct}
+      />
+
+      {/* Código sin producto → buscar el producto y vincularle el código */}
+      <AssignBarcodeDialog
+        barcode={unmatchedBarcode}
+        open={!!unmatchedBarcode}
+        onClose={() => setUnmatchedBarcode(null)}
+        onAssigned={() => {
+          queryClient.invalidateQueries({ queryKey: ["products"] });
+        }}
       />
 
       {/* Quick price modal (solo precio, atajo Ctrl+Shift+P / Enter) */}

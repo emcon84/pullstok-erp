@@ -179,14 +179,42 @@ describe("Dashboard admin — escaneo abre el producto", () => {
     );
   });
 
-  it("404 muestra toast de producto no encontrado y no abre modal", async () => {
+  it("404 abre el diálogo Vincular código con el código escaneado y sin toast de error", async () => {
     mockScanResponse({}, 404);
     renderDashboard();
     await scan("0000000000000");
-    await waitFor(() =>
-      expect(toastMock.error).toHaveBeenCalledWith("Producto no encontrado para ese código"),
-    );
+    expect(await screen.findByText("Vincular código")).toBeInTheDocument();
+    expect(screen.getByText("0000000000000")).toBeInTheDocument();
+    expect(toastMock.error).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /Editar/ })).not.toBeInTheDocument();
+  });
+
+  it("mientras Vincular código está abierto no se captura otro escaneo", async () => {
+    mockScanResponse({}, 404);
+    renderDashboard();
+    await scan("0000000000000");
+    await screen.findByText("Vincular código");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 450));
+    });
+    await scan("1111111111");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("asignar el código cierra el diálogo", async () => {
+    mockScanResponse({}, 404);
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [{ id: "p1", name: "Alimento Listado", code: "A1" }] })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ id: "p1", name: "Alimento Listado" }) });
+    renderDashboard();
+    await scan("0000000000000");
+    await screen.findByText("Vincular código");
+    fireEvent.change(screen.getByPlaceholderText(/Buscá el producto por nombre/), {
+      target: { value: "alimento" },
+    });
+    fireEvent.click(await screen.findByText("Alimento Listado"));
+    await waitFor(() => expect(screen.queryByText("Vincular código")).not.toBeInTheDocument());
+    expect(toastMock.success).toHaveBeenCalledWith("¡Código asignado!");
   });
 
   it("etiqueta de balanza (isScale) -> toast.info con looseName, sin modal", async () => {

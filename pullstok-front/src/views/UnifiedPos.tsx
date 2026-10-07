@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Landmark, ShoppingCart, PackageOpen, PackagePlus, Minus, Plus, Scale } from "lucide-react";
 import { toast } from "react-toastify";
 import { API_URL } from "@/constants";
@@ -11,6 +11,7 @@ import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecules/VendorOrderPanel";
 import { OpenBagDialog } from "@/components/molecules/OpenBagDialog";
+import { AssignBarcodeDialog } from "@/components/molecules/AssignBarcodeDialog";
 import { ManualProductDialog } from "@/components/molecules/ManualProductDialog";
 import { FreeLineDialog } from "@/components/molecules/FreeLineDialog";
 import { PrintTicketDialog } from "@/components/molecules/PrintTicketDialog";
@@ -108,6 +109,12 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
 
   // Modal de "Abrir bolsa" - flujo para abrir bolsas y creditar kg a celda suelta
   const [openBagDialogOpen, setOpenBagDialogOpen] = useState(false);
+
+  // Código escaneado que ningún producto tiene (404): abre "Vincular código".
+  // Mientras está abierto el capturador de la pistola se desactiva para que lo
+  // tipeado en el buscador del diálogo no se confunda con un escaneo.
+  const [unmatchedBarcode, setUnmatchedBarcode] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Modal "Producto manual": el vendedor carga nombre + precio de algo que no
   // encuentra; se crea en el server y se suma al pedido como BOLSA_CERRADA.
@@ -253,7 +260,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } },
         );
         if (res.status === 404) {
-          toast.error("Producto no encontrado para ese código");
+          setUnmatchedBarcode(barcode);
           return;
         }
         if (!res.ok) {
@@ -437,7 +444,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // mismo con "Producto manual": el nombre tipeado rápido + Enter (>= 6
   // caracteres) se confundiría con un escaneo.
   useEffect(() => {
-    if (openBagDialogOpen || manualOpen || freeOpen) return; // El diálogo maneja su propio input
+    if (openBagDialogOpen || manualOpen || freeOpen || unmatchedBarcode) return; // El diálogo maneja su propio input
     let buffer = "";
     let lastKeyAt = 0;
     const onKey = (e: KeyboardEvent) => {
@@ -484,7 +491,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [handleScan, openBagDialogOpen, manualOpen, freeOpen]);
+  }, [handleScan, openBagDialogOpen, manualOpen, freeOpen, unmatchedBarcode]);
 
   // Teclas +/- del teclado para ajustar la cantidad del modal de escaneo sin
   // mouse. Solo mientras el modal está abierto (scanProduct), y en captura
@@ -835,6 +842,18 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
       onOpenChange={setManualOpen}
       onCreated={handleManualCreated}
       onClosed={exitToGrid}
+    />
+
+    {/* ── Código sin producto: buscar el producto y vincularle el código ── */}
+    <AssignBarcodeDialog
+      barcode={unmatchedBarcode}
+      open={!!unmatchedBarcode}
+      onClose={() => setUnmatchedBarcode(null)}
+      onAssigned={() => {
+        queryClient.invalidateQueries({ queryKey: ["products"] });
+        // Re-escanea el código ya vinculado: el producto entra al flujo normal.
+        if (unmatchedBarcode) void handleScan(unmatchedBarcode);
+      }}
     />
 
     {/* ── Modal de Venta libre (vuelve el foco al listado al cerrarse) ── */}
