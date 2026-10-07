@@ -88,17 +88,8 @@ describe("LooseStockAdmin — lista la planilla completa", () => {
   });
 });
 
-describe("LooseStockAdmin — sucursal por fila", () => {
-  it("lets you pick a branch on a new line from the all-branches view and saves stock there", async () => {
-    // Touch media query → NativeSelect renders a plain <select> we can drive.
-    const originalMatchMedia = window.matchMedia;
-    window.matchMedia = ((q: string) => ({
-      matches: q.includes("coarse"),
-      media: q,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    })) as never;
-
+describe("LooseStockAdmin — línea × sucursal", () => {
+  it("lists a new line once per branch in the all-branches view and saves stock for the chosen branch", async () => {
     mockUseBranches.mockReturnValue({
       branches: [
         { id: "b1", name: "Sucursal 1", isActive: true, createdAt: "" },
@@ -120,27 +111,25 @@ describe("LooseStockAdmin — sucursal por fila", () => {
       quantity: 7,
     });
 
-    try {
-      renderAdmin();
-      await screen.findByText("Nueva · Adulto");
+    renderAdmin();
 
-      fireEvent.change(screen.getByLabelText("Sucursal de Nueva · Adulto"), {
-        target: { value: "b2" },
-      });
-      fireEvent.change(screen.getByLabelText("Ajustar kg de Nueva · Adulto"), {
-        target: { value: "7" },
-      });
-      fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
+    expect(await screen.findAllByText("Nueva · Adulto")).toHaveLength(2);
+    expect(screen.getByText("Sucursal 1")).toBeInTheDocument();
 
-      await waitFor(() =>
-        expect(setLooseStock).toHaveBeenCalledWith("c1", {
-          branchId: "b2",
-          quantity: 7,
-        }),
-      );
-    } finally {
-      window.matchMedia = originalMatchMedia;
-    }
+    fireEvent.change(
+      screen.getByLabelText("Ajustar kg de Nueva · Adulto en Sucursal 2"),
+      { target: { value: "7" } },
+    );
+    const saveButtons = screen.getAllByRole("button", { name: /guardar/i });
+    // Rows are ordered by name then branch: Sucursal 1 first, Sucursal 2 second.
+    fireEvent.click(saveButtons[1]);
+
+    await waitFor(() =>
+      expect(setLooseStock).toHaveBeenCalledWith("c1", {
+        branchId: "b2",
+        quantity: 7,
+      }),
+    );
   });
 });
 
