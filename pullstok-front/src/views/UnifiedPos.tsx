@@ -592,6 +592,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             </div>
             {tab === "unidad" && (
               <Button
+                variant="outline"
                 onClick={() => setOpenBagDialogOpen(true)}
                 className="whitespace-nowrap"
                 aria-label="Abrir bolsa"
