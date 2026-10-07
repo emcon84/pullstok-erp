@@ -44,6 +44,9 @@ const SPECIES_LABELS: Record<string, string> = {
   AMBOS: "Perros y gatos",
 };
 
+const normalizeText = (s: string) =>
+  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
 const formatKg = (n: number) =>
   n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -59,6 +62,7 @@ export const LooseStockAdmin = () => {
   const { branches, loading: loadingBranches } = useBranches();
   const [selectedBranchId, setSelectedBranchId] = useState("");
   const [lines, setLines] = useState<LooseStockLine[]>([]);
+  const [listSearch, setListSearch] = useState("");
   const [plan, setPlan] = useState<PriceKgPrice[]>([]);
   const [planTypes, setPlanTypes] = useState<PriceKgType[]>([]);
   const [planBrands, setPlanBrands] = useState<PriceKgBrand[]>([]);
@@ -121,18 +125,23 @@ export const LooseStockAdmin = () => {
       });
   }, []);
 
-  const rows = useMemo(
-    () =>
-      buildLooseStockRows({
-        plan,
-        brands: planBrands,
-        types: planTypes,
-        lines,
-        branchId: selectedBranchId,
-        branchName: branches.find((b) => b.id === selectedBranchId)?.name ?? "",
-      }),
-    [plan, planBrands, planTypes, lines, selectedBranchId, branches],
-  );
+  const rows = useMemo(() => {
+    const all = buildLooseStockRows({
+      plan,
+      brands: planBrands,
+      types: planTypes,
+      lines,
+      branchId: selectedBranchId,
+      branchName: branches.find((b) => b.id === selectedBranchId)?.name ?? "",
+    });
+    const q = normalizeText(listSearch.trim());
+    if (!q) return all;
+    return all.filter((r) =>
+      normalizeText(
+        `${r.lineName ?? ""} ${SPECIES_LABELS[r.species ?? ""] ?? ""}`,
+      ).includes(q),
+    );
+  }, [plan, planBrands, planTypes, lines, selectedBranchId, branches, listSearch]);
 
   const handleSave = async (line: LooseStockLine) => {
     // La sucursal de la línea si no hay filtro; si hay filtro, la seleccionada.
@@ -296,6 +305,16 @@ export const LooseStockAdmin = () => {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="text-base">Líneas con stock suelto</CardTitle>
             <div className="flex flex-wrap items-end gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  aria-label="Buscar línea"
+                  className="w-56 pl-9"
+                  placeholder="Buscar línea..."
+                  value={listSearch}
+                  onChange={(e) => setListSearch(e.target.value)}
+                />
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="loose-branch" className="text-xs">
                   Sucursal

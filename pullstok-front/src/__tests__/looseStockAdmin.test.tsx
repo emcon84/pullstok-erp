@@ -88,6 +88,37 @@ describe("LooseStockAdmin — lista la planilla completa", () => {
   });
 });
 
+describe("LooseStockAdmin — buscador del listado", () => {
+  it("filters the list by line name, ignoring case and accents", async () => {
+    mockUseBranches.mockReturnValue({
+      branches: [{ id: "b1", name: "Sucursal 1", isActive: true, createdAt: "" }],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mockListLooseStocks.mockResolvedValue({ items: [] });
+    mockGetPriceKgPlan.mockResolvedValue([
+      { id: "c1", brandId: "br1", typeId: "t1", species: "PERRO", priceKg: 4200 },
+      { id: "c2", brandId: "br2", typeId: "t1", species: "GATO", priceKg: 3900 },
+    ]);
+    mockListPriceKgTypes.mockResolvedValue([{ id: "t1", name: "Adulto" } as never]);
+    mockListPriceKgBrands.mockResolvedValue([
+      { id: "br1", name: "Pedigrí" } as never,
+      { id: "br2", name: "Whiskas" } as never,
+    ]);
+
+    renderAdmin();
+    await screen.findByText("Whiskas · Adulto");
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar línea..."), {
+      target: { value: "PEDIGRI" },
+    });
+
+    expect(screen.getByText("Pedigrí · Adulto")).toBeInTheDocument();
+    expect(screen.queryByText("Whiskas · Adulto")).not.toBeInTheDocument();
+  });
+});
+
 describe("LooseStockAdmin — buscador de bolsa vía catálogo offline (T5)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
