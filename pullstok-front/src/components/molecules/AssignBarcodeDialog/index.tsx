@@ -27,6 +27,10 @@ interface AssignBarcodeDialogProps {
   onAssigned?: (product: DataItem) => void;
 }
 
+// The API may return the category as a plain name or as a populated object.
+const categoryLabel = (category: unknown): string | undefined =>
+  typeof category === "string" ? category : (category as { name?: string } | null)?.name;
+
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
   "Content-Type": "application/json",
@@ -187,9 +191,9 @@ export const AssignBarcodeDialog = ({
                     ))}
                   </span>
                 ) : (
-                  p.category?.name && (
+                  categoryLabel(p.category) && (
                     <Badge variant="outline" className="mt-1.5 px-1.5 py-0.5 text-[11px]">
-                      {p.category.name}
+                      {categoryLabel(p.category)}
                     </Badge>
                   )
                 )}
