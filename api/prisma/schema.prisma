@@ -111,6 +111,7 @@ model Organization {
   providers             Provider[]
   accounts              Account[]
   productPresentations  ProductPresentation[]
+  productBarcodes       ProductBarcode[]
   priceKgTypes          PriceKgType[]
   priceKgBrands         PriceKgBrand[]
   priceKgPrices         PriceKgPrice[]
@@ -624,6 +625,8 @@ model Product {
   // la presentación (factor 1) y se vende por presentación. Solo FARMACIA.
   hasPresentations   Boolean            @default(false)
   presentations      ProductPresentation[]
+  // Codigos de barras adicionales (alias); Product.barcode sigue siendo el primario.
+  barcodes           ProductBarcode[]
 
   @@index([organizationId])
   @@index([categoryId])
@@ -680,6 +683,24 @@ model ProductPresentation {
   @@unique([productId, name])
   @@index([organizationId, productId])
   @@map("product_presentations")
+}
+
+// Codigo de barras adicional (alias) de un producto. Product.barcode es el
+// primario; un codigo debe ser unico entre Product.barcode y ProductBarcode.code
+// dentro de la org (se valida en el controller; aca solo unique entre alias).
+// Tenant-scoped y en TENANT_MODELS (db.ts).
+model ProductBarcode {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  code           String
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, code])
+  @@index([productId])
+  @@map("product_barcodes")
 }
 
 // Stock de alimento SUELTO por línea de la planilla (celda PriceKgPrice) y por
