@@ -941,6 +941,19 @@ const updateProduct = async (req: Request, res: Response) => {
   try {
     const { variantOptionIds, ...data } = req.body;
 
+    // A primary barcode cannot reuse a code that is an alias of ANOTHER product.
+    if (typeof data.barcode === "string" && data.barcode.trim().length > 0) {
+      const aliasOwner = await prisma.productBarcode.findFirst({
+        where: { code: data.barcode.trim(), productId: { not: req.params.id } },
+        select: { id: true },
+      });
+      if (aliasOwner) {
+        return res.status(409).json({
+          message: "Ese código de barras ya está asignado como código adicional de otro producto.",
+        });
+      }
+    }
+
     // Precio de BOLSA CERRADA >= 500 → múltiplo de 100; < 500 se conserva.
     // NO se toca priceKgSuelto (venta por kg) ni suggestedPrice.
     if (data.price !== undefined && data.price !== null) {
@@ -2416,7 +2429,80 @@ export const generateProductBarcode = async (req: AuthedRequest, res: Response) 
   }
 };
 
+/**
+ * POST /products/:id/barcodes {code} — adds an additional (alias) barcode.
+ * A code must be unique across Product.barcode and ProductBarcode.code in the
+ * org (409), including the product's own primary barcode.
+ */
+export const addProductBarcode = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const { id } = req.params;
+    const code = typeof req.body?.code === "string" ? req.body.code.trim() : "";
+    if (!code) {
+      return res.status(400).json({ message: "El código es requerido" });
+    }
+
+    const product = await prisma.product.findFirst({ where: { id }, select: { id: true } });
+    if (!product) {
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
+
+    const conflictMessage = "Ese código de barras ya está en uso en otro producto.";
+    const primaryOwner = await prisma.product.findFirst({
+      where: { barcode: code },
+      select: { id: true },
+    });
+    if (primaryOwner) {
+      return res.status(409).json({ message: conflictMessage });
+    }
+    const aliasOwner = await prisma.productBarcode.findFirst({
+      where: { code },
+      select: { id: true },
+    });
+    if (aliasOwner) {
+      return res.status(409).json({ message: conflictMessage });
+    }
+
+    try {
+      const created = await prisma.productBarcode.create({
+        data: { organizationId, productId: id, code },
+        select: { id: true, code: true },
+      });
+      notifyProductChanged(id, "updated");
+      return res.status(201).json(created);
+    } catch (error: any) {
+      // Unique index (organizationId, code) lost a race with a concurrent insert.
+      if (error?.code === "P2002") {
+        return res.status(409).json({ message: conflictMessage });
+      }
+      throw error;
+    }
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/** DELETE /products/:id/barcodes/:barcodeId — removes an alias barcode. */
+export const deleteProductBarcode = async (req: Request, res: Response) => {
+  try {
+    const { id, barcodeId } = req.params;
+    const result = await prisma.productBarcode.deleteMany({
+      where: { id: barcodeId, productId: id },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ message: "Código de barras no encontrado" });
+    }
+    notifyProductChanged(id, "updated");
+    res.status(204).send();
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export default {
+  addProductBarcode,
+  deleteProductBarcode,
   createProduct,
   bulkUploadProducts,
   getProducts,

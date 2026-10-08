@@ -161,6 +161,19 @@ router.put(
   validate(updateProductSchema),
   productController.updateProduct,
 );
+// Additional (alias) barcodes per product. Same guards as PUT /:id.
+router.post(
+  "/:id/barcodes",
+  authenticateJWT,
+  checkBusinessHours,
+  productController.addProductBarcode,
+);
+router.delete(
+  "/:id/barcodes/:barcodeId",
+  authenticateJWT,
+  checkBusinessHours,
+  productController.deleteProductBarcode,
+);
 router.patch(
   "/:id/publish",
   authenticateJWT,
