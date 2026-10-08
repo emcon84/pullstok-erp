@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency } from "../../../utils/statsHelpers";
+import { formatQuantity } from "../../../utils/formatQuantity";
 import { truncateLabel } from "../../../utils/truncateLabel";
 
 const MAX_LABEL = 24;
@@ -27,6 +28,7 @@ export interface RankedRowData {
   label: string;
   amount: number;
   quantity: number;
+  unit?: "kg";
 }
 
 interface RankedBarChartProps {
@@ -51,9 +53,6 @@ const compactCurrency = (n: number): string =>
     maximumFractionDigits: 1,
   }).format(n);
 
-const formatQuantity = (n: number): string =>
-  new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 }).format(n);
-
 interface TooltipPayload {
   payload?: RankedRowData;
 }
@@ -72,7 +71,7 @@ const RankedTooltip = ({
       <p className="mb-1 font-medium break-words">{row.label}</p>
       <p className="tabular-nums">{formatCurrency(row.amount)}</p>
       <p className="text-muted-foreground tabular-nums">
-        Cantidad: {formatQuantity(row.quantity)}
+        Cantidad: {formatQuantity(row.quantity, row.unit)}
       </p>
     </div>
   );
@@ -134,7 +133,7 @@ export const RankedBarChart = ({
             {rows.map((r) => (
               <TableRow key={r.label}>
                 <TableCell className="whitespace-normal break-words">{r.label}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatQuantity(r.quantity)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatQuantity(r.quantity, r.unit)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCurrency(r.amount)}</TableCell>
               </TableRow>
             ))}
