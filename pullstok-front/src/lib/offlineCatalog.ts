@@ -26,6 +26,8 @@ export interface OfflineProduct {
   name: string;
   code: string | null;
   barcode: string | null;
+  /** Códigos de barras adicionales (alias) que también resuelven el producto. */
+  barcodes?: string[];
   price: number;
   priceKgLista: number | null;
   priceKgSuelto: number | null;
@@ -79,6 +81,12 @@ function rebuildIndexes(list: OfflineProduct[]) {
   for (const p of list) {
     if (p.code) byCode.set(p.code, p);
     if (p.barcode) byBarcode.set(p.barcode, p);
+  }
+  // Alias en una segunda pasada: nunca pisan el barcode principal de otro producto.
+  for (const p of list) {
+    for (const alias of p.barcodes ?? []) {
+      if (alias && !byBarcode.has(alias)) byBarcode.set(alias, p);
+    }
   }
 }
 

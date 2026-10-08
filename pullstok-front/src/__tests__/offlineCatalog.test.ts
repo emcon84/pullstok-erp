@@ -76,6 +76,43 @@ describe("offlineCatalog — patch puntual (T3)", () => {
     });
   });
 
+  describe("códigos de barras adicionales (alias)", () => {
+    // storeOfflineSnapshot([]) no resetea la memoria sin IndexedDB: limpiamos a mano.
+    afterEach(async () => {
+      await removeProductFromCatalog("p1");
+      await removeProductFromCatalog("p2");
+    });
+
+    it("resuelve el producto por un alias y sigue resolviendo por el principal", async () => {
+      const product = baseProduct({ barcodes: ["ALIAS-1", "ALIAS-2"] });
+      await patchProduct(product);
+
+      expect(lookupProductByCode("ALIAS-1")).toEqual(product);
+      expect(lookupProductByCode("ALIAS-2")).toEqual(product);
+      expect(lookupProductByCode("7791234567890")).toEqual(product);
+    });
+
+    it("el code/barcode principal tiene prioridad sobre un alias de otro producto", async () => {
+      const owner = baseProduct({ id: "p1", barcode: "SHARED", barcodes: [] });
+      const other = baseProduct({ id: "p2", code: "COD-2", barcode: "OTHER", barcodes: ["SHARED"] });
+      await patchProduct(other);
+      await patchProduct(owner);
+
+      expect(lookupProductByCode("SHARED")?.id).toBe("p1");
+    });
+
+    it("al quitar un alias (patch) deja de resolver", async () => {
+      await patchProduct(baseProduct({ barcodes: ["ALIAS-1"] }));
+      await patchProduct(baseProduct({ barcodes: [] }));
+      expect(lookupProductByCode("ALIAS-1")).toBeNull();
+    });
+
+    it("tolera productos sin el campo barcodes (snapshot viejo)", async () => {
+      await patchProduct(baseProduct());
+      expect(lookupProductByCode("NADA")).toBeNull();
+    });
+  });
+
   describe("removeProductFromCatalog", () => {
     it("saca el producto del catálogo y deja de aparecer en búsquedas", async () => {
       const product = baseProduct();

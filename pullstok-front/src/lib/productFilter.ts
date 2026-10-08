@@ -78,7 +78,7 @@ export function parseFilterTerms(filter: string): string[][] {
 }
 
 /**
- * Haystack sobre el que se matchea: nombre + código + código de barras +
+ * Haystack sobre el que se matchea: nombre + código + código de barras (y alias) +
  * valores de variantes (incluye la marca). El barcode permite encontrar el
  * producto tipeando el código cuando la pistola falla.
  */
@@ -89,7 +89,12 @@ export function productHaystack(product: DataItem): string {
   })
     ?.variantAssignments?.map((pv) => pv.option?.value ?? "")
     .join(" ");
-  return `${product.name} ${product.code || ""} ${product.barcode || ""} ${variantValues || ""}`.toLowerCase();
+  const rawAliases = (product as unknown as { barcodes?: Array<string | { code?: string }> })
+    ?.barcodes;
+  const aliasCodes = Array.isArray(rawAliases)
+    ? rawAliases.map((b) => (typeof b === "string" ? b : b?.code ?? "")).join(" ")
+    : "";
+  return `${product.name} ${product.code || ""} ${product.barcode || ""} ${aliasCodes} ${variantValues || ""}`.toLowerCase();
 }
 
 // Sinónimos de RAZA (razas pequeñas vs medianas/grandes). Mantener las listas

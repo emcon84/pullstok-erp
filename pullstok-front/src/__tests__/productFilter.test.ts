@@ -166,6 +166,24 @@ describe("matchesProductFilter — código de barras tipeado a mano", () => {
   });
 });
 
+describe("matchesProductFilter — códigos de barras adicionales (alias)", () => {
+  const withAliases = product({
+    name: "Arnés Mediano",
+    barcode: "7790001234567",
+    barcodes: [{ id: "b1", code: "ALIAS-998877" }, "7795550001111"],
+  });
+
+  it("encuentra el producto por un código adicional (objeto o string)", () => {
+    expect(matchesProductFilter(withAliases, parseFilterTerms("alias-998877"))).toBe(true);
+    expect(matchesProductFilter(withAliases, parseFilterTerms("7795550001111"))).toBe(true);
+  });
+
+  it("sigue encontrando por el principal y no matchea códigos ajenos", () => {
+    expect(matchesProductFilter(withAliases, parseFilterTerms("7790001234567"))).toBe(true);
+    expect(matchesProductFilter(withAliases, parseFilterTerms("0000000"))).toBe(false);
+  });
+});
+
 describe("isPurinaProduct", () => {
   it("matchea las marcas del grupo Purina por prefijo de nombre", () => {
     expect(isPurinaProduct(product({ name: "PRO PLAN DOG ADULT X3KG" }))).toBe(true);
