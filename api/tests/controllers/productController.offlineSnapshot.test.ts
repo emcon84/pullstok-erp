@@ -166,4 +166,34 @@ describe("productController.getOfflineProductSnapshot", () => {
     expect(jsonArg.priceKgLista).toBeNull();
     expect(jsonArg.categoryName).toBeNull();
   });
+
+  it("emits alias codes as barcodes: string[] and keeps the primary barcode", async () => {
+    mockedPrisma.product.findFirst.mockResolvedValue({
+      id: "prod-1",
+      name: "Arnes M",
+      code: "C1",
+      barcode: "111",
+      barcodes: [{ code: "222" }, { code: "333" }],
+      price: 10,
+      description: null,
+      categoryId: null,
+      priceKgSuelto: null,
+      priceKgSueltoManual: false,
+      category: null,
+      variantAssignments: [],
+    });
+    mockedPrisma.category.findMany.mockResolvedValue([]);
+    mockedPrisma.priceKgBrand.findMany.mockResolvedValue([]);
+    mockedPrisma.priceKgType.findMany.mockResolvedValue([]);
+    mockedPrisma.priceKgPrice.findMany.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await getOfflineProductSnapshot(mockParamsRequest("prod-1"), res);
+
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ barcode: "111", barcodes: ["222", "333"] }),
+    );
+    const select = mockedPrisma.product.findFirst.mock.calls[0][0].select;
+    expect(select.barcodes).toEqual({ select: { code: true } });
+  });
 });

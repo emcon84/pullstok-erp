@@ -8,6 +8,7 @@ jest.mock("../../src/config/db", () => ({
   prisma: {
     product: { findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     category: { findMany: jest.fn() },
+    productBarcode: { findMany: jest.fn() },
     priceKgPrice: { findFirst: jest.fn() },
   },
 }));
@@ -19,6 +20,7 @@ jest.mock("../../src/config/tenantContext", () => ({
 const mockedPrisma = prisma as unknown as {
   product: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
   category: { findMany: jest.Mock };
+  productBarcode: { findMany: jest.Mock };
   priceKgPrice: { findFirst: jest.Mock };
 };
 
@@ -34,6 +36,7 @@ const mockResponse = () => {
 describe("productController.generateProductBarcode", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedPrisma.productBarcode.findMany.mockResolvedValue([]);
   });
 
   it("404 si el producto no existe en la org", async () => {
@@ -94,6 +97,24 @@ describe("productController.generateProductBarcode", () => {
       id: "prod-1",
       name: "PRODUCTO SIN CODIGO",
       barcode: "INT00001",
+    });
+  });
+
+  it("tiene en cuenta los códigos adicionales (alias) al calcular el siguiente INT", async () => {
+    mockedPrisma.product.findFirst.mockResolvedValue({
+      id: "prod-1",
+      name: "PRODUCTO SIN CODIGO",
+      barcode: null,
+    });
+    mockedPrisma.product.findMany.mockResolvedValue([{ barcode: "INT00002" }]);
+    mockedPrisma.productBarcode.findMany.mockResolvedValue([{ code: "INT00007" }]);
+    mockedPrisma.product.update.mockResolvedValue({});
+
+    await productController.generateProductBarcode(mockRequest({ id: "prod-1" }) as any, mockResponse());
+
+    expect(mockedPrisma.product.update).toHaveBeenCalledWith({
+      where: { id: "prod-1" },
+      data: { barcode: "INT00008" },
     });
   });
 
@@ -205,7 +226,14 @@ describe("getProductByScan", () => {
     expect(res.status).not.toHaveBeenCalledWith(400);
     expect(mockedPrisma.product.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organizationId: "org-1", OR: [{ code: "BLST00008" }, { barcode: "BLST00008" }] },
+        where: {
+          organizationId: "org-1",
+          OR: [
+            { code: "BLST00008" },
+            { barcode: "BLST00008" },
+            { barcodes: { some: { code: "BLST00008" } } },
+          ],
+        },
       }),
     );
     expect(res.status).toHaveBeenCalledWith(200);

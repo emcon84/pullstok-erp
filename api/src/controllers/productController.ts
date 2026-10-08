@@ -363,6 +363,8 @@ export function buildProductSearchWhere(
     { category: { name: { contains: w, mode: "insensitive" } } },
     variantMatch(w),
     { barcode: { contains: w, mode: "insensitive" } },
+    // Codigos de barras adicionales (alias): tambien al final, no mueve indices.
+    { barcodes: { some: { code: { contains: w, mode: "insensitive" } } } },
   ];
 
   /**
@@ -1170,12 +1172,13 @@ export const getProductByCode = async (req: Request, res: Response) => {
     const product = await prisma.product.findFirst({
       where: {
         organizationId,
-        OR: [{ code }, { barcode: code }],
+        OR: [{ code }, { barcode: code }, { barcodes: { some: { code } } }],
       },
       // Include mínimo (mobile): el scanner solo pinta category.name y
       // option.value + variant.name. No se trae el árbol de variantes completo.
       include: {
         category: { select: { id: true, name: true } },
+        barcodes: { select: { id: true, code: true } },
         variantAssignments: {
           include: {
             option: {
@@ -1248,6 +1251,7 @@ const offlineSnapshotProductSelect = (organizationId: string) => ({
   name: true,
   code: true,
   barcode: true,
+  barcodes: { select: { code: true } },
   price: true,
   description: true,
   categoryId: true,
@@ -1276,6 +1280,7 @@ type OfflineSnapshotProduct = {
   name: string;
   code: string | null;
   barcode: string | null;
+  barcodes?: { code: string }[];
   price: number;
   description: string | null;
   categoryId: string | null;
@@ -1320,6 +1325,7 @@ const mapProductToOfflineSnapshot = (
     name: product.name,
     code: product.code,
     barcode: product.barcode,
+    barcodes: (product.barcodes ?? []).map((b) => b.code),
     price: product.price,
     priceKgLista: cell?.priceKg ?? null,
     priceKgSuelto: product.priceKgSuelto,
@@ -1491,9 +1497,13 @@ export const getProductByScan = async (req: Request, res: Response) => {
     }
 
     const product = await prisma.product.findFirst({
-      where: { organizationId, OR: [{ code: barcode }, { barcode }] },
+      where: {
+        organizationId,
+        OR: [{ code: barcode }, { barcode }, { barcodes: { some: { code: barcode } } }],
+      },
       include: {
         category: { select: { id: true, name: true } },
+        barcodes: { select: { id: true, code: true } },
         variantAssignments: { include: { option: { include: { variant: true } } } },
         // sdd/product-presentations: presentaciones activas (factor desc).
         presentations: activePresentationsInclude(organizationId),
@@ -2414,11 +2424,14 @@ export const generateProductBarcode = async (req: AuthedRequest, res: Response) 
         .json({ message: "El producto ya tiene un código de barras asignado." });
     }
 
-    const allBarcodes = await prisma.product.findMany({
-      where: { organizationId },
-      select: { barcode: true },
-    });
-    const seq = nextInternalBarcodeSeq(GENERATED_BARCODE_PREFIX, allBarcodes.map((p) => p.barcode));
+    const [allBarcodes, aliasBarcodes] = await Promise.all([
+      prisma.product.findMany({ where: { organizationId }, select: { barcode: true } }),
+      prisma.productBarcode.findMany({ where: { organizationId }, select: { code: true } }),
+    ]);
+    const seq = nextInternalBarcodeSeq(GENERATED_BARCODE_PREFIX, [
+      ...allBarcodes.map((p) => p.barcode),
+      ...aliasBarcodes.map((b) => b.code),
+    ]);
     const newBarcode = formatInternalBarcode(GENERATED_BARCODE_PREFIX, seq);
 
     await prisma.product.update({ where: { id: product.id }, data: { barcode: newBarcode } });
