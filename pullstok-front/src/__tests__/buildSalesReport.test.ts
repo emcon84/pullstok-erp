@@ -36,6 +36,18 @@ const base = {
   products: [{ label: "Prod A", amount: 2500, quantity: 3 }],
 };
 
+describe("buildSalesReport unit passthrough", () => {
+  it("keeps the kg unit on loose rows", () => {
+    const r = buildSalesReport({
+      ...base,
+      categories: [{ label: "Alimento suelto (por peso)", amount: 100, quantity: 2, unit: "kg" }],
+      products: [{ label: "Granel", amount: 100, quantity: 2, unit: "kg" }],
+    });
+    expect(r.categories[0].unit).toBe("kg");
+    expect(r.products[0].unit).toBe("kg");
+  });
+});
+
 describe("buildSalesReport", () => {
   it("computes KPIs: count, total, average and best period", () => {
     const r = buildSalesReport(base);

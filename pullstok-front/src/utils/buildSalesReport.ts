@@ -51,8 +51,8 @@ export interface SalesReport {
     rows: (ShareRow & { count: number })[];
     items: { date: string; customer: string; method: string; amount: number }[];
   } | null;
-  categories: (ShareRow & { quantity: number })[];
-  products: (ShareRow & { quantity: number })[];
+  categories: (ShareRow & { quantity: number; unit?: "kg" })[];
+  products: (ShareRow & { quantity: number; unit?: "kg" })[];
   detail: { name: string; count: number; total: number; average: number }[];
 }
 
@@ -128,8 +128,8 @@ export const buildSalesReport = (input: SalesReportInput): SalesReport => {
     evolution: chartData.map((p) => ({ name: p.name, value: p.value })),
     payments: { rows: payments, total: payments.reduce((s, r) => s + r.amount, 0) },
     collections,
-    categories: withShare(input.categories.map((c) => ({ label: c.label, amount: c.amount, quantity: c.quantity }))),
-    products: withShare(input.products.map((c) => ({ label: c.label, amount: c.amount, quantity: c.quantity }))),
+    categories: withShare(input.categories.map((c) => ({ label: c.label, amount: c.amount, quantity: c.quantity, ...(c.unit ? { unit: c.unit } : {}) }))),
+    products: withShare(input.products.map((c) => ({ label: c.label, amount: c.amount, quantity: c.quantity, ...(c.unit ? { unit: c.unit } : {}) }))),
     detail: chartData.map((p) => ({
       name: p.name,
       count: p.cantidad,

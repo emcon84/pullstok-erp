@@ -98,6 +98,24 @@ describe("renderSalesReportPdf", () => {
     expect(hasText("Producto Estrella")).toBe(true);
   });
 
+  it("formats quantities es-AR rounded to 3 decimals, with kg for loose rows", () => {
+    renderSalesReportPdf(
+      buildSalesReport(
+        makeInput({
+          categories: [
+            { label: "Alimento suelto (por peso)", amount: 5000, quantity: 1134.6451000000002, unit: "kg" },
+            { label: "Accesorios", amount: 1000, quantity: 194.01 },
+          ],
+          products: [{ label: "Granel", amount: 500, quantity: 2.5, unit: "kg" }],
+        }),
+      ),
+    );
+    expect(texts()).toContain("1.134,645 kg");
+    expect(texts()).toContain("194,01");
+    expect(texts()).toContain("2,5 kg");
+    expect(hasText("1134.6451")).toBe(false);
+  });
+
   it("draws the evolution chart natively: one bar rect per period", () => {
     renderSalesReportPdf(buildSalesReport(makeInput()));
     // 3 bars + KPI boxes + payment segments etc. => at least the 3 bars exist

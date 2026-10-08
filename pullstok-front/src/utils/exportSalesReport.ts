@@ -9,6 +9,7 @@ import * as XLSX from "xlsx";
 import orgLogoUrl from "@/assets/logo-horizontal-almacen.png";
 import type { SalesReport, ShareRow } from "./buildSalesReport";
 import { formatCurrency } from "./statsHelpers";
+import { formatQuantity, roundQuantity } from "./formatQuantity";
 
 export interface PdfLogo {
   dataUrl: string;
@@ -270,7 +271,7 @@ const drawShareBar = (c: Cursor, rows: ShareRow[]) => {
 };
 
 /** Horizontal bars: label on the left, proportional bar, amount at the end. */
-const drawHorizontalBars = (c: Cursor, rows: (ShareRow & { quantity: number })[]) => {
+const drawHorizontalBars = (c: Cursor, rows: (ShareRow & { quantity: number; unit?: "kg" })[]) => {
   const { doc } = c;
   const max = Math.max(...rows.map((r) => r.amount), 1);
   const labelW = 150;
@@ -366,7 +367,7 @@ export const renderSalesReportPdf = (report: SalesReport, logo?: PdfLogo | null)
     table(
       c,
       ["Nombre", "Cant.", "Monto", "%"],
-      rows.map((r) => [r.label, r.quantity, formatCurrency(r.amount), fmtPercent(r.percent)]),
+      rows.map((r) => [r.label, formatQuantity(r.quantity, r.unit), formatCurrency(r.amount), fmtPercent(r.percent)]),
       [1, 2, 3],
     );
   };
@@ -465,7 +466,7 @@ export const buildSalesReportSheets = (report: SalesReport): SheetSpec[] => {
     sheets.push({
       name,
       widths: [40, 12, 16, 10],
-      rows: [["Nombre", "Cant.", "Monto", "%"], ...rows.map((r) => [r.label, r.quantity, r.amount, r.percent])],
+      rows: [["Nombre", "Cant.", "Monto", "%"], ...rows.map((r) => [r.label, roundQuantity(r.quantity), r.amount, r.percent])],
     });
   };
   ranked("Categorías", report.categories);

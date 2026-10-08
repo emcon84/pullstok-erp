@@ -59,6 +59,14 @@ describe("buildSalesReportSheets", () => {
     expect(summary.rows).toContainEqual(["Período", "Octubre 2026"]);
   });
 
+  it("keeps quantities numeric rounded to 3 decimals", () => {
+    const sheets = buildSalesReportSheets(
+      makeReport({ categories: [{ label: "Suelto", amount: 100, quantity: 1134.6451000000002, unit: "kg" }] }),
+    );
+    const cat = sheets.find((s) => s.name === "Categorías")!;
+    expect(cat.rows[1][1]).toBe(1134.645);
+  });
+
   it("puts collection summary and detail on the same sheet", () => {
     const col = buildSalesReportSheets(makeReport()).find((s) => s.name === "Cobros cta cte")!;
     expect(col.rows).toContainEqual(["Efectivo", 1, 500, 100]);
