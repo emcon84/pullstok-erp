@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AssignBarcodeDialog } from "@/components/molecules/AssignBarcodeDialog";
 import { toast } from "react-toastify";
+import { addProductBarcode } from "@/services/productService";
 
 vi.mock("react-toastify", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock("@/services/productService", () => ({
+  addProductBarcode: vi.fn(),
 }));
 
 const hits = [
@@ -134,5 +139,70 @@ describe("AssignBarcodeDialog", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(onAssigned).toHaveBeenCalledWith(assigned));
     expect(fetchMock.mock.calls[1][0]).toContain("/products/p2");
+  });
+
+  describe("when the chosen product already has a barcode", () => {
+    const withBarcode = [{ ...hits[0], barcode: "OLD-111" }];
+
+    const pickProduct = async () => {
+      fetchMock.mockImplementationOnce(() => jsonResponse(withBarcode));
+      fireEvent.change(screen.getByPlaceholderText(/Buscá el producto por nombre/), {
+        target: { value: "royal" },
+      });
+      fireEvent.click(await screen.findByText(hits[0].name));
+    };
+
+    it("asks add-vs-replace instead of assigning right away", async () => {
+      render(<AssignBarcodeDialog barcode="7790001" open onClose={vi.fn()} />);
+      await pickProduct();
+      expect(await screen.findByText("Agregar como código adicional")).toBeInTheDocument();
+      expect(screen.getByText("Reemplazar código")).toBeInTheDocument();
+      expect(screen.getByText("OLD-111")).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledTimes(1); // only the search, no PUT yet
+    });
+
+    it("adds the code as an additional barcode", async () => {
+      const onClose = vi.fn();
+      const onAssigned = vi.fn();
+      vi.mocked(addProductBarcode).mockResolvedValue({ id: "b1", code: "7790001" });
+      render(
+        <AssignBarcodeDialog barcode="7790001" open onClose={onClose} onAssigned={onAssigned} />,
+      );
+      await pickProduct();
+      fireEvent.click(await screen.findByText("Agregar como código adicional"));
+      await waitFor(() => expect(addProductBarcode).toHaveBeenCalledWith("p1", "7790001"));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(onAssigned).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "p1", barcodes: [{ id: "b1", code: "7790001" }] }),
+      );
+      expect(toast.success).toHaveBeenCalledWith("Código adicional agregado");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("surfaces the 409 message and stays open", async () => {
+      const onClose = vi.fn();
+      vi.mocked(addProductBarcode).mockRejectedValue(new Error("El código ya está en uso"));
+      render(<AssignBarcodeDialog barcode="7790001" open onClose={onClose} />);
+      await pickProduct();
+      fireEvent.click(await screen.findByText("Agregar como código adicional"));
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith("El código ya está en uso"),
+      );
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("replaces the primary code with the existing PUT behavior", async () => {
+      const onAssigned = vi.fn();
+      const assigned = { id: "p1", name: hits[0].name, barcode: "7790001" };
+      render(<AssignBarcodeDialog barcode="7790001" open onClose={vi.fn()} onAssigned={onAssigned} />);
+      await pickProduct();
+      fetchMock.mockImplementationOnce(() => jsonResponse(assigned));
+      fireEvent.click(await screen.findByText("Reemplazar código"));
+      await waitFor(() => expect(onAssigned).toHaveBeenCalledWith(assigned));
+      const [putUrl, putInit] = fetchMock.mock.calls[1];
+      expect(putUrl).toContain("/products/p1");
+      expect(putInit.method).toBe("PUT");
+      expect(addProductBarcode).not.toHaveBeenCalled();
+    });
   });
 });

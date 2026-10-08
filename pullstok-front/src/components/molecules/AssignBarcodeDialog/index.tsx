@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { addProductBarcode } from "@/services/productService";
 import type { DataItem } from "@/types";
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -52,6 +53,8 @@ export const AssignBarcodeDialog = ({
   const [searching, setSearching] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
+  // Product that already has a primary barcode: the user picks add vs replace.
+  const [choosing, setChoosing] = useState<DataItem | null>(null);
   const requestId = useRef(0);
 
   // Fresh state every time the dialog opens for a (new) code.
@@ -61,6 +64,7 @@ export const AssignBarcodeDialog = ({
       setResults([]);
       setHighlighted(-1);
       setAssigning(false);
+      setChoosing(null);
     }
   }, [open, barcode]);
 
@@ -92,7 +96,7 @@ export const AssignBarcodeDialog = ({
     return () => clearTimeout(timer);
   }, [query, open]);
 
-  const assign = async (product: DataItem) => {
+  const replacePrimary = async (product: DataItem) => {
     const productId = product.id ?? product._id;
     if (!productId || !barcode || assigning) return;
     setAssigning(true);
@@ -114,6 +118,30 @@ export const AssignBarcodeDialog = ({
       toast.error("Error de conexión");
     }
     setAssigning(false);
+  };
+
+  const addAdditional = async (product: DataItem) => {
+    const productId = product.id ?? product._id;
+    if (!productId || !barcode || assigning) return;
+    setAssigning(true);
+    try {
+      const alias = await addProductBarcode(productId, barcode);
+      toast.success("Código adicional agregado");
+      onAssigned?.({ ...product, barcodes: [...(product.barcodes ?? []), alias] });
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al agregar código");
+    }
+    setAssigning(false);
+  };
+
+  // Products without a barcode keep the direct flow; otherwise ask add vs replace.
+  const assign = async (product: DataItem) => {
+    if (product.barcode) {
+      setChoosing(product);
+      return;
+    }
+    await replacePrimary(product);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -144,6 +172,33 @@ export const AssignBarcodeDialog = ({
           <p className="mt-0.5 font-mono text-xl font-bold text-amber-800">{barcode}</p>
         </div>
 
+        {choosing ? (
+          <div className="space-y-3">
+            <div className="rounded-lg border px-4 py-3">
+              <p className="text-sm font-medium leading-snug">{choosing.name}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ya tiene el código{" "}
+                <span className="font-mono font-semibold">{choosing.barcode}</span>
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button disabled={assigning} onClick={() => void addAdditional(choosing)}>
+                Agregar como código adicional
+              </Button>
+              <Button
+                variant="outline"
+                disabled={assigning}
+                onClick={() => void replacePrimary(choosing)}
+              >
+                Reemplazar código
+              </Button>
+              <Button variant="ghost" disabled={assigning} onClick={() => setChoosing(null)}>
+                Elegir otro producto
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -201,6 +256,8 @@ export const AssignBarcodeDialog = ({
             </button>
           ))}
         </div>
+          </>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={assigning}>

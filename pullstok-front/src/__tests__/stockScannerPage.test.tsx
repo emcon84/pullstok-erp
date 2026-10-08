@@ -242,4 +242,31 @@ describe("StockScannerPage — stock por sucursal (spec F2)", () => {
 
     expect(screen.getByTestId("dup-drawer")).toHaveTextContent("Anillo de Plata|qty:7");
   });
+
+  it("lists the additional codes of the scanned product on the card (read-only)", async () => {
+    setLoggedUser("ADMIN");
+    mockStockWithBranchStock(mockUpdateBranchStock);
+    renderScanner();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: "p1",
+        name: "Arnés Mediano",
+        code: "SKU-9",
+        barcode: "779123",
+        barcodes: [{ id: "b1", code: "ALIAS-777" }],
+        price: 1500,
+        quantity: 5,
+        description: null,
+        category: null,
+      }),
+    });
+    fireEvent.change(screen.getByPlaceholderText(/escribí el código/i), {
+      target: { value: "ALIAS-777" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/escribí el código/i), { key: "Enter" });
+    await screen.findByText("Arnés Mediano");
+
+    expect(screen.getByText("Adicional: ALIAS-777")).toBeInTheDocument();
+  });
 });

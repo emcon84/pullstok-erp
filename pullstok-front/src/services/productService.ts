@@ -757,3 +757,50 @@ export const generateProductBarcode = async (
   }
 };
 
+/** An additional (alias) barcode that also resolves a product. */
+export interface ProductBarcodeAlias {
+  id: string;
+  code: string;
+}
+
+/** POST /products/:id/barcodes — adds an additional barcode (409 if already used). */
+export const addProductBarcode = async (
+  productId: string,
+  code: string,
+): Promise<ProductBarcodeAlias> => {
+  try {
+    const token = localStorage.getItem("token");
+    const response = await axios.post<ProductBarcodeAlias>(
+      `${API_URL}/products/${productId}/barcodes`,
+      { code },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "add product barcode failed");
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+
+/** DELETE /products/:id/barcodes/:barcodeId — removes an additional barcode. */
+export const deleteProductBarcode = async (
+  productId: string,
+  barcodeId: string,
+): Promise<void> => {
+  try {
+    const token = localStorage.getItem("token");
+    await axios.delete(`${API_URL}/products/${productId}/barcodes/${barcodeId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "delete product barcode failed");
+    } else {
+      throw new Error("An unknown error occurred");
+    }
+  }
+};
+

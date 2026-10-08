@@ -43,6 +43,8 @@ type BarcodeDetectorClass = {
 
 interface Product {
   id: string; name: string; code: string; barcode: string; price: number;
+  // Códigos adicionales (alias): online vienen como {id, code}, offline como string.
+  barcodes?: (string | { id: string; code: string })[];
   quantity: number; description: string | null;
   weightKg?: number; priceKgSuelto?: number;
   priceKgSueltoManual?: boolean;
@@ -60,6 +62,7 @@ function mapOfflineProduct(p: OfflineProduct): Product {
     name: p.name,
     code: p.code ?? "",
     barcode: p.barcode ?? "",
+    barcodes: p.barcodes ?? [],
     price: p.price,
     quantity: 0,
     description: p.description,
@@ -840,6 +843,14 @@ export const StockScannerPage = () => {
                 </Button>
               </span>
             )}
+            {product.barcodes?.map((b) => {
+              const alias = typeof b === "string" ? b : b.code;
+              return (
+                <Badge key={alias} variant="outline" className="border-amber-200 bg-amber-50/50 text-amber-700">
+                  Adicional: {alias}
+                </Badge>
+              );
+            })}
             {!product.barcode && (
               <Button
                 variant="ghost"
