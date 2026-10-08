@@ -3,6 +3,7 @@ import {
   aggregateSalesByCategory,
   aggregateTopProducts,
   SIN_CATEGORIA,
+  LOOSE_CATEGORY,
   OTRAS_CATEGORIAS,
 } from "../utils/salesAggregations";
 import type { Sale } from "../models/salesModel";
@@ -54,11 +55,31 @@ describe("aggregateSalesByCategory", () => {
     expect(rows).toContainEqual({ label: "Perros", amount: 10, quantity: 1 });
   });
 
+  it("renglón suelto sin categoría -> LOOSE_CATEGORY con unit kg; el resto sigue en 'Sin categoría'", () => {
+    const rows = aggregateSalesByCategory([
+      sale([
+        item({ name: "Granel", quantity: 1.5, price: 100, category: "", productId: null, loosePriceId: "lp1", saleMode: "POR_PESO" }),
+        item({ name: "Granel2", quantity: 0.25, price: 100, category: "", productId: null, saleMode: "POR_PESO", loosePriceId: undefined }),
+        item({ name: "Otro", quantity: 1, price: 10, category: "" }),
+      ]),
+    ]);
+    expect(LOOSE_CATEGORY).toBe("Alimento suelto (por peso)");
+    expect(rows).toContainEqual({ label: LOOSE_CATEGORY, amount: 175, quantity: 1.75, unit: "kg" });
+    expect(rows).toContainEqual({ label: SIN_CATEGORIA, amount: 10, quantity: 1 });
+  });
+
+  it("producto suelto en el top lleva unit kg", () => {
+    const rows = aggregateTopProducts([
+      sale([item({ name: "Granel", quantity: 2, price: 100, category: "", productId: null, loosePriceId: "lp1", saleMode: "POR_PESO" })]),
+    ]);
+    expect(rows).toEqual([{ label: "Granel", amount: 200, quantity: 2, unit: "kg" }]);
+  });
+
   it("redondea con round2 el monto del renglón (kg × precio suelto)", () => {
     const rows = aggregateSalesByCategory([
       sale([item({ name: "Suelto", quantity: 0.333, price: 100, saleMode: "POR_PESO" })]),
     ]);
-    expect(rows).toEqual([{ label: "Alimento", amount: 33.3, quantity: 0.333 }]);
+    expect(rows).toEqual([{ label: "Alimento", amount: 33.3, quantity: 0.333, unit: "kg" }]);
   });
 
   it("descarta filas con monto <= 0", () => {
@@ -157,7 +178,7 @@ describe("aggregateTopProducts", () => {
       ]),
     ]);
     expect(rows).toEqual([
-      { label: "Suelto X", amount: 300, quantity: 3 },
+      { label: "Suelto X", amount: 300, quantity: 3, unit: "kg" },
       { label: "Manual", amount: 80, quantity: 2 },
     ]);
   });
