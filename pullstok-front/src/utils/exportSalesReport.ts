@@ -5,6 +5,7 @@
  */
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 import orgLogoUrl from "@/assets/logo-horizontal-almacen.png";
 import type { SalesReport, ShareRow } from "./buildSalesReport";
 import { formatCurrency } from "./statsHelpers";
@@ -394,4 +395,102 @@ export const exportSalesReportPdf = async (
 ): Promise<void> => {
   const logo = logoUrl ? await loadLogo(logoUrl) : null;
   renderSalesReportPdf(report, logo).save(`${report.fileName}.pdf`);
+};
+
+// ---------------------------------------------------------------- Excel
+
+export interface SheetSpec {
+  name: string;
+  rows: (string | number)[][];
+  widths: number[];
+}
+
+/** One sheet per section; empty sections are skipped. Amounts stay numeric. */
+export const buildSalesReportSheets = (report: SalesReport): SheetSpec[] => {
+  const best = report.kpis.bestPeriod;
+  const sheets: SheetSpec[] = [
+    {
+      name: "Resumen",
+      widths: [22, 34],
+      rows: [
+        [report.title],
+        ["Período", report.periodLabel],
+        ["Generado", report.generatedLabel],
+        [],
+        ["Ventas", report.kpis.count],
+        ["Total vendido", report.kpis.total],
+        ["Ticket promedio", report.kpis.average],
+        ["Mejor período", best ? `${best.name} (${best.value})` : "-"],
+      ],
+    },
+  ];
+
+  if (report.evolution.length > 0) {
+    sheets.push({
+      name: "Evolución",
+      widths: [22, 16],
+      rows: [["Período", "Total"], ...report.evolution.map((p) => [p.name, p.value])],
+    });
+  }
+
+  if (report.payments.rows.length > 0) {
+    sheets.push({
+      name: "Medios de pago",
+      widths: [26, 10, 16, 10],
+      rows: [
+        ["Medio de pago", "Cant.", "Monto", "%"],
+        ...report.payments.rows.map((r) => [r.label, r.count, r.amount, r.percent]),
+        ["Total", report.payments.rows.reduce((s, r) => s + r.count, 0), report.payments.total, 100],
+      ],
+    });
+  }
+
+  if (report.collections) {
+    const col = report.collections;
+    const rows: (string | number)[][] = [
+      ["Medio de pago", "Cant.", "Monto", "%"],
+      ...col.rows.map((r) => [r.label, r.count, r.amount, r.percent]),
+      ["Total", col.count, col.total, 100],
+    ];
+    if (col.items.length > 0) {
+      rows.push([], ["Fecha", "Cliente", "Medio de pago", "Monto"]);
+      rows.push(...col.items.map((it) => [it.date, it.customer, it.method, it.amount]));
+      if (col.truncated) rows.push([`Se muestran los ${MAX_COLLECTION_ROWS} cobros más recientes; el resumen incluye todos.`]);
+    }
+    sheets.push({ name: "Cobros cta cte", widths: [26, 30, 22, 16], rows });
+  }
+
+  const ranked = (name: string, rows: SalesReport["categories"]) => {
+    if (rows.length === 0) return;
+    sheets.push({
+      name,
+      widths: [40, 12, 16, 10],
+      rows: [["Nombre", "Cant.", "Monto", "%"], ...rows.map((r) => [r.label, r.quantity, r.amount, r.percent])],
+    });
+  };
+  ranked("Categorías", report.categories);
+  ranked("Top productos", report.products);
+
+  if (report.detail.length > 0) {
+    sheets.push({
+      name: "Detalle",
+      widths: [22, 10, 16, 16],
+      rows: [
+        ["Período", "Ventas", "Total", "Promedio"],
+        ...report.detail.map((d) => [d.name, d.count, d.total, d.average]),
+        ["Total", report.kpis.count, report.kpis.total, report.kpis.average],
+      ],
+    });
+  }
+  return sheets;
+};
+
+export const exportSalesReportExcel = (report: SalesReport): void => {
+  const workbook = XLSX.utils.book_new();
+  for (const sheet of buildSalesReportSheets(report)) {
+    const ws = XLSX.utils.aoa_to_sheet(sheet.rows);
+    ws["!cols"] = sheet.widths.map((wch) => ({ wch }));
+    XLSX.utils.book_append_sheet(workbook, ws, sheet.name);
+  }
+  XLSX.writeFile(workbook, `${report.fileName}.xlsx`);
 };
