@@ -31,6 +31,8 @@ import { aggregateSalesByCategory, aggregateTopProducts } from "../utils/salesAg
 import type { Sale } from "../models/salesModel";
 import { exportToPDF } from "../utils/exportToPDF";
 import { exportToExcel } from "../utils/exportToExcel";
+import { exportSalesReportPdf, exportSalesReportExcel } from "../utils/exportSalesReport";
+import { buildSalesReport, buildPeriodLabel } from "../utils/buildSalesReport";
 import { useGetSales } from "../components/hooks/useSales";
 import { useGetBudgets } from "../components/hooks/useBudget";
 import { useOrders } from "../components/hooks/useOrder";
@@ -171,6 +173,26 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
     total: statsData.total,
   });
 
+  // Ventas: informe completo con los mismos datos/período del dashboard.
+  const buildReport = () =>
+    buildSalesReport({
+      periodLabel: buildPeriodLabel(period, selectedDay),
+      generatedAt: new Date(),
+      chartData: statsData.chartData,
+      total: statsData.total,
+      count: statsData.count,
+      payments: paymentBreakdown,
+      paymentLabel,
+      collections: collections ?? null,
+      categories: rankings.categories,
+      products: rankings.products,
+    });
+
+  const handleExportPDF = () =>
+    type === "sales" ? exportSalesReportPdf(buildReport()) : exportToPDF(buildExport());
+  const handleExportExcel = () =>
+    type === "sales" ? exportSalesReportExcel(buildReport()) : exportToExcel(buildExport());
+
   const label = title.replace("Estadísticas de ", "");
   const average = statsData.count > 0 ? statsData.total / statsData.count : 0;
 
@@ -198,8 +220,8 @@ export const Statistics = ({ type, onBack }: StatisticsProps) => {
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         </div>
         <ExportButtons
-          onExportPDF={() => exportToPDF(buildExport())}
-          onExportExcel={() => exportToExcel(buildExport())}
+          onExportPDF={handleExportPDF}
+          onExportExcel={handleExportExcel}
         />
       </div>
 
