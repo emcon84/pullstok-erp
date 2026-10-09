@@ -132,15 +132,17 @@ export const OpenBagDialog = ({
     [scannedProduct, cells],
   );
 
-  const handleConfirm = useCallback(async () => {
-    if (!scannedProduct || !selectedCellId || submitting) return;
+  // `cellId` is passed by the one-click pills; the footer button uses the selected cell.
+  const handleConfirm = useCallback(async (cellId?: string) => {
+    const targetCellId = cellId ?? selectedCellId;
+    if (!scannedProduct || !targetCellId || submitting) return;
 
     setSubmitting(true);
     try {
-      const result = await openBag(scannedProduct.id, selectedCellId);
+      const result = await openBag(scannedProduct.id, targetCellId);
       const weightKg = scannedProduct.weightKg ?? 0;
       toast.success(
-        `Bolsa abierta: ${scannedProduct.name} → +${weightKg.toFixed(2)} kg en ${cellOptions.find((c) => c.value === selectedCellId)?.label ?? result.priceKgPriceId}`,
+        `Bolsa abierta: ${scannedProduct.name} → +${weightKg.toFixed(2)} kg en ${cellOptions.find((c) => c.value === targetCellId)?.label ?? result.priceKgPriceId}`,
       );
       onSuccess?.();
       onOpenChange(false);
@@ -254,8 +256,11 @@ export const OpenBagDialog = ({
                         role="radio"
                         aria-checked={checked}
                         data-prominent={prominent ? "true" : undefined}
-                        onClick={() => setSelectedCellId(c.id)}
-                        disabled={submitting}
+                        onClick={() => {
+                          setSelectedCellId(c.id);
+                          void handleConfirm(c.id);
+                        }}
+                        disabled={submitting || loading || loadingCells}
                         className={cn(
                           "rounded-full border px-3 py-1.5 text-sm transition-colors",
                           checked
@@ -291,7 +296,7 @@ export const OpenBagDialog = ({
             <Button type="button" variant="outline" onClick={handleCancel} disabled={submitting}>
               Cancelar
             </Button>
-            <Button type="button" onClick={handleConfirm} disabled={!scannedProduct || !selectedCellId || submitting}>
+            <Button type="button" onClick={() => void handleConfirm()} disabled={!scannedProduct || !selectedCellId || submitting}>
               {submitting ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />

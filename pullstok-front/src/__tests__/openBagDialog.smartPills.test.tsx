@@ -23,6 +23,7 @@ vi.mock("@/components/hooks/useOpenBag", () => ({
 }));
 vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
+import { toast } from "react-toastify";
 import { OpenBagDialog } from "@/components/molecules/OpenBagDialog";
 
 const scan = (name: string) => ({
@@ -36,9 +37,11 @@ describe("OpenBagDialog — smart cell pills", () => {
     openBag.mockResolvedValue({ priceKgPriceId: "ex-ad-dog" });
   });
 
-  it("shows the matching brand cells as pills and opens the clicked one", async () => {
+  it("shows the matching brand cells as pills and opens the clicked one with a single click", async () => {
     searchProduct.mockResolvedValue(scan("Excellent Perro 15kg"));
-    render(<OpenBagDialog branchId="b" open onOpenChange={() => {}} initialBarcode="B1" />);
+    const onSuccess = vi.fn();
+    const onOpenChange = vi.fn();
+    render(<OpenBagDialog branchId="b" open onOpenChange={onOpenChange} onSuccess={onSuccess} initialBarcode="B1" />);
 
     const pill = await screen.findByRole("radio", { name: /Adulto · Perro — \$5\.000\/kg/ });
     expect(screen.getAllByRole("radio")).toHaveLength(2);
@@ -48,11 +51,53 @@ describe("OpenBagDialog — smart cell pills", () => {
     expect(screen.getByRole("button", { name: /abrir bolsa/i })).toBeDisabled();
 
     fireEvent.click(pill);
-    expect(pill).toHaveAttribute("aria-checked", "true");
-    const confirm = screen.getByRole("button", { name: /abrir bolsa/i });
-    expect(confirm).toBeEnabled();
-    fireEvent.click(confirm);
     await waitFor(() => expect(openBag).toHaveBeenCalledWith("p1", "ex-ad-dog"));
+    expect(openBag).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(toast.success).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a second click on a pill while the bag is being opened", async () => {
+    searchProduct.mockResolvedValue(scan("Excellent Perro 15kg"));
+    let resolve!: (v: unknown) => void;
+    openBag.mockReturnValue(new Promise((r) => (resolve = r)));
+    render(<OpenBagDialog branchId="b" open onOpenChange={() => {}} initialBarcode="B1" />);
+
+    const pill = await screen.findByRole("radio", { name: /Adulto · Perro/ });
+    fireEvent.click(pill);
+    fireEvent.click(pill);
+    fireEvent.click(screen.getAllByRole("radio")[1]);
+    expect(openBag).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(pill).toBeDisabled());
+    resolve({ priceKgPriceId: "ex-ad-dog" });
+  });
+
+  it("keeps the dialog open when opening from a pill fails", async () => {
+    searchProduct.mockResolvedValue(scan("Excellent Perro 15kg"));
+    openBag.mockRejectedValue(new Error("boom"));
+    const onSuccess = vi.fn();
+    const onOpenChange = vi.fn();
+    render(<OpenBagDialog branchId="b" open onOpenChange={onOpenChange} onSuccess={onSuccess} initialBarcode="B1" />);
+
+    fireEvent.click(await screen.findByRole("radio", { name: /Adulto · Perro/ }));
+    await waitFor(() => expect(openBag).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getAllByRole("radio")[0]).toBeEnabled());
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("still needs the Abrir bolsa button when the cell is picked in the select", async () => {
+    searchProduct.mockResolvedValue(scan("Excellent Perro 15kg"));
+    render(<OpenBagDialog branchId="b" open onOpenChange={() => {}} initialBarcode="B1" />);
+    await screen.findAllByRole("radio");
+
+    fireEvent.click(screen.getByLabelText("Celda destino para abrir bolsa"));
+    fireEvent.click(await screen.findByText("Pro Plan · Adulto · Perro — $6.000/kg"));
+    expect(openBag).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /abrir bolsa/i }));
+    await waitFor(() => expect(openBag).toHaveBeenCalledWith("p1", "pp-ad-dog"));
   });
 
   it("highlights the single narrowed pill without selecting it", async () => {
