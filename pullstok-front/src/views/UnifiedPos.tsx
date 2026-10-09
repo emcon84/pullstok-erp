@@ -514,6 +514,27 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [handleScan, openBagDialogOpen, manualOpen, freeOpen, unmatchedBarcode]);
 
+  // Atajo "A" en el modal de escaneo → "Abrir bolsa" (solo si el botón existe).
+  // Una "a" que llega pegada a otro carácter (<60ms) es parte de una ráfaga de
+  // la pistola (re-escaneo de un código alfanumérico), no una pulsación humana.
+  useEffect(() => {
+    if (!canOpenBagFromScan) return;
+    let lastCharAt = 0;
+    const onKey = (e: KeyboardEvent) => {
+      const now = Date.now();
+      const isBurst = now - lastCharAt < 60;
+      if (/^[0-9A-Za-z]$/.test(e.key)) lastCharAt = now;
+      if (e.ctrlKey || e.altKey || e.metaKey || e.repeat || isBurst) return;
+      if (e.key === "a" || e.key === "A") {
+        e.preventDefault();
+        e.stopPropagation();
+        handleOpenBagFromScan();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [canOpenBagFromScan, handleOpenBagFromScan]);
+
   // Teclas +/- del teclado para ajustar la cantidad del modal de escaneo sin
   // mouse. Solo mientras el modal está abierto (scanProduct), y en captura
   // para ganarle a cualquier otro listener; no interfiere con el detector de
@@ -839,7 +860,12 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
             Cancelar
           </Button>
           {canOpenBagFromScan && (
-            <Button variant="outline" onClick={handleOpenBagFromScan}>
+            <Button
+              variant="outline"
+              onClick={handleOpenBagFromScan}
+              title="Atajo: A"
+              aria-keyshortcuts="A"
+            >
               <PackageOpen className="h-4 w-4 mr-2" />
               Abrir bolsa
             </Button>

@@ -127,6 +127,46 @@ describe("UnifiedPos — 'Abrir bolsa' desde el modal de escaneo", () => {
     expect(await screen.findByText("15.00 kg")).toBeInTheDocument();
   });
 
+  it("la tecla A en el modal abre el diálogo de abrir bolsa con el código precargado", async () => {
+    mockFetchWith({ ...baseProduct, priceKgSuelto: 1200 });
+    renderPos();
+    scanCode("7791234567890");
+    await screen.findByRole("button", { name: "Agregar al pedido" });
+
+    fireEvent.keyDown(window, { key: "a" });
+
+    expect(await screen.findByRole("dialog", { name: /abrir bolsa/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Escaneá o ingresá el código de barras")).toHaveValue(
+      "7791234567890",
+    );
+    expect(screen.queryByRole("button", { name: "Agregar al pedido" })).not.toBeInTheDocument();
+  });
+
+  it("la tecla A no hace nada si el producto no admite venta suelta", async () => {
+    mockFetchWith({ ...baseProduct, priceKgSuelto: null });
+    renderPos();
+    scanCode("7791234567890");
+    await screen.findByRole("button", { name: "Agregar al pedido" });
+
+    fireEvent.keyDown(window, { key: "a" });
+
+    expect(screen.getByRole("button", { name: "Agregar al pedido" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /abrir bolsa/i })).not.toBeInTheDocument();
+  });
+
+  it("una 'a' dentro de una ráfaga de la pistola (re-escaneo) no abre el diálogo", async () => {
+    mockFetchWith({ ...baseProduct, priceKgSuelto: 1200 });
+    renderPos();
+    scanCode("7791234567890");
+    await screen.findByRole("button", { name: "Agregar al pedido" });
+
+    // Código alfanumérico escaneado con el modal abierto: "a" llega pegada a otra tecla
+    fireEvent.keyDown(window, { key: "B" });
+    fireEvent.keyDown(window, { key: "a" });
+
+    expect(screen.queryByRole("dialog", { name: /abrir bolsa/i })).not.toBeInTheDocument();
+  });
+
   it("al cerrar el diálogo no queda código precargado (reabrirlo manualmente lo muestra vacío)", async () => {
     mockFetchWith({ ...baseProduct, priceKgSuelto: 1200 });
     renderPos();
