@@ -27,7 +27,7 @@ describe("productRoutes — endpoints de producto manual", () => {
     expect(manual).toBeLessThan(indexOf("delete", "/:id"));
   });
 
-  it("DELETE /manual/:id exige autenticación y rol ADMIN/MANAGEMENT (mismo guard que GET /manual)", () => {
+  it("DELETE /manual/:id exige autenticación y rol ADMIN/MANAGEMENT/VENDEDOR (mismo guard que GET /manual)", () => {
     type RouteLayer = { route?: { path: string; methods: Record<string, boolean>; stack: { handle: Function }[] } };
     const layers = (productRoutes as unknown as { stack: RouteLayer[] }).stack;
     const handlers = (method: string, path: string) =>
@@ -41,7 +41,7 @@ describe("productRoutes — endpoints de producto manual", () => {
     expect(del).toHaveLength(list.length);
     expect(del[0]).toBe(list[0]);
 
-    // El 2º handler es requireRole("ADMIN","MANAGEMENT"): se ejercita su comportamiento.
+    // El 2º handler es requireRole("ADMIN","MANAGEMENT","VENDEDOR"): se ejercita su comportamiento.
     const roleGuard = del[1] as (req: any, res: any, next: () => void) => unknown;
     const run = (role: string) => {
       const res: any = { status: jest.fn().mockReturnThis(), json: jest.fn() };
@@ -51,7 +51,8 @@ describe("productRoutes — endpoints de producto manual", () => {
     };
     expect(run("ADMIN").next).toHaveBeenCalled();
     expect(run("MANAGEMENT").next).toHaveBeenCalled();
-    for (const role of ["VENDEDOR", "CASHIER"]) {
+    expect(run("VENDEDOR").next).toHaveBeenCalled();
+    for (const role of ["CASHIER"]) {
       const { res, next } = run(role);
       expect(next).not.toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(403);
@@ -70,7 +71,7 @@ describe("productRoutes — presentaciones", () => {
     ["put", "/:id/presentations", 5],
     ["post", "/:id/presentations/enable", 5],
     ["post", "/:id/presentations/disable", 4],
-  ])("%s %s exige ADMIN/MANAGEMENT (VENDEDOR/CASHIER -> 403)", (method, path, len) => {
+  ])("%s %s exige ADMIN/MANAGEMENT/VENDEDOR (CASHIER -> 403)", (method, path, len) => {
     const hs = handlers(method, path);
     expect(hs).toHaveLength(len);
     const roleGuard = hs![2] as (req: any, res: any, next: () => void) => unknown;
@@ -82,7 +83,8 @@ describe("productRoutes — presentaciones", () => {
     };
     expect(run("ADMIN").next).toHaveBeenCalled();
     expect(run("MANAGEMENT").next).toHaveBeenCalled();
-    for (const role of ["VENDEDOR", "CASHIER"]) {
+    expect(run("VENDEDOR").next).toHaveBeenCalled();
+    for (const role of ["CASHIER"]) {
       const { res, next } = run(role);
       expect(next).not.toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(403);
