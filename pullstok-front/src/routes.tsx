@@ -313,6 +313,8 @@ const AppRoutes = () => (
         <Route path="/dashboard" element={<HomeRoute />} />
         {/* Stock (modo ADMINISTRATIVO): mismo listado de productos del Dashboard. */}
         <Route path="/stock" element={<Dashboard />} />
+        {/* Productos (VENDEDOR): listado completo + ProductDrawer, sin POS. */}
+        <Route path="/productos" element={<Dashboard forceProductList />} />
         <Route path="/presupuestos" element={<Quotations />} />
         <Route path="/pedidos" element={<Orders />} />
         <Route path="/pedidos-whatsapp" element={<WhatsappOrders />} />

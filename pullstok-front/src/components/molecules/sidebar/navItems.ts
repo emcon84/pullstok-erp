@@ -131,6 +131,7 @@ export const vendorSimpleNav: NavItem[] = [
   { to: "/caja", label: "Caja", icon: Wallet },
   { to: "/Clientes", label: "Clientes", icon: Users },
   { to: "/scanner", label: "Scanner", icon: ScanLine },
+  { to: "/productos", label: "Productos", icon: Package },
   { to: "/carga-manual", label: "Carga manual", icon: PackagePlus },
   { to: "/stock-suelto", label: "Stock suelto", icon: PackageOpen, moduleKey: "suelto" },
 ];

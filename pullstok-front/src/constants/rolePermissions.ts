@@ -33,6 +33,8 @@ export const ROLE_VISIBLE_PATHS: Record<string, Role[]> = {
   ],
   // Stock (modo ADMINISTRATIVO): mismo listado de productos que /dashboard.
   "/stock": ["SUPERADMIN", "ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER", "EMPLOYEE"],
+  // Listado completo de productos con ProductDrawer (entrada del menú simple del vendedor).
+  "/productos": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/Ventas": ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"],
   "/caja": ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"],
   "/Clientes": ["ADMIN", "MANAGEMENT", "VENDEDOR"],

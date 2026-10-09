@@ -62,10 +62,17 @@ type StatType = "sales" | "budgets" | "orders" | "receipts" | null;
 // Pausa de tipeo tras la cual se actualiza el área de impresión.
 const PRINT_SETTLE_MS = 400;
 
-export const Dashboard = () => {
-  // En modo ADMINISTRATIVO /stock reutiliza esta vista recortada: solo el
-  // listado de productos, sin POS, estadísticas, venta rápida ni chat de ventas.
-  const isAdminMode = useUiMode() === "ADMINISTRATIVO";
+interface DashboardProps {
+  /** Fuerza el listado de productos (sin POS) aunque el usuario sea vendedor/cajero de una sucursal (/productos). */
+  forceProductList?: boolean;
+}
+
+export const Dashboard = ({ forceProductList = false }: DashboardProps = {}) => {
+  // En modo ADMINISTRATIVO /stock (y /productos para el vendedor) reutiliza esta
+  // vista recortada: solo el listado de productos, sin POS, estadísticas, venta
+  // rápida ni chat de ventas.
+  const uiModeIsAdmin = useUiMode() === "ADMINISTRATIVO";
+  const isAdminMode = uiModeIsAdmin || forceProductList;
   const showVendorChat = !isAdminMode;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerProduct, setDrawerProduct] = useState<DataItem | null>(null);
@@ -373,7 +380,7 @@ export const Dashboard = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {isAdminMode ? "Stock" : "Dashboard"}
+            {forceProductList ? "Productos" : isAdminMode ? "Stock" : "Dashboard"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isAdminMode ? "Productos y existencias" : "Resumen y stock de tu negocio"}
