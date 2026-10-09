@@ -20,6 +20,8 @@ interface OpenBagDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  /** Código a buscar automáticamente al abrir (p. ej. el recién escaneado). */
+  initialBarcode?: string;
 }
 
 interface ScannedProductDisplay {
@@ -37,6 +39,7 @@ export const OpenBagDialog = ({
   open,
   onOpenChange,
   onSuccess,
+  initialBarcode,
 }: OpenBagDialogProps) => {
   const {
     cellOptions,
@@ -71,14 +74,14 @@ export const OpenBagDialog = ({
     }
   }, [open, clearError]);
 
-  const handleBarcodeSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!barcode.trim()) return;
+  const lookupBarcode = useCallback(
+    async (rawCode: string) => {
+      const code = rawCode.trim();
+      if (!code) return;
 
       clearError();
       try {
-        const result = await searchProduct(barcode.trim());
+        const result = await searchProduct(code);
         setScannedProduct({
           id: result.product.id,
           name: result.product.name,
@@ -96,8 +99,26 @@ export const OpenBagDialog = ({
         }
       }
     },
-    [barcode, searchProduct, clearError],
+    [searchProduct, clearError, error],
   );
+
+  const handleBarcodeSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      await lookupBarcode(barcode);
+    },
+    [barcode, lookupBarcode],
+  );
+
+  // Código precargado (venimos del modal de escaneo): lo cargamos y buscamos
+  // una sola vez por apertura, sin que el vendedor tenga que reescanear.
+  const lookupRef = useRef(lookupBarcode);
+  lookupRef.current = lookupBarcode;
+  useEffect(() => {
+    if (!open || !initialBarcode) return;
+    setBarcode(initialBarcode);
+    void lookupRef.current(initialBarcode);
+  }, [open, initialBarcode]);
 
   const handleConfirm = useCallback(async () => {
     if (!scannedProduct || !selectedCellId || submitting) return;

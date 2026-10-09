@@ -109,6 +109,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
 
   // Modal de "Abrir bolsa" - flujo para abrir bolsas y creditar kg a celda suelta
   const [openBagDialogOpen, setOpenBagDialogOpen] = useState(false);
+  // Código con el que se abre el diálogo desde el modal de escaneo (autobúsqueda).
+  const [openBagInitialBarcode, setOpenBagInitialBarcode] = useState<string | undefined>(undefined);
 
   // Código escaneado que ningún producto tiene (404): abre "Vincular código".
   // Mientras está abierto el capturador de la pistola se desactiva para que lo
@@ -389,6 +391,23 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     setScanProduct(null);
     setSellLooseBlister(false);
     setPiecesPerBlister(0);
+  }, []);
+
+  // Desde el modal de escaneo: cierra el modal (resetea blister/cantidad) y abre
+  // "Abrir bolsa" con el código precargado. Ambos setState van en el mismo batch,
+  // así el capturador global (suspendido mientras openBagDialogOpen) no ve un
+  // instante con ambos cerrados.
+  const handleOpenBagFromScan = useCallback(() => {
+    const code = scanProduct?.barcode || scanProduct?.code;
+    if (!code) return;
+    handleCancelScan();
+    setOpenBagInitialBarcode(code);
+    setOpenBagDialogOpen(true);
+  }, [scanProduct, handleCancelScan]);
+
+  const handleOpenBagOpenChange = useCallback((open: boolean) => {
+    setOpenBagDialogOpen(open);
+    if (!open) setOpenBagInitialBarcode(undefined);
   }, []);
 
   // sdd/venta-pastillas-sueltas-blister: switch activo (SOLO FARMACIA) → la
@@ -815,6 +834,12 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           <Button variant="outline" onClick={handleCancelScan}>
             Cancelar
           </Button>
+          {scanProduct?.priceKgSuelto != null && (scanProduct.barcode || scanProduct.code) && (
+            <Button variant="outline" onClick={handleOpenBagFromScan}>
+              <PackageOpen className="h-4 w-4 mr-2" />
+              Abrir bolsa
+            </Button>
+          )}
           <Button
             autoFocus
             onClick={handleConfirmScan}
@@ -869,7 +894,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     <OpenBagDialog
       branchId={branchId}
       open={openBagDialogOpen}
-      onOpenChange={setOpenBagDialogOpen}
+      onOpenChange={handleOpenBagOpenChange}
+      initialBarcode={openBagInitialBarcode}
       onSuccess={() => {
         // Optionally refresh loose stock tab data here
       }}
