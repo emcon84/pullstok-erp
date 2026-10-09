@@ -82,9 +82,11 @@ const RAZAS_CELL_TOKENS: Record<Razas, string[]> = {
 };
 
 const RAZAS_PHRASE: [RegExp, Razas][] = [
-  [/\brazas? pequenas?\b/, "RAZAS PEQUEÑAS"],
-  [/\brazas? medianas?\b/, "RAZAS MEDIANAS"],
-  [/\brazas? grandes?\b/, "RAZAS GRANDES"],
+  // The size is often written as a standalone adjective ("ADULTO PEQUEÑO"), so
+  // "razas" is optional and gender/number variants are accepted.
+  [/\b(?:razas? )?pequen[oa]s?\b/, "RAZAS PEQUEÑAS"],
+  [/\b(?:razas? )?median[oa]s?\b/, "RAZAS MEDIANAS"],
+  [/\b(?:razas? )?grandes?\b/, "RAZAS GRANDES"],
 ];
 
 /** Breed size of a product: the phrase written in full, else the shared `razasOf` hints. */

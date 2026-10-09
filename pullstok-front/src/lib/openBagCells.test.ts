@@ -149,6 +149,21 @@ describe("suggestLooseCells", () => {
       expect(ids(suggestLooseCells("EXCELLENT ADULT RAZAS PEQUEÑAS PERRO X15KG", null, prod))).toEqual(["exrp-ad"]);
     });
 
+    it("detects the size written as a standalone adjective (PEQUEÑO/PEQUEÑA/PEQUEÑOS)", () => {
+      const sab: LooseCell[] = [
+        cell({ id: "sab-ad", brandName: "SABROSITO", typeName: "Adulto", typeSynonyms: ["adulto"], priceKg: 1900 }),
+        cell({ id: "sabrp-ad", brandName: "SABROSITO RP", typeName: "Adulto", typeSynonyms: ["adulto"], priceKg: 2100 }),
+      ];
+      for (const name of [
+        "SABROSITO PERRO ADULTO PEQUEÑO X 15 KG",
+        "SABROSITO ADULTO PEQUEÑA X 15 KG",
+        "SABROSITO ADULTOS PEQUEÑOS X 15 KG",
+      ]) {
+        expect(ids(suggestLooseCells(name, "ALIMENTO SECO (BALANCEADO)", sab))).toEqual(["sabrp-ad"]);
+      }
+      expect(ids(suggestLooseCells("SABROSITO PERRO ADULTO X 15 KG", null, sab))).toEqual(["sab-ad"]);
+    });
+
     it("never suggests RP brands when the product has no razas hint", () => {
       expect(ids(suggestLooseCells("DOG CHOW ADULT X20KG", null, prod))).toEqual(["dc-ad"]);
       expect(ids(suggestLooseCells("EXCELLENT ADULT PERRO X15KG", null, prod))).toEqual(["ex-ad-dog"]);
