@@ -1,5 +1,5 @@
 import type { PriceKgSpecies } from "@/services/priceKgTypes";
-import { speciesOfName } from "@/utils/planillaGroups";
+import { razasOf, speciesOfName } from "@/utils/planillaGroups";
 
 /** A loose-stock cell (brand x type x species) with the data needed to match it. */
 export interface LooseCell {
@@ -69,6 +69,33 @@ const termMatchLength = (nameTokens: string[], term: string): number => {
 const bestTermLength = (nameTokens: string[], terms: string[]): number =>
   terms.reduce((best, t) => Math.max(best, termMatchLength(nameTokens, t)), 0);
 
+type Razas = "RAZAS PEQUEÑAS" | "RAZAS MEDIANAS" | "RAZAS GRANDES";
+
+/** Cell type tokens (whole tokens, accent/case-insensitive) that denote each breed size. */
+const RAZAS_CELL_TOKENS: Record<Razas, string[]> = {
+  "RAZAS PEQUEÑAS": ["rp", "peq", "pequenas", "mini", "small"],
+  "RAZAS MEDIANAS": ["rm", "med", "medianas", "medium"],
+  "RAZAS GRANDES": ["rg", "gr", "grandes", "maxi", "large", "giant"],
+};
+
+const RAZAS_PHRASE: [RegExp, Razas][] = [
+  [/\brazas? pequenas?\b/, "RAZAS PEQUEÑAS"],
+  [/\brazas? medianas?\b/, "RAZAS MEDIANAS"],
+  [/\brazas? grandes?\b/, "RAZAS GRANDES"],
+];
+
+/** Breed size of a product: the phrase written in full, else the shared `razasOf` hints. */
+const razasHint = (productName: string): Razas | null => {
+  const flat = tokenize(productName).join(" ");
+  for (const [re, razas] of RAZAS_PHRASE) if (re.test(flat)) return razas;
+  return razasOf(productName, null) as Razas | null;
+};
+
+const cellMatchesRazas = (cell: LooseCell, razas: Razas): boolean => {
+  const tokens = new Set([cell.typeName, ...cell.typeSynonyms].flatMap(tokenize));
+  return RAZAS_CELL_TOKENS[razas].some((t) => tokens.has(t));
+};
+
 /**
  * Suggests the loose cells that probably belong to a scanned product, from its
  * name (the scan result carries no brand field): brand by name/keywords, then
@@ -95,13 +122,20 @@ export const suggestLooseCells = (
 
   let result = scored.map((s) => s.cell);
 
-  // 2) Type.
+  // 2) Breed size: razas-specific cells are more specific than the generic stage type.
+  const razas = razasHint(productName);
+  if (razas) {
+    const byRazas = result.filter((c) => cellMatchesRazas(c, razas));
+    if (byRazas.length > 0) result = byRazas;
+  }
+
+  // 3) Type.
   const byType = result.filter(
     (c) => bestTermLength(nameTokens, [c.typeName, ...c.typeSynonyms]) > 0,
   );
   if (byType.length > 0) result = byType;
 
-  // 3) Species (AMBOS cells fit either).
+  // 4) Species (AMBOS cells fit either).
   const hint = speciesOfName(`${productName} ${categoryName ?? ""}`);
   if (hint) {
     const bySpecies = result.filter((c) => c.species === hint || c.species === "AMBOS");

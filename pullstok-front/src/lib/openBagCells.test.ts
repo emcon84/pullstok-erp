@@ -73,4 +73,51 @@ describe("suggestLooseCells", () => {
     ];
     expect(ids(suggestLooseCells("Royal Canin Veterinary Renal", null, list))).toEqual(["rcv"]);
   });
+  describe("razas narrowing", () => {
+    const dc = (id: string, typeName: string, extra: Partial<LooseCell> = {}) =>
+      cell({ id, brandName: "Dog Chow", brandKeywords: [], typeName, ...extra });
+
+    it("prefers the RP cell over the generic stage type (exact Dog Chow case)", () => {
+      const list = [dc("ad", "Adulto"), dc("cach", "Cachorro"), dc("rp", "RP"), dc("rm", "RM")];
+      const r = suggestLooseCells("DOG CHOW ADULT RAZAS PEQUEÑAS X20KG", "ALIMENTO SECO", list);
+      expect(ids(r)).toEqual(["rp"]);
+      expect(r.brandMatched).toBe(true);
+    });
+
+    it("prefers 'Adulto RP' over plain 'Adulto'", () => {
+      const list = [dc("ad", "Adulto"), dc("adrp", "Adulto RP")];
+      expect(ids(suggestLooseCells("Dog Chow Adulto Razas Pequeñas 20kg", null, list))).toEqual(["adrp"]);
+    });
+
+    it("matches medianas and grandes", () => {
+      const list = [dc("ad", "Adulto"), dc("rm", "RM"), dc("rg", "Razas Grandes")];
+      expect(ids(suggestLooseCells("Dog Chow Adulto Razas Medianas", null, list))).toEqual(["rm"]);
+      expect(ids(suggestLooseCells("Dog Chow Adulto Razas Grandes", null, list))).toEqual(["rg"]);
+    });
+
+    it("matches through synonyms and accents/case", () => {
+      const list = [dc("ad", "Adulto"), dc("x", "Mini Breed", { typeSynonyms: ["Pequeñas"] })];
+      expect(ids(suggestLooseCells("DOG CHOW RAZAS PEQUENAS", null, list))).toEqual(["x"]);
+    });
+
+    it("does not match token substrings (RP inside another word)", () => {
+      const list = [dc("ad", "Adulto"), dc("w", "Superp")];
+      expect(ids(suggestLooseCells("Dog Chow Razas Pequeñas", null, list))).toEqual(["ad", "w"]);
+    });
+
+    it("is unchanged when the product has no razas hint", () => {
+      const list = [dc("ad", "Adulto"), dc("rp", "RP")];
+      expect(ids(suggestLooseCells("Dog Chow Adulto 20kg", null, list))).toEqual(["ad"]);
+    });
+
+    it("falls back to current behavior when no cell matches the razas", () => {
+      const list = [dc("ad", "Adulto"), dc("cach", "Cachorro"), dc("rm", "RM")];
+      expect(ids(suggestLooseCells("Dog Chow Adulto Razas Pequeñas", null, list))).toEqual(["ad"]);
+    });
+
+    it("still narrows by species after razas", () => {
+      const list = [dc("rp-dog", "RP"), dc("rp-cat", "RP", { species: "GATO" })];
+      expect(ids(suggestLooseCells("Dog Chow Razas Pequeñas Perro", null, list))).toEqual(["rp-dog"]);
+    });
+  });
 });
