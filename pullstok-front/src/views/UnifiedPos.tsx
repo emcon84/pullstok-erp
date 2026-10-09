@@ -414,6 +414,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // línea se agrega POR_UNIDAD_BLISTER con el conteo ad-hoc de piecesPerBlister;
   // requiere piecesPerBlister entero > 1 (mismo criterio que el server, T1).
   const isFarmacia = isFarmaciaProduct(scanProduct);
+  const canOpenBagFromScan =
+    scanProduct?.priceKgSuelto != null && !!(scanProduct.barcode || scanProduct.code);
   const isBlisterSale = isFarmacia && sellLooseBlister;
   const piecesPerBlisterValid = isValidPiecesPerBlister(piecesPerBlister);
 
@@ -830,17 +832,20 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           );
         })()}
 
-        <DialogFooter className="sm:flex-wrap">
+        {/* Con "Abrir bolsa": acción principal a todo el ancho arriba y las dos
+            secundarias en columnas iguales abajo (sin botones desalineados). */}
+        <DialogFooter className="sm:grid sm:grid-cols-2">
           <Button variant="outline" onClick={handleCancelScan}>
             Cancelar
           </Button>
-          {scanProduct?.priceKgSuelto != null && (scanProduct.barcode || scanProduct.code) && (
+          {canOpenBagFromScan && (
             <Button variant="outline" onClick={handleOpenBagFromScan}>
               <PackageOpen className="h-4 w-4 mr-2" />
               Abrir bolsa
             </Button>
           )}
           <Button
+            className={canOpenBagFromScan ? "sm:order-first sm:col-span-2" : undefined}
             autoFocus
             onClick={handleConfirmScan}
             disabled={scanQty <= 0 || (isBlisterSale && !piecesPerBlisterValid)}
