@@ -120,4 +120,53 @@ describe("suggestLooseCells", () => {
       expect(ids(suggestLooseCells("Dog Chow Razas Pequeñas Perro", null, list))).toEqual(["rp-dog"]);
     });
   });
+
+  describe("razas encoded in the brand name (production data)", () => {
+    const prod: LooseCell[] = [
+      cell({ id: "dc-ad", brandName: "DOG CHOW", typeName: "Adulto", typeSynonyms: ["adult"], priceKg: 3600 }),
+      cell({ id: "dc-cach", brandName: "DOG CHOW", typeName: "Cachorro", typeSynonyms: ["puppy"] }),
+      cell({ id: "dc-sen", brandName: "DOG CHOW", typeName: "Senior" }),
+      cell({ id: "dcrp-ad", brandName: "DOG CHOW RP", typeName: "Adulto", typeSynonyms: ["adult"], priceKg: 3800 }),
+      cell({ id: "dcrp-cach", brandName: "DOG CHOW RP", typeName: "Cachorro", typeSynonyms: ["puppy"], priceKg: 4100 }),
+      cell({ id: "ex-ad-cat", brandName: "EXCELLENT", typeName: "Adulto", typeSynonyms: ["adult"], species: "GATO", priceKg: 10000 }),
+      cell({ id: "ex-ad-dog", brandName: "EXCELLENT", typeName: "Adulto", typeSynonyms: ["adult"], species: "PERRO", priceKg: 5500 }),
+      cell({ id: "exrp-ad", brandName: "EXCELLENT RP", typeName: "Adulto", typeSynonyms: ["adult"], species: "PERRO" }),
+      cell({ id: "exrp-cach", brandName: "EXCELLENT RP", typeName: "Cachorro", typeSynonyms: ["puppy"], species: "PERRO" }),
+      cell({ id: "rc-card", brandName: "ROYAL CANIN RP CARDIO", typeName: "Adulto" }),
+    ];
+
+    it("picks the 'DOG CHOW RP' brand cell for a razas pequeñas product", () => {
+      const r = suggestLooseCells("DOG CHOW ADULT RAZAS PEQUEÑAS X20KG", "ALIMENTO SECO", prod);
+      expect(ids(r)).toEqual(["dcrp-ad"]);
+      expect(r.genericBrandName).toBe("DOG CHOW");
+    });
+
+    it("still picks by type inside the RP brand", () => {
+      expect(ids(suggestLooseCells("DOG CHOW PUPPY RAZAS PEQUEÑAS X3KG", null, prod))).toEqual(["dcrp-cach"]);
+    });
+
+    it("keeps species narrowing inside the RP brand", () => {
+      expect(ids(suggestLooseCells("EXCELLENT ADULT RAZAS PEQUEÑAS PERRO X15KG", null, prod))).toEqual(["exrp-ad"]);
+    });
+
+    it("never suggests RP brands when the product has no razas hint", () => {
+      expect(ids(suggestLooseCells("DOG CHOW ADULT X20KG", null, prod))).toEqual(["dc-ad"]);
+      expect(ids(suggestLooseCells("EXCELLENT ADULT PERRO X15KG", null, prod))).toEqual(["ex-ad-dog"]);
+    });
+
+    it("keeps the generic brand when no razas brand exists", () => {
+      const only = prod.filter((c) => c.brandName === "DOG CHOW");
+      expect(ids(suggestLooseCells("DOG CHOW ADULT RAZAS PEQUEÑAS", null, only))).toEqual(["dc-ad"]);
+    });
+
+    it("accepts the razas token anywhere in the brand and PEQ/MED/GR synonyms", () => {
+      const list = [
+        cell({ id: "g", brandName: "Kongo" }),
+        cell({ id: "peq", brandName: "Kongo Peq" }),
+        cell({ id: "med", brandName: "MED Kongo" }),
+      ];
+      expect(ids(suggestLooseCells("Kongo Adulto Razas Pequeñas", null, list))).toEqual(["peq"]);
+      expect(ids(suggestLooseCells("Kongo Adulto Razas Medianas", null, list))).toEqual(["med"]);
+    });
+  });
 });

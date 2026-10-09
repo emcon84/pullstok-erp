@@ -8,6 +8,9 @@ const cells = [
   { ...base, id: "ex-ad-dog", brandName: "Excellent", typeName: "Adulto", typeSynonyms: ["adult"], species: "PERRO", label: "Excellent · Adulto · Perro — $5.000/kg" },
   { ...base, id: "ex-cach-dog", brandName: "Excellent", typeName: "Cachorro", typeSynonyms: ["puppy"], species: "PERRO", label: "Excellent · Cachorro · Perro — $5.000/kg" },
   { ...base, id: "pp-ad-dog", brandName: "Pro Plan", typeName: "Adulto", species: "PERRO", priceKg: 6000, label: "Pro Plan · Adulto · Perro — $6.000/kg" },
+  { ...base, id: "dc-ad", brandName: "DOG CHOW", typeName: "Adulto", typeSynonyms: ["adult"], species: "PERRO", priceKg: 3600, label: "DOG CHOW · Adulto · Perro — $3.600/kg" },
+  { ...base, id: "dcrp-ad", brandName: "DOG CHOW RP", typeName: "Adulto", typeSynonyms: ["adult"], species: "PERRO", priceKg: 3800, label: "DOG CHOW RP · Adulto · Perro — $3.800/kg" },
+  { ...base, id: "dcrp-cach", brandName: "DOG CHOW RP", typeName: "Cachorro", typeSynonyms: ["puppy"], species: "PERRO", priceKg: 4100, label: "DOG CHOW RP · Cachorro · Perro — $4.100/kg" },
 ];
 vi.mock("@/components/hooks/useOpenBag", () => ({
   useOpenBag: () => ({
@@ -131,5 +134,19 @@ describe("OpenBagDialog — smart cell pills", () => {
     fireEvent.change(screen.getByPlaceholderText(PLACEHOLDER), { target: { value: "B1" } });
     fireEvent.click(screen.getByRole("button", { name: /buscar/i }));
     expect(await screen.findByRole("radio", { name: /Adulto · Perro — \$6\.000\/kg/ })).toBeInTheDocument();
+  });
+
+  it("suggests the razas brand cell and opens it with one click", async () => {
+    searchProduct.mockResolvedValue(scan("DOG CHOW ADULT RAZAS PEQUEÑAS X20KG"));
+    render(<OpenBagDialog branchId="b" open onOpenChange={() => {}} initialBarcode="B1" />);
+
+    const pills = await screen.findAllByRole("radio");
+    expect(pills).toHaveLength(1);
+    expect(pills[0]).toHaveTextContent("DOG CHOW RP · Adulto · Perro — $3.800/kg");
+    expect(screen.getByText("Sugeridas para DOG CHOW RP")).toBeInTheDocument();
+
+    fireEvent.click(pills[0]);
+    await waitFor(() => expect(openBag).toHaveBeenCalledWith("p1", "dcrp-ad"));
+    expect(openBag).toHaveBeenCalledTimes(1);
   });
 });

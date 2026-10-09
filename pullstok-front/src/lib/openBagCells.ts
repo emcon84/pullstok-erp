@@ -17,6 +17,9 @@ export interface LooseCell {
 export interface CellSuggestion {
   cells: LooseCell[];
   brandMatched: boolean;
+  /** Brand matched from the product name, which may differ from the cells' brand
+   * when a razas variant brand (e.g. "DOG CHOW RP") replaced it. */
+  genericBrandName?: string;
 }
 
 const MAX_RUN = 4;
@@ -96,6 +99,23 @@ const cellMatchesRazas = (cell: LooseCell, razas: Razas): boolean => {
   return RAZAS_CELL_TOKENS[razas].some((t) => tokens.has(t));
 };
 
+const sortedKey = (tokens: string[]): string => [...tokens].sort().join(" ");
+
+/**
+ * Cells whose brand is a matched brand plus one razas token in any position
+ * (e.g. "DOG CHOW" -> "DOG CHOW RP"), searched across every cell.
+ */
+const razasBrandCells = (all: LooseCell[], matched: LooseCell[], razas: Razas): LooseCell[] => {
+  const genericKeys = new Set(matched.map((c) => sortedKey(tokenize(c.brandName))));
+  const razasTokens = new Set(RAZAS_CELL_TOKENS[razas]);
+  return all.filter((c) => {
+    const tokens = tokenize(c.brandName);
+    const at = tokens.findIndex((t) => razasTokens.has(t));
+    if (at < 0) return false;
+    return genericKeys.has(sortedKey(tokens.filter((_, i) => i !== at)));
+  });
+};
+
 /**
  * Suggests the loose cells that probably belong to a scanned product, from its
  * name (the scan result carries no brand field): brand by name/keywords, then
@@ -121,9 +141,16 @@ export const suggestLooseCells = (
   if (scored.length === 0) return { cells: [], brandMatched: false };
 
   let result = scored.map((s) => s.cell);
+  const genericBrandName = result[0].brandName;
 
-  // 2) Breed size: razas-specific cells are more specific than the generic stage type.
+  // 2a) Razas variant brands ("<brand> RP") replace the generic brand when present.
   const razas = razasHint(productName);
+  if (razas) {
+    const variants = razasBrandCells(cells, result, razas);
+    if (variants.length > 0) result = variants;
+  }
+
+  // 2b) Breed size: razas-specific cells are more specific than the generic stage type.
   if (razas) {
     const byRazas = result.filter((c) => cellMatchesRazas(c, razas));
     if (byRazas.length > 0) result = byRazas;
@@ -142,5 +169,5 @@ export const suggestLooseCells = (
     if (bySpecies.length > 0) result = bySpecies;
   }
 
-  return { cells: result, brandMatched: true };
+  return { cells: result, brandMatched: true, genericBrandName };
 };

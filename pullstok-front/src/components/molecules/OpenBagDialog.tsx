@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PackageOpen, Search } from "lucide-react";
 import { toast } from "react-toastify";
 import { useOpenBag } from "@/components/hooks/useOpenBag";
-import { compactCellLabel, suggestLooseCells } from "@/lib/openBagCells";
+import { compactCellLabel, fullCellLabel, suggestLooseCells } from "@/lib/openBagCells";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -270,7 +270,7 @@ export const OpenBagDialog = ({
                               : "border-input hover:bg-accent",
                         )}
                       >
-                        {compactCellLabel(c)}
+                        {c.brandName !== suggested.genericBrandName ? fullCellLabel(c) : compactCellLabel(c)}
                       </button>
                     );
                   })}
