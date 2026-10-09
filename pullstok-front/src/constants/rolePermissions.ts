@@ -41,7 +41,7 @@ export const ROLE_VISIBLE_PATHS: Record<string, Role[]> = {
   "/presupuestos": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/pedidos": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
   "/categorias": ["ADMIN", "MANAGEMENT"],
-  "/carga-manual": ["ADMIN", "MANAGEMENT"], // productos cargados a mano desde el POS
+  "/carga-manual": ["ADMIN", "MANAGEMENT", "VENDEDOR"], // productos cargados a mano desde el POS
   "/facturas": ["ADMIN", "MANAGEMENT", "CASHIER"], // Remitos
   "/tienda": ["ADMIN", "MANAGEMENT"],
   "/mensajes": ["ADMIN", "MANAGEMENT", "VENDEDOR"],
@@ -50,6 +50,11 @@ export const ROLE_VISIBLE_PATHS: Record<string, Role[]> = {
   "/usuarios": ["ADMIN", "MANAGEMENT"], // NEW — user management
   "/impresoras": ["ADMIN", "MANAGEMENT"], // impresión desde el celular (relay)
 };
+
+/** Roles allowed to delete a sale (mirrors backend DELETE /api/sales/:id). */
+export function canDeleteSaleRole(role: string | null | undefined): boolean {
+  return role === "ADMIN" || role === "MANAGEMENT" || role === "VENDEDOR";
+}
 
 /**
  * Returns true if the given role can access the given path.

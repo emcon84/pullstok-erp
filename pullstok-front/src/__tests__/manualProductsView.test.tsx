@@ -277,8 +277,8 @@ describe("ManualProducts (vista admin)", () => {
     expect(await screen.findByText("TORNILLO")).toBeInTheDocument();
   });
 
-  it("un rol sin acceso (VENDEDOR) vuelve al dashboard", async () => {
-    mockGetMe.mockResolvedValue({ role: "VENDEDOR" } as never);
+  it("un rol sin acceso (CASHIER) vuelve al dashboard", async () => {
+    mockGetMe.mockResolvedValue({ role: "CASHIER" } as never);
     renderView();
 
     expect(await screen.findByText("DASHBOARD")).toBeInTheDocument();
