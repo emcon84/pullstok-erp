@@ -700,7 +700,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
 
     {/* ── Modal de confirmación de bolsa cerrada escaneada ── */}
     <Dialog open={!!scanProduct} onOpenChange={(open) => !open && handleCancelScan()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{scanProduct?.name}</DialogTitle>
           <DialogDescription>
@@ -830,7 +830,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           );
         })()}
 
-        <DialogFooter>
+        <DialogFooter className="sm:flex-wrap">
           <Button variant="outline" onClick={handleCancelScan}>
             Cancelar
           </Button>
