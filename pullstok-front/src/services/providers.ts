@@ -20,8 +20,11 @@ export interface Provider {
   phone?: string | null;
   email?: string | null;
   classification?: string | null;
-  /** Referencia contable legada (texto libre; luego será relación al plan de cuentas). */
+  /** Referencia contable legada de GFLOW (texto libre); la cuenta real es `account`. */
   accountingRef?: string | null;
+  /** Cuenta contable imputable vinculada (plan de cuentas). */
+  accountId?: string | null;
+  account?: { id: string; code: string; shortCode?: string | null; name: string } | null;
   isActive?: boolean;
   createdAt?: string;
 }
@@ -39,6 +42,8 @@ export interface ProviderInput {
   email?: string;
   classification?: string;
   accountingRef?: string;
+  /** null desvincula la cuenta (solo edición). */
+  accountId?: string | null;
   isActive?: boolean;
 }
 

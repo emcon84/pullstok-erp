@@ -280,7 +280,9 @@ export const ChartOfAccounts = () => {
     if (!gflowPreview) return;
     importAccounts(gflowPreview.accounts, {
       onSuccess: (r) => {
-        toast.success(`Plan importado (${r.imported} cuentas)`);
+        toast.success(
+          `Plan importado (${r.imported} cuentas, ${r.linkedProviders} proveedores vinculados)`,
+        );
         setGflowPreview(null);
       },
       onError: (error) => toast.error(`Error al importar el plan: ${error.message}`),

@@ -339,8 +339,12 @@ model Provider {
   email          String?
   classification String?
   // Referencia contable legada en texto libre (ej. "2001 Proveedores Varios").
-  // Más adelante pasará a ser una relación con el plan de cuentas.
+  // Se conserva como dato legado; la cuenta contable real es `accountId`.
   accountingRef  String?
+  // Cuenta contable imputable del plan de cuentas (SetNull si se borra la cuenta;
+  // el controller igual bloquea borrar cuentas asignadas).
+  accountId      String?
+  account        Account?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
   isActive       Boolean      @default(true)
   createdAt      DateTime     @default(now())
   organizationId String
@@ -351,6 +355,7 @@ model Provider {
   // Código legado único POR organización (varios NULL no colisionan en Postgres).
   @@unique([organizationId, code])
   @@index([organizationId])
+  @@index([accountId])
   @@map("providers")
 }
 
@@ -384,6 +389,7 @@ model Account {
   parentId       String?
   parent         Account?     @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children       Account[]    @relation("AccountHierarchy")
+  providers      Provider[]
   isPostable     Boolean      @default(false)
   isActive       Boolean      @default(true)
   normalBalance  AccountNormalBalance?

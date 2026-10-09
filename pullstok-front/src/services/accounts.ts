@@ -114,9 +114,9 @@ export interface ImportAccountRow {
 /** POST /accounts/import — REEMPLAZA el plan de cuentas de la organización (solo ADMIN). */
 export const importAccounts = async (
   accounts: ImportAccountRow[],
-): Promise<{ imported: number }> => {
+): Promise<{ imported: number; linkedProviders: number }> => {
   try {
-    const res = await axios.post<{ imported: number }>(
+    const res = await axios.post<{ imported: number; linkedProviders: number }>(
       `${API_URL}/accounts/import`,
       { accounts },
       { headers: authHeaders() },

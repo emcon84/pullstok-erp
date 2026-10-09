@@ -8,6 +8,8 @@ import {
   validateParentCanHaveChildren,
   validatePostableChange,
   validateReparent,
+  shortCodeFromAccountingRef,
+  planProviderRelinks,
 } from "../../src/services/accountRules";
 
 // a → b → c ; d suelta
@@ -122,5 +124,59 @@ describe("validateImportRows", () => {
   it("rechaza un tipo distinto al de la madre", () => {
     const rows = [row({ code: "1" }), row({ code: "1.01", parentCode: "1", type: "INCOME" })];
     expect(validateImportRows(rows)).toMatch(/mismo tipo.*1\.01|1\.01.*mismo tipo/);
+  });
+});
+
+describe("shortCodeFromAccountingRef", () => {
+  it("toma el primer token numérico", () => {
+    expect(shortCodeFromAccountingRef("2001 Proveedores Varios")).toBe("2001");
+    expect(shortCodeFromAccountingRef("  2500  Acreedores")).toBe("2500");
+  });
+  it("devuelve null sin código numérico o sin valor", () => {
+    expect(shortCodeFromAccountingRef("Proveedores")).toBeNull();
+    expect(shortCodeFromAccountingRef("")).toBeNull();
+    expect(shortCodeFromAccountingRef(null)).toBeNull();
+    expect(shortCodeFromAccountingRef(undefined)).toBeNull();
+  });
+});
+
+describe("planProviderRelinks", () => {
+  const imported = [
+    { shortCode: "2001", isPostable: true },
+    { shortCode: "2500", isPostable: true },
+    { shortCode: "2000", isPostable: false },
+    { shortCode: null, isPostable: true },
+  ];
+  it("agrupa por shortCode usando accountingRef cuando no hay cuenta", () => {
+    const plan = planProviderRelinks(
+      [
+        { id: "p1", accountingRef: "2001 Proveedores Varios", currentShortCode: null },
+        { id: "p2", accountingRef: "2001 Proveedores Varios", currentShortCode: null },
+        { id: "p3", accountingRef: "2500 Acreedores Varios", currentShortCode: null },
+      ],
+      imported,
+    );
+    expect(plan.get("2001")).toEqual(["p1", "p2"]);
+    expect(plan.get("2500")).toEqual(["p3"]);
+  });
+  it("un proveedor vinculado conserva su cuenta por shortCode aunque accountingRef diga otra", () => {
+    const plan = planProviderRelinks(
+      [{ id: "p1", accountingRef: "2001 Proveedores Varios", currentShortCode: "2500" }],
+      imported,
+    );
+    expect(plan.get("2500")).toEqual(["p1"]);
+    expect(plan.has("2001")).toBe(false);
+  });
+  it("no vincula a cuentas no imputables, inexistentes ni sin shortCode", () => {
+    const plan = planProviderRelinks(
+      [
+        { id: "p1", accountingRef: "2000 Madre", currentShortCode: null },
+        { id: "p2", accountingRef: "9999 Otra", currentShortCode: null },
+        { id: "p3", accountingRef: "Sin código", currentShortCode: null },
+        { id: "p4", accountingRef: null, currentShortCode: null },
+      ],
+      imported,
+    );
+    expect(plan.size).toBe(0);
   });
 });

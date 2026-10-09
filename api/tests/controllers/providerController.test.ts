@@ -11,6 +11,7 @@ jest.mock("../../src/config/db", () => ({
       updateMany: jest.fn(),
       deleteMany: jest.fn(),
     },
+    account: { findFirst: jest.fn() },
   },
 }));
 
@@ -19,6 +20,7 @@ jest.mock("../../src/config/tenantContext", () => ({
 }));
 
 const p = (prisma as any).provider as Record<string, jest.Mock>;
+const acc = (prisma as any).account as Record<string, jest.Mock>;
 
 const mockRequest = (params: any = {}, body: any = {}, query: any = {}) =>
   ({ params, body, query } as unknown as Request);
@@ -34,6 +36,7 @@ describe("Provider Controller", () => {
   beforeEach(() => {
     // reset solo de los mocks de provider: resetAllMocks borraría el mock de tenantContext.
     Object.values(p).forEach((m) => m.mockReset());
+    Object.values(acc).forEach((m) => m.mockReset());
   });
 
   describe("listProviders", () => {
@@ -44,6 +47,7 @@ describe("Provider Controller", () => {
       expect(p.findMany).toHaveBeenCalledWith({
         where: { organizationId: "org-1" },
         orderBy: { name: "asc" },
+        include: { account: { select: { id: true, code: true, shortCode: true, name: true } } },
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ items: [{ id: "p1", name: "A" }] });
@@ -87,7 +91,38 @@ describe("Provider Controller", () => {
       await providerController.createProvider(mockRequest({}, { name: "Nuevo", code: "P1" }), res);
       expect(p.create).toHaveBeenCalledWith({
         data: { name: "Nuevo", code: "P1", organizationId: "org-1" },
+        include: expect.any(Object),
       });
+      expect(res.status).toHaveBeenCalledWith(201);
+    });
+
+    it("400 si la cuenta contable no existe en la org", async () => {
+      p.findFirst.mockResolvedValue(null);
+      acc.findFirst.mockResolvedValue(null);
+      const res = mockResponse();
+      await providerController.createProvider(mockRequest({}, { name: "N", accountId: "a1" }), res);
+      expect(acc.findFirst.mock.calls[0][0].where).toEqual({ id: "a1", organizationId: "org-1" });
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ message: "La cuenta contable no existe" });
+      expect(p.create).not.toHaveBeenCalled();
+    });
+
+    it("400 si la cuenta contable no es imputable", async () => {
+      p.findFirst.mockResolvedValue(null);
+      acc.findFirst.mockResolvedValue({ isPostable: false });
+      const res = mockResponse();
+      await providerController.createProvider(mockRequest({}, { name: "N", accountId: "a1" }), res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ message: "La cuenta contable debe ser imputable" });
+    });
+
+    it("crea con cuenta contable imputable", async () => {
+      p.findFirst.mockResolvedValue(null);
+      acc.findFirst.mockResolvedValue({ isPostable: true });
+      p.create.mockResolvedValue({ id: "p1" });
+      const res = mockResponse();
+      await providerController.createProvider(mockRequest({}, { name: "N", accountId: "a1" }), res);
+      expect(p.create.mock.calls[0][0].data.accountId).toBe("a1");
       expect(res.status).toHaveBeenCalledWith(201);
     });
 

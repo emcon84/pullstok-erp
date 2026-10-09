@@ -151,3 +151,39 @@ export const validateImportRows = (rows: ImportAccountRow[]): string | null => {
   }
   return null;
 };
+
+/**
+ * Código corto contenido en una referencia contable legada de GFLOW
+ * ("<shortCode> <nombre>"): el primer token si es solo dígitos.
+ */
+export const shortCodeFromAccountingRef = (ref: string | null | undefined): string | null => {
+  const token = (ref ?? "").trim().split(/\s+/)[0] ?? "";
+  return /^\d+$/.test(token) ? token : null;
+};
+
+export interface ProviderLinkInfo {
+  id: string;
+  accountingRef: string | null;
+  /** shortCode de la cuenta a la que el proveedor está vinculado hoy (si hay). */
+  currentShortCode: string | null;
+}
+
+/**
+ * Re-vincula proveedores tras reemplazar el plan: la clave de cada proveedor es
+ * el shortCode de su cuenta actual (si está vinculado) o, si no, el que sale de
+ * su accountingRef. Solo se vincula a filas imputables con shortCode.
+ * Devuelve shortCode → ids de proveedores a vincular a esa cuenta.
+ */
+export const planProviderRelinks = (
+  providers: ProviderLinkInfo[],
+  importedRows: Pick<ImportAccountRow, "shortCode" | "isPostable">[],
+): Map<string, string[]> => {
+  const postable = new Set(importedRows.filter((r) => r.isPostable && r.shortCode).map((r) => r.shortCode as string));
+  const plan = new Map<string, string[]>();
+  for (const p of providers) {
+    const key = p.currentShortCode ?? shortCodeFromAccountingRef(p.accountingRef);
+    if (!key || !postable.has(key)) continue;
+    plan.set(key, [...(plan.get(key) ?? []), p.id]);
+  }
+  return plan;
+};

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Pencil, Factory, Phone, Search, Power } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { GenericModal } from "../components/molecules/GenericModal";
 import { Loader } from "../components/atoms/loader";
 import { groupByLetter, OTHER_GROUP } from "../utils/groupByLetter";
@@ -15,7 +16,12 @@ import {
   useCreateProvider,
   useUpdateProvider,
 } from "../components/hooks/useProvider";
+import { useAccounts } from "../components/hooks/useAccounts";
 import type { Provider } from "../services/providers";
+
+/** "2001 · Proveedores Varios" (código corto, con fallback al código jerárquico). */
+const accountLabel = (a: { code: string; shortCode?: string | null; name: string }) =>
+  `${a.shortCode || a.code} · ${a.name}`;
 
 interface ProviderForm {
   name: string;
@@ -29,6 +35,7 @@ interface ProviderForm {
   email: string;
   classification: string;
   accountingRef: string;
+  accountId: string;
   isActive: boolean;
 }
 
@@ -44,6 +51,7 @@ const EMPTY_FORM: ProviderForm = {
   email: "",
   classification: "",
   accountingRef: "",
+  accountId: "",
   isActive: true,
 };
 
@@ -59,6 +67,7 @@ const formFromProvider = (p: Provider): ProviderForm => ({
   email: p.email ?? "",
   classification: p.classification ?? "",
   accountingRef: p.accountingRef ?? "",
+  accountId: p.accountId ?? "",
   isActive: p.isActive !== false,
 });
 
@@ -68,6 +77,7 @@ export const Providers = () => {
   const { providers, loadingProvider, errorProvider } = useProviders();
   const { submitProvider, loadingProvider: creating } = useCreateProvider();
   const { updateProvider, loadingUpdate } = useUpdateProvider();
+  const { accounts } = useAccounts();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
@@ -76,6 +86,21 @@ export const Providers = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<ProviderForm>(EMPTY_FORM);
+
+  // Solo cuentas imputables, por código; la ya vinculada se conserva aunque
+  // dejara de ser imputable para no perder el valor al editar.
+  const editing = editId ? providers?.find((p) => p.id === editId) : undefined;
+  const accountOptions = useMemo(() => {
+    const postable = (accounts ?? [])
+      .filter((a) => a.isPostable)
+      .sort((a, b) => a.code.localeCompare(b.code))
+      .map((a) => ({ value: a.id, label: accountLabel(a) }));
+    const linked = editing?.account;
+    if (linked && !postable.some((o) => o.value === linked.id)) {
+      postable.unshift({ value: linked.id, label: accountLabel(linked) });
+    }
+    return [{ value: "", label: "Sin cuenta" }, ...postable];
+  }, [accounts, editing]);
 
   const set = <K extends keyof ProviderForm>(key: K, value: ProviderForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -119,6 +144,7 @@ export const Providers = () => {
       email: text(form.email),
       classification: text(form.classification),
       accountingRef: text(form.accountingRef),
+      accountId: editId ? form.accountId || null : form.accountId || undefined,
       isActive: form.isActive,
     };
     if (editId) {
@@ -304,7 +330,7 @@ export const Providers = () => {
                         <span className="truncate">{p.phone || "Sin teléfono"}</span>
                       </div>
                       <div className="truncate text-sm text-muted-foreground sm:w-48">
-                        {p.accountingRef || "—"}
+                        {p.account ? accountLabel(p.account) : p.accountingRef || "—"}
                       </div>
                       <div className="flex items-center gap-1">
                         <Button
@@ -442,13 +468,22 @@ export const Providers = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="p-accountingref">Cuenta contable</Label>
-              <Input
-                id="p-accountingref"
-                value={form.accountingRef}
-                onChange={(e) => set("accountingRef", e.target.value)}
-                placeholder="Ej. 2001 Proveedores Varios"
+              <Label htmlFor="p-account">Cuenta contable</Label>
+              <SearchableSelect
+                id="p-account"
+                ariaLabel="Cuenta contable"
+                value={form.accountId}
+                onValueChange={(v) => set("accountId", v)}
+                options={accountOptions}
+                placeholder="Sin cuenta"
+                searchPlaceholder="Buscar cuenta…"
+                emptyMessage="Sin cuentas imputables"
               />
+              {!form.accountId && form.accountingRef && (
+                <p className="text-xs text-muted-foreground">
+                  Referencia GFLOW: {form.accountingRef}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center justify-between gap-3 rounded-md border p-3">

@@ -12,6 +12,25 @@ const uniqueViolationMessage = (error: any): string | null => {
   return "Ya existe un proveedor con esos datos";
 };
 
+// Cuenta contable vinculada que viaja en las respuestas.
+const accountInclude = {
+  account: { select: { id: true, code: true, shortCode: true, name: true } },
+} as const;
+
+/**
+ * Valida que la cuenta exista en la org y sea imputable. Devuelve el mensaje
+ * de error (400) o null si es válida.
+ */
+const validateAccountLink = async (organizationId: string, accountId: string): Promise<string | null> => {
+  const account = await prisma.account.findFirst({
+    where: { id: accountId, organizationId },
+    select: { isPostable: true },
+  });
+  if (!account) return "La cuenta contable no existe";
+  if (!account.isPostable) return "La cuenta contable debe ser imputable";
+  return null;
+};
+
 /** ¿Hay otro proveedor de la org con el mismo nombre ignorando mayúsculas? */
 const nameTaken = async (organizationId: string, name: string, excludeId?: string) => {
   const existing = await prisma.provider.findFirst({
@@ -55,6 +74,7 @@ export const listProviders = async (req: Request, res: Response) => {
     const providers = await prisma.provider.findMany({
       where,
       orderBy: { name: "asc" },
+      include: accountInclude,
     });
     return res.status(200).json({ items: providers });
   } catch (error: any) {
@@ -69,6 +89,7 @@ export const getProviderById = async (req: Request, res: Response) => {
     const organizationId = requireOrganizationId();
     const provider = await prisma.provider.findFirst({
       where: { id: req.params.id, organizationId },
+      include: accountInclude,
     });
     if (!provider) return res.status(404).json({ message: "Proveedor no encontrado" });
     return res.status(200).json(provider);
@@ -87,8 +108,13 @@ export const createProvider = async (req: Request, res: Response) => {
     if (await nameTaken(organizationId, req.body.name)) {
       return res.status(409).json({ message: "Ya existe un proveedor con ese nombre" });
     }
+    if (req.body.accountId) {
+      const accountError = await validateAccountLink(organizationId, req.body.accountId);
+      if (accountError) return res.status(400).json({ message: accountError });
+    }
     const provider = await prisma.provider.create({
       data: { ...req.body, organizationId },
+      include: accountInclude,
     });
     return res.status(201).json(provider);
   } catch (error: any) {
@@ -106,6 +132,10 @@ export const updateProvider = async (req: Request, res: Response) => {
     if (typeof req.body.name === "string" && (await nameTaken(organizationId, req.body.name, req.params.id))) {
       return res.status(409).json({ message: "Ya existe un proveedor con ese nombre" });
     }
+    if (req.body.accountId) {
+      const accountError = await validateAccountLink(organizationId, req.body.accountId);
+      if (accountError) return res.status(400).json({ message: accountError });
+    }
     const result = await prisma.provider.updateMany({
       where: { id: req.params.id, organizationId },
       data: req.body,
@@ -115,6 +145,7 @@ export const updateProvider = async (req: Request, res: Response) => {
     }
     const provider = await prisma.provider.findFirst({
       where: { id: req.params.id, organizationId },
+      include: accountInclude,
     });
     return res.status(200).json(provider);
   } catch (error: any) {

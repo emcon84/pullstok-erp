@@ -4,6 +4,7 @@ import { prisma } from "../config/db";
 import { requireOrganizationId } from "../config/tenantContext";
 import {
   buildDefaultChartRows,
+  planProviderRelinks,
   resolveAccountType,
   validateImportRows,
   validateDeletion,
@@ -113,6 +114,14 @@ export const updateAccount = async (req: Request, res: Response) => {
     if (typeof data.isPostable === "boolean") {
       const postableError = validatePostableChange(accounts, id, data.isPostable);
       if (postableError) return res.status(400).json({ message: postableError });
+      if (!data.isPostable && current.isPostable) {
+        const linked = await prisma.provider.count({ where: { organizationId, accountId: id } });
+        if (linked > 0) {
+          return res
+            .status(400)
+            .json({ message: "No se puede quitar la imputabilidad de una cuenta asignada a proveedores" });
+        }
+      }
     }
 
     const result = await prisma.account.updateMany({ where: { id, organizationId }, data });
@@ -138,6 +147,11 @@ export const deleteAccount = async (req: Request, res: Response) => {
     }
     const blocked = validateDeletion(accounts, id);
     if (blocked) return res.status(409).json({ message: blocked });
+    // La FK es SetNull: sin este chequeo se desvincularían proveedores en silencio.
+    const linked = await prisma.provider.count({ where: { organizationId, accountId: id } });
+    if (linked > 0) {
+      return res.status(409).json({ message: "No se puede eliminar una cuenta asignada a proveedores" });
+    }
     const result = await prisma.account.deleteMany({ where: { id, organizationId } });
     if (result.count === 0) return res.status(404).json({ message: "Cuenta no encontrada" });
     return res.status(200).json({ message: "Cuenta eliminada" });
@@ -187,8 +201,8 @@ export const seedDefaultAccounts = async (_req: Request, res: Response) => {
 
 /**
  * POST /accounts/import — reemplaza TODO el plan de la org por el importado.
- * Hoy nada referencia a Account por FK (aún no hay asientos), por eso reemplazar
- * es seguro. TODO: cuando existan asientos, bloquear la importación si hay movimientos.
+ * Los proveedores vinculados se re-vinculan por shortCode (o accountingRef si no
+ * tenían cuenta); los que no matchean quedan sin cuenta (SetNull). TODO: cuando existan asientos, bloquear la importación si hay movimientos.
  */
 export const importAccounts = async (req: Request, res: Response) => {
   try {
@@ -196,6 +210,17 @@ export const importAccounts = async (req: Request, res: Response) => {
     const rows = req.body.accounts as ImportAccountRow[];
     const invalid = validateImportRows(rows);
     if (invalid) return res.status(400).json({ message: invalid });
+
+    // Antes de borrar: la cuenta actual de cada proveedor (por shortCode) para
+    // conservar los vínculos al reemplazar el plan.
+    const providers = (
+      await prisma.provider.findMany({
+        where: { organizationId },
+        select: { id: true, accountingRef: true, account: { select: { shortCode: true } } },
+      })
+    ).map((p) => ({ id: p.id, accountingRef: p.accountingRef, currentShortCode: p.account?.shortCode ?? null }));
+    const relinks = planProviderRelinks(providers, rows);
+    let linkedProviders = 0;
 
     await prisma.$transaction(
       async (tx) => {
@@ -217,10 +242,18 @@ export const importAccounts = async (req: Request, res: Response) => {
             normalBalance: r.normalBalance ?? null,
           })),
         });
+        for (const [shortCode, providerIds] of relinks) {
+          const row = rows.find((r) => r.shortCode === shortCode) as ImportAccountRow;
+          const result = await tx.provider.updateMany({
+            where: { organizationId, id: { in: providerIds } },
+            data: { accountId: idByCode.get(row.code) as string },
+          });
+          linkedProviders += result.count;
+        }
       },
       { timeout: 30000 },
     );
-    return res.status(200).json({ imported: rows.length });
+    return res.status(200).json({ imported: rows.length, linkedProviders });
   } catch (error: any) {
     const dup = uniqueViolationMessage(error);
     if (dup) return res.status(409).json({ message: dup });

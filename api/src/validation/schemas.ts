@@ -312,6 +312,8 @@ export const createProviderSchema = z.object({
   email: z.preprocess(blankToNull, z.email().nullable().optional()),
   classification: optionalText,
   accountingRef: optionalText,
+  // Cuenta contable imputable del plan de cuentas (el controller valida org y imputabilidad).
+  accountId: z.preprocess(blankToNull, z.string().uuid("Cuenta contable inválida").nullable().optional()),
   isActive: z.boolean().optional(),
 });
 export const updateProviderSchema = createProviderSchema.partial();

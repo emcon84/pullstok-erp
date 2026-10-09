@@ -62,7 +62,7 @@ export const useSeedDefaultAccounts = () => {
 
 export const useImportAccounts = () => {
   const queryClient = useQueryClient();
-  const mutation = useMutation<{ imported: number }, Error, ImportAccountRow[]>({
+  const mutation = useMutation<{ imported: number; linkedProviders: number }, Error, ImportAccountRow[]>({
     mutationFn: importAccounts,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounts"] }),
   });
