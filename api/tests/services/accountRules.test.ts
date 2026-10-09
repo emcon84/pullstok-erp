@@ -1,4 +1,6 @@
 import {
+  type ImportAccountRow,
+  validateImportRows,
   buildDefaultChartRows,
   descendantIds,
   resolveAccountType,
@@ -81,5 +83,44 @@ describe("buildDefaultChartRows", () => {
     }
     expect(rows.find((r) => r.code === "1")?.type).toBe("ASSET");
     expect(rows.find((r) => r.code === "5.3.01")?.type).toBe("EXPENSE");
+  });
+});
+
+describe("validateImportRows", () => {
+  const row = (over: Partial<ImportAccountRow> & { code: string }): ImportAccountRow => ({
+    name: over.code,
+    type: "ASSET",
+    parentCode: null,
+    isPostable: false,
+    ...over,
+  });
+  const valid: ImportAccountRow[] = [
+    row({ code: "1" }),
+    row({ code: "1.01", parentCode: "1" }),
+    row({ code: "1.01.001", parentCode: "1.01" }),
+    row({ code: "1.01.001.001.000", parentCode: "1.01.001", isPostable: true, shortCode: "1001" }),
+    row({ code: "1.01.001.002.000", parentCode: "1.01.001", isPostable: true, shortCode: "1002" }),
+  ];
+
+  it("acepta un plan válido", () => {
+    expect(validateImportRows(valid)).toBeNull();
+  });
+  it("rechaza códigos duplicados", () => {
+    expect(validateImportRows([...valid, row({ code: "1.01", parentCode: "1" })])).toMatch(/duplicado: 1\.01/);
+  });
+  it("rechaza códigos cortos duplicados", () => {
+    const rows = [...valid.slice(0, 4), row({ code: "1.01.001.002.000", parentCode: "1.01.001", isPostable: true, shortCode: "1001" })];
+    expect(validateImportRows(rows)).toMatch(/corto duplicado: 1001/);
+  });
+  it("rechaza una madre inexistente", () => {
+    expect(validateImportRows([row({ code: "1.01", parentCode: "1" })])).toMatch(/inexistente \(1\)/);
+  });
+  it("rechaza una madre imputable", () => {
+    const rows = [row({ code: "1", isPostable: true }), row({ code: "1.01", parentCode: "1" })];
+    expect(validateImportRows(rows)).toMatch(/madre 1 de 1\.01 no puede ser imputable/);
+  });
+  it("rechaza un tipo distinto al de la madre", () => {
+    const rows = [row({ code: "1" }), row({ code: "1.01", parentCode: "1", type: "INCOME" })];
+    expect(validateImportRows(rows)).toMatch(/mismo tipo.*1\.01|1\.01.*mismo tipo/);
   });
 });

@@ -331,6 +331,25 @@ export const createAccountSchema = z.object({
 });
 export const updateAccountSchema = createAccountSchema.partial();
 
+// Importación masiva del plan (GFLOW): reemplaza todo el plan de la org.
+// El árbol se valida en accountRules.validateImportRows.
+export const importAccountsSchema = z.object({
+  accounts: z
+    .array(
+      z.object({
+        code: z.string().trim().min(1, "El código es requerido").max(50),
+        shortCode: z.preprocess(blankToNull, z.string().max(30).nullable().optional()),
+        name: z.string().trim().min(1, "El nombre es requerido").max(200),
+        type: accountTypeEnum,
+        parentCode: z.preprocess(blankToNull, z.string().max(50).nullable()),
+        isPostable: z.boolean(),
+        normalBalance: z.enum(["DEBIT", "CREDIT"]).nullable().optional(),
+      }),
+    )
+    .min(1, "El plan a importar no tiene cuentas")
+    .max(5000, "El plan a importar supera el máximo de 5000 cuentas"),
+});
+
 // ---------- Ventas ----------
 // saleMode (sdd/venta-alimento-suelto B-08): opcional en el payload —
 // ausente = legado BOLSA_CERRADA. superRefine aplica las reglas por modo:

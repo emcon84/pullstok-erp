@@ -114,3 +114,40 @@ export const buildDefaultChartRows = (): SeedAccountRow[] => {
     };
   });
 };
+
+export interface ImportAccountRow extends SeedAccountRow {
+  shortCode?: string | null;
+  normalBalance?: "DEBIT" | "CREDIT" | null;
+}
+
+/**
+ * Valida un plan importado (p. ej. de GFLOW) antes de reemplazar el actual:
+ * códigos y códigos cortos únicos, madres presentes en el payload y no
+ * imputables, mismo tipo que la madre, y raíces sin madre.
+ */
+export const validateImportRows = (rows: ImportAccountRow[]): string | null => {
+  const byCode = new Map<string, ImportAccountRow>();
+  const shortCodes = new Set<string>();
+  for (const r of rows) {
+    if (byCode.has(r.code)) return `Código duplicado: ${r.code}`;
+    byCode.set(r.code, r);
+    if (r.shortCode) {
+      if (shortCodes.has(r.shortCode)) {
+        return `Código corto duplicado: ${r.shortCode} (cuenta ${r.code})`;
+      }
+      shortCodes.add(r.shortCode);
+    }
+  }
+  for (const r of rows) {
+    if (r.parentCode === null) continue;
+    const parent = byCode.get(r.parentCode);
+    if (!parent) return `La cuenta ${r.code} referencia una cuenta madre inexistente (${r.parentCode})`;
+    if (parent.isPostable) {
+      return `La cuenta madre ${parent.code} de ${r.code} no puede ser imputable`;
+    }
+    if (parent.type !== r.type) {
+      return `La cuenta ${r.code} debe tener el mismo tipo que su cuenta madre ${parent.code}`;
+    }
+  }
+  return null;
+};

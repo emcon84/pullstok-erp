@@ -7,6 +7,7 @@ vi.mock("../components/hooks/useAccounts", () => ({
   useUpdateAccount: vi.fn(),
   useDeleteAccount: vi.fn(),
   useSeedDefaultAccounts: vi.fn(),
+  useImportAccounts: vi.fn(),
 }));
 
 import { ChartOfAccounts } from "../views/ChartOfAccounts";
@@ -16,6 +17,7 @@ import {
   useUpdateAccount,
   useDeleteAccount,
   useSeedDefaultAccounts,
+  useImportAccounts,
 } from "../components/hooks/useAccounts";
 
 const submitAccount = vi.fn();
@@ -49,9 +51,19 @@ beforeEach(() => {
   vi.mocked(useUpdateAccount).mockReturnValue({ updateAccount, loadingUpdate: false } as any);
   vi.mocked(useDeleteAccount).mockReturnValue({ deleteAccount, loadingDelete: false } as any);
   vi.mocked(useSeedDefaultAccounts).mockReturnValue({ seedAccounts, loadingSeed: false } as any);
+  vi.mocked(useImportAccounts).mockReturnValue({ importAccounts: vi.fn(), loadingImport: false } as any);
 });
 
 describe("ChartOfAccounts view", () => {
+  it("muestra 'Importar desde GFLOW' solo al ADMIN", () => {
+    const { unmount } = render(<ChartOfAccounts />);
+    expect(screen.getByRole("button", { name: /Importar desde GFLOW/ })).toBeInTheDocument();
+    unmount();
+    localStorage.setItem("user", JSON.stringify({ role: "MANAGEMENT" }));
+    render(<ChartOfAccounts />);
+    expect(screen.queryByRole("button", { name: /Importar desde GFLOW/ })).not.toBeInTheDocument();
+  });
+
   it("muestra el conteo y el árbol con los rubros raíz abiertos", () => {
     render(<ChartOfAccounts />);
     expect(screen.getByText("4 cuentas registradas")).toBeInTheDocument();

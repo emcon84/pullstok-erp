@@ -3,7 +3,7 @@ import accountController from "../controllers/accountController";
 import { authenticateJWT, requireRole } from "../middlewares/authMiddleware";
 import { checkBusinessHours } from "../middlewares/checkBusinessHours";
 import { validate } from "../middlewares/validate";
-import { createAccountSchema, updateAccountSchema } from "../validation/schemas";
+import { createAccountSchema, importAccountsSchema, updateAccountSchema } from "../validation/schemas";
 
 const router = Router();
 
@@ -18,6 +18,15 @@ router.post(
   checkBusinessHours,
   requireRole("ADMIN"),
   accountController.seedDefaultAccounts,
+);
+// Reemplaza el plan completo (importación GFLOW), solo ADMIN; también antes de "/:id".
+router.post(
+  "/import",
+  authenticateJWT,
+  checkBusinessHours,
+  requireRole("ADMIN"),
+  validate(importAccountsSchema),
+  accountController.importAccounts,
 );
 router.post(
   "/",

@@ -15,6 +15,8 @@ export interface Account {
   /** Imputable: solo las cuentas hoja reciben asientos. */
   isPostable: boolean;
   isActive: boolean;
+  /** Saldo normal (importado de GFLOW); null si no se informó. */
+  normalBalance?: "DEBIT" | "CREDIT" | null;
 }
 
 /** Payload de alta/edición. En edición, shortCode "" lo limpia y parentId null la vuelve raíz. */
@@ -95,5 +97,32 @@ export const seedDefaultAccounts = async (): Promise<{ count: number }> => {
     return res.data;
   } catch (error) {
     return fail(error, "Error al cargar el plan de cuentas base");
+  }
+};
+
+/** Fila del plan a importar (parentCode en vez de parentId: el backend resuelve la jerarquía). */
+export interface ImportAccountRow {
+  code: string;
+  shortCode: string | null;
+  name: string;
+  type: AccountType;
+  parentCode: string | null;
+  isPostable: boolean;
+  normalBalance: "DEBIT" | "CREDIT" | null;
+}
+
+/** POST /accounts/import — REEMPLAZA el plan de cuentas de la organización (solo ADMIN). */
+export const importAccounts = async (
+  accounts: ImportAccountRow[],
+): Promise<{ imported: number }> => {
+  try {
+    const res = await axios.post<{ imported: number }>(
+      `${API_URL}/accounts/import`,
+      { accounts },
+      { headers: authHeaders() },
+    );
+    return res.data;
+  } catch (error) {
+    return fail(error, "Error al importar el plan de cuentas");
   }
 };

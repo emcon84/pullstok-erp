@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
   ListTree,
+  Upload,
   Pencil,
   Plus,
   Search,
@@ -36,8 +37,11 @@ import {
   useUpdateAccount,
   useDeleteAccount,
   useSeedDefaultAccounts,
+  useImportAccounts,
 } from "../components/hooks/useAccounts";
-import type { Account, AccountType } from "../services/accounts";
+import type { Account, AccountType, ImportAccountRow } from "../services/accounts";
+import { GflowImportDialog } from "../components/molecules/GflowImportDialog";
+import { readGflowFile } from "../utils/gflowChartOfAccounts";
 import {
   childrenMap,
   flattenTree,
@@ -89,14 +93,33 @@ const readCanWrite = () => {
   }
 };
 
+// La importación reemplaza el plan completo: el backend la limita a ADMIN.
+const readIsAdmin = () => {
+  try {
+    return JSON.parse(localStorage.getItem("user") ?? "null")?.role === "ADMIN";
+  } catch {
+    return false;
+  }
+};
+
+interface GflowPreview {
+  fileName: string;
+  accounts: ImportAccountRow[];
+  errors: string[];
+}
+
 export const ChartOfAccounts = () => {
   const { accounts, loadingAccounts, errorAccounts } = useAccounts();
   const { submitAccount, loadingCreate } = useCreateAccount();
   const { updateAccount, loadingUpdate } = useUpdateAccount();
   const { deleteAccount } = useDeleteAccount();
   const { seedAccounts, loadingSeed } = useSeedDefaultAccounts();
+  const { importAccounts, loadingImport } = useImportAccounts();
 
   const canWrite = useMemo(readCanWrite, []);
+  const isAdmin = useMemo(readIsAdmin, []);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [gflowPreview, setGflowPreview] = useState<GflowPreview | null>(null);
   const [search, setSearch] = useState("");
   // null = estado por defecto (solo los rubros raíz abiertos).
   const [expandedState, setExpandedState] = useState<Set<string> | null>(null);
@@ -241,6 +264,29 @@ export const ChartOfAccounts = () => {
       onError: (error) => toast.error(`Error al cargar el plan base: ${error.message}`),
     });
 
+  const handleGflowFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite volver a elegir el mismo archivo
+    if (!file) return;
+    try {
+      const { accounts: parsed, errors } = await readGflowFile(file);
+      setGflowPreview({ fileName: file.name, accounts: parsed, errors });
+    } catch {
+      toast.error("No se pudo leer el archivo de GFLOW");
+    }
+  };
+
+  const confirmGflowImport = () => {
+    if (!gflowPreview) return;
+    importAccounts(gflowPreview.accounts, {
+      onSuccess: (r) => {
+        toast.success(`Plan importado (${r.imported} cuentas)`);
+        setGflowPreview(null);
+      },
+      onError: (error) => toast.error(`Error al importar el plan: ${error.message}`),
+    });
+  };
+
   if (loadingAccounts) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -268,13 +314,42 @@ export const ChartOfAccounts = () => {
             {total} cuenta{total === 1 ? "" : "s"} registrada{total === 1 ? "" : "s"}
           </p>
         </div>
-        {canWrite && (
-          <Button onClick={() => openCreate()}>
-            <Plus className="h-4 w-4" />
-            Agregar cuenta
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {isAdmin && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xls,.xlsx"
+                className="hidden"
+                aria-label="Archivo de GFLOW"
+                data-testid="gflow-file-input"
+                onChange={handleGflowFile}
+              />
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-4 w-4" />
+                Importar desde GFLOW
+              </Button>
+            </>
+          )}
+          {canWrite && (
+            <Button onClick={() => openCreate()}>
+              <Plus className="h-4 w-4" />
+              Agregar cuenta
+            </Button>
+          )}
+        </div>
       </div>
+
+      <GflowImportDialog
+        open={gflowPreview !== null}
+        fileName={gflowPreview?.fileName ?? ""}
+        accounts={gflowPreview?.accounts ?? []}
+        errors={gflowPreview?.errors ?? []}
+        loading={loadingImport}
+        onConfirm={confirmGflowImport}
+        onCancel={() => setGflowPreview(null)}
+      />
 
       {total > 0 && (
         <div className="flex flex-col gap-2 sm:flex-row">

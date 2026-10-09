@@ -5,10 +5,12 @@ import { requireOrganizationId } from "../config/tenantContext";
 import {
   buildDefaultChartRows,
   resolveAccountType,
+  validateImportRows,
   validateDeletion,
   validateParentCanHaveChildren,
   validatePostableChange,
   validateReparent,
+  type ImportAccountRow,
 } from "../services/accountRules";
 
 const uniqueViolationMessage = (error: any): string | null => {
@@ -183,11 +185,56 @@ export const seedDefaultAccounts = async (_req: Request, res: Response) => {
   }
 };
 
+/**
+ * POST /accounts/import — reemplaza TODO el plan de la org por el importado.
+ * Hoy nada referencia a Account por FK (aún no hay asientos), por eso reemplazar
+ * es seguro. TODO: cuando existan asientos, bloquear la importación si hay movimientos.
+ */
+export const importAccounts = async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrganizationId();
+    const rows = req.body.accounts as ImportAccountRow[];
+    const invalid = validateImportRows(rows);
+    if (invalid) return res.status(400).json({ message: invalid });
+
+    await prisma.$transaction(
+      async (tx) => {
+        // parentId → null primero: la autorrelación es ON DELETE RESTRICT y un
+        // único deleteMany sobre una jerarquía puede fallar según el orden.
+        await tx.account.updateMany({ where: { organizationId }, data: { parentId: null } });
+        await tx.account.deleteMany({ where: { organizationId } });
+        const idByCode = new Map(rows.map((r) => [r.code, randomUUID()]));
+        await tx.account.createMany({
+          data: rows.map((r) => ({
+            id: idByCode.get(r.code) as string,
+            organizationId,
+            code: r.code,
+            shortCode: r.shortCode || null,
+            name: r.name,
+            type: r.type,
+            parentId: r.parentCode ? (idByCode.get(r.parentCode) as string) : null,
+            isPostable: r.isPostable,
+            normalBalance: r.normalBalance ?? null,
+          })),
+        });
+      },
+      { timeout: 30000 },
+    );
+    return res.status(200).json({ imported: rows.length });
+  } catch (error: any) {
+    const dup = uniqueViolationMessage(error);
+    if (dup) return res.status(409).json({ message: dup });
+    console.error("Error importando plan de cuentas:", error);
+    return res.status(500).json({ message: "Error al importar el plan de cuentas" });
+  }
+};
+
 const accountController = {
   listAccounts,
   createAccount,
   updateAccount,
   deleteAccount,
   seedDefaultAccounts,
+  importAccounts,
 };
 export default accountController;

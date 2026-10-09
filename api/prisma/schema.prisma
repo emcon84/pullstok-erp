@@ -366,6 +366,13 @@ enum AccountType {
   EXPENSE
 }
 
+// Naturaleza del saldo normal de una cuenta imputable (importada de GFLOW:
+// Deudor/Acreedor). Nula en cuentas no imputables o cargadas a mano.
+enum AccountNormalBalance {
+  DEBIT
+  CREDIT
+}
+
 model Account {
   id             String       @id @default(uuid())
   organizationId String
@@ -379,6 +386,7 @@ model Account {
   children       Account[]    @relation("AccountHierarchy")
   isPostable     Boolean      @default(false)
   isActive       Boolean      @default(true)
+  normalBalance  AccountNormalBalance?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

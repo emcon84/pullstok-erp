@@ -5,6 +5,8 @@ import {
   updateAccount,
   deleteAccount,
   seedDefaultAccounts,
+  importAccounts,
+  type ImportAccountRow,
   type Account,
   type AccountInput,
 } from "../../services/accounts";
@@ -56,4 +58,13 @@ export const useSeedDefaultAccounts = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounts"] }),
   });
   return { seedAccounts: mutation.mutate, loadingSeed: mutation.isPending };
+};
+
+export const useImportAccounts = () => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation<{ imported: number }, Error, ImportAccountRow[]>({
+    mutationFn: importAccounts,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+  });
+  return { importAccounts: mutation.mutate, loadingImport: mutation.isPending };
 };
