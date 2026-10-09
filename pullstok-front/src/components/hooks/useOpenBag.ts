@@ -4,6 +4,7 @@ import { getPriceKgPlan } from "@/services/priceKgPlan";
 import { listPriceKgTypes } from "@/services/priceKgTypes";
 import { listPriceKgBrands } from "@/services/priceKgBrands";
 import { openBag, type OpenBagResult } from "@/services/looseStock";
+import { fullCellLabel, type LooseCell } from "@/lib/openBagCells";
 import { NativeSelectOption } from "@/components/ui/native-select";
 
 export interface ProductScanResult {
@@ -21,6 +22,8 @@ export interface ProductScanResult {
 
 export interface UseOpenBagResult {
   cellOptions: NativeSelectOption[];
+  /** Structured cells (same order as cellOptions) for brand/type matching. */
+  cells: LooseCell[];
   loadingCells: boolean;
   searchProduct: (barcode: string) => Promise<ProductScanResult>;
   openBag: (productId: string, priceKgPriceId: string) => Promise<OpenBagResult>;
@@ -29,12 +32,6 @@ export interface UseOpenBagResult {
   clearError: () => void;
 }
 
-const SPECIES_LABELS: Record<string, string> = {
-  PERRO: "Perro",
-  GATO: "Gato",
-  AMBOS: "Perros y gatos",
-};
-
 /**
  * Hook for the "Abrir bolsa" flow in UnifiedPos.
  * Encapsulates: loading cell options (plan + types + brands), product search via /by-scan,
@@ -42,6 +39,7 @@ const SPECIES_LABELS: Record<string, string> = {
  */
 export function useOpenBag({ branchId }: { branchId: string }): UseOpenBagResult {
   const [cellOptions, setCellOptions] = useState<NativeSelectOption[]>([]);
+  const [cells, setCells] = useState<LooseCell[]>([]);
   const [loadingCells, setLoadingCells] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -64,20 +62,28 @@ export function useOpenBag({ branchId }: { branchId: string }): UseOpenBagResult
         const typeById = new Map(types.map((t) => [t.id, t]));
         const brandById = new Map(brands.map((b) => [b.id, b]));
 
-        const options: NativeSelectOption[] = plan.map((cell) => {
-          const brandName = brandById.get(cell.brandId)?.name ?? "";
-          const typeName = typeById.get(cell.typeId)?.name ?? "";
-          const speciesLabel = SPECIES_LABELS[cell.species] ?? cell.species;
-          const label = `${brandName} · ${typeName} · ${speciesLabel}${
-            cell.priceKg ? ` — $${cell.priceKg.toLocaleString("es-AR")}/kg` : ""
-          }`;
-          return { value: cell.id, label };
+        const structured: LooseCell[] = plan.map((cell) => {
+          const brand = brandById.get(cell.brandId);
+          const type = typeById.get(cell.typeId);
+          const base = {
+            id: cell.id,
+            brandName: brand?.name ?? "",
+            brandKeywords: brand?.keywords ?? [],
+            typeName: type?.name ?? "",
+            typeSynonyms: type?.synonyms ?? [],
+            species: cell.species,
+            priceKg: cell.priceKg ?? null,
+          };
+          return { ...base, label: fullCellLabel(base) };
         });
+        const options: NativeSelectOption[] = structured.map((c) => ({ value: c.id, label: c.label }));
 
+        setCells(structured);
         setCellOptions(options);
       } catch {
         if (mounted) {
           setCellOptions([]);
+          setCells([]);
         }
       } finally {
         if (mounted) {
@@ -201,6 +207,7 @@ export function useOpenBag({ branchId }: { branchId: string }): UseOpenBagResult
 
   return {
     cellOptions,
+    cells,
     loadingCells,
     searchProduct,
     openBag: openBagFn,

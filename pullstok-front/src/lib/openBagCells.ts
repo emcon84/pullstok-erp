@@ -21,6 +21,23 @@ export interface CellSuggestion {
 
 const MAX_RUN = 4;
 
+export const SPECIES_LABELS: Record<string, string> = {
+  PERRO: "Perro",
+  GATO: "Gato",
+  AMBOS: "Perros y gatos",
+};
+
+const priceSuffix = (priceKg: number | null): string =>
+  priceKg ? ` — $${priceKg.toLocaleString("es-AR")}/kg` : "";
+
+/** Full select label: "Brand · Type · Species — $/kg". */
+export const fullCellLabel = (c: Pick<LooseCell, "brandName" | "typeName" | "species" | "priceKg">): string =>
+  `${c.brandName} · ${c.typeName} · ${SPECIES_LABELS[c.species] ?? c.species}${priceSuffix(c.priceKg)}`;
+
+/** Compact pill label (brand is already known): "Type · Species — $/kg". */
+export const compactCellLabel = (c: Pick<LooseCell, "typeName" | "species" | "priceKg">): string =>
+  `${c.typeName} · ${SPECIES_LABELS[c.species] ?? c.species}${priceSuffix(c.priceKg)}`;
+
 /** Lowercase, accent-free, alphanumeric tokens. */
 const tokenize = (s: string): string[] =>
   s

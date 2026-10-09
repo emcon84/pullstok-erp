@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PackageOpen, Search } from "lucide-react";
 import { toast } from "react-toastify";
 import { useOpenBag } from "@/components/hooks/useOpenBag";
+import { compactCellLabel, suggestLooseCells } from "@/lib/openBagCells";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +45,7 @@ export const OpenBagDialog = ({
 }: OpenBagDialogProps) => {
   const {
     cellOptions,
+    cells = [],
     loadingCells,
     searchProduct,
     openBag,
@@ -119,6 +122,15 @@ export const OpenBagDialog = ({
     setBarcode(initialBarcode);
     void lookupRef.current(initialBarcode);
   }, [open, initialBarcode]);
+
+  // Loose cells that probably belong to the scanned product (brand from its name).
+  const suggested = useMemo(
+    () =>
+      scannedProduct
+        ? suggestLooseCells(scannedProduct.name, scannedProduct.category?.name, cells)
+        : { cells: [], brandMatched: false },
+    [scannedProduct, cells],
+  );
 
   const handleConfirm = useCallback(async () => {
     if (!scannedProduct || !selectedCellId || submitting) return;
@@ -226,13 +238,47 @@ export const OpenBagDialog = ({
             <Label htmlFor="cell-select" className="text-sm font-medium">
               Celda destino
             </Label>
+            {suggested.cells.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Sugeridas para {suggested.cells[0].brandName}
+                </p>
+                <div role="radiogroup" aria-label="Celdas sugeridas" className="flex flex-wrap gap-2">
+                  {suggested.cells.map((c) => {
+                    const checked = selectedCellId === c.id;
+                    const prominent = suggested.cells.length === 1;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={checked}
+                        data-prominent={prominent ? "true" : undefined}
+                        onClick={() => setSelectedCellId(c.id)}
+                        disabled={submitting}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                          checked
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : prominent
+                              ? "border-primary text-primary ring-2 ring-primary/40 font-medium hover:bg-primary/10"
+                              : "border-input hover:bg-accent",
+                        )}
+                      >
+                        {compactCellLabel(c)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <SearchableSelect
               id="cell-select"
               ariaLabel="Celda destino para abrir bolsa"
               value={selectedCellId}
               onValueChange={setSelectedCellId}
               options={cellOptions}
-              placeholder="Seleccioná una celda"
+              placeholder={suggested.cells.length > 0 ? "Otra celda…" : "Seleccioná una celda"}
               searchPlaceholder="Buscar marca, tipo o especie…"
               emptyMessage="Sin celdas que coincidan"
               disabled={!scannedProduct || loadingCells}
