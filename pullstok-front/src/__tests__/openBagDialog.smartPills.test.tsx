@@ -143,7 +143,12 @@ describe("OpenBagDialog — smart cell pills", () => {
     const pills = await screen.findAllByRole("radio");
     expect(pills).toHaveLength(1);
     expect(pills[0]).toHaveTextContent("DOG CHOW RP · Adulto · Perro — $3.800/kg");
-    expect(screen.getByText("Sugeridas para DOG CHOW RP")).toBeInTheDocument();
+    // The brand must be easy to read: it is the main clue of which cell is the right one.
+    const brand = screen.getByTestId("suggested-brand");
+    expect(brand).toHaveTextContent("DOG CHOW RP");
+    expect(brand.className).toContain("font-semibold");
+    expect(brand.className).toContain("text-foreground");
+    expect(screen.getByText(/Sugeridas para/)).toBeInTheDocument();
 
     fireEvent.click(pills[0]);
     await waitFor(() => expect(openBag).toHaveBeenCalledWith("p1", "dcrp-ad"));

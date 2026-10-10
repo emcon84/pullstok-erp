@@ -311,8 +311,11 @@ export const OpenBagDialog = ({
             </Label>
             {suggested.cells.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">
-                  Sugeridas para {suggested.cells[0].brandName}
+                <p className="text-sm text-muted-foreground">
+                  Sugeridas para{" "}
+                  <span data-testid="suggested-brand" className="text-base font-semibold text-foreground">
+                    {suggested.cells[0].brandName}
+                  </span>
                 </p>
                 <div
                   ref={pillsGroupRef}
@@ -338,7 +341,7 @@ export const OpenBagDialog = ({
                         }}
                         disabled={submitting || loading || loadingCells}
                         className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                          "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-base transition-colors",
                           checked
                             ? "border-primary bg-primary text-primary-foreground"
                             : prominent
