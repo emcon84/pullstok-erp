@@ -6,6 +6,7 @@
 - **Opus** → SOLO arquitectura compleja, debugging difícil o decisiones de diseño grandes. AVISAR antes ("esto amerita Opus"); el usuario sube con `/model opus` y vuelve a Sonnet.
 
 ## Hábitos siempre activos
+- **Pull de main antes de trabajar**: al arrancar cualquier tarea, `git fetch` + pull de `main` (se trabaja desde dos PCs). Volver a chequear `origin/main` antes de iniciar la revisión RDD y antes del push: si avanzó, integrar primero y revisar después (si no, el gate pre-push queda invalidado).
 - **Engram religioso**: `mem_save` proactivo tras cada decisión/fix/milestone + `mem_session_summary` antes de cerrar. Nada se pierde si se cuelga la sesión.
 - **Cerrar sesiones** tras bloques lógicos (no dejarlas abiertas días → contexto gigante = caro).
 - **Screenshots con moderación**: leer imágenes es caro en tokens; verificar visualmente solo en hitos.
