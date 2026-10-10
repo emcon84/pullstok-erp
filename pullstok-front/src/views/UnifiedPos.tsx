@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Landmark, ShoppingCart, PackageOpen, PackagePlus, Minus, Plus, Scale } from "lucide-react";
+import { Landmark, ShoppingCart, PackageOpen, PackagePlus, Minus, Plus, Scale, AlertTriangle } from "lucide-react";
 import { toast } from "react-toastify";
 import { API_URL } from "@/constants";
 import { VendorCatalogTab } from "@/components/organisms/VendorCatalogTab";
@@ -10,6 +10,7 @@ import { useVendorCart, type FreeLineInput } from "@/components/hooks/useVendorC
 import { useVendorCheckout } from "@/components/hooks/useVendorCheckout";
 import { useGetCurrentCashSession } from "@/components/hooks/useCashSession";
 import { VendorOrderPanel, type VendorOrderPanelApi } from "@/components/molecules/VendorOrderPanel";
+import { weightKgOf } from "@/utils/planillaGroups";
 import { OpenBagDialog } from "@/components/molecules/OpenBagDialog";
 import { AssignBarcodeDialog } from "@/components/molecules/AssignBarcodeDialog";
 import { ManualProductDialog } from "@/components/molecules/ManualProductDialog";
@@ -62,6 +63,7 @@ interface ScannedProduct {
   category?: { name?: string } | null;
   quantity?: number | string;
   priceKgSuelto?: number | null;
+  weightKg?: number | null;
   unitsPerBox?: number | null;
   wholesalePrice?: number | string | null;
   // sdd/product-presentations
@@ -414,6 +416,13 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
   // línea se agrega POR_UNIDAD_BLISTER con el conteo ad-hoc de piecesPerBlister;
   // requiere piecesPerBlister entero > 1 (mismo criterio que el server, T1).
   const isFarmacia = isFarmaciaProduct(scanProduct);
+  // Weighed food bag (name says "X <n> KG") with no weight configured: it can't
+  // be opened or sold loose, so warn the seller instead of silently hiding the button.
+  const nameWeightKg = scanProduct ? weightKgOf(scanProduct.name) : Infinity;
+  const missingWeightKg =
+    scanProduct && !scanProduct.isManual && !(Number(scanProduct.weightKg) > 0) && Number.isFinite(nameWeightKg)
+      ? nameWeightKg
+      : null;
   const canOpenBagFromScan =
     scanProduct?.priceKgSuelto != null && !!(scanProduct.barcode || scanProduct.code);
   const isBlisterSale = isFarmacia && sellLooseBlister;
@@ -755,6 +764,22 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
                 <span className="font-medium text-foreground">{scanProduct.barcode}</span>
               </p>
             )}
+          </div>
+        )}
+
+        {missingWeightKg != null && (
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">Falta cargar el peso</p>
+              <p>
+                Este producto no tiene el peso cargado (en el nombre figura {missingWeightKg} kg), por eso no se
+                puede abrir bolsa ni vender suelto. Cargalo desde Productos.
+              </p>
+            </div>
           </div>
         )}
 
