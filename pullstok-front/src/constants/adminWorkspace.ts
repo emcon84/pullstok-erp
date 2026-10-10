@@ -6,6 +6,7 @@ import {
   Briefcase,
   Building,
   Calculator,
+  CalendarRange,
   CreditCard,
   Factory,
   HandCoins,
@@ -158,6 +159,13 @@ export const ADMIN_WORKSPACE_AREAS: AdminWorkspaceArea[] = [
     label: "Contabilidad",
     icon: Calculator,
     items: [
+      {
+        key: "ejercicios",
+        label: "Ejercicios",
+        description: "Apertura y cierre de ejercicios contables",
+        icon: CalendarRange,
+        available: false,
+      },
       {
         key: "asientos",
         label: "Asientos",
