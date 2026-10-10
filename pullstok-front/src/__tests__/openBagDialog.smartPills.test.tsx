@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 
 const searchProduct = vi.fn();
 const openBag = vi.fn();
@@ -148,5 +148,144 @@ describe("OpenBagDialog — smart cell pills", () => {
     fireEvent.click(pills[0]);
     await waitFor(() => expect(openBag).toHaveBeenCalledWith("p1", "dcrp-ad"));
     expect(openBag).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("OpenBagDialog — number key shortcuts", () => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const press = (key: string, init: KeyboardEventInit = {}) =>
+    fireEvent.keyDown(window, { key, code: /^\d$/.test(key) ? `Digit${key}` : key, ...init });
+  // Product result shown + the post-render quiet period elapsed.
+  const showPills = async (name = "Excellent Perro 15kg") => {
+    searchProduct.mockResolvedValue(scan(name));
+    render(<OpenBagDialog branchId="b" open onOpenChange={() => {}} initialBarcode="B1" />);
+    const pills = await screen.findAllByRole("radio");
+    await act(async () => {
+      await sleep(160);
+    });
+    return pills;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    openBag.mockResolvedValue({ priceKgPriceId: "ex-ad-dog" });
+  });
+
+  it("numbers the pills with a badge and shows the hint", async () => {
+    const pills = await showPills();
+    expect(pills[0]).toHaveTextContent(/^1/);
+    expect(pills[1]).toHaveTextContent(/^2/);
+    expect(screen.getByText("Tocá o presioná el número")).toBeInTheDocument();
+  });
+
+  it("opens the second pill's cell when 2 is pressed once", async () => {
+    await showPills();
+    press("2");
+    await waitFor(() => expect(openBag).toHaveBeenCalledWith("p1", "ex-cach-dog"));
+    await act(async () => {
+      await sleep(200);
+    });
+    expect(openBag).toHaveBeenCalledTimes(1);
+  });
+
+  it("works with the numpad and with a single pill via 1", async () => {
+    await showPills("Excellent Cachorro Puppy 15kg");
+    press("1", { code: "Numpad1" });
+    await waitFor(() => expect(openBag).toHaveBeenCalledWith("p1", "ex-cach-dog"));
+  });
+
+  it("does not fire when another key arrives inside the burst window", async () => {
+    await showPills();
+    press("2");
+    press("5");
+    await act(async () => {
+      await sleep(300);
+    });
+    expect(openBag).not.toHaveBeenCalled();
+  });
+
+  it("does not fire when Enter follows the digit (scanner burst)", async () => {
+    await showPills();
+    press("2");
+    press("Enter");
+    await act(async () => {
+      await sleep(300);
+    });
+    expect(openBag).not.toHaveBeenCalled();
+  });
+
+  it("ignores digits typed into the barcode input before a result is shown", async () => {
+    searchProduct.mockResolvedValue(scan("Excellent Perro 15kg"));
+    render(<OpenBagDialog branchId="b" open onOpenChange={() => {}} />);
+    const input = screen.getByPlaceholderText(PLACEHOLDER);
+    fireEvent.keyDown(input, { key: "2", code: "Digit2" });
+    await act(async () => {
+      await sleep(250);
+    });
+    expect(openBag).not.toHaveBeenCalled();
+  });
+
+  it("moves focus off the barcode input once a product is found", async () => {
+    await showPills();
+    expect(screen.getByPlaceholderText(PLACEHOLDER)).not.toHaveFocus();
+  });
+
+  it("ignores a digit while an editable field has focus", async () => {
+    await showPills();
+    screen.getByPlaceholderText(PLACEHOLDER).focus();
+    press("2");
+    await act(async () => {
+      await sleep(250);
+    });
+    expect(openBag).not.toHaveBeenCalled();
+  });
+
+  it("ignores numbers beyond the pill count, modifiers and key repeat", async () => {
+    await showPills();
+    press("3");
+    await act(async () => {
+      await sleep(250);
+    });
+    press("1", { ctrlKey: true });
+    await act(async () => {
+      await sleep(250);
+    });
+    press("1", { repeat: true });
+    await act(async () => {
+      await sleep(250);
+    });
+    expect(openBag).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when there are no pills", async () => {
+    searchProduct.mockResolvedValue(scan("Whiskas Atun 1kg"));
+    render(<OpenBagDialog branchId="b" open onOpenChange={() => {}} initialBarcode="B1" />);
+    await screen.findByText("Whiskas Atun 1kg");
+    await act(async () => {
+      await sleep(160);
+    });
+    press("1");
+    await act(async () => {
+      await sleep(250);
+    });
+    expect(openBag).not.toHaveBeenCalled();
+    expect(screen.queryByText("Tocá o presioná el número")).toBeNull();
+  });
+
+  it("is disabled while a bag is being opened", async () => {
+    await showPills();
+    let resolve!: (v: unknown) => void;
+    openBag.mockReturnValue(new Promise((r) => (resolve = r)));
+    fireEvent.click(screen.getAllByRole("radio")[0]);
+    await waitFor(() => expect(screen.getAllByRole("radio")[0]).toBeDisabled());
+    await act(async () => {
+      await sleep(160);
+    });
+    press("2");
+    await act(async () => {
+      await sleep(250);
+    });
+    expect(openBag).toHaveBeenCalledTimes(1);
+    resolve({ priceKgPriceId: "ex-ad-dog" });
   });
 });

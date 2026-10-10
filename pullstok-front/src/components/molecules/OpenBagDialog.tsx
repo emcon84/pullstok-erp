@@ -26,6 +26,25 @@ interface OpenBagDialogProps {
   initialBarcode?: string;
 }
 
+/** Max pills reachable with a single number key (1..9). */
+const MAX_SHORTCUT_PILLS = 9;
+/**
+ * A deliberate key press fires only after this quiet window. A scanner burst
+ * (or a multi-digit entry) sends further keydowns inside it and cancels the pick.
+ */
+const SHORTCUT_BURST_GUARD_MS = 120;
+
+const isEditableTarget = (el: Element | null): boolean => {
+  if (!el) return false;
+  const tag = el.tagName;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    (el as HTMLElement).isContentEditable === true
+  );
+};
+
 interface ScannedProductDisplay {
   id: string;
   name: string;
@@ -59,6 +78,7 @@ export const OpenBagDialog = ({
   const [barcode, setBarcode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const pillsGroupRef = useRef<HTMLDivElement>(null);
 
   // Focus barcode input when dialog opens
   useEffect(() => {
@@ -153,6 +173,55 @@ export const OpenBagDialog = ({
     }
   }, [scannedProduct, selectedCellId, submitting, openBag, cellOptions, onSuccess, onOpenChange]);
 
+  const pills = useMemo(() => suggested.cells.slice(0, MAX_SHORTCUT_PILLS), [suggested.cells]);
+  const shortcutsActive =
+    open && !!scannedProduct && pills.length > 0 && !loading && !submitting && !loadingCells;
+
+  // Hand focus to the pills once a product is found, so later digits are not
+  // typed into the barcode input (and an editable field never swallows a pick).
+  const hasPills = pills.length > 0;
+  useEffect(() => {
+    if (open && scannedProduct && hasPills) pillsGroupRef.current?.focus();
+  }, [open, scannedProduct, hasPills]);
+
+  const pickRef = useRef<(cellId: string) => void>(() => {});
+  pickRef.current = (cellId: string) => {
+    setSelectedCellId(cellId);
+    void handleConfirm(cellId);
+  };
+
+  // 1..9 picks the matching pill, but only for a deliberate single press.
+  useEffect(() => {
+    if (!shortcutsActive) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Starts "just now": a digit right after the result renders is likely scanner tail.
+    let lastKeyAt = Date.now();
+    const cancel = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      const now = Date.now();
+      const quiet = now - lastKeyAt >= SHORTCUT_BURST_GUARD_MS;
+      lastKeyAt = now;
+      cancel();
+      if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+      if (!/^[1-9]$/.test(e.key) || !quiet) return;
+      const pill = pills[Number(e.key) - 1];
+      if (!pill) return;
+      if (isEditableTarget(document.activeElement)) return;
+      timer = setTimeout(() => {
+        timer = null;
+        pickRef.current(pill.id);
+      }, SHORTCUT_BURST_GUARD_MS);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      cancel();
+    };
+  }, [shortcutsActive, pills]);
+
   const handleCancel = useCallback(() => {
     onOpenChange(false);
   }, [onOpenChange]);
@@ -245,8 +314,14 @@ export const OpenBagDialog = ({
                 <p className="text-xs text-muted-foreground">
                   Sugeridas para {suggested.cells[0].brandName}
                 </p>
-                <div role="radiogroup" aria-label="Celdas sugeridas" className="flex flex-wrap gap-2">
-                  {suggested.cells.map((c) => {
+                <div
+                  ref={pillsGroupRef}
+                  tabIndex={-1}
+                  role="radiogroup"
+                  aria-label="Celdas sugeridas"
+                  className="flex flex-wrap gap-2 outline-none"
+                >
+                  {suggested.cells.map((c, index) => {
                     const checked = selectedCellId === c.id;
                     const prominent = suggested.cells.length === 1;
                     return (
@@ -255,6 +330,7 @@ export const OpenBagDialog = ({
                         type="button"
                         role="radio"
                         aria-checked={checked}
+                        aria-keyshortcuts={index < MAX_SHORTCUT_PILLS ? String(index + 1) : undefined}
                         data-prominent={prominent ? "true" : undefined}
                         onClick={() => {
                           setSelectedCellId(c.id);
@@ -262,7 +338,7 @@ export const OpenBagDialog = ({
                         }}
                         disabled={submitting || loading || loadingCells}
                         className={cn(
-                          "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
                           checked
                             ? "border-primary bg-primary text-primary-foreground"
                             : prominent
@@ -270,11 +346,20 @@ export const OpenBagDialog = ({
                               : "border-input hover:bg-accent",
                         )}
                       >
+                        {index < MAX_SHORTCUT_PILLS && (
+                          <kbd
+                            aria-hidden="true"
+                            className="rounded border border-current/30 px-1 text-[10px] font-mono leading-4 opacity-70"
+                          >
+                            {index + 1}
+                          </kbd>
+                        )}
                         {c.brandName !== suggested.genericBrandName ? fullCellLabel(c) : compactCellLabel(c)}
                       </button>
                     );
                   })}
                 </div>
+                <p className="text-xs text-muted-foreground">Tocá o presioná el número</p>
               </div>
             )}
             <SearchableSelect
