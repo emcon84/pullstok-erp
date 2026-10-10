@@ -88,7 +88,7 @@ export const SidebarContent = ({
   // VENDEDOR usa el menú plano simple solo en modo operativo.
   const useVendorNav = role === "VENDEDOR" && !isAdminMode;
   const flatItems: NavItem[] = useVendorNav
-    ? vendorSimpleNav
+    ? filterNavItemsByModules(vendorSimpleNav, effectiveModules)
     : visibleGroups.flatMap((g) => g.items);
 
   // Auto-open group containing the current route
@@ -221,7 +221,7 @@ export const SidebarContent = ({
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
         {useVendorNav ? (
           <div className="space-y-1">
-            {vendorSimpleNav.map(({ to, label, icon: Icon }) => {
+            {flatItems.map(({ to, label, icon: Icon }) => {
               const count = badgeCount(to);
               return (
                 <NavLink

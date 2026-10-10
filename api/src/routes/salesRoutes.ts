@@ -18,14 +18,14 @@ router.post(
 router.get("/", authenticateJWT, checkBusinessHours, SaleController.getAllSales);
 router.get("/:id", authenticateJWT, checkBusinessHours, SaleController.getSaleById);
 
-// Elimina una venta: solo ADMIN/MANAGEMENT. Restaura el stock y revierte el
+// Elimina una venta: solo ADMIN/MANAGEMENT/VENDEDOR. Restaura el stock y revierte el
 // pedido asociado a PENDING. Una venta con factura (cualquier estado) queda
 // protegida → 409 SALE_ALREADY_INVOICED.
 router.delete(
   "/:id",
   authenticateJWT,
   checkBusinessHours,
-  requireRole("ADMIN", "MANAGEMENT"),
+  requireRole("ADMIN", "MANAGEMENT", "VENDEDOR"),
   SaleController.deleteSale,
 );
 

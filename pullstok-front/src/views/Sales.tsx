@@ -1,4 +1,5 @@
 import { useState, useMemo, ChangeEvent } from "react";
+import { canDeleteSaleRole } from "@/constants/rolePermissions";
 import { useNavigate, Link } from "react-router-dom";
 import DateObject from "react-date-object";
 import { Plus, Search, Loader2 } from "lucide-react";
@@ -212,7 +213,7 @@ export const SalesPage = () => {
     }
   };
 
-  // Eliminar venta: solo ADMIN/MANAGEMENT (mismo policy que el backend
+  // Eliminar venta: ADMIN/MANAGEMENT/VENDEDOR (mismo policy que el backend
   // requireRole). El rol sale de localStorage (mismo patrón que Dashboard).
   const currentUser = useMemo(() => {
     const raw = localStorage.getItem("user");
@@ -223,8 +224,7 @@ export const SalesPage = () => {
       return null;
     }
   }, []);
-  const canDeleteSale =
-    currentUser?.role === "ADMIN" || currentUser?.role === "MANAGEMENT";
+  const canDeleteSale = canDeleteSaleRole(currentUser?.role);
 
   const handleDeleteSale = (sale: Sale) => {
     const saleId = sale.id || sale._id || "";

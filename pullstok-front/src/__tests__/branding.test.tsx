@@ -95,7 +95,9 @@ describe("BrandLogo", () => {
 
     const img = screen.getByRole("img");
     expect(img.className).toContain("h-10");
-    expect(img.className).toContain("w-10");
+    // Wide wordmark logos must keep their aspect ratio instead of being squeezed into a square
+    expect(img.className).toContain("w-auto");
+    expect(img.className).not.toContain("w-10");
   });
 
   it("uses the first letter capitalised from displayName", () => {

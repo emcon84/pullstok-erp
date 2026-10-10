@@ -109,6 +109,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
 
   // Modal de "Abrir bolsa" - flujo para abrir bolsas y creditar kg a celda suelta
   const [openBagDialogOpen, setOpenBagDialogOpen] = useState(false);
+  // Código con el que se abre el diálogo desde el modal de escaneo (autobúsqueda).
+  const [openBagInitialBarcode, setOpenBagInitialBarcode] = useState<string | undefined>(undefined);
 
   // Código escaneado que ningún producto tiene (404): abre "Vincular código".
   // Mientras está abierto el capturador de la pistola se desactiva para que lo
@@ -391,10 +393,29 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     setPiecesPerBlister(0);
   }, []);
 
+  // Desde el modal de escaneo: cierra el modal (resetea blister/cantidad) y abre
+  // "Abrir bolsa" con el código precargado. Ambos setState van en el mismo batch,
+  // así el capturador global (suspendido mientras openBagDialogOpen) no ve un
+  // instante con ambos cerrados.
+  const handleOpenBagFromScan = useCallback(() => {
+    const code = scanProduct?.barcode || scanProduct?.code;
+    if (!code) return;
+    handleCancelScan();
+    setOpenBagInitialBarcode(code);
+    setOpenBagDialogOpen(true);
+  }, [scanProduct, handleCancelScan]);
+
+  const handleOpenBagOpenChange = useCallback((open: boolean) => {
+    setOpenBagDialogOpen(open);
+    if (!open) setOpenBagInitialBarcode(undefined);
+  }, []);
+
   // sdd/venta-pastillas-sueltas-blister: switch activo (SOLO FARMACIA) → la
   // línea se agrega POR_UNIDAD_BLISTER con el conteo ad-hoc de piecesPerBlister;
   // requiere piecesPerBlister entero > 1 (mismo criterio que el server, T1).
   const isFarmacia = isFarmaciaProduct(scanProduct);
+  const canOpenBagFromScan =
+    scanProduct?.priceKgSuelto != null && !!(scanProduct.barcode || scanProduct.code);
   const isBlisterSale = isFarmacia && sellLooseBlister;
   const piecesPerBlisterValid = isValidPiecesPerBlister(piecesPerBlister);
 
@@ -492,6 +513,27 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [handleScan, openBagDialogOpen, manualOpen, freeOpen, unmatchedBarcode]);
+
+  // Atajo "A" en el modal de escaneo → "Abrir bolsa" (solo si el botón existe).
+  // Una "a" que llega pegada a otro carácter (<60ms) es parte de una ráfaga de
+  // la pistola (re-escaneo de un código alfanumérico), no una pulsación humana.
+  useEffect(() => {
+    if (!canOpenBagFromScan) return;
+    let lastCharAt = 0;
+    const onKey = (e: KeyboardEvent) => {
+      const now = Date.now();
+      const isBurst = now - lastCharAt < 60;
+      if (/^[0-9A-Za-z]$/.test(e.key)) lastCharAt = now;
+      if (e.ctrlKey || e.altKey || e.metaKey || e.repeat || isBurst) return;
+      if (e.key === "a" || e.key === "A") {
+        e.preventDefault();
+        e.stopPropagation();
+        handleOpenBagFromScan();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [canOpenBagFromScan, handleOpenBagFromScan]);
 
   // Teclas +/- del teclado para ajustar la cantidad del modal de escaneo sin
   // mouse. Solo mientras el modal está abierto (scanProduct), y en captura
@@ -681,7 +723,7 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
 
     {/* ── Modal de confirmación de bolsa cerrada escaneada ── */}
     <Dialog open={!!scanProduct} onOpenChange={(open) => !open && handleCancelScan()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{scanProduct?.name}</DialogTitle>
           <DialogDescription>
@@ -811,11 +853,25 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
           );
         })()}
 
-        <DialogFooter>
+        {/* Con "Abrir bolsa": acción principal a todo el ancho arriba y las dos
+            secundarias en columnas iguales abajo (sin botones desalineados). */}
+        <DialogFooter className="sm:grid sm:grid-cols-2">
           <Button variant="outline" onClick={handleCancelScan}>
             Cancelar
           </Button>
+          {canOpenBagFromScan && (
+            <Button
+              variant="outline"
+              onClick={handleOpenBagFromScan}
+              title="Atajo: A"
+              aria-keyshortcuts="A"
+            >
+              <PackageOpen className="h-4 w-4 mr-2" />
+              Abrir bolsa
+            </Button>
+          )}
           <Button
+            className={canOpenBagFromScan ? "sm:order-first sm:col-span-2" : undefined}
             autoFocus
             onClick={handleConfirmScan}
             disabled={scanQty <= 0 || (isBlisterSale && !piecesPerBlisterValid)}
@@ -869,7 +925,8 @@ export const UnifiedPos = ({ branchId }: UnifiedPosProps) => {
     <OpenBagDialog
       branchId={branchId}
       open={openBagDialogOpen}
-      onOpenChange={setOpenBagDialogOpen}
+      onOpenChange={handleOpenBagOpenChange}
+      initialBarcode={openBagInitialBarcode}
       onSuccess={() => {
         // Optionally refresh loose stock tab data here
       }}

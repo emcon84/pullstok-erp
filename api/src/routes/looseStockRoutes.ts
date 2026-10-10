@@ -12,7 +12,7 @@ import {
 /**
  * Stock de alimento suelto (sdd/loose-lines-stock). open-bag y GET los usa
  * cualquier rol autenticado (el vendedor abre bolsas y consulta líneas); el
- * ajuste manual (PUT /:lineId) es solo ADMIN/MANAGEMENT.
+ * ajuste manual (PUT /:lineId) es solo ADMIN/MANAGEMENT/VENDEDOR/VENDEDOR.
  */
 const router = Router();
 
@@ -48,7 +48,7 @@ router.put(
   "/:lineId",
   authenticateJWT,
   checkBusinessHours,
-  requireRole("ADMIN", "MANAGEMENT"),
+  requireRole("ADMIN", "MANAGEMENT", "VENDEDOR"),
   validate(setLooseStockSchema),
   LooseStockController.set,
 );

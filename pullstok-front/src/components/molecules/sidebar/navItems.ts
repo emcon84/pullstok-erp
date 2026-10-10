@@ -58,12 +58,12 @@ export const navGroups: NavGroup[] = [
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/categorias", label: "Categorías", icon: Tags, visibleRoles: ["ADMIN", "MANAGEMENT"] },
-      { to: "/carga-manual", label: "Carga manual", icon: PackagePlus, visibleRoles: ["ADMIN", "MANAGEMENT"] },
+      { to: "/carga-manual", label: "Carga manual", icon: PackagePlus, visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
       { to: "/actualizar-precios", label: "Actualizar precios", icon: DollarSign, moduleKey: "suelto", visibleRoles: ["ADMIN", "SUPERADMIN"] },
       { to: "/precios-por-kilo", label: "Precios por kilo", icon: Scale, moduleKey: "suelto", visibleRoles: ["ADMIN", "SUPERADMIN"] },
       { to: "/consultar-precios", label: "Venta suelta", icon: Search, moduleKey: "suelto", visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR", "CASHIER"] },
       { to: "/revision-precios-kg", label: "Revisión precios kg", icon: ClipboardCheck, moduleKey: "suelto", visibleRoles: ["ADMIN"] },
-      { to: "/stock-suelto", label: "Stock suelto", icon: PackageOpen, moduleKey: "suelto", visibleRoles: ["ADMIN", "MANAGEMENT"] },
+      { to: "/stock-suelto", label: "Stock suelto", icon: PackageOpen, moduleKey: "suelto", visibleRoles: ["ADMIN", "MANAGEMENT", "VENDEDOR"] },
       { to: "/planilla-mayorista", label: "Planilla mayorista", icon: FileSpreadsheet, moduleKey: "suelto", visibleRoles: ["ADMIN", "SUPERADMIN"] },
       { to: "/saved-planillas", label: "Planillas guardadas", icon: Save, moduleKey: "suelto", visibleRoles: ["ADMIN", "SUPERADMIN"] },
     ],
@@ -131,6 +131,9 @@ export const vendorSimpleNav: NavItem[] = [
   { to: "/caja", label: "Caja", icon: Wallet },
   { to: "/Clientes", label: "Clientes", icon: Users },
   { to: "/scanner", label: "Scanner", icon: ScanLine },
+  { to: "/productos", label: "Productos", icon: Package },
+  { to: "/carga-manual", label: "Carga manual", icon: PackagePlus },
+  { to: "/stock-suelto", label: "Stock suelto", icon: PackageOpen, moduleKey: "suelto" },
 ];
 
 export function filterNavItemsByPlan(

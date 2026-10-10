@@ -134,21 +134,21 @@ router.post(
 router.get(
   "/manual",
   authenticateJWT,
-  requireRole("ADMIN", "MANAGEMENT"),
+  requireRole("ADMIN", "MANAGEMENT", "VENDEDOR"),
   manualProductController.listManualProducts,
 );
 // Baja de un producto manual (solo isManual=true; 409 si está en pedido/presupuesto).
 router.delete(
   "/manual/:id",
   authenticateJWT,
-  requireRole("ADMIN", "MANAGEMENT"),
+  requireRole("ADMIN", "MANAGEMENT", "VENDEDOR"),
   manualProductController.deleteManualProduct,
 );
 router.post(
   "/:id/promote",
   authenticateJWT,
   checkBusinessHours,
-  requireRole("ADMIN", "MANAGEMENT"),
+  requireRole("ADMIN", "MANAGEMENT", "VENDEDOR"),
   validate(promoteManualProductSchema),
   manualProductController.promoteManualProduct,
 );
@@ -182,14 +182,14 @@ router.patch(
   checkStoreProductLimit,
   productController.publishProduct,
 );
-router.delete("/:id", authenticateJWT, checkBusinessHours, requireRole("ADMIN", "MANAGEMENT"), productController.deleteProduct);
+router.delete("/:id", authenticateJWT, checkBusinessHours, requireRole("ADMIN", "MANAGEMENT", "VENDEDOR"), productController.deleteProduct);
 
 // Presentaciones de venta (sdd/product-presentations) — ADMIN/MANAGEMENT.
 router.put(
   "/:id/presentations",
   authenticateJWT,
   checkBusinessHours,
-  requireRole("ADMIN", "MANAGEMENT"),
+  requireRole("ADMIN", "MANAGEMENT", "VENDEDOR"),
   validate(replacePresentationsSchema),
   presentationsController.replace,
 );
@@ -197,7 +197,7 @@ router.post(
   "/:id/presentations/enable",
   authenticateJWT,
   checkBusinessHours,
-  requireRole("ADMIN", "MANAGEMENT"),
+  requireRole("ADMIN", "MANAGEMENT", "VENDEDOR"),
   validate(enablePresentationsSchema),
   presentationsController.enable,
 );
@@ -205,7 +205,7 @@ router.post(
   "/:id/presentations/disable",
   authenticateJWT,
   checkBusinessHours,
-  requireRole("ADMIN", "MANAGEMENT"),
+  requireRole("ADMIN", "MANAGEMENT", "VENDEDOR"),
   presentationsController.disable,
 );
 
@@ -258,12 +258,12 @@ router.post(
 );
 
 // Bulk "Publicar en tienda" por marca — publica/despublica todos los productos
-// de la org con la variante "Marca" en brandValues. ADMIN/MANAGEMENT.
+// de la org con la variante "Marca" en brandValues. ADMIN/MANAGEMENT/VENDEDOR.
 router.post(
   "/bulk-publish",
   authenticateJWT,
   checkBusinessHours,
-  requireRole("ADMIN", "MANAGEMENT"),
+  requireRole("ADMIN", "MANAGEMENT", "VENDEDOR"),
   validate(bulkPublishSchema),
   productController.bulkPublish,
 );

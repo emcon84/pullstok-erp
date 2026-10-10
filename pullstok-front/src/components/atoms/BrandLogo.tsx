@@ -26,6 +26,13 @@ export const BrandLogo = ({
       ? "h-10 w-10 text-xl"
       : "h-7 w-7 text-base";
 
+  // Logos are usually wide wordmarks: fix the height, let the width follow the
+  // aspect ratio. `dark:invert` flips a black monochrome logo to white.
+  const imgSizeClasses =
+    size === "sidebar"
+      ? "h-10 w-auto max-w-[7.5rem]"
+      : "h-7 w-auto max-w-[6rem]";
+
   const hasLogo = logoUrl && !imgError;
 
   return hasLogo ? (
@@ -33,7 +40,7 @@ export const BrandLogo = ({
       src={logoUrl!}
       alt={displayName ?? "Logo"}
       onError={() => setImgError(true)}
-      className={cn("rounded object-contain", sizeClasses)}
+      className={cn("rounded object-contain dark:invert", imgSizeClasses)}
     />
   ) : (
     <div

@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PackageOpen, Search } from "lucide-react";
 import { toast } from "react-toastify";
 import { useOpenBag } from "@/components/hooks/useOpenBag";
+import { compactCellLabel, fullCellLabel, suggestLooseCells } from "@/lib/openBagCells";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +22,8 @@ interface OpenBagDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  /** Código a buscar automáticamente al abrir (p. ej. el recién escaneado). */
+  initialBarcode?: string;
 }
 
 interface ScannedProductDisplay {
@@ -37,9 +41,11 @@ export const OpenBagDialog = ({
   open,
   onOpenChange,
   onSuccess,
+  initialBarcode,
 }: OpenBagDialogProps) => {
   const {
     cellOptions,
+    cells = [],
     loadingCells,
     searchProduct,
     openBag,
@@ -71,14 +77,14 @@ export const OpenBagDialog = ({
     }
   }, [open, clearError]);
 
-  const handleBarcodeSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!barcode.trim()) return;
+  const lookupBarcode = useCallback(
+    async (rawCode: string) => {
+      const code = rawCode.trim();
+      if (!code) return;
 
       clearError();
       try {
-        const result = await searchProduct(barcode.trim());
+        const result = await searchProduct(code);
         setScannedProduct({
           id: result.product.id,
           name: result.product.name,
@@ -96,18 +102,47 @@ export const OpenBagDialog = ({
         }
       }
     },
-    [barcode, searchProduct, clearError],
+    [searchProduct, clearError, error],
   );
 
-  const handleConfirm = useCallback(async () => {
-    if (!scannedProduct || !selectedCellId || submitting) return;
+  const handleBarcodeSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      await lookupBarcode(barcode);
+    },
+    [barcode, lookupBarcode],
+  );
+
+  // Código precargado (venimos del modal de escaneo): lo cargamos y buscamos
+  // una sola vez por apertura, sin que el vendedor tenga que reescanear.
+  const lookupRef = useRef(lookupBarcode);
+  lookupRef.current = lookupBarcode;
+  useEffect(() => {
+    if (!open || !initialBarcode) return;
+    setBarcode(initialBarcode);
+    void lookupRef.current(initialBarcode);
+  }, [open, initialBarcode]);
+
+  // Loose cells that probably belong to the scanned product (brand from its name).
+  const suggested = useMemo(
+    () =>
+      scannedProduct
+        ? suggestLooseCells(scannedProduct.name, scannedProduct.category?.name, cells)
+        : { cells: [], brandMatched: false },
+    [scannedProduct, cells],
+  );
+
+  // `cellId` is passed by the one-click pills; the footer button uses the selected cell.
+  const handleConfirm = useCallback(async (cellId?: string) => {
+    const targetCellId = cellId ?? selectedCellId;
+    if (!scannedProduct || !targetCellId || submitting) return;
 
     setSubmitting(true);
     try {
-      const result = await openBag(scannedProduct.id, selectedCellId);
+      const result = await openBag(scannedProduct.id, targetCellId);
       const weightKg = scannedProduct.weightKg ?? 0;
       toast.success(
-        `Bolsa abierta: ${scannedProduct.name} → +${weightKg.toFixed(2)} kg en ${cellOptions.find((c) => c.value === selectedCellId)?.label ?? result.priceKgPriceId}`,
+        `Bolsa abierta: ${scannedProduct.name} → +${weightKg.toFixed(2)} kg en ${cellOptions.find((c) => c.value === targetCellId)?.label ?? result.priceKgPriceId}`,
       );
       onSuccess?.();
       onOpenChange(false);
@@ -205,13 +240,50 @@ export const OpenBagDialog = ({
             <Label htmlFor="cell-select" className="text-sm font-medium">
               Celda destino
             </Label>
+            {suggested.cells.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Sugeridas para {suggested.cells[0].brandName}
+                </p>
+                <div role="radiogroup" aria-label="Celdas sugeridas" className="flex flex-wrap gap-2">
+                  {suggested.cells.map((c) => {
+                    const checked = selectedCellId === c.id;
+                    const prominent = suggested.cells.length === 1;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={checked}
+                        data-prominent={prominent ? "true" : undefined}
+                        onClick={() => {
+                          setSelectedCellId(c.id);
+                          void handleConfirm(c.id);
+                        }}
+                        disabled={submitting || loading || loadingCells}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                          checked
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : prominent
+                              ? "border-primary text-primary ring-2 ring-primary/40 font-medium hover:bg-primary/10"
+                              : "border-input hover:bg-accent",
+                        )}
+                      >
+                        {c.brandName !== suggested.genericBrandName ? fullCellLabel(c) : compactCellLabel(c)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <SearchableSelect
               id="cell-select"
               ariaLabel="Celda destino para abrir bolsa"
               value={selectedCellId}
               onValueChange={setSelectedCellId}
               options={cellOptions}
-              placeholder="Seleccioná una celda"
+              placeholder={suggested.cells.length > 0 ? "Otra celda…" : "Seleccioná una celda"}
               searchPlaceholder="Buscar marca, tipo o especie…"
               emptyMessage="Sin celdas que coincidan"
               disabled={!scannedProduct || loadingCells}
@@ -224,7 +296,7 @@ export const OpenBagDialog = ({
             <Button type="button" variant="outline" onClick={handleCancel} disabled={submitting}>
               Cancelar
             </Button>
-            <Button type="button" onClick={handleConfirm} disabled={!scannedProduct || !selectedCellId || submitting}>
+            <Button type="button" onClick={() => void handleConfirm()} disabled={!scannedProduct || !selectedCellId || submitting}>
               {submitting ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />

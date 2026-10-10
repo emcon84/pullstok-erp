@@ -118,6 +118,31 @@ describe("useOpenBag hook", () => {
       });
     });
 
+    it("exposes structured cells with brand keywords and type synonyms", async () => {
+      listPriceKgBrandsMock.mockResolvedValue([
+        { ...mockBrands[0], keywords: ["agi"] },
+        mockBrands[1],
+      ]);
+      listPriceKgTypesMock.mockResolvedValue([
+        { ...mockTypes[0], synonyms: ["adult"] },
+        mockTypes[1],
+      ]);
+      const { result } = renderHook(() => useOpenBag({ branchId }));
+      await waitFor(() => expect(result.current.loadingCells).toBe(false));
+
+      expect(result.current.cells[0]).toEqual({
+        id: "cell-1",
+        brandName: "Agility",
+        brandKeywords: ["agi"],
+        typeName: "Adulto",
+        typeSynonyms: ["adult"],
+        species: "PERRO",
+        priceKg: 1200,
+        label: "Agility · Adulto · Perro — $1.200/kg",
+      });
+      expect(result.current.cells).toHaveLength(2);
+    });
+
     it("calls all three services in parallel via Promise.all", async () => {
       const { result } = renderHook(() => useOpenBag({ branchId }));
       await waitFor(() => expect(result.current.loadingCells).toBe(false));
